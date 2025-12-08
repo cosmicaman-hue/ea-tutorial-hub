@@ -1,0 +1,229 @@
+{% extends "base.html" %}
+
+{% block title %}View All Student Profiles - Admin{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <h2>👥 Student Profiles</h2>
+            <p class="text-muted">View and manage all student profiles dynamically</p>
+        </div>
+        <div class="col-md-4 text-end">
+            <a href="{{ url_for('profile_viewer.export_profiles') }}" class="btn btn-success">
+                <i class="fas fa-download"></i> Export CSV
+            </a>
+        </div>
+    </div>
+
+    <!-- Statistics -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <h5 class="card-title">Total Students</h5>
+                    <h2>{{ total_students }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-success text-white">
+                <div class="card-body">
+                    <h5 class="card-title">Profiles Complete</h5>
+                    <h2>{{ profiles_complete }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-info text-white">
+                <div class="card-body">
+                    <h5 class="card-title">Completion Rate</h5>
+                    <h2>{% if total_students > 0 %}{{ (profiles_complete / total_students * 100) | round(1) }}%{% else %}0%{% endif %}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-warning text-white">
+                <div class="card-body">
+                    <h5 class="card-title">Incomplete</h5>
+                    <h2>{{ total_students - profiles_complete }}</h2>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="card mb-4">
+        <div class="card-header bg-light">
+            <h5 class="mb-0">🔍 Filters & Search</h5>
+        </div>
+        <div class="card-body">
+            <form method="GET" class="row g-3">
+                <div class="col-md-3">
+                    <input type="text" name="search" class="form-control" placeholder="Search by name, ID, email..."
+                           value="{{ search_query }}">
+                </div>
+                <div class="col-md-2">
+                    <select name="class" class="form-select">
+                        <option value="">All Classes</option>
+                        {% for class_name in classes %}
+                        <option value="{{ class_name }}" {% if class_name == class_filter %}selected{% endif %}>
+                            {{ class_name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <select name="school" class="form-select">
+                        <option value="">All Schools</option>
+                        {% for school in schools %}
+                        <option value="{{ school }}" {% if school == school_filter %}selected{% endif %}>
+                            {{ school }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <select name="gender" class="form-select">
+                        <option value="">All Genders</option>
+                        {% for gender in genders %}
+                        <option value="{{ gender }}" {% if gender == gender_filter %}selected{% endif %}>
+                            {{ gender }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <select name="sort" class="form-select">
+                        <option value="created" {% if sort_by == 'created' %}selected{% endif %}>Recently Created</option>
+                        <option value="name" {% if sort_by == 'name' %}selected{% endif %}>Name (A-Z)</option>
+                        <option value="class" {% if sort_by == 'class' %}selected{% endif %}>Class</option>
+                        <option value="school" {% if sort_by == 'school' %}selected{% endif %}>School</option>
+                    </select>
+                </div>
+                <div class="col-md-1">
+                    <button type="submit" class="btn btn-primary w-100">Filter</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Profiles Table -->
+    <div class="card">
+        <div class="card-header bg-light">
+            <h5 class="mb-0">📋 Student List ({{ paginated.total }} total)</h5>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Login ID</th>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Class</th>
+                        <th>School</th>
+                        <th>Gender</th>
+                        <th>Registered</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if profiles %}
+                        {% for user, profile in profiles %}
+                        <tr>
+                            <td><strong>{{ user.login_id }}</strong></td>
+                            <td>
+                                {% if profile %}
+                                    {{ profile.first_name or '' }} {{ profile.second_name or '' }}
+                                    <br><small class="text-muted">{{ profile.third_name or '' }}</small>
+                                {% else %}
+                                    <em class="text-muted">Profile incomplete</em>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if profile %}
+                                    <a href="mailto:{{ profile.email }}">{{ profile.email or '-' }}</a>
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                            <td>{% if profile %}{{ profile.class_name or '-' }}{% else %}-{% endif %}</td>
+                            <td>{% if profile %}{{ profile.school_name or '-' }}{% else %}-{% endif %}</td>
+                            <td>{% if profile %}{{ profile.gender or '-' }}{% else %}-{% endif %}</td>
+                            <td>
+                                <small>{{ user.created_at.strftime('%Y-%m-%d') if user.created_at else '-' }}</small>
+                            </td>
+                            <td>
+                                <a href="{{ url_for('profile_viewer.view_profile_detail', profile_id=profile.id if profile else 0) }}"
+                                   class="btn btn-sm btn-info" {% if not profile %}disabled{% endif %}>
+                                    <i class="fas fa-eye"></i> View
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                    <tr>
+                        <td colspan="8" class="text-center text-muted py-4">
+                            No profiles found matching your filters
+                        </td>
+                    </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- Pagination -->
+        {% if paginated.pages > 1 %}
+        <div class="card-footer bg-light">
+            <nav aria-label="Page navigation">
+                <ul class="pagination mb-0">
+                    {% if paginated.has_prev %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('profile_viewer.view_all_profiles', page=paginated.prev_num, search=search_query, class=class_filter, school=school_filter, gender=gender_filter, sort=sort_by) }}">
+                            Previous
+                        </a>
+                    </li>
+                    {% endif %}
+                    
+                    {% for page_num in paginated.iter_pages(left_edge=1, right_edge=5) %}
+                        {% if page_num %}
+                            {% if page_num == paginated.page %}
+                            <li class="page-item active">
+                                <span class="page-link">{{ page_num }}</span>
+                            </li>
+                            {% else %}
+                            <li class="page-item">
+                                <a class="page-link" href="{{ url_for('profile_viewer.view_all_profiles', page=page_num, search=search_query, class=class_filter, school=school_filter, gender=gender_filter, sort=sort_by) }}">
+                                    {{ page_num }}
+                                </a>
+                            </li>
+                            {% endif %}
+                        {% else %}
+                        <li class="page-item disabled"><span class="page-link">...</span></li>
+                        {% endif %}
+                    {% endfor %}
+                    
+                    {% if paginated.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('profile_viewer.view_all_profiles', page=paginated.next_num, search=search_query, class=class_filter, school=school_filter, gender=gender_filter, sort=sort_by) }}">
+                            Next
+                        </a>
+                    </li>
+                    {% endif %}
+                </ul>
+            </nav>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<style>
+    .card {
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .table-hover tbody tr:hover {
+        background-color: #f5f5f5;
+    }
+</style>
+{% endblock %}

@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+
+{% block title %}Online Quizzes - EA Tutorial Hub{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row mb-4">
+        <div class="col-12">
+            <h1><i class="fas fa-question-circle"></i> Online Quizzes</h1>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <label class="form-label">Filter by Subject</label>
+            <div class="list-group">
+                <a href="{{ url_for('quiz.index') }}" class="list-group-item list-group-item-action {% if selected_subject == 'all' %}active{% endif %}">
+                    All Subjects
+                </a>
+                {% for subject_tuple in subjects %}
+                    {% set subject = subject_tuple[0] %}
+                    <a href="{{ url_for('quiz.index', subject=subject) }}" class="list-group-item list-group-item-action {% if selected_subject == subject %}active{% endif %}">
+                        {{ subject }}
+                    </a>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <label class="form-label">Filter by Class</label>
+            <div class="list-group">
+                <a href="{{ url_for('quiz.index') }}" class="list-group-item list-group-item-action {% if selected_class == 'all' %}active{% endif %}">
+                    All Classes
+                </a>
+                {% for class_tuple in classes %}
+                    {% set class_name = class_tuple[0] %}
+                    <a href="{{ url_for('quiz.index', **dict(request.args, **{'class': class_name})) }}" class="list-group-item list-group-item-action {% if selected_class == class_name %}active{% endif %}">
+                        {{ class_name }}
+                    </a>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <label class="form-label">Search Quizzes</label>
+            <form method="GET" action="{{ url_for('dashboard.search') }}">
+                <div class="input-group">
+                    <input type="text" name="q" class="form-control" placeholder="Search...">
+                    <select name="category" class="form-select" style="max-width: 150px;">
+                        <option value="quizzes">Quizzes</option>
+                    </select>
+                    <button class="btn btn-outline-secondary" type="submit">
+                        <i class="fas fa-search"></i> Search
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="row">
+        {% if quizzes.items %}
+            {% for quiz in quizzes.items %}
+            <div class="col-md-6 col-lg-4 mb-4">
+                <div class="card h-100 shadow-sm">
+                    <div class="card-body">
+                        <h5 class="card-title">{{ quiz.title }}</h5>
+                        <p class="card-text text-muted small">
+                            <i class="fas fa-tag"></i> {{ quiz.subject }} | {{ quiz.class_level }}
+                        </p>
+                        <p class="card-text">{{ quiz.description[:100] if quiz.description else 'No description' }}...</p>
+                        <div class="small text-muted mb-3">
+                            <span><i class="fas fa-clock"></i> {{ quiz.duration_minutes }} minutes</span><br>
+                            <span><i class="fas fa-star"></i> {{ quiz.total_points }} points</span><br>
+                            <span><i class="fas fa-check"></i> Pass: {{ quiz.passing_score }}%</span>
+                        </div>
+                        <a href="{{ url_for('quiz.view', quiz_id=quiz.id) }}" class="btn btn-sm btn-outline-success w-100">
+                            <i class="fas fa-play"></i> Start Quiz
+                        </a>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+        <div class="col-12">
+            <div class="alert alert-info">
+                <i class="fas fa-info-circle"></i> No quizzes available in this category.
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Pagination -->
+    {% if quizzes.pages > 1 %}
+    <nav aria-label="Page navigation" class="mt-4">
+        <ul class="pagination justify-content-center">
+            {% if quizzes.has_prev %}
+                <li class="page-item">
+                    <a class="page-link" href="{{ url_for('quiz.index', page=quizzes.prev_num, subject=selected_subject, **{'class': selected_class}) }}">Previous</a>
+                </li>
+            {% endif %}
+
+            {% for page_num in quizzes.iter_pages() %}
+                {% if page_num %}
+                    {% if page_num == quizzes.page %}
+                        <li class="page-item active"><span class="page-link">{{ page_num }}</span></li>
+                    {% else %}
+                        <li class="page-item"><a class="page-link" href="{{ url_for('quiz.index', page=page_num, subject=selected_subject, **{'class': selected_class}) }}">{{ page_num }}</a></li>
+                    {% endif %}
+                {% else %}
+                    <li class="page-item disabled"><span class="page-link">...</span></li>
+                {% endif %}
+            {% endfor %}
+
+            {% if quizzes.has_next %}
+                <li class="page-item">
+                    <a class="page-link" href="{{ url_for('quiz.index', page=quizzes.next_num, subject=selected_subject, **{'class': selected_class}) }}">Next</a>
+                </li>
+            {% endif %}
+        </ul>
+    </nav>
+    {% endif %}
+</div>
+{% endblock %}

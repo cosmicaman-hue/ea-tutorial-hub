@@ -1,0 +1,955 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EA System Launcher</title>
+    <style>
+        :root {
+            --ink: #0f2f2d;
+            --ink-soft: #35524f;
+            --paper: #f6f0e6;
+            --paper-2: #fffaf3;
+            --accent: #1f8a70;
+            --accent-dark: #176d59;
+            --accent-2: #f59e0b;
+            --accent-3: #0ea5e9;
+            --success: #16a34a;
+            --danger: #dc2626;
+            --shadow: 0 24px 60px rgba(12, 24, 20, 0.18);
+            --radius: 20px;
+            --font-body: "Bahnschrift", "Trebuchet MS", "Verdana", sans-serif;
+            --font-display: "Palatino Linotype", "Book Antiqua", "Georgia", serif;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: var(--font-body);
+            color: var(--ink);
+            min-height: 100vh;
+            background:
+                radial-gradient(900px 500px at 10% 10%, rgba(31, 138, 112, 0.18), transparent 70%),
+                radial-gradient(700px 400px at 90% 20%, rgba(245, 158, 11, 0.22), transparent 70%),
+                linear-gradient(135deg, #fef7ea 0%, #e6f2ef 45%, #f8efe0 100%);
+            padding: 32px 20px 60px;
+        }
+
+        body::before,
+        body::after {
+            content: "";
+            position: fixed;
+            z-index: -1;
+            border-radius: 999px;
+            filter: blur(0.5px);
+            opacity: 0.6;
+        }
+
+        body::before {
+            width: 320px;
+            height: 320px;
+            top: -90px;
+            left: -120px;
+            background: radial-gradient(circle, rgba(14, 165, 233, 0.28), transparent 70%);
+        }
+
+        body::after {
+            width: 420px;
+            height: 420px;
+            bottom: -160px;
+            right: -120px;
+            background: radial-gradient(circle, rgba(31, 138, 112, 0.25), transparent 70%);
+        }
+
+        .shell {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            gap: 22px;
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.93);
+            border-radius: var(--radius);
+            padding: 26px 28px;
+            box-shadow: var(--shadow);
+            border: 1px solid rgba(31, 138, 112, 0.08);
+            backdrop-filter: blur(6px);
+        }
+
+        .reveal {
+            animation: rise 0.7s ease both;
+            animation-delay: var(--delay, 0s);
+        }
+
+        @keyframes rise {
+            from {
+                opacity: 0;
+                transform: translateY(16px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .eyebrow {
+            text-transform: uppercase;
+            letter-spacing: 0.18em;
+            font-size: 11px;
+            color: var(--accent-dark);
+            font-weight: 700;
+            margin-bottom: 12px;
+        }
+
+        h1 {
+            font-family: var(--font-display);
+            font-size: 36px;
+            line-height: 1.1;
+            margin-bottom: 14px;
+            color: #122e2c;
+        }
+
+        h2 {
+            font-family: var(--font-display);
+            font-size: 24px;
+            margin-bottom: 6px;
+            color: #163634;
+        }
+
+        h3 {
+            font-family: var(--font-display);
+            font-size: 18px;
+            margin-bottom: 10px;
+            color: #153a37;
+        }
+
+        p {
+            line-height: 1.6;
+            color: var(--ink-soft);
+        }
+
+        .hero-grid {
+            display: grid;
+            grid-template-columns: 1.05fr 0.95fr;
+            gap: 26px;
+        }
+
+        .hero-actions,
+        .micro-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin: 18px 0 10px;
+        }
+
+        .micro-actions {
+            margin-top: 6px;
+        }
+
+        button,
+        .pill {
+            border: none;
+            border-radius: 12px;
+            font-family: var(--font-body);
+            font-weight: 700;
+            cursor: pointer;
+            transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+        }
+
+        button {
+            padding: 12px 16px;
+            font-size: 14px;
+            background: #f2f5f4;
+            color: #153a37;
+        }
+
+        button:hover:not([disabled]) {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 24px rgba(23, 109, 89, 0.18);
+        }
+
+        button[disabled] {
+            cursor: not-allowed;
+            opacity: 0.55;
+            box-shadow: none;
+            transform: none;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent) 0%, #2fb694 100%);
+            color: #fff;
+            box-shadow: 0 12px 24px rgba(31, 138, 112, 0.25);
+        }
+
+        .btn-ghost {
+            background: #fff7ec;
+            border: 1px solid rgba(245, 158, 11, 0.3);
+            color: #6a3b00;
+        }
+
+        .btn-outline {
+            background: #ffffff;
+            border: 1px solid rgba(31, 138, 112, 0.4);
+            color: var(--accent-dark);
+        }
+
+        .btn-small {
+            padding: 9px 12px;
+            font-size: 12px;
+        }
+
+        .callout {
+            background: #fff2e2;
+            border-radius: 14px;
+            padding: 12px 14px;
+            font-size: 13px;
+            color: #5a3600;
+            display: inline-flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .pipe {
+            color: #e6ad68;
+        }
+
+        .status-panel {
+            background: rgba(246, 244, 236, 0.95);
+            border-radius: 18px;
+            padding: 20px;
+            border: 1px solid rgba(31, 138, 112, 0.1);
+        }
+
+        .status-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        .status-pill {
+            padding: 6px 12px;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            font-weight: 800;
+            border-radius: 999px;
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .status-pill.running {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .status-pill.error {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .status-title {
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 6px;
+            color: #183835;
+        }
+
+        .status-hint {
+            font-size: 13px;
+            color: #5d6f6d;
+            margin-bottom: 14px;
+        }
+
+        .status-meta {
+            font-size: 12px;
+            color: #6d7b78;
+        }
+
+        .status-grid {
+            display: grid;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .stat {
+            background: #ffffff;
+            border-radius: 12px;
+            padding: 12px 14px;
+            border: 1px solid rgba(31, 138, 112, 0.08);
+        }
+
+        .stat-label {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+            color: #6b7c79;
+            margin-bottom: 6px;
+        }
+
+        .stat-value {
+            font-size: 14px;
+            font-weight: 600;
+            color: #1b3d39;
+        }
+
+        .status-actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .section-header {
+            margin-bottom: 16px;
+        }
+
+        .section-header p {
+            margin-top: 4px;
+        }
+
+        .button-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+            gap: 12px;
+        }
+
+        .button-grid button {
+            text-align: left;
+        }
+
+        .note {
+            margin-top: 12px;
+            font-size: 13px;
+            color: #6d7b78;
+        }
+
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 16px;
+        }
+
+        .feature-card {
+            background: #ffffff;
+            border-radius: 16px;
+            padding: 16px 16px 18px;
+            border: 1px solid rgba(31, 138, 112, 0.1);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .feature-icon {
+            width: 38px;
+            height: 38px;
+            border-radius: 12px;
+            display: grid;
+            place-items: center;
+            font-size: 18px;
+            background: rgba(31, 138, 112, 0.12);
+            color: var(--accent-dark);
+            font-weight: 700;
+        }
+
+        .feature-list {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            font-size: 13px;
+            color: #4b5b59;
+        }
+
+        .feature-list li::before {
+            content: "+";
+            margin-right: 8px;
+            color: var(--accent);
+            font-weight: 700;
+        }
+
+        .mode-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 16px;
+        }
+
+        .mode-card {
+            border-radius: 16px;
+            border: 1px solid rgba(245, 158, 11, 0.25);
+            background: #fff8ec;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .mode-card strong {
+            color: #6a3b00;
+        }
+
+        .steps {
+            list-style: decimal;
+            padding-left: 18px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            font-size: 14px;
+            color: #4b5b59;
+        }
+
+        .doc-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 12px;
+        }
+
+        .doc-grid button {
+            background: #f4f8f6;
+            border: 1px solid rgba(31, 138, 112, 0.14);
+        }
+
+        .network {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 12px;
+        }
+
+        .network input {
+            padding: 12px 14px;
+            border-radius: 12px;
+            border: 1px solid rgba(31, 138, 112, 0.2);
+            font-family: var(--font-body);
+            font-size: 14px;
+        }
+
+        .network-row {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .network-status {
+            font-size: 12px;
+            color: #6d7b78;
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 18px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #183835;
+            color: #fff;
+            padding: 10px 16px;
+            border-radius: 999px;
+            font-size: 13px;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s ease;
+        }
+
+        .toast.show {
+            opacity: 1;
+        }
+
+        .footer {
+            text-align: center;
+            font-size: 12px;
+            color: #6f7e7b;
+            margin-top: 6px;
+        }
+
+        @media (max-width: 980px) {
+            .hero-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 720px) {
+            h1 {
+                font-size: 30px;
+            }
+
+            .card {
+                padding: 22px;
+            }
+
+            .hero-actions {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <main class="shell">
+        <header class="hero card reveal" style="--delay: 0s;">
+            <div class="eyebrow">EA SYSTEM LAUNCHER</div>
+            <div class="hero-grid">
+                <div class="hero-content">
+                    <h1>Excel Academy Leadership Board</h1>
+                    <p>
+                        Offline leadership board plus online admin and learning hub.
+                        Start the system once, then jump into scoring, profiles, notes, quizzes, and reports.
+                    </p>
+                    <div class="hero-actions">
+                        <button class="btn-primary" id="launchBtn" type="button" onclick="launchSystem()">Start System</button>
+                        <button class="btn-ghost" type="button" onclick="openUrl('/scoreboard/offline')" data-requires="server">Open Offline Scoreboard</button>
+                        <button class="btn-outline" type="button" onclick="openUrl('/scoreboard/')" data-requires="server">Open Online Scoreboard</button>
+                    </div>
+                    <div class="micro-actions">
+                        <button class="btn-ghost btn-small" type="button" onclick="copyLocalUrl()">Copy Offline URL</button>
+                        <button class="btn-ghost btn-small" type="button" onclick="openDoc('EA_QUICK_START.md')">Open Quick Start</button>
+                        <button class="btn-outline btn-small" type="button" onclick="openLocalOffline()">Open Offline HTML</button>
+                    </div>
+                    <div class="callout">
+                        <strong>Default Admin:</strong> Admin / admin123
+                        <span class="pipe">|</span>
+                        <strong>Offline URL:</strong> http://127.0.0.1:5000/scoreboard/offline
+                    </div>
+                </div>
+                <div class="status-panel">
+                    <div class="status-row">
+                        <span id="statusPill" class="status-pill">Checking</span>
+                        <span id="lastCheck" class="status-meta">Last check: --</span>
+                    </div>
+                    <div id="statusText" class="status-title">Checking system availability...</div>
+                    <div id="statusHint" class="status-hint">The launcher will detect the local server and unlock shortcuts.</div>
+                    <div class="status-grid">
+                        <div class="stat">
+                            <div class="stat-label">Mode</div>
+                            <div class="stat-value">Offline-first, online-ready</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-label">Data</div>
+                            <div class="stat-value">SQLite online + localStorage offline</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-label">Security</div>
+                            <div class="stat-value">Role-based login and activity logs</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-label">Local Time</div>
+                            <div class="stat-value" id="localTime">--</div>
+                        </div>
+                    </div>
+                    <div class="status-actions">
+                        <button class="btn-primary" id="connectBtn" type="button" onclick="connectToApp()" data-requires="server">Open App</button>
+                        <button class="btn-outline" type="button" onclick="checkServer(true)">Recheck</button>
+                    </div>
+                </div>
+            </div>
+        </header>
+        <section class="card reveal" style="--delay: 0.1s;">
+            <div class="section-header">
+                <h2>Launch Shortcuts</h2>
+                <p>Direct routes for the full system, from scoring to admin controls.</p>
+            </div>
+            <div class="button-grid">
+                <button type="button" onclick="openUrl('/scoreboard/offline')" data-requires="server">Scoreboard (Offline)</button>
+                <button type="button" onclick="openUrl('/scoreboard/')" data-requires="server">Scoreboard (Online)</button>
+                <button type="button" onclick="openUrl('/scoreboard/leaderboard')" data-requires="server">Leaderboard</button>
+                <button type="button" onclick="openUrl('/scoreboard/month-summary')" data-requires="server">Month Summary</button>
+                <button type="button" onclick="openUrl('/auth/login')" data-requires="server">Login</button>
+                <button type="button" onclick="openUrl('/dashboard')" data-requires="server">User Dashboard</button>
+                <button type="button" onclick="openUrl('/search')" data-requires="server">Search</button>
+                <button type="button" onclick="openUrl('/notes')" data-requires="server">Notes Library</button>
+                <button type="button" onclick="openUrl('/notes/upload')" data-requires="server">Upload Notes</button>
+                <button type="button" onclick="openUrl('/quiz')" data-requires="server">Quizzes</button>
+                <button type="button" onclick="openUrl('/quiz/my-attempts')" data-requires="server">My Quiz Attempts</button>
+                <button type="button" onclick="openUrl('/admin/dashboard')" data-requires="server">Admin Dashboard</button>
+                <button type="button" onclick="openUrl('/admin/activity-log')" data-requires="server">Activity Log</button>
+                <button type="button" onclick="openUrl('/admin/users')" data-requires="server">Manage Users</button>
+                <button type="button" onclick="openUrl('/admin/settings')" data-requires="server">System Settings</button>
+                <button type="button" onclick="openUrl('/admin/notes/pending')" data-requires="server">Pending Notes</button>
+                <button type="button" onclick="openUrl('/admin/profiles/')" data-requires="server">Profile Viewer</button>
+                <button type="button" onclick="openUrl('/quiz-ai/create')" data-requires="server">AI Quiz Creator</button>
+                <button type="button" onclick="openUrl('/admin/profiles/export')" data-requires="server">Export Profiles CSV</button>
+            </div>
+            <p class="note">If a shortcut does nothing, the server may still be starting. Use Start System and recheck.</p>
+        </section>
+        <section class="card reveal" style="--delay: 0.2s;">
+            <div class="section-header">
+                <h2>Feature Map</h2>
+                <p>Every major capability in Project EA across offline and online modes.</p>
+            </div>
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">&#x1F4CA;</div>
+                    <h3>Offline Leadership Board</h3>
+                    <ul class="feature-list">
+                        <li>Monthly scoreboards with rankings and medals</li>
+                        <li>Record daily points, stars, and vetos</li>
+                        <li>Student roster management and profiles</li>
+                        <li>Search, filters, and month navigation</li>
+                        <li>Excel import/export and JSON backup</li>
+                    </ul>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">&#x1F3C6;</div>
+                    <h3>Online Scoreboard</h3>
+                    <ul class="feature-list">
+                        <li>Authenticated access with Admin and teacher roles</li>
+                        <li>Database-backed scoring and multi-user updates</li>
+                        <li>Leaderboard and month summary views</li>
+                        <li>API endpoints for scoreboard data</li>
+                        <li>Network sharing across devices</li>
+                    </ul>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">&#x1F4DA;</div>
+                    <h3>EA Tutorial Hub</h3>
+                    <ul class="feature-list">
+                        <li>Notes repository with PDF upload and approvals</li>
+                        <li>Quiz system with MCQ, T/F, and short answers</li>
+                        <li>Student profiles and progress tracking</li>
+                        <li>Search across notes and quizzes</li>
+                        <li>Mobile-ready UI for students and teachers</li>
+                    </ul>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">&#x1F512;</div>
+                    <h3>Admin and Security</h3>
+                    <ul class="feature-list">
+                        <li>Role-based authentication and access control</li>
+                        <li>User management and account approval</li>
+                        <li>Password reset and activity monitoring</li>
+                        <li>System settings and audit trail</li>
+                        <li>Multi-user concurrency for labs and schools</li>
+                    </ul>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">&#x1F9E0;</div>
+                    <h3>AI and Profiles</h3>
+                    <ul class="feature-list">
+                        <li>AI quiz creation from documents</li>
+                        <li>Profile viewer and detailed student stats</li>
+                        <li>Profile statistics API for dashboards</li>
+                        <li>CSV export for reports and analysis</li>
+                        <li>Integrated navigation in admin dashboard</li>
+                    </ul>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">&#x1F4BE;</div>
+                    <h3>Data and Reports</h3>
+                    <ul class="feature-list">
+                        <li>Excel import from EA Score Tally v5.5</li>
+                        <li>Excel export for monthly reports</li>
+                        <li>JSON backup and restore workflows</li>
+                        <li>Offline and online data sync strategies</li>
+                        <li>No tracking or external analytics</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+        <section class="card reveal" style="--delay: 0.3s;">
+            <div class="section-header">
+                <h2>Modes and Access</h2>
+                <p>Choose the right mode for each classroom or deployment.</p>
+            </div>
+            <div class="mode-grid">
+                <div class="mode-card">
+                    <strong>Offline Mode</strong>
+                    <p>Open locally without login. Works fully offline after first load.</p>
+                    <p><strong>URL:</strong> http://127.0.0.1:5000/scoreboard/offline</p>
+                    <p><strong>Storage:</strong> browser localStorage</p>
+                    <p><strong>Best for:</strong> teacher laptops, mobile, quick scoring</p>
+                </div>
+                <div class="mode-card">
+                    <strong>Online Mode</strong>
+                    <p>Login required with role-based access and database storage.</p>
+                    <p><strong>URL:</strong> http://127.0.0.1:5000/scoreboard/</p>
+                    <p><strong>Storage:</strong> SQLite database</p>
+                    <p><strong>Best for:</strong> multi-user and network access</p>
+                </div>
+                <div class="mode-card">
+                    <strong>Direct Offline File</strong>
+                    <p>Open the offline HTML directly without starting the server.</p>
+                    <p><strong>File:</strong> app/static/offline_scoreboard.html</p>
+                    <p><strong>Notes:</strong> data is device-specific</p>
+                </div>
+            </div>
+        </section>
+        <section class="card reveal" style="--delay: 0.4s;">
+            <div class="section-header">
+                <h2>Quick Start Checklist</h2>
+                <p>Run through this once, then you are ready for daily use.</p>
+            </div>
+            <ol class="steps">
+                <li>Click Start System or run START_SYSTEM.bat.</li>
+                <li>Open the Offline Scoreboard and confirm sample data.</li>
+                <li>Record a test score and verify ranking updates.</li>
+                <li>Export Excel or JSON backup from the Tools tab.</li>
+                <li>Use Online mode for multi-user access and admin controls.</li>
+            </ol>
+        </section>
+        <section class="card reveal" style="--delay: 0.5s;">
+            <div class="section-header">
+                <h2>Documentation Hub</h2>
+                <p>Open the exact guide you need without searching.</p>
+            </div>
+            <div class="doc-grid">
+                <button type="button" onclick="openDoc('START_EA_SYSTEM_HERE.md')">Start EA System Here</button>
+                <button type="button" onclick="openDoc('EA_README.md')">EA Readme</button>
+                <button type="button" onclick="openDoc('EA_SCORING_SYSTEM_GUIDE.md')">Scoring System Guide</button>
+                <button type="button" onclick="openDoc('EA_EXCEL_INTEGRATION_GUIDE.md')">Excel Integration Guide</button>
+                <button type="button" onclick="openDoc('OFFLINE_QUICK_START.md')">Offline Quick Start</button>
+                <button type="button" onclick="openDoc('COMPLETE_SYSTEM_DOCUMENTATION.md')">Complete System Documentation</button>
+                <button type="button" onclick="openDoc('START_HERE.md')">Admin and Security Features</button>
+                <button type="button" onclick="openDoc('START_PHASE5_HERE.md')">AI Features Overview</button>
+                <button type="button" onclick="openDoc('PHASE_5_AI_FEATURES_GUIDE.md')">AI Features Guide</button>
+            </div>
+        </section>
+        <section class="card reveal" style="--delay: 0.6s;">
+            <div class="section-header">
+                <h2>Network Access Helper</h2>
+                <p>Share the offline scoreboard over LAN using your PC IP address.</p>
+            </div>
+            <div class="network">
+                <input id="ipInput" type="text" placeholder="Enter your PC IP, e.g. 192.168.1.100">
+                <div class="network-row">
+                    <button class="btn-outline" type="button" onclick="openNetworkOffline()">Open Network Offline</button>
+                    <button class="btn-ghost" type="button" onclick="copyNetworkUrl()">Copy Network URL</button>
+                </div>
+                <div id="networkStatus" class="network-status">Tip: Find your IP in Command Prompt using ipconfig.</div>
+            </div>
+        </section>
+        <section class="card reveal" style="--delay: 0.7s;">
+            <div class="section-header">
+                <h2>Important Notes</h2>
+                <p>Keep the system stable and data safe.</p>
+            </div>
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <h3>Offline Data Safety</h3>
+                    <ul class="feature-list">
+                        <li>Offline data lives in browser localStorage.</li>
+                        <li>Do not clear browser data while using offline mode.</li>
+                        <li>Export JSON backups regularly.</li>
+                    </ul>
+                </div>
+                <div class="feature-card">
+                    <h3>Online Access</h3>
+                    <ul class="feature-list">
+                        <li>Login required for online scoreboard and admin tools.</li>
+                        <li>Admin credentials: Admin / admin123.</li>
+                        <li>Use online mode for multi-user and network sharing.</li>
+                    </ul>
+                </div>
+                <div class="feature-card">
+                    <h3>Excel Imports</h3>
+                    <ul class="feature-list">
+                        <li>Use the EA STUDENT SCORE TALLY v5.5 format.</li>
+                        <li>Import from Tools tab in the offline scoreboard.</li>
+                        <li>Verify data in the scoreboard after import.</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+        <div class="footer">EA System Launcher v2.0 | Offline + Online Ready</div>
+    </main>
+
+    <div id="toast" class="toast">Copied</div>
+
+    <script>
+        const SERVER_URL = 'http://127.0.0.1:5000';
+        const CHECK_INTERVAL = 12000;
+        let isServerRunning = false;
+        let autoCheckTimer = null;
+
+        const statusPill = document.getElementById('statusPill');
+        const statusText = document.getElementById('statusText');
+        const statusHint = document.getElementById('statusHint');
+        const lastCheck = document.getElementById('lastCheck');
+        const localTime = document.getElementById('localTime');
+        const toast = document.getElementById('toast');
+
+        function setStatus(type, message, hint) {
+            statusPill.className = 'status-pill ' + type;
+            if (type === 'running') {
+                statusPill.textContent = 'Ready';
+            } else if (type === 'error') {
+                statusPill.textContent = 'Offline';
+            } else {
+                statusPill.textContent = 'Checking';
+            }
+            statusText.textContent = message;
+            statusHint.textContent = hint || '';
+        }
+
+        function updateLastCheck() {
+            const now = new Date();
+            lastCheck.textContent = 'Last check: ' + now.toLocaleTimeString();
+        }
+
+        function updateClock() {
+            const now = new Date();
+            localTime.textContent = now.toLocaleString();
+        }
+
+        function toggleServerButtons(enabled) {
+            const buttons = document.querySelectorAll('[data-requires="server"]');
+            buttons.forEach((btn) => {
+                btn.disabled = !enabled;
+            });
+        }
+
+        function pingServer() {
+            return new Promise((resolve) => {
+                const timeout = setTimeout(() => resolve(false), 1500);
+                fetch(SERVER_URL + '/scoreboard/offline', {
+                    method: 'HEAD',
+                    mode: 'no-cors',
+                    cache: 'no-store'
+                })
+                .then(() => {
+                    clearTimeout(timeout);
+                    resolve(true);
+                })
+                .catch(() => {
+                    clearTimeout(timeout);
+                    resolve(false);
+                });
+            });
+        }
+
+        function checkServer(manual = false) {
+            setStatus('checking', manual ? 'Rechecking system status...' : 'Checking system availability...', 'Waiting for the local server response.');
+            return pingServer().then((ok) => {
+                isServerRunning = ok;
+                updateLastCheck();
+                if (ok) {
+                    setStatus('running', 'System ready. All shortcuts available.', 'Open any module or launch the offline scoreboard.');
+                    toggleServerButtons(true);
+                } else {
+                    setStatus('error', 'Server not detected. Start the system to continue.', 'Click Start System or run START_SYSTEM.bat manually.');
+                    toggleServerButtons(false);
+                }
+                return ok;
+            });
+        }
+
+        function startAutoCheck() {
+            if (autoCheckTimer) {
+                clearInterval(autoCheckTimer);
+            }
+            autoCheckTimer = setInterval(() => checkServer(false), CHECK_INTERVAL);
+        }
+
+        function showToast(message) {
+            toast.textContent = message;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 1600);
+        }
+
+        function openUrl(path) {
+            const url = path.startsWith('http') ? path : SERVER_URL + path;
+            window.open(url, '_blank', 'noopener');
+        }
+
+        function openDoc(file) {
+            window.open(file, '_blank');
+        }
+
+        function openLocalOffline() {
+            window.open('app/static/offline_scoreboard.html', '_blank');
+        }
+
+        function copyLocalUrl() {
+            const url = SERVER_URL + '/scoreboard/offline';
+            if (navigator.clipboard) {
+                navigator.clipboard.writeText(url).then(() => showToast('Offline URL copied'));
+            } else {
+                showToast('Clipboard not available');
+            }
+        }
+
+        function connectToApp() {
+            openUrl('/scoreboard/offline');
+        }
+
+        function launchSystem() {
+            const btn = document.getElementById('launchBtn');
+            btn.disabled = true;
+            setStatus('checking', 'Starting system...', 'This can take 10 to 15 seconds.');
+
+            try {
+                const shell = new ActiveXObject('WScript.Shell');
+                const batPath = 'C:\\Users\\sujit\\Desktop\\Project EA\\START_SYSTEM.bat';
+                shell.Run(batPath, 0, false);
+            } catch (e) {
+                setStatus('error', 'Auto-start failed. Run START_SYSTEM.bat manually.', 'After starting, click Recheck or Open App.');
+                btn.disabled = false;
+                return;
+            }
+
+            pollServer(0);
+        }
+
+        function pollServer(attempt) {
+            const maxAttempts = 15;
+            pingServer().then((ok) => {
+                if (ok) {
+                    isServerRunning = true;
+                    setStatus('running', 'System ready. All shortcuts available.', 'Open any module or launch the offline scoreboard.');
+                    toggleServerButtons(true);
+                    document.getElementById('launchBtn').disabled = false;
+                } else if (attempt < maxAttempts) {
+                    setStatus('checking', 'Starting system... (' + (attempt + 1) + '/' + maxAttempts + ')', 'Waiting for the server to come online.');
+                    setTimeout(() => pollServer(attempt + 1), 1000);
+                } else {
+                    setStatus('error', 'Server taking longer than expected.', 'Run START_SYSTEM.bat manually and click Recheck.');
+                    document.getElementById('launchBtn').disabled = false;
+                }
+            });
+        }
+
+        function openNetworkOffline() {
+            const ip = document.getElementById('ipInput').value.trim();
+            if (!ip) {
+                setNetworkStatus('Enter a valid IP address first.');
+                return;
+            }
+            const url = 'http://' + ip + ':5000/scoreboard/offline';
+            window.open(url, '_blank', 'noopener');
+            setNetworkStatus('Opening: ' + url);
+        }
+
+        function copyNetworkUrl() {
+            const ip = document.getElementById('ipInput').value.trim();
+            if (!ip) {
+                setNetworkStatus('Enter a valid IP address first.');
+                return;
+            }
+            const url = 'http://' + ip + ':5000/scoreboard/offline';
+            if (navigator.clipboard) {
+                navigator.clipboard.writeText(url).then(() => {
+                    showToast('Network URL copied');
+                    setNetworkStatus('Copied: ' + url);
+                });
+            } else {
+                setNetworkStatus('Clipboard not available.');
+            }
+        }
+
+        function setNetworkStatus(message) {
+            document.getElementById('networkStatus').textContent = message;
+        }
+
+        window.addEventListener('load', () => {
+            updateClock();
+            setInterval(updateClock, 1000);
+            toggleServerButtons(false);
+            checkServer(false);
+            startAutoCheck();
+        });
+    </script>
+</body>
+</html>

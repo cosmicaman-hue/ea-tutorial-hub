@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+
+{% block title %}My Profile - EA Tutorial Hub{% endblock %}
+
+{% block content %}
+<div class="container my-5">
+    <div class="row">
+        <div class="col-lg-3">
+            <div class="card sticky-top" style="top: 20px;">
+                <div class="card-body text-center">
+                    <i class="fas fa-user-circle fa-5x text-primary mb-3"></i>
+                    <h5 class="card-title">{{ user.login_id }}</h5>
+                    <p class="text-muted text-capitalize">{{ user.role }}</p>
+                    <div class="d-grid gap-2">
+                        <a href="{{ url_for('dashboard.edit_profile') }}" class="btn btn-primary btn-sm">
+                            <i class="fas fa-edit"></i> Edit Profile
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-9">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0"><i class="fas fa-user"></i> Personal Information</h5>
+                </div>
+                <div class="card-body">
+                    {% if profile %}
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <strong>Name:</strong><br>
+                            {{ profile.first_name }} {{ profile.second_name }} {{ profile.third_name or '' }}
+                        </div>
+                        <div class="col-md-4">
+                            <strong>Date of Birth:</strong><br>
+                            {% if profile.date_of_birth %}
+                                {{ profile.date_of_birth.strftime('%d-%m-%Y') }}
+                            {% endif %}
+                        </div>
+                        <div class="col-md-4">
+                            <strong>Gender:</strong><br>
+                            {{ profile.gender or 'Not specified' }}
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <strong>Religion:</strong><br>
+                            {{ profile.religion or 'Not specified' }}
+                        </div>
+                        <div class="col-md-4">
+                            <strong>Nationality:</strong><br>
+                            {{ profile.nationality or 'Not specified' }}
+                        </div>
+                        <div class="col-md-4">
+                            <strong>Blood Group:</strong><br>
+                            {{ profile.blood_group or 'Not specified' }}
+                        </div>
+                    </div>
+                    {% else %}
+                    <p class="text-muted">No profile information available. Please complete your profile.</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0"><i class="fas fa-school"></i> School Information</h5>
+                </div>
+                <div class="card-body">
+                    {% if profile %}
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <strong>School:</strong><br>
+                            {{ profile.school_name }}
+                        </div>
+                        <div class="col-md-2 mb-3">
+                            <strong>Class:</strong><br>
+                            {{ profile.class_name }}
+                        </div>
+                        <div class="col-md-2 mb-3">
+                            <strong>Section:</strong><br>
+                            {{ profile.section or 'N/A' }}
+                        </div>
+                        <div class="col-md-2 mb-3">
+                            <strong>Roll No:</strong><br>
+                            {{ profile.roll_number or 'N/A' }}
+                        </div>
+                    </div>
+                    {% else %}
+                    <p class="text-muted">No school information available.</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0"><i class="fas fa-phone"></i> Contact Information</h5>
+                </div>
+                <div class="card-body">
+                    {% if profile %}
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <strong>Contact 1:</strong><br>
+                            {{ profile.contact_number_1 }}
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <strong>Contact 2:</strong><br>
+                            {{ profile.contact_number_2 or 'Not provided' }}
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-12 mb-3">
+                            <strong>Email:</strong><br>
+                            {{ profile.email or 'Not provided' }}
+                        </div>
+                    </div>
+                    {% else %}
+                    <p class="text-muted">No contact information available.</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0"><i class="fas fa-map-marker-alt"></i> Address</h5>
+                </div>
+                <div class="card-body">
+                    {% if profile %}
+                    <p>
+                        {{ profile.village_area }}<br>
+                        {% if profile.post_office %}{{ profile.post_office }}<br>{% endif %}
+                        {{ profile.district }}, {{ profile.state }} - {{ profile.pin_code }}
+                    </p>
+                    {% else %}
+                    <p class="text-muted">No address information available.</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            {% if profile %}
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0"><i class="fas fa-star"></i> Personal Interests</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <strong>Hobbies:</strong><br>
+                        {{ profile.hobbies or 'Not specified' }}
+                    </div>
+                    <div>
+                        <strong>Areas for Improvement:</strong><br>
+                        {{ profile.improvement_areas or 'Not specified' }}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

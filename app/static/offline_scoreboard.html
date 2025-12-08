@@ -1,0 +1,1981 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EXCEL ACADEMY LEADERSHIP BOARD - Offline System</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-dark: #1e40af;
+            --danger: #dc2626;
+            --success: #16a34a;
+            --warning: #ea580c;
+            --info: #0891b2;
+            --bg: #f8fafc;
+            --bg-card: #ffffff;
+            --border: #e2e8f0;
+            --text: #1e293b;
+            --text-muted: #64748b;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 0 15px;
+        }
+
+        /* HEADER */
+        .header {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            color: white;
+            padding: 25px 0;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+
+        .header p {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        /* CONTROLS */
+        .controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 25px;
+            flex-wrap: wrap;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        label {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        input, select, button {
+            padding: 10px 12px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 14px;
+            font-family: inherit;
+            transition: all 0.3s ease;
+        }
+
+        input, select {
+            background: var(--bg-card);
+            color: var(--text);
+            border-color: var(--border);
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+
+        button {
+            background: var(--primary);
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        button:hover {
+            background: var(--primary-dark);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+        }
+
+        button.secondary {
+            background: var(--bg-card);
+            color: var(--text);
+            border: 1px solid var(--border);
+        }
+
+        button.secondary:hover {
+            background: var(--border);
+        }
+
+        button.danger {
+            background: var(--danger);
+        }
+
+        button.danger:hover {
+            background: #b91c1c;
+        }
+
+        /* TABS */
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 25px;
+            flex-wrap: wrap;
+            border-bottom: 2px solid var(--border);
+            padding-bottom: 0;
+        }
+
+        .tab-button {
+            padding: 12px 20px;
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-weight: 600;
+            border-bottom: 3px solid transparent;
+            margin-bottom: -2px;
+            transition: all 0.3s ease;
+        }
+
+        .tab-button.active {
+            color: var(--primary);
+            border-bottom-color: var(--primary);
+        }
+
+        .tab-button:hover {
+            color: var(--text);
+        }
+
+        .tab-spacer {
+            flex: 1;
+        }
+
+        .tab-button.right-tab {
+            margin-left: auto;
+        }
+
+        .score-cell.editable {
+            cursor: pointer;
+        }
+
+        .score-cell.editable:hover {
+            background: #e0f2fe;
+        }
+
+        /* MONTH SELECTOR */
+        .month-nav {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .month-button {
+            padding: 8px 16px;
+            background: var(--bg-card);
+            border: 2px solid var(--border);
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            font-size: 13px;
+        }
+
+        .month-button.active {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+
+        .month-button:hover:not(.active) {
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+
+        /* SCOREBOARD */
+        .scoreboard-wrapper {
+            background: var(--bg-card);
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .scoreboard-scroll {
+            overflow-x: auto;
+        }
+
+        .scoreboard {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        .scoreboard thead {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            color: white;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .scoreboard th {
+            padding: 12px 8px;
+            text-align: left;
+            font-weight: 600;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+
+        .scoreboard td {
+            padding: 12px 8px;
+            border: 1px solid var(--border);
+        }
+
+        .scoreboard tbody tr:hover {
+            background: var(--bg);
+        }
+
+        .scoreboard tbody tr:nth-child(even) {
+            background: rgba(37, 99, 235, 0.02);
+        }
+
+        /* MEDALS/BADGES */
+        .medal {
+            display: inline-block;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: white;
+            font-size: 12px;
+            margin-right: 8px;
+        }
+
+        .medal.gold {
+            background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+        }
+
+        .medal.silver {
+            background: linear-gradient(135deg, #d1d5db 0%, #9ca3af 100%);
+        }
+
+        .medal.bronze {
+            background: linear-gradient(135deg, #fb923c 0%, #ea580c 100%);
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 2px 6px;
+            background: var(--info);
+            color: white;
+            border-radius: 3px;
+            font-size: 11px;
+            font-weight: 600;
+            margin: 0 2px;
+        }
+
+        .badge.cr { background: #8b5cf6; }
+        .badge.col { background: #06b6d4; }
+        .badge.rm { background: #f59e0b; }
+        .badge.v { background: #10b981; }
+        .badge.vv { background: #34d399; }
+
+        /* SCORE CELL */
+        .score-cell {
+            text-align: center;
+            min-width: 50px;
+            font-weight: 500;
+            background: var(--bg);
+            padding: 10px 6px;
+        }
+
+        .score-cell.positive {
+            color: var(--success);
+            font-weight: 600;
+        }
+
+        .score-cell.negative {
+            color: var(--danger);
+            font-weight: 600;
+        }
+
+        .score-cell.total {
+            background: linear-gradient(135deg, #fef3c7 0%, #fcd34d 100%);
+            font-weight: 700;
+            color: var(--text);
+        }
+
+        /* FORMS */
+        .form-card {
+            background: var(--bg-card);
+            border-radius: 8px;
+            padding: 25px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            margin-bottom: 25px;
+        }
+
+        .form-card h3 {
+            margin-bottom: 20px;
+            color: var(--primary);
+            font-size: 18px;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .form-group label {
+            font-weight: 600;
+            color: var(--text);
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            padding: 10px 12px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-family: inherit;
+            font-size: 14px;
+        }
+
+        .form-group textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        .form-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+
+        /* STATS */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(37, 99, 235, 0.2);
+        }
+
+        .stat-card h4 {
+            font-size: 12px;
+            opacity: 0.9;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .stat-card .value {
+            font-size: 28px;
+            font-weight: 700;
+        }
+
+        /* MODAL */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: var(--bg-card);
+            padding: 30px;
+            border-radius: 8px;
+            max-width: 500px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 25px rgba(0,0,0,0.2);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .modal-header h2 {
+            color: var(--primary);
+            font-size: 20px;
+        }
+
+        .close-btn {
+            background: transparent;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: var(--text-muted);
+            padding: 0;
+        }
+
+        .close-btn:hover {
+            color: var(--text);
+        }
+
+        /* ALERTS */
+        .alert {
+            padding: 12px 16px;
+            border-radius: 6px;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .alert-success {
+            background: rgba(22, 163, 74, 0.1);
+            color: var(--success);
+            border-left: 4px solid var(--success);
+        }
+
+        .alert-danger {
+            background: rgba(220, 38, 38, 0.1);
+            color: var(--danger);
+            border-left: 4px solid var(--danger);
+        }
+
+        .alert-info {
+            background: rgba(37, 99, 235, 0.1);
+            color: var(--primary);
+            border-left: 4px solid var(--primary);
+        }
+
+        /* RESPONSIVE */
+        @media (max-width: 768px) {
+            .header h1 { font-size: 20px; }
+            .form-grid { grid-template-columns: 1fr; }
+            .stats-grid { grid-template-columns: repeat(2, 1fr); }
+            .scoreboard { font-size: 12px; }
+            .scoreboard td, .scoreboard th { padding: 8px 4px; }
+            .month-nav { gap: 5px; }
+            .month-button { padding: 6px 12px; font-size: 12px; }
+        }
+
+        /* LOADING */
+        .loading {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--text-muted);
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 30px;
+            height: 30px;
+            border: 3px solid var(--border);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .hidden { display: none !important; }
+        .text-center { text-align: center; }
+        .mt-20 { margin-top: 20px; }
+        .mb-20 { margin-bottom: 20px; }
+
+        /* EXPORT BUTTON */
+        .export-area {
+            background: var(--bg);
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="container">
+            <h1>📊 EXCEL ACADEMY LEADERSHIP BOARD</h1>
+            <p>Offline Student Scoring & Ranking System</p>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- ALERTS -->
+        <div id="alertContainer"></div>
+
+        <!-- TABS -->
+        <div class="tabs">
+            <button class="tab-button active" onclick="switchTab('scoreboard')">
+                <i class="fas fa-table"></i> Scoreboard
+            </button>
+            <button class="tab-button" onclick="switchTab('add-score')">
+                <i class="fas fa-plus-circle"></i> Record Score
+            </button>
+            <button class="tab-button" onclick="switchTab('students')">
+                <i class="fas fa-users"></i> Students
+            </button>
+            <button class="tab-button" onclick="switchTab('ranking')">
+                <i class="fas fa-trophy"></i> Rankings
+            </button>
+            <button class="tab-button" onclick="switchTab('party')">
+                <i class="fas fa-flag"></i> Party System
+            </button>
+            <button class="tab-button" onclick="switchTab('tools')">
+                <i class="fas fa-tools"></i> Tools
+            </button>
+            <div class="tab-spacer"></div>
+            <button class="tab-button right-tab" onclick="switchTab('leadership')">
+                <i class="fas fa-crown"></i> Leadership Posts
+            </button>
+        </div>
+
+        <!-- TAB: SCOREBOARD -->
+        <div id="scoreboard-tab" class="tab-content">
+            <div class="controls">
+                <div class="control-group">
+                    <label>Select Month</label>
+                    <div id="monthSelector" class="month-nav"></div>
+                </div>
+                <div class="control-group">
+                    <label>Filter by Class</label>
+                    <select id="classFilter" onchange="filterScoreboard()">
+                        <option value="">All Classes</option>
+                        <option value="2">Class 2</option>
+                        <option value="3">Class 3</option>
+                        <option value="4">Class 4</option>
+                        <option value="5">Class 5</option>
+                        <option value="6">Class 6</option>
+                        <option value="7">Class 7</option>
+                        <option value="8">Class 8</option>
+                        <option value="9">Class 9</option>
+                        <option value="10">Class 10</option>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <label>Search Student</label>
+                    <input type="text" id="searchStudent" placeholder="Name or Roll No..." onkeyup="filterScoreboard()">
+                </div>
+            </div>
+
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <h4>Total Students</h4>
+                    <div class="value" id="totalStudents">0</div>
+                </div>
+                <div class="stat-card">
+                    <h4>Current Month</h4>
+                    <div class="value" id="currentMonth">-</div>
+                </div>
+                <div class="stat-card">
+                    <h4>Avg Score</h4>
+                    <div class="value" id="avgScore">0</div>
+                </div>
+                <div class="stat-card">
+                    <h4>Top Scorer</h4>
+                    <div class="value" id="topScorer" style="font-size: 16px; word-break: break-word;">-</div>
+                </div>
+            </div>
+
+            <div class="scoreboard-wrapper">
+                <div class="scoreboard-scroll">
+                    <table class="scoreboard" id="scoreboardTable">
+                        <thead>
+                            <tr>
+                                <th style="width: 80px;">Rank</th>
+                                <th style="width: 100px;">Roll No.</th>
+                                <th style="width: 200px;">Student Name</th>
+                                <th style="width: 60px;">Class</th>
+                                <th style="width: 60px;">Fees</th>
+                                <th id="dailyScoresHeader"></th>
+                                <th style="width: 80px; background: #fbbf24 !important;">Total</th>
+                            </tr>
+                        </thead>
+                        <tbody id="scoreboardBody">
+                            <tr>
+                                <td colspan="7" class="text-center loading">
+                                    <div class="spinner"></div> Loading data...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB: ADD SCORE -->
+        <div id="add-score-tab" class="tab-content hidden">
+            <div class="form-card">
+                <h3><i class="fas fa-plus-circle"></i> Record Daily Score</h3>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>Student *</label>
+                        <select id="scoreStudent" required>
+                            <option value="">Select Student...</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Date *</label>
+                        <input type="date" id="scoreDate" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Points *</label>
+                        <input type="number" id="scorePoints" min="-100" max="100" required placeholder="0">
+                    </div>
+                    <div class="form-group">
+                        <label>Month *</label>
+                        <select id="scoreMonth" required>
+                            <option value="">Select Month...</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Notes</label>
+                    <textarea id="scoreNotes" placeholder="Optional notes..."></textarea>
+                </div>
+                <div class="form-buttons">
+                    <button class="secondary" onclick="clearScoreForm()">Clear</button>
+                    <button class="danger" onclick="deleteScore()">Delete Score</button>
+                    <button onclick="saveScore()">Save Score</button>
+                </div>
+                <p id="scoreHint" style="color: var(--text-muted); font-size: 12px; margin-top: 10px;">
+                    Tip: Saving a score for the same student and date will update the existing entry.
+                </p>
+            </div>
+        </div>
+
+        <!-- TAB: STUDENTS -->
+        <div id="students-tab" class="tab-content hidden">
+            <div class="form-card">
+                <h3><i class="fas fa-plus"></i> Add New Student</h3>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>Roll Number *</label>
+                        <input type="text" id="newRoll" placeholder="EA24A01" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Full Name *</label>
+                        <input type="text" id="newName" placeholder="Student Name" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Class *</label>
+                        <select id="newClass" required>
+                            <option value="">Select Class...</option>
+                            <option value="2">2</option>
+                            <option value="3">3</option>
+                            <option value="4">4</option>
+                            <option value="5">5</option>
+                            <option value="6">6</option>
+                            <option value="7">7</option>
+                            <option value="8">8</option>
+                            <option value="9">9</option>
+                            <option value="10">10</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Fees</label>
+                        <input type="number" id="newFees" placeholder="500" min="0">
+                    </div>
+                    <div class="form-group">
+                        <label>Vote Power</label>
+                        <input type="number" id="newVotePower" placeholder="1" min="-5" max="20">
+                    </div>
+                </div>
+                <div class="form-buttons">
+                    <button class="secondary" onclick="clearStudentForm()">Clear</button>
+                    <button onclick="addNewStudent()">Add Student</button>
+                </div>
+            </div>
+
+            <div class="scoreboard-wrapper">
+                <div class="scoreboard-scroll">
+                    <table class="scoreboard" id="studentsList">
+                        <thead>
+                            <tr>
+                                <th>Roll No.</th>
+                                <th>Student Name</th>
+                                <th>Class</th>
+                                <th>Fees</th>
+                                <th>Vote Power</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="studentsBody">
+                            <tr>
+                                <td colspan="6" class="text-center loading">Loading...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB: RANKINGS -->
+        <div id="ranking-tab" class="tab-content hidden">
+            <div class="controls">
+                <div class="control-group">
+                    <label>Select Month for Ranking</label>
+                    <select id="rankingMonth" onchange="loadRankings()">
+                        <option value="">Select Month...</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="scoreboard-wrapper">
+                <div class="scoreboard-scroll">
+                    <table class="scoreboard" id="rankingsTable">
+                        <thead>
+                            <tr>
+                                <th style="width: 50px;">Rank</th>
+                                <th>Student Name</th>
+                                <th style="width: 100px;">Class</th>
+                                <th style="width: 120px;">Total Score</th>
+                                <th style="width: 100px;">Position</th>
+                            </tr>
+                        </thead>
+                        <tbody id="rankingsBody">
+                            <tr>
+                                <td colspan="5" class="text-center" style="padding: 40px;">
+                                    Select a month to view rankings
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB: PARTY SYSTEM -->
+        <div id="party-tab" class="tab-content hidden">
+            <div class="form-card">
+                <h3><i class="fas fa-flag"></i> Party System</h3>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>Party Code *</label>
+                        <input type="text" id="partyCode" placeholder="MAP" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Power *</label>
+                        <input type="number" id="partyPower" placeholder="15" required>
+                    </div>
+                </div>
+                <div class="form-buttons">
+                    <button class="secondary" onclick="clearPartyForm()">Clear</button>
+                    <button onclick="saveParty()">Save Party</button>
+                </div>
+            </div>
+
+            <div class="scoreboard-wrapper">
+                <div class="scoreboard-scroll">
+                    <table class="scoreboard" id="partyTable">
+                        <thead>
+                            <tr>
+                                <th style="width: 120px;">Party</th>
+                                <th style="width: 120px;">Power</th>
+                                <th style="width: 180px;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="partyBody">
+                            <tr>
+                                <td colspan="3" class="text-center loading">Loading...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB: LEADERSHIP POSTS -->
+        <div id="leadership-tab" class="tab-content hidden">
+            <div class="form-card">
+                <h3><i class="fas fa-crown"></i> Leadership Posts</h3>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>Post *</label>
+                        <input type="text" id="leadershipPost" placeholder="LEADER (L)" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Post Holder</label>
+                        <input type="text" id="leadershipHolder" placeholder="Name">
+                    </div>
+                </div>
+                <div class="form-buttons">
+                    <button class="secondary" onclick="clearLeadershipForm()">Clear</button>
+                    <button onclick="saveLeadershipPost()">Save Post</button>
+                </div>
+            </div>
+
+            <div class="scoreboard-wrapper">
+                <div class="scoreboard-scroll">
+                    <table class="scoreboard" id="leadershipTable">
+                        <thead>
+                            <tr>
+                                <th>Post</th>
+                                <th style="width: 220px;">Post Holder</th>
+                                <th style="width: 180px;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="leadershipBody">
+                            <tr>
+                                <td colspan="3" class="text-center loading">Loading...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB: TOOLS -->
+        <div id="tools-tab" class="tab-content hidden">
+            <div class="form-card">
+                <h3><i class="fas fa-file-import"></i> Import from Excel</h3>
+                <p style="color: var(--text-muted); margin-bottom: 15px; font-size: 14px;">
+                    Upload an Excel file (.xlsx) with monthly scoreboard data. Expected format: Roll No., Class, Student Name, then daily scores.
+                </p>
+                <input type="file" id="excelFile" accept=".xlsx,.xls,.xlsm" style="margin-bottom: 15px;">
+                <button onclick="importExcel()">Import Excel File</button>
+            </div>
+
+            <div class="export-area">
+                <button onclick="exportToExcel()"><i class="fas fa-download"></i> Export as Excel</button>
+                <button class="secondary" onclick="exportJSON()"><i class="fas fa-code"></i> Export as JSON</button>
+                <button class="secondary" onclick="importJSON()"><i class="fas fa-upload"></i> Import JSON</button>
+            </div>
+
+            <div class="form-card">
+                <h3><i class="fas fa-database"></i> Database Management</h3>
+                <p style="color: var(--text-muted); margin-bottom: 15px; font-size: 14px;">
+                    Manage your offline database
+                </p>
+                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                    <button class="secondary" onclick="backupData()"><i class="fas fa-save"></i> Backup Data</button>
+                    <button class="secondary" onclick="showStats()"><i class="fas fa-chart-bar"></i> Show Stats</button>
+                    <button class="secondary" onclick="loadFeb26Seed()"><i class="fas fa-database"></i> Load Feb 26 Data</button>
+                    <button class="danger" onclick="clearAllData()"><i class="fas fa-trash"></i> Clear All Data</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL FOR DETAILS -->
+    <div id="detailsModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Student Details</h2>
+                <button class="close-btn" onclick="closeModal()">✕</button>
+            </div>
+            <div id="modalBody"></div>
+        </div>
+    </div>
+
+    <!-- MODAL: EDIT STUDENT -->
+    <div id="editStudentModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Edit Student</h2>
+                <button class="close-btn" onclick="closeModal('editStudentModal')">✕</button>
+            </div>
+            <input type="hidden" id="editStudentId">
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>Roll Number *</label>
+                    <input type="text" id="editRoll" required>
+                </div>
+                <div class="form-group">
+                    <label>Full Name *</label>
+                    <input type="text" id="editName" required>
+                </div>
+                <div class="form-group">
+                    <label>Class *</label>
+                    <input type="number" id="editClass" min="1" max="12" required>
+                </div>
+                <div class="form-group">
+                    <label>Fees</label>
+                    <input type="number" id="editFees" min="0">
+                </div>
+                <div class="form-group">
+                    <label>Vote Power</label>
+                    <input type="number" id="editVotePower" min="-5" max="20">
+                </div>
+            </div>
+            <div class="form-buttons">
+                <button class="secondary" onclick="closeModal('editStudentModal')">Cancel</button>
+                <button onclick="saveStudentEdits()">Save Changes</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- JSON IMPORT INPUT -->
+    <input type="file" id="jsonFile" accept=".json" style="display: none;">
+
+    <script>
+        // ============================================
+        // EXCEL ACADEMY SCOREBOARD DATABASE MANAGER
+        // ============================================
+
+        const FEB26_SEED = {
+          "students": [
+            { "id": 1, "roll": "EA24A01", "name": "Ayush Gupta** (CR) (Vv)", "class": 4, "fees": 500, "total_score": 0, "rank": 28, "vote_power": 1 },
+            { "id": 2, "roll": "EA24A03", "name": "Ayat Parveen", "class": 4, "fees": 800, "total_score": 0, "rank": 28, "vote_power": 1 },
+            { "id": 3, "roll": "EA24A04", "name": "Tanu Sinha**", "class": 4, "fees": 600, "total_score": 60, "rank": 20, "vote_power": 4 },
+            { "id": 4, "roll": "EA24A05", "name": "Rashi (v)", "class": 3, "fees": 500, "total_score": 0, "rank": 28, "vote_power": 1 },
+            { "id": 5, "roll": "EA25A07", "name": "Vishes Xalxo***(v)", "class": 3, "fees": 500, "total_score": 0, "rank": 28, "vote_power": 1 },
+            { "id": 6, "roll": "EA25A13", "name": "Afreen Khatun", "class": 3, "fees": 600, "total_score": 0, "rank": 28, "vote_power": 1 },
+            { "id": 7, "roll": "EA25A15", "name": "Ansh Kumar Singh", "class": 2, "fees": 0, "total_score": 0, "rank": 28, "vote_power": 1 },
+            { "id": 8, "roll": "EA24B01", "name": "Pari Gupta****** (v)", "class": 6, "fees": 0, "total_score": 0, "rank": 28, "vote_power": 1 },
+            { "id": 9, "roll": "EA24B03", "name": "Deep Das*", "class": 6, "fees": 1000, "total_score": 97, "rank": 12, "vote_power": 6 },
+            { "id": 10, "roll": "EA24B09", "name": "Abdul Arman**** (ECS) (PP)", "class": 5, "fees": 1000, "total_score": 79, "rank": 16, "vote_power": 5 },
+            { "id": 11, "roll": "EA25B05", "name": "Rajveer Thakur", "class": 6, "fees": 800, "total_score": 0, "rank": 28, "vote_power": 1 },
+            { "id": 12, "roll": "EA25B06", "name": "Jay Arya***", "class": 5, "fees": 800, "total_score": 139, "rank": 6, "vote_power": 8 },
+            { "id": 13, "roll": "EA25B10", "name": "Shiva Mallick (v)", "class": 5, "fees": 1000, "total_score": 160, "rank": 3, "vote_power": 9 },
+            { "id": 14, "roll": "EA25B13", "name": "Rehmetun Khatun (ECJ)", "class": 6, "fees": 1200, "total_score": 0, "rank": 28, "vote_power": 1 },
+            { "id": 15, "roll": "EA25B14", "name": "Prem Oraon*****", "class": 6, "fees": 800, "total_score": 0, "rank": 28, "vote_power": 1 },
+            { "id": 16, "roll": "EA24C02", "name": "Sahil Yadav****************** (vvv)", "class": 8, "fees": 0, "total_score": 94, "rank": 13, "vote_power": 6 },
+            { "id": 17, "roll": "EA24C03", "name": "Abhik Mallik", "class": 8, "fees": 1000, "total_score": 41, "rank": 25, "vote_power": 3 },
+            { "id": 18, "roll": "EA24C06", "name": "Sakshi*** (v) (CCAI)", "class": 8, "fees": 1500, "total_score": 0, "rank": 28, "vote_power": 1 },
+            { "id": 19, "roll": "EA25C07", "name": "Khushi Paswan** (v)", "class": 8, "fees": 500, "total_score": 72, "rank": 17, "vote_power": 4 },
+            { "id": 20, "roll": "EA25C09", "name": "Shomiya Xalxo*** (WCI) (PP)", "class": 7, "fees": 1000, "total_score": 182, "rank": 2, "vote_power": 10 },
+            { "id": 21, "roll": "EA25C10", "name": "Adarsh Arya*", "class": 8, "fees": 1200, "total_score": 1, "rank": 27, "vote_power": 1 },
+            { "id": 22, "roll": "EA25C11", "name": "Sourav Das*", "class": 8, "fees": 1200, "total_score": 0, "rank": 28, "vote_power": 1 },
+            { "id": 23, "roll": "EA25C12", "name": "Shubham Singha (PP)", "class": 8, "fees": 1200, "total_score": 47, "rank": 22, "vote_power": 3 },
+            { "id": 24, "roll": "EA25C15", "name": "Nirupam Vaid*", "class": 8, "fees": 1500, "total_score": 35, "rank": 26, "vote_power": 2 },
+            { "id": 25, "roll": "EA25C17", "name": "Alen Ghartimagar", "class": 8, "fees": 1500, "total_score": 63, "rank": 19, "vote_power": 4 },
+            { "id": 26, "roll": "EA25C18", "name": "N Riya Kumari", "class": 8, "fees": 1500, "total_score": 118, "rank": 9, "vote_power": 7 },
+            { "id": 27, "roll": "EA25C19", "name": "Samarth Patel*(CITC)", "class": 8, "fees": 1500, "total_score": 153, "rank": 5, "vote_power": 9 },
+            { "id": 28, "roll": "EA25C20", "name": "Rishi Trivedi", "class": 8, "fees": 1500, "total_score": 90, "rank": 15, "vote_power": 5 },
+            { "id": 29, "roll": "EA25C21", "name": "Sristi Kumari", "class": 7, "fees": 1500, "total_score": 0, "rank": 28, "vote_power": 1 },
+            { "id": 30, "roll": "EA25C22", "name": "Piyush Rajak", "class": 8, "fees": 1000, "total_score": 0, "rank": 28, "vote_power": 1 },
+            { "id": 31, "roll": "EA25C23", "name": "Abhinav Khati (CR) (PP)", "class": 7, "fees": 1200, "total_score": 0, "rank": 28, "vote_power": 1 },
+            { "id": 32, "roll": "EA26C24", "name": "Rishabh Kumar Singh", "class": 7, "fees": 0, "total_score": 42, "rank": 24, "vote_power": 3 },
+            { "id": 33, "roll": "EA24D01", "name": "Jay Kumar Yadav*** (CR) (V)", "class": 10, "fees": 0, "total_score": 187, "rank": 1, "vote_power": 10 },
+            { "id": 34, "roll": "EA24D06", "name": "Tanmay Biswas*", "class": 10, "fees": 2000, "total_score": 102, "rank": 11, "vote_power": 6 },
+            { "id": 35, "roll": "EA24D08", "name": "Sanjana Sutradhar (PP)", "class": 9, "fees": 1500, "total_score": 0, "rank": 28, "vote_power": 1 },
+            { "id": 36, "roll": "EA25D12", "name": "Roshan Paswan** (PP)", "class": 10, "fees": 2000, "total_score": 158, "rank": 4, "vote_power": 9 },
+            { "id": 37, "roll": "EA25D13", "name": "Aamna Khatoon*", "class": 10, "fees": 1500, "total_score": 105, "rank": 10, "vote_power": 6 },
+            { "id": 38, "roll": "EA24D15", "name": "Reeyansh Lama (VVvvv) (CoL) (SC)", "class": 9, "fees": 1500, "total_score": 122, "rank": 7, "vote_power": 7 },
+            { "id": 39, "roll": "EA25D17", "name": "Aditya Singh***", "class": 10, "fees": 2000, "total_score": 57, "rank": 21, "vote_power": 4 },
+            { "id": 40, "roll": "EA25D20", "name": "Harsh Mallik****** (VVV) (L)", "class": 9, "fees": 1500, "total_score": 43, "rank": 23, "vote_power": 3 },
+            { "id": 41, "roll": "EA25D21", "name": "Xavier Herenj***", "class": 9, "fees": 2000, "total_score": -30, "rank": 46, "vote_power": -1 },
+            { "id": 42, "roll": "EA25D22", "name": "Mahek Mahato*******", "class": 9, "fees": 2000, "total_score": 0, "rank": 28, "vote_power": 1 },
+            { "id": 43, "roll": "EA25D24", "name": "Aansh Mandal****** (DWI)", "class": 10, "fees": 2000, "total_score": 122, "rank": 7, "vote_power": 7 },
+            { "id": 44, "roll": "EA24D25", "name": "Nandani Gupta** (v)", "class": 9, "fees": 0, "total_score": 0, "rank": 28, "vote_power": 1 },
+            { "id": 45, "roll": "EA25D26", "name": "Shankar Pradhan (CI)", "class": 9, "fees": 2000, "total_score": 92, "rank": 14, "vote_power": 5 },
+            { "id": 46, "roll": "EA26D28", "name": "Riya Singh (RM)", "class": 9, "fees": 2000, "total_score": 70, "rank": 18, "vote_power": 4 }
+          ],
+          "scores": [
+            { "id": 1, "studentId": 3, "date": "2026-02-01", "points": 60, "month": "2026-02", "notes": "" },
+            { "id": 2, "studentId": 9, "date": "2026-02-01", "points": 97, "month": "2026-02", "notes": "" },
+            { "id": 3, "studentId": 10, "date": "2026-02-01", "points": 79, "month": "2026-02", "notes": "" },
+            { "id": 4, "studentId": 12, "date": "2026-02-01", "points": 79, "month": "2026-02", "notes": "" },
+            { "id": 5, "studentId": 12, "date": "2026-02-02", "points": 60, "month": "2026-02", "notes": "" },
+            { "id": 6, "studentId": 13, "date": "2026-02-01", "points": 60, "month": "2026-02", "notes": "" },
+            { "id": 7, "studentId": 13, "date": "2026-02-03", "points": 100, "month": "2026-02", "notes": "" },
+            { "id": 8, "studentId": 16, "date": "2026-02-01", "points": 94, "month": "2026-02", "notes": "" },
+            { "id": 9, "studentId": 17, "date": "2026-02-01", "points": 41, "month": "2026-02", "notes": "" },
+            { "id": 10, "studentId": 19, "date": "2026-02-01", "points": 72, "month": "2026-02", "notes": "" },
+            { "id": 11, "studentId": 20, "date": "2026-02-01", "points": 182, "month": "2026-02", "notes": "" },
+            { "id": 12, "studentId": 21, "date": "2026-02-01", "points": -99, "month": "2026-02", "notes": "" },
+            { "id": 13, "studentId": 21, "date": "2026-02-03", "points": 100, "month": "2026-02", "notes": "" },
+            { "id": 14, "studentId": 22, "date": "2026-02-01", "points": 0, "month": "2026-02", "notes": "" },
+            { "id": 15, "studentId": 23, "date": "2026-02-01", "points": 47, "month": "2026-02", "notes": "" },
+            { "id": 16, "studentId": 24, "date": "2026-02-01", "points": 35, "month": "2026-02", "notes": "" },
+            { "id": 17, "studentId": 25, "date": "2026-02-01", "points": 63, "month": "2026-02", "notes": "" },
+            { "id": 18, "studentId": 26, "date": "2026-02-01", "points": 118, "month": "2026-02", "notes": "" },
+            { "id": 19, "studentId": 27, "date": "2026-02-01", "points": 153, "month": "2026-02", "notes": "" },
+            { "id": 20, "studentId": 28, "date": "2026-02-01", "points": 90, "month": "2026-02", "notes": "" },
+            { "id": 21, "studentId": 32, "date": "2026-02-01", "points": 42, "month": "2026-02", "notes": "" },
+            { "id": 22, "studentId": 33, "date": "2026-02-01", "points": 187, "month": "2026-02", "notes": "" },
+            { "id": 23, "studentId": 34, "date": "2026-02-01", "points": 102, "month": "2026-02", "notes": "" },
+            { "id": 24, "studentId": 36, "date": "2026-02-01", "points": 158, "month": "2026-02", "notes": "" },
+            { "id": 25, "studentId": 37, "date": "2026-02-01", "points": 105, "month": "2026-02", "notes": "" },
+            { "id": 26, "studentId": 38, "date": "2026-02-01", "points": 122, "month": "2026-02", "notes": "" },
+            { "id": 27, "studentId": 39, "date": "2026-02-01", "points": 57, "month": "2026-02", "notes": "" },
+            { "id": 28, "studentId": 40, "date": "2026-02-01", "points": 43, "month": "2026-02", "notes": "" },
+            { "id": 29, "studentId": 41, "date": "2026-02-01", "points": -30, "month": "2026-02", "notes": "" },
+            { "id": 30, "studentId": 43, "date": "2026-02-01", "points": 122, "month": "2026-02", "notes": "" },
+            { "id": 31, "studentId": 45, "date": "2026-02-01", "points": 127, "month": "2026-02", "notes": "" },
+            { "id": 32, "studentId": 45, "date": "2026-02-02", "points": -35, "month": "2026-02", "notes": "" },
+            { "id": 33, "studentId": 46, "date": "2026-02-01", "points": 70, "month": "2026-02", "notes": "" }
+          ],
+          "parties": [
+            { "code": "MAP", "power": 15 },
+            { "code": "BWP", "power": 27 },
+            { "code": "ESP", "power": 30 },
+            { "code": "MRP", "power": 23 },
+            { "code": "SSP", "power": 57 },
+            { "code": "NJP", "power": 15 }
+          ],
+          "leadership": [
+            { "post": "LEADER (L)", "holder": "HARSH MALLICK" },
+            { "post": "LEADER OF OPPOSITION (LoP)", "holder": "" },
+            { "post": "CO-LEADER (CoL)", "holder": "REEYANSH LAMA" },
+            { "post": "CODING & IT CAPTAIN (CITC)", "holder": "SAMARTH PATEL" },
+            { "post": "DISCIPLINE & WELFARE IN-CHARGE (DWI)", "holder": "AANSH MANDAL" },
+            { "post": "RESOURCE MANAGER (RM)", "holder": "RIYA SINGH" },
+            { "post": "SPORTS CAPTAIN (SC)", "holder": "REEYANSH LAMA" },
+            { "post": "ENGLISH CAPTAIN- SENIOR (ECS)", "holder": "ABDUL ARMAN" },
+            { "post": "CULTURE & CREATIVE ARTS IN-CHARGE (CCAI)", "holder": "SAKSHI" },
+            { "post": "CLEANLINESS IN-CHARGE (CI)", "holder": "SHANKAR PRADHAN" },
+            { "post": "ENGLISH CAPTAIN- JUNIOR (ECJ)", "holder": "REHMATUN KHATUN" },
+            { "post": "WELCOME & COMMUNICATION IN-CHARGE (WCI)", "holder": "SHOMIYA XALXO" },
+            { "post": "LEADER", "holder": "" },
+            { "post": "LEADER OF OPPOSITION", "holder": "" }
+          ]
+        };
+
+        function cloneSeed(data) {
+            return JSON.parse(JSON.stringify(data));
+        }
+
+        class ScoreboardDB {
+            constructor() {
+                this.storageKey = 'ea_scoreboard_data';
+                this.init();
+            }
+
+            init() {
+                const data = localStorage.getItem(this.storageKey);
+                if (!data) {
+                    this.saveData({
+                        students: [],
+                        scores: [],
+                        months: [],
+                        parties: [],
+                        leadership: []
+                    });
+                }
+                this.ensureSchema();
+                this.loadSampleData();
+            }
+
+            ensureSchema() {
+                const data = this.getData();
+                if (!data.parties) data.parties = [];
+                if (!data.leadership) data.leadership = [];
+                if (!data.months) data.months = [];
+                this.saveData(data);
+            }
+
+            getData() {
+                const data = localStorage.getItem(this.storageKey);
+                return data ? JSON.parse(data) : { students: [], scores: [], months: [], parties: [], leadership: [] };
+            }
+
+            saveData(data) {
+                localStorage.setItem(this.storageKey, JSON.stringify(data));
+            }
+
+            loadSampleData() {
+                const data = this.getData();
+                let updated = false;
+                if (data.students.length === 0) {
+                    data.students = cloneSeed(FEB26_SEED.students);
+                    updated = true;
+                }
+                if (data.scores.length === 0) {
+                    data.scores = cloneSeed(FEB26_SEED.scores);
+                    updated = true;
+                }
+                if (data.parties.length === 0) {
+                    data.parties = cloneSeed(FEB26_SEED.parties).map((party, idx) => ({
+                        id: idx + 1,
+                        ...party
+                    }));
+                    updated = true;
+                }
+                if (data.leadership.length === 0) {
+                    data.leadership = cloneSeed(FEB26_SEED.leadership).map((post, idx) => ({
+                        id: idx + 1,
+                        ...post
+                    }));
+                    updated = true;
+                }
+                if (updated) {
+                    this.saveData(data);
+                }
+            }
+
+            addStudent(student) {
+                const data = this.getData();
+                student.id = Date.now();
+                data.students.push(student);
+                this.saveData(data);
+                return student;
+            }
+
+            addScore(score) {
+                const data = this.getData();
+                const existing = data.scores.find(s => s.studentId === score.studentId && s.date === score.date);
+                if (existing) {
+                    existing.points = score.points;
+                    existing.month = score.month;
+                    existing.notes = score.notes || '';
+                    existing.recordedBy = score.recordedBy || existing.recordedBy;
+                    this.saveData(data);
+                    return { score: existing, updated: true };
+                }
+                score.id = Date.now();
+                data.scores.push(score);
+                this.saveData(data);
+                return { score, updated: false };
+            }
+
+            getScore(studentId, date) {
+                const data = this.getData();
+                return data.scores.find(s => s.studentId === studentId && s.date === date);
+            }
+
+            deleteScore(studentId, date) {
+                const data = this.getData();
+                data.scores = data.scores.filter(s => !(s.studentId === studentId && s.date === date));
+                this.saveData(data);
+            }
+
+            getStudents() {
+                return this.getData().students;
+            }
+
+            updateStudent(studentId, updates) {
+                const data = this.getData();
+                const student = data.students.find(s => s.id === studentId);
+                if (!student) return null;
+                Object.assign(student, updates);
+                this.saveData(data);
+                return student;
+            }
+
+            getParties() {
+                return this.getData().parties || [];
+            }
+
+            addParty(party) {
+                const data = this.getData();
+                party.id = Date.now();
+                data.parties.push(party);
+                this.saveData(data);
+                return party;
+            }
+
+            updateParty(partyId, updates) {
+                const data = this.getData();
+                const party = data.parties.find(p => p.id === partyId);
+                if (!party) return null;
+                Object.assign(party, updates);
+                this.saveData(data);
+                return party;
+            }
+
+            deleteParty(partyId) {
+                const data = this.getData();
+                data.parties = data.parties.filter(p => p.id !== partyId);
+                this.saveData(data);
+            }
+
+            getLeadership() {
+                return this.getData().leadership || [];
+            }
+
+            addLeadership(post) {
+                const data = this.getData();
+                post.id = Date.now();
+                data.leadership.push(post);
+                this.saveData(data);
+                return post;
+            }
+
+            updateLeadership(postId, updates) {
+                const data = this.getData();
+                const post = data.leadership.find(p => p.id === postId);
+                if (!post) return null;
+                Object.assign(post, updates);
+                this.saveData(data);
+                return post;
+            }
+
+            deleteLeadership(postId) {
+                const data = this.getData();
+                data.leadership = data.leadership.filter(p => p.id !== postId);
+                this.saveData(data);
+            }
+
+            getMonths() {
+                const data = this.getData();
+                const months = new Set();
+                data.scores.forEach(s => {
+                    const date = new Date(s.date);
+                    const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+                    months.add(monthKey);
+                });
+                return Array.from(months).sort().reverse();
+            }
+
+            getScoresForMonth(month) {
+                const data = this.getData();
+                return data.scores.filter(s => {
+                    const date = new Date(s.date);
+                    const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+                    return monthKey === month;
+                });
+            }
+
+            getMonthlyScoreboard(month) {
+                const scores = this.getScoresForMonth(month);
+                const students = this.getStudents();
+                
+                const scoreboard = students.map(student => {
+                    const studentScores = scores.filter(s => s.studentId === student.id);
+                    const dates = [...new Set(studentScores.map(s => new Date(s.date).toISOString().split('T')[0]))].sort();
+                    const dailyScores = dates.map(date => {
+                        const dayScores = studentScores.filter(s => s.date.startsWith(date));
+                        return dayScores.reduce((sum, s) => sum + (s.points || 0), 0);
+                    });
+                    const total = dailyScores.reduce((sum, p) => sum + p, 0);
+                    
+                    return {
+                        student,
+                        dailyScores,
+                        dates,
+                        total
+                    };
+                }).filter(row => row.total > 0 || row.student).sort((a, b) => b.total - a.total);
+
+                return scoreboard;
+            }
+
+            deleteStudent(studentId) {
+                const data = this.getData();
+                data.students = data.students.filter(s => s.id !== studentId);
+                data.scores = data.scores.filter(s => s.studentId !== studentId);
+                this.saveData(data);
+            }
+
+            clearAll() {
+                localStorage.removeItem(this.storageKey);
+                this.init();
+            }
+        }
+
+        // Initialize database
+        const db = new ScoreboardDB();
+        let editingPartyId = null;
+        let editingLeadershipId = null;
+
+        // ============================================
+        // UI FUNCTIONS
+        // ============================================
+
+        function switchTab(tabName) {
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.add('hidden');
+            });
+
+            // Remove active from all buttons
+            document.querySelectorAll('.tab-button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+
+            // Show selected tab
+            const tabId = `${tabName}-tab`;
+            if (document.getElementById(tabId)) {
+                document.getElementById(tabId).classList.remove('hidden');
+            }
+
+            // Add active to clicked button
+            event.target.closest('.tab-button').classList.add('active');
+
+            // Initialize tab-specific content
+            if (tabName === 'scoreboard') loadScoreboard();
+            else if (tabName === 'add-score') initScoreForm();
+            else if (tabName === 'students') loadStudents();
+            else if (tabName === 'ranking') initRankingForm();
+            else if (tabName === 'party') loadParties();
+            else if (tabName === 'leadership') loadLeadership();
+        }
+
+        function loadScoreboard() {
+            const months = db.getMonths();
+            const currentMonth = months[0] || new Date().toISOString().substring(0, 7);
+            
+            // Populate month selector
+            const monthSelector = document.getElementById('monthSelector');
+            monthSelector.innerHTML = months.map(month => {
+                const [year, monthNum] = month.split('-');
+                const date = new Date(year, monthNum - 1);
+                const label = date.toLocaleDateString('en-US', { year: 'numeric', month: 'short' });
+                return `<button class="month-button ${month === currentMonth ? 'active' : ''}" onclick="loadMonthScoreboard('${month}')">${label}</button>`;
+            }).join('');
+
+            loadMonthScoreboard(currentMonth);
+        }
+
+        function loadMonthScoreboard(month) {
+            // Update active month button
+            document.querySelectorAll('.month-button').forEach(btn => {
+                btn.classList.toggle('active', btn.textContent.includes(new Date(month + '-01').toLocaleDateString('en-US', { month: 'short' })));
+            });
+
+            let scoreboard = db.getMonthlyScoreboard(month);
+            const classFilter = document.getElementById('classFilter').value;
+            const searchValue = document.getElementById('searchStudent').value.toLowerCase().trim();
+
+            if (classFilter) {
+                scoreboard = scoreboard.filter(row => String(row.student.class) === classFilter);
+            }
+            if (searchValue) {
+                scoreboard = scoreboard.filter(row =>
+                    row.student.name.toLowerCase().includes(searchValue) ||
+                    row.student.roll.toLowerCase().includes(searchValue)
+                );
+            }
+            const table = document.getElementById('scoreboardTable');
+            const thead = table.querySelector('thead tr');
+            const tbody = document.getElementById('scoreboardBody');
+
+            // Update header with dates
+            if (scoreboard.length > 0) {
+                const dates = scoreboard[0].dates;
+                const dateHeaders = dates.map(date => {
+                    const d = new Date(date);
+                    return `<th style="min-width: 50px;">${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</th>`;
+                }).join('');
+                document.getElementById('dailyScoresHeader').innerHTML = dateHeaders;
+            }
+
+            // Update stats
+            document.getElementById('currentMonth').textContent = new Date(month + '-01').toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+            document.getElementById('totalStudents').textContent = db.getStudents().length;
+            const avgScore = scoreboard.length > 0 ? Math.round(scoreboard.reduce((sum, row) => sum + row.total, 0) / scoreboard.length) : 0;
+            document.getElementById('avgScore').textContent = avgScore;
+            if (scoreboard.length > 0) {
+                document.getElementById('topScorer').textContent = scoreboard[0].student.name.substring(0, 20) + (scoreboard[0].student.name.length > 20 ? '...' : '');
+            }
+
+            // Populate table
+            tbody.innerHTML = scoreboard.map((row, idx) => {
+                const scores = row.dailyScores.map((score, i) => {
+                    const scoreClass = score > 0 ? 'positive' : score < 0 ? 'negative' : '';
+                    return `<td class="score-cell ${scoreClass}">${score !== 0 ? score : '-'}</td>`;
+                }).join('');
+
+                const medals = ['gold', 'silver', 'bronze'];
+                const medal = idx < 3 ? `<span class="medal ${medals[idx]}">${idx + 1}</span>` : `<span style="display: inline-block; width: 32px; text-align: center; font-weight: bold;">${idx + 1}</span>`;
+
+                return `<tr>
+                    <td>${medal}</td>
+                    <td><strong>${row.student.roll}</strong></td>
+                    <td>${row.student.name}</td>
+                    <td>${row.student.class}</td>
+                    <td>${row.student.fees || '-'}</td>
+                    ${scores}
+                    <td class="score-cell total">${row.total}</td>
+                </tr>`;
+            }).join('');
+
+            if (tbody.children.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="7" class="text-center" style="padding: 40px; color: var(--text-muted);">No data for this month</td></tr>`;
+            }
+        }
+
+        function filterScoreboard() {
+            // Implementation for filtering
+            loadScoreboard();
+        }
+
+        function initScoreForm() {
+            const students = db.getStudents();
+            const studentSelect = document.getElementById('scoreStudent');
+            studentSelect.innerHTML = '<option value="">Select Student...</option>' + 
+                students.map(s => `<option value="${s.id}">${s.name} (${s.roll})</option>`).join('');
+
+            const months = db.getMonths();
+            const monthSelect = document.getElementById('scoreMonth');
+            const todayMonth = new Date().toISOString().substring(0, 7);
+            if (!months.includes(todayMonth)) {
+                months.unshift(todayMonth);
+            }
+            monthSelect.innerHTML = '<option value="">Select Month...</option>' + 
+                months.map(m => {
+                    const date = new Date(m + '-01');
+                    return `<option value="${m}">${date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</option>`;
+                }).join('');
+
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('scoreDate').value = today;
+            document.getElementById('scoreMonth').value = today.substring(0, 7);
+
+            document.getElementById('scoreStudent').onchange = loadExistingScore;
+            document.getElementById('scoreDate').onchange = loadExistingScore;
+        }
+
+        function saveScore() {
+            const studentId = parseInt(document.getElementById('scoreStudent').value);
+            const date = document.getElementById('scoreDate').value;
+            const pointsInput = document.getElementById('scorePoints').value;
+            const points = pointsInput === '' ? NaN : parseInt(pointsInput);
+            const month = document.getElementById('scoreMonth').value;
+            const notes = document.getElementById('scoreNotes').value;
+
+            if (!studentId || !date || Number.isNaN(points) || !month) {
+                showAlert('Please fill all required fields', 'danger');
+                return;
+            }
+
+            const result = db.addScore({
+                studentId,
+                date,
+                points,
+                month,
+                notes,
+                recordedBy: 'admin'
+            });
+
+            clearScoreForm();
+            showAlert(result.updated ? 'Score updated successfully!' : 'Score saved successfully!', 'success');
+        }
+
+        function loadExistingScore() {
+            const studentId = parseInt(document.getElementById('scoreStudent').value);
+            const date = document.getElementById('scoreDate').value;
+            if (!studentId || !date) return;
+
+            const existing = db.getScore(studentId, date);
+            if (existing) {
+                document.getElementById('scorePoints').value = existing.points;
+                document.getElementById('scoreNotes').value = existing.notes || '';
+                document.getElementById('scoreMonth').value = existing.month || date.substring(0, 7);
+                document.getElementById('scoreHint').textContent = 'Editing existing score. Save will update the entry.';
+            } else {
+                document.getElementById('scorePoints').value = '';
+                document.getElementById('scoreNotes').value = '';
+                document.getElementById('scoreMonth').value = date.substring(0, 7);
+                document.getElementById('scoreHint').textContent = 'Tip: Saving a score for the same student and date will update the existing entry.';
+            }
+        }
+
+        function deleteScore() {
+            const studentId = parseInt(document.getElementById('scoreStudent').value);
+            const date = document.getElementById('scoreDate').value;
+            if (!studentId || !date) {
+                showAlert('Select a student and date first', 'danger');
+                return;
+            }
+            const existing = db.getScore(studentId, date);
+            if (!existing) {
+                showAlert('No score found for this student and date', 'danger');
+                return;
+            }
+            if (confirm('Delete this score entry?')) {
+                db.deleteScore(studentId, date);
+                clearScoreForm();
+                showAlert('Score deleted successfully!', 'success');
+            }
+        }
+
+        function clearScoreForm() {
+            document.getElementById('scoreStudent').value = '';
+            document.getElementById('scoreDate').value = new Date().toISOString().split('T')[0];
+            document.getElementById('scorePoints').value = '';
+            document.getElementById('scoreMonth').value = new Date().toISOString().substring(0, 7);
+            document.getElementById('scoreNotes').value = '';
+            if (document.getElementById('scoreHint')) {
+                document.getElementById('scoreHint').textContent = 'Tip: Saving a score for the same student and date will update the existing entry.';
+            }
+        }
+
+        function loadStudents() {
+            const students = db.getStudents();
+            const tbody = document.getElementById('studentsBody');
+
+            tbody.innerHTML = students.map(student => `
+                <tr>
+                    <td>${student.roll}</td>
+                    <td>${student.name}</td>
+                    <td>${student.class}</td>
+                    <td>${student.fees || '-'}</td>
+                    <td>${student.vote_power ?? '-'}</td>
+                    <td>
+                        <button class="secondary" onclick="openEditStudent(${student.id})" style="font-size: 12px;">Edit</button>
+                        <button class="secondary" onclick="deleteStudent(${student.id})" style="font-size: 12px;">Delete</button>
+                    </td>
+                </tr>
+            `).join('');
+
+            if (students.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" class="text-center" style="padding: 40px;">No students added yet</td></tr>`;
+            }
+        }
+
+        function addNewStudent() {
+            const roll = document.getElementById('newRoll').value;
+            const name = document.getElementById('newName').value;
+            const classNum = parseInt(document.getElementById('newClass').value);
+            const fees = parseInt(document.getElementById('newFees').value) || 0;
+            const votePowerInput = document.getElementById('newVotePower').value;
+            const votePower = votePowerInput === '' ? null : parseInt(votePowerInput);
+
+            if (!roll || !name || !classNum) {
+                showAlert('Please fill all required fields', 'danger');
+                return;
+            }
+
+            db.addStudent({ roll, name, class: classNum, fees, vote_power: votePower });
+            clearStudentForm();
+            loadStudents();
+            showAlert('Student added successfully!', 'success');
+        }
+
+        function clearStudentForm() {
+            document.getElementById('newRoll').value = '';
+            document.getElementById('newName').value = '';
+            document.getElementById('newClass').value = '';
+            document.getElementById('newFees').value = '';
+            document.getElementById('newVotePower').value = '';
+        }
+
+        function deleteStudent(studentId) {
+            if (confirm('Are you sure you want to delete this student? All associated scores will be deleted.')) {
+                db.deleteStudent(studentId);
+                loadStudents();
+                showAlert('Student deleted', 'success');
+            }
+        }
+
+        function openEditStudent(studentId) {
+            const student = db.getStudents().find(s => s.id === studentId);
+            if (!student) return;
+
+            document.getElementById('editStudentId').value = student.id;
+            document.getElementById('editRoll').value = student.roll || '';
+            document.getElementById('editName').value = student.name || '';
+            document.getElementById('editClass').value = student.class || '';
+            document.getElementById('editFees').value = student.fees || 0;
+            document.getElementById('editVotePower').value = student.vote_power ?? '';
+
+            openModal('editStudentModal');
+        }
+
+        function saveStudentEdits() {
+            const studentId = parseInt(document.getElementById('editStudentId').value);
+            const roll = document.getElementById('editRoll').value.trim();
+            const name = document.getElementById('editName').value.trim();
+            const classNum = parseInt(document.getElementById('editClass').value);
+            const fees = parseInt(document.getElementById('editFees').value) || 0;
+            const votePowerInput = document.getElementById('editVotePower').value;
+            const votePower = votePowerInput === '' ? null : parseInt(votePowerInput);
+
+            if (!roll || !name || !classNum) {
+                showAlert('Please fill all required fields', 'danger');
+                return;
+            }
+
+            db.updateStudent(studentId, {
+                roll,
+                name,
+                class: classNum,
+                fees,
+                vote_power: votePower
+            });
+
+            closeModal('editStudentModal');
+            loadStudents();
+            loadScoreboard();
+            showAlert('Student updated successfully!', 'success');
+        }
+
+        function initRankingForm() {
+            const months = db.getMonths();
+            const rankingMonth = document.getElementById('rankingMonth');
+            rankingMonth.innerHTML = '<option value="">Select Month...</option>' + 
+                months.map(m => {
+                    const date = new Date(m + '-01');
+                    return `<option value="${m}">${date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</option>`;
+                }).join('');
+        }
+
+        function loadRankings() {
+            const month = document.getElementById('rankingMonth').value;
+            if (!month) return;
+
+            const scoreboard = db.getMonthlyScoreboard(month);
+            const tbody = document.getElementById('rankingsBody');
+
+            tbody.innerHTML = scoreboard.map((row, idx) => {
+                const medals = ['gold', 'silver', 'bronze'];
+                const medal = idx < 3 ? `<span class="medal ${medals[idx]}">${idx + 1}</span>` : idx + 1;
+
+                return `<tr>
+                    <td>${medal}</td>
+                    <td>${row.student.name}</td>
+                    <td>${row.student.class}</td>
+                    <td style="font-weight: bold; color: var(--primary);">${row.total}</td>
+                    <td>${idx === 0 ? '🥇 1st' : idx === 1 ? '🥈 2nd' : idx === 2 ? '🥉 3rd' : `#${idx + 1}`}</td>
+                </tr>`;
+            }).join('');
+
+            if (scoreboard.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" class="text-center" style="padding: 40px;">No data for this month</td></tr>`;
+            }
+        }
+
+        function loadParties() {
+            const parties = db.getParties();
+            const tbody = document.getElementById('partyBody');
+
+            const totalPower = parties.reduce((sum, party) => sum + (parseInt(party.power) || 0), 0);
+            tbody.innerHTML = parties.map(party => `
+                <tr>
+                    <td>${party.code}</td>
+                    <td>${party.power}</td>
+                    <td>
+                        <button class="secondary" onclick="editParty(${party.id})" style="font-size: 12px;">Edit</button>
+                        <button class="secondary" onclick="deleteParty(${party.id})" style="font-size: 12px;">Delete</button>
+                    </td>
+                </tr>
+            `).join('') + (parties.length ? `
+                <tr>
+                    <td><strong>Total</strong></td>
+                    <td><strong>${totalPower}</strong></td>
+                    <td></td>
+                </tr>
+            ` : '');
+
+            if (parties.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="3" class="text-center" style="padding: 40px;">No parties added yet</td></tr>`;
+            }
+        }
+
+        function saveParty() {
+            const code = document.getElementById('partyCode').value.trim();
+            const powerInput = document.getElementById('partyPower').value;
+            const power = powerInput === '' ? NaN : parseInt(powerInput);
+
+            if (!code || Number.isNaN(power)) {
+                showAlert('Please enter party code and power', 'danger');
+                return;
+            }
+
+            if (editingPartyId) {
+                db.updateParty(editingPartyId, { code, power });
+                showAlert('Party updated successfully!', 'success');
+            } else {
+                db.addParty({ code, power });
+                showAlert('Party added successfully!', 'success');
+            }
+
+            clearPartyForm();
+            loadParties();
+        }
+
+        function editParty(partyId) {
+            const party = db.getParties().find(p => p.id === partyId);
+            if (!party) return;
+            editingPartyId = partyId;
+            document.getElementById('partyCode').value = party.code;
+            document.getElementById('partyPower').value = party.power;
+        }
+
+        function deleteParty(partyId) {
+            if (confirm('Delete this party entry?')) {
+                db.deleteParty(partyId);
+                loadParties();
+                showAlert('Party deleted', 'success');
+            }
+        }
+
+        function clearPartyForm() {
+            editingPartyId = null;
+            document.getElementById('partyCode').value = '';
+            document.getElementById('partyPower').value = '';
+        }
+
+        function loadLeadership() {
+            const posts = db.getLeadership();
+            const tbody = document.getElementById('leadershipBody');
+
+            tbody.innerHTML = posts.map(post => `
+                <tr>
+                    <td>${post.post}</td>
+                    <td>${post.holder || '-'}</td>
+                    <td>
+                        <button class="secondary" onclick="editLeadership(${post.id})" style="font-size: 12px;">Edit</button>
+                        <button class="secondary" onclick="deleteLeadership(${post.id})" style="font-size: 12px;">Delete</button>
+                    </td>
+                </tr>
+            `).join('');
+
+            if (posts.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="3" class="text-center" style="padding: 40px;">No leadership posts added yet</td></tr>`;
+            }
+        }
+
+        function saveLeadershipPost() {
+            const post = document.getElementById('leadershipPost').value.trim();
+            const holder = document.getElementById('leadershipHolder').value.trim();
+
+            if (!post) {
+                showAlert('Post name is required', 'danger');
+                return;
+            }
+
+            if (editingLeadershipId) {
+                db.updateLeadership(editingLeadershipId, { post, holder });
+                showAlert('Leadership post updated successfully!', 'success');
+            } else {
+                db.addLeadership({ post, holder });
+                showAlert('Leadership post added successfully!', 'success');
+            }
+
+            clearLeadershipForm();
+            loadLeadership();
+        }
+
+        function editLeadership(postId) {
+            const post = db.getLeadership().find(p => p.id === postId);
+            if (!post) return;
+            editingLeadershipId = postId;
+            document.getElementById('leadershipPost').value = post.post;
+            document.getElementById('leadershipHolder').value = post.holder || '';
+        }
+
+        function deleteLeadership(postId) {
+            if (confirm('Delete this leadership post?')) {
+                db.deleteLeadership(postId);
+                loadLeadership();
+                showAlert('Leadership post deleted', 'success');
+            }
+        }
+
+        function clearLeadershipForm() {
+            editingLeadershipId = null;
+            document.getElementById('leadershipPost').value = '';
+            document.getElementById('leadershipHolder').value = '';
+        }
+
+        function importExcel() {
+            const file = document.getElementById('excelFile').files[0];
+            if (!file) {
+                showAlert('Please select an Excel file', 'danger');
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    
+                    // Parse first sheet as example
+                    const firstSheet = workbook.SheetNames[0];
+                    const sheet = workbook.Sheets[firstSheet];
+                    const jsonData = XLSX.utils.sheet_to_json(sheet);
+
+                    showAlert(`Excel file analyzed. Found ${jsonData.length} rows.`, 'info');
+                    console.log('Excel data:', jsonData);
+                    
+                } catch (err) {
+                    showAlert('Error reading Excel file: ' + err.message, 'danger');
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        function exportToExcel() {
+            const students = db.getStudents();
+            const data = students.map(s => ({ ...s }));
+            
+            const ws = XLSX.utils.json_to_sheet(data);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Students');
+            XLSX.writeFile(wb, 'EA_Scoreboard_Export.xlsx');
+            
+            showAlert('Data exported to Excel!', 'success');
+        }
+
+        function exportJSON() {
+            const data = db.getData();
+            const json = JSON.stringify(data, null, 2);
+            const blob = new Blob([json], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'EA_Scoreboard_Backup.json';
+            a.click();
+            URL.revokeObjectURL(url);
+            showAlert('Data exported as JSON!', 'success');
+        }
+
+        function importJSON() {
+            document.getElementById('jsonFile').click();
+            document.getElementById('jsonFile').onchange = (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    try {
+                        const data = JSON.parse(event.target.result);
+                        db.saveData(data);
+                        showAlert('Data imported successfully!', 'success');
+                    } catch (err) {
+                        showAlert('Error importing JSON: ' + err.message, 'danger');
+                    }
+                };
+                reader.readAsText(file);
+            };
+        }
+
+        function backupData() {
+            const data = db.getData();
+            const backup = {
+                timestamp: new Date().toISOString(),
+                data
+            };
+            console.log('Backup:', backup);
+            showAlert('Backup created: ' + backup.timestamp, 'success');
+        }
+
+        function showStats() {
+            const data = db.getData();
+            const stats = `
+                Total Students: ${data.students.length}
+                Total Scores Recorded: ${data.scores.length}
+                Months with Data: ${db.getMonths().length}
+                Parties: ${(data.parties || []).length}
+                Leadership Posts: ${(data.leadership || []).length}
+                Storage Used: ~${(JSON.stringify(data).length / 1024).toFixed(2)} KB
+            `;
+            alert(stats);
+        }
+
+        function clearAllData() {
+            if (confirm('WARNING: This will delete all data! Are you sure?')) {
+                db.clearAll();
+                showAlert('All data cleared', 'success');
+                loadScoreboard();
+            }
+        }
+
+        function loadFeb26Seed() {
+            if (!confirm('This will replace current data with Feb 26 sheet data. Continue?')) {
+                return;
+            }
+            const seed = cloneSeed(FEB26_SEED);
+            seed.parties = seed.parties.map((party, idx) => ({ id: idx + 1, ...party }));
+            seed.leadership = seed.leadership.map((post, idx) => ({ id: idx + 1, ...post }));
+
+            db.saveData({
+                students: seed.students,
+                scores: seed.scores,
+                months: [],
+                parties: seed.parties,
+                leadership: seed.leadership
+            });
+            showAlert('Feb 26 data loaded successfully!', 'success');
+            loadScoreboard();
+            loadStudents();
+            loadParties();
+            loadLeadership();
+        }
+
+        function openModal(modalId) {
+            const modal = document.getElementById(modalId);
+            if (modal) modal.classList.add('active');
+        }
+
+        function closeModal(modalId = 'detailsModal') {
+            const modal = document.getElementById(modalId);
+            if (modal) modal.classList.remove('active');
+        }
+
+        function showAlert(message, type = 'info') {
+            const container = document.getElementById('alertContainer');
+            const alertId = 'alert-' + Date.now();
+            const html = `
+                <div class="alert alert-${type}" id="${alertId}">
+                    <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'danger' ? 'exclamation-circle' : 'info-circle'}"></i>
+                    <span>${message}</span>
+                </div>
+            `;
+            container.insertAdjacentHTML('beforeend', html);
+            
+            setTimeout(() => {
+                const element = document.getElementById(alertId);
+                if (element) element.remove();
+            }, 4000);
+        }
+
+        // Initialize on load
+        document.addEventListener('DOMContentLoaded', () => {
+            loadScoreboard();
+        });
+    </script>
+</body>
+</html>

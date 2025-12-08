@@ -1,0 +1,43 @@
+# EA Tutorial Hub - Server Configuration
+# Generated: 2026-02-05T17:04:47.767971
+
+[SERVER_INFO]
+Hostname: ExcelAcademy
+IP_Address: 192.168.0.163
+Port: 5000
+
+[ACCESS_URLS]
+Main: http://192.168.0.163:5000
+Login: http://192.168.0.163:5000/auth/login
+Admin_Dashboard: http://192.168.0.163:5000/admin/dashboard
+
+[DATABASE]
+Location: C:\Users\sujit\Desktop\Project EA\instance\ea_tutorial.db
+Type: SQLite3
+
+[DEFAULT_CREDENTIALS]
+Admin_Username: Admin
+Admin_Password: admin123
+Teacher_Username: Teacher
+Teacher_Password: teacher123
+Student_Username: EA24C001
+Student_Password: student123
+
+[INSTRUCTIONS]
+1. Keep this server PC on 24x7
+2. Double-click 'run_server.bat' to start the application
+3. Access from other PCs using the URLs above
+4. To stop, press Ctrl+C in the terminal
+
+[FIREWALL]
+If Python is blocked by firewall:
+1. Settings > Privacy & Security > Firewall
+2. Allow an app through firewall
+3. Find 'python.exe' and check 'Private'
+4. Click OK
+
+[TROUBLESHOOTING]
+- Port already in use: netstat -ano | findstr :5000
+- Database error: Delete 'instance/ea_tutorial.db' and restart
+- Can't connect: Make sure both PCs on same WiFi network
+- Check this guide: NETWORK_DEPLOYMENT_GUIDE.md

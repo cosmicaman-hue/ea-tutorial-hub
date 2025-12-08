@@ -1,0 +1,1482 @@
+{% extends "base.html" %}
+
+{% block title %}Scoreboard - Student Scoring System{% endblock %}
+
+{% block content %}
+<style>
+    .scoreboard-container {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        gap: 20px;
+        padding: 20px;
+    }
+    
+    .filter-section {
+        display: flex;
+        gap: 15px;
+        flex-wrap: wrap;
+        align-items: center;
+        padding: 15px;
+        background: #f8f9fa;
+        border-radius: 8px;
+        border: 1px solid #dee2e6;
+    }
+    
+    .filter-group {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+    }
+    
+    .filter-group label {
+        font-weight: 600;
+        color: #495057;
+        margin: 0;
+    }
+    
+    .filter-group input,
+    .filter-group select {
+        padding: 8px 12px;
+        border: 1px solid #dee2e6;
+        border-radius: 6px;
+        font-size: 0.95rem;
+    }
+    
+    .month-tabs {
+        display: flex;
+        gap: 8px;
+        overflow-x: auto;
+        padding: 10px 0;
+        margin-bottom: 10px;
+    }
+    
+    .month-tab {
+        padding: 8px 16px;
+        border: 1px solid #dee2e6;
+        border-radius: 20px;
+        background: white;
+        cursor: pointer;
+        white-space: nowrap;
+        transition: all 0.3s;
+    }
+    
+    .month-tab:hover {
+        border-color: #007bff;
+        color: #007bff;
+    }
+    
+    .month-tab.active {
+        background: #007bff;
+        color: white;
+        border-color: #007bff;
+    }
+    
+    .actions-bar {
+        display: flex;
+        gap: 10px;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+    }
+    
+    .search-box {
+        flex: 1;
+        min-width: 250px;
+        padding: 8px 12px;
+        border: 1px solid #dee2e6;
+        border-radius: 6px;
+        font-size: 0.95rem;
+    }
+    
+    .admin-actions {
+        display: flex;
+        gap: 8px;
+    }
+    
+    .btn-action {
+        padding: 8px 16px;
+        border: 1px solid #dee2e6;
+        border-radius: 6px;
+        background: white;
+        cursor: pointer;
+        font-weight: 500;
+        transition: all 0.3s;
+        font-size: 0.9rem;
+    }
+    
+    .btn-action:hover {
+        background: #f8f9fa;
+        border-color: #007bff;
+        color: #007bff;
+    }
+    
+    .btn-add { background: #28a745; color: white; border-color: #28a745; }
+    .btn-add:hover { background: #218838; border-color: #218838; }
+    
+    .btn-import { background: #007bff; color: white; border-color: #007bff; }
+    .btn-import:hover { background: #0056b3; border-color: #0056b3; }
+    
+    .table-wrapper {
+        flex: 1;
+        overflow: auto;
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+    }
+
+    .scoreboard-layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 320px;
+        gap: 20px;
+        align-items: start;
+    }
+
+    .side-panel {
+        position: sticky;
+        top: 20px;
+    }
+
+    .side-card {
+        background: #ffffff;
+        border: 1px solid #dee2e6;
+        border-radius: 10px;
+        padding: 16px;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+    }
+
+    .side-tabs {
+        display: flex;
+        gap: 6px;
+        margin-bottom: 12px;
+    }
+
+    .side-tab {
+        flex: 1;
+        padding: 8px 10px;
+        border: 1px solid #dee2e6;
+        background: #f8f9fa;
+        border-radius: 8px;
+        font-weight: 600;
+        cursor: pointer;
+        font-size: 0.85rem;
+    }
+
+    .side-tab.active {
+        background: #007bff;
+        color: #fff;
+        border-color: #007bff;
+    }
+
+    .side-form {
+        display: grid;
+        gap: 8px;
+        margin-bottom: 12px;
+    }
+
+    .side-form input {
+        padding: 8px 10px;
+        border: 1px solid #dee2e6;
+        border-radius: 6px;
+        font-size: 0.85rem;
+    }
+
+    .side-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.85rem;
+    }
+
+    .side-table th,
+    .side-table td {
+        padding: 8px 6px;
+        border-bottom: 1px solid #dee2e6;
+        text-align: left;
+    }
+
+    .side-actions {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+    }
+
+    .score-editable {
+        cursor: pointer;
+    }
+
+    .score-editable:hover {
+        background: #e9f2ff;
+    }
+
+    @media (max-width: 1200px) {
+        .scoreboard-layout {
+            grid-template-columns: 1fr;
+        }
+        .side-panel {
+            position: static;
+        }
+    }
+    
+    .scoreboard-table {
+        width: 100%;
+        border-collapse: collapse;
+        background: white;
+    }
+    
+    .scoreboard-table thead {
+        background: #f8f9fa;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+    }
+    
+    .scoreboard-table th {
+        padding: 12px;
+        text-align: left;
+        font-weight: 600;
+        border-bottom: 2px solid #dee2e6;
+        color: #495057;
+        font-size: 0.9rem;
+    }
+    
+    .scoreboard-table td {
+        padding: 12px;
+        border-bottom: 1px solid #dee2e6;
+        font-size: 0.9rem;
+    }
+    
+    .scoreboard-table tbody tr:hover {
+        background: #f8f9fa;
+    }
+    
+    .student-name {
+        color: #007bff;
+        cursor: pointer;
+        font-weight: 500;
+        text-decoration: none;
+    }
+    
+    .student-name:hover {
+        text-decoration: underline;
+    }
+    
+    .rank-badge {
+        display: inline-block;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-weight: bold;
+        font-size: 0.85rem;
+    }
+    
+    .rank-1 { background: #ffd700; color: #333; }
+    .rank-2 { background: #c0c0c0; color: #333; }
+    .rank-3 { background: #cd7f32; color: white; }
+    
+    .score-cell {
+        text-align: center;
+        font-weight: 500;
+    }
+    
+    .score-positive { color: #28a745; }
+    .score-negative { color: #dc3545; }
+    .score-neutral { color: #495057; }
+    
+    .delete-btn {
+        padding: 4px 8px;
+        background: #dc3545;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 0.8rem;
+    }
+    
+    .delete-btn:hover {
+        background: #c82333;
+    }
+    
+    .modal {
+        display: none;
+        position: fixed;
+        z-index: 1000;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.4);
+    }
+    
+    .modal.show {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    .modal-content {
+        background-color: #fefefe;
+        padding: 30px;
+        border-radius: 10px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        width: 90%;
+        max-width: 600px;
+        max-height: 90vh;
+        overflow-y: auto;
+    }
+    
+    .modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+    }
+    
+    .modal-header h2 {
+        margin: 0;
+    }
+    
+    .close-btn {
+        background: none;
+        border: none;
+        font-size: 1.5rem;
+        cursor: pointer;
+        color: #666;
+    }
+    
+    .close-btn:hover {
+        color: #333;
+    }
+    
+    .form-group {
+        margin-bottom: 15px;
+    }
+    
+    .form-group label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: 600;
+        color: #495057;
+    }
+    
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid #dee2e6;
+        border-radius: 6px;
+        font-size: 0.95rem;
+        box-sizing: border-box;
+        font-family: inherit;
+    }
+    
+    .form-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 15px;
+    }
+    
+    .form-actions {
+        display: flex;
+        gap: 10px;
+        justify-content: flex-end;
+        margin-top: 20px;
+    }
+    
+    .btn-primary {
+        padding: 10px 20px;
+        background: #007bff;
+        color: white;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-weight: 600;
+    }
+    
+    .btn-primary:hover {
+        background: #0056b3;
+    }
+    
+    .btn-secondary {
+        padding: 10px 20px;
+        background: #6c757d;
+        color: white;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-weight: 600;
+    }
+    
+    .btn-secondary:hover {
+        background: #5a6268;
+    }
+    
+    .alert {
+        padding: 12px 15px;
+        border-radius: 6px;
+        margin-bottom: 15px;
+    }
+    
+    .alert-success {
+        background: #d4edda;
+        border: 1px solid #c3e6cb;
+        color: #155724;
+    }
+    
+    .alert-error {
+        background: #f8d7da;
+        border: 1px solid #f5c6cb;
+        color: #721c24;
+    }
+    
+    .admin-only {
+        display: none;
+    }
+    
+    .admin-only.visible {
+        display: flex;
+    }
+    
+    .hidden {
+        display: none;
+    }
+</style>
+
+<div class="scoreboard-container">
+    <!-- Alert Messages -->
+    <div id="alertBox"></div>
+    
+    <!-- Filter Section -->
+    <div class="filter-section">
+        <div class="filter-group">
+            <label>From Date:</label>
+            <input type="date" id="filterDateFrom">
+        </div>
+        <div class="filter-group">
+            <label>To Date:</label>
+            <input type="date" id="filterDateTo">
+        </div>
+        <div class="filter-group">
+            <label>Class:</label>
+            <select id="filterClass">
+                <option value="All">All</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
+                <option value="4">4</option>
+                <option value="5">5</option>
+                <option value="6">6</option>
+                <option value="7">7</option>
+                <option value="8">8</option>
+                <option value="9">9</option>
+                <option value="10">10</option>
+            </select>
+        </div>
+        <div class="filter-group">
+            <label>Group:</label>
+            <select id="filterGroup">
+                <option value="All">All</option>
+                <option value="A">A</option>
+                <option value="B">B</option>
+                <option value="C">C</option>
+                <option value="D">D</option>
+            </select>
+        </div>
+        <button class="btn-action" onclick="applyFilters()" style="margin-left: auto;">🔍 Apply Filters</button>
+    </div>
+    
+    <!-- Month Tabs -->
+    <div id="monthTabsContainer" class="month-tabs"></div>
+    
+    <!-- Actions Bar -->
+    <div class="actions-bar">
+        <input type="text" id="searchBox" class="search-box" placeholder="🔍 Search by name or roll number...">
+        <div class="admin-actions" id="adminActionsContainer">
+            <button class="btn-action btn-add" onclick="openAddStudentModal()">➕ Add Student</button>
+            <button class="btn-action btn-import" onclick="document.getElementById('excelInput').click()">📊 Import Excel</button>
+            <input type="file" id="excelInput" accept=".xlsx,.xls,.xlsm" style="display: none;" onchange="handleExcelUpload(this.files[0])">
+            <button class="btn-action btn-import" onclick="seedFeb26()">Load Feb 26 Data</button>
+        </div>
+    </div>
+    
+    <!-- Scoreboard Table + Side Panel -->
+    <div class="scoreboard-layout">
+        <div class="table-wrapper">
+            <table class="scoreboard-table">
+                <thead id="tableHeader"></thead>
+                <tbody id="tableBody"></tbody>
+            </table>
+        </div>
+        <aside class="side-panel">
+            <div class="side-card">
+                <div class="side-tabs">
+                    <button class="side-tab active" onclick="switchSidePanel('partyPanel', this)">Party System</button>
+                    <button class="side-tab" onclick="switchSidePanel('leadershipPanel', this)">Leadership Posts</button>
+                </div>
+
+                <div id="partyPanel" class="side-panel-content">
+                    <div class="side-form">
+                        <input type="text" id="partyCodeInput" placeholder="Party Code (MAP)">
+                        <input type="number" id="partyPowerInput" placeholder="Power">
+                        <div class="side-actions">
+                            <button class="btn-action btn-add" type="button" onclick="saveParty()">Save Party</button>
+                            <button class="btn-action" type="button" onclick="clearPartyForm()">Clear</button>
+                        </div>
+                    </div>
+                    <table class="side-table">
+                        <thead>
+                            <tr>
+                                <th>Party</th>
+                                <th>Power</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="partyBody">
+                            <tr><td colspan="3">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div id="leadershipPanel" class="side-panel-content" style="display: none;">
+                    <div class="side-form">
+                        <input type="text" id="leadershipPostInput" placeholder="Post">
+                        <input type="text" id="leadershipHolderInput" placeholder="Post Holder">
+                        <div class="side-actions">
+                            <button class="btn-action btn-add" type="button" onclick="saveLeadership()">Save Post</button>
+                            <button class="btn-action" type="button" onclick="clearLeadershipForm()">Clear</button>
+                        </div>
+                    </div>
+                    <table class="side-table">
+                        <thead>
+                            <tr>
+                                <th>Post</th>
+                                <th>Holder</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="leadershipBody">
+                            <tr><td colspan="3">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </aside>
+    </div>
+</div>
+
+<!-- Add Student Modal -->
+<div id="addStudentModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>Add New Student</h2>
+            <button class="close-btn" onclick="closeModal('addStudentModal')">&times;</button>
+        </div>
+        <form id="addStudentForm" onsubmit="submitAddStudent(event)">
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="newStudentRoll">Roll Number *</label>
+                    <input type="text" id="newStudentRoll" required>
+                </div>
+                <div class="form-group">
+                    <label for="newStudentName">Full Name *</label>
+                    <input type="text" id="newStudentName" required>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="newStudentClass">Class *</label>
+                    <select id="newStudentClass" required>
+                        <option value="">Select Class</option>
+                        <option value="2">2</option>
+                        <option value="3">3</option>
+                        <option value="4">4</option>
+                        <option value="5">5</option>
+                        <option value="6">6</option>
+                        <option value="7">7</option>
+                        <option value="8">8</option>
+                        <option value="9">9</option>
+                        <option value="10">10</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="newStudentGroup">Group</label>
+                    <select id="newStudentGroup">
+                        <option value="A">A</option>
+                        <option value="B">B</option>
+                        <option value="C">C</option>
+                        <option value="D">D</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="newStudentFees">Fees</label>
+                    <input type="number" id="newStudentFees" min="0">
+                </div>
+                <div class="form-group">
+                    <label for="newStudentVote">Vote Power</label>
+                    <input type="number" id="newStudentVote" min="-5" max="20">
+                </div>
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn-secondary" onclick="closeModal('addStudentModal')">Cancel</button>
+                <button type="submit" class="btn-primary">Add Student</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Edit Student Profile Modal -->
+<div id="profileModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2 id="profileModalTitle">Student Profile</h2>
+            <button class="close-btn" onclick="closeModal('profileModal')">&times;</button>
+        </div>
+        <form id="profileForm" onsubmit="submitProfileForm(event)">
+            <div id="profileFormContent"></div>
+            <div class="form-actions">
+                <button type="button" class="btn-secondary" onclick="closeModal('profileModal')">Close</button>
+                <button type="submit" class="btn-primary">Save Profile</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Edit Score Modal -->
+<div id="scoreEditModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>Edit Score Entry</h2>
+            <button class="close-btn" onclick="closeModal('scoreEditModal')">&times;</button>
+        </div>
+        <form id="scoreEditForm" onsubmit="submitScoreEdit(event)">
+            <input type="hidden" id="scoreEditStudentId">
+            <input type="hidden" id="scoreEditDateValue">
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Student</label>
+                    <input type="text" id="scoreEditStudent" readonly>
+                </div>
+                <div class="form-group">
+                    <label>Date</label>
+                    <input type="date" id="scoreEditDate" readonly>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Points</label>
+                    <input type="number" id="scoreEditPoints">
+                </div>
+                <div class="form-group">
+                    <label>Stars</label>
+                    <input type="number" id="scoreEditStars" min="0">
+                </div>
+                <div class="form-group">
+                    <label>Vetos</label>
+                    <input type="number" id="scoreEditVetos" min="0">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Notes</label>
+                <textarea id="scoreEditNotes" rows="3"></textarea>
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn-secondary" onclick="closeModal('scoreEditModal')">Cancel</button>
+                <button type="submit" class="btn-primary">Save Score</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    let currentStudents = [];
+    let currentDateFrom = null;
+    let currentDateTo = null;
+    let currentEditingStudentId = null;
+    let isAdmin = {{ 'true' if current_user.role == 'admin' else 'false' }};
+    let partyData = [];
+    let leadershipData = [];
+    let editingPartyId = null;
+    let editingLeadershipId = null;
+    
+    // Initialize on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        initializePage();
+    });
+    
+    async function initializePage() {
+        // Set up search with debounce
+        setupSearch();
+        
+        // Set today's date as default
+        const today = new Date().toISOString().split('T')[0];
+        const monthStart = new Date();
+        monthStart.setDate(1);
+        const monthStartStr = monthStart.toISOString().split('T')[0];
+        
+        document.getElementById('filterDateFrom').value = monthStartStr;
+        document.getElementById('filterDateTo').value = today;
+        
+        // Load month tabs
+        await loadMonthTabs();
+        
+        // Show/hide admin actions
+        if (!isAdmin) {
+            document.getElementById('adminActionsContainer').style.display = 'none';
+        }
+        
+        // Load initial data
+        await applyFilters();
+        await loadSidePanels();
+    }
+    
+    async function loadMonthTabs() {
+        try {
+            const response = await fetch('/scoreboard/month-summary');
+            const data = await response.json();
+            
+            if (data.success) {
+                const container = document.getElementById('monthTabsContainer');
+                container.innerHTML = '';
+                
+                data.months.forEach(month => {
+                    const btn = document.createElement('button');
+                    btn.className = `month-tab ${month.is_current ? 'active' : ''}`;
+                    btn.textContent = month.name;
+                    btn.onclick = () => switchMonth(month.year, month.month);
+                    container.appendChild(btn);
+                });
+            }
+        } catch (error) {
+            console.error('Error loading month tabs:', error);
+        }
+    }
+    
+    function switchMonth(year, month) {
+        // Calculate date range for the month
+        const dateFrom = new Date(year, month - 1, 1);
+        const dateTo = new Date(year, month, 0);
+        
+        document.getElementById('filterDateFrom').value = dateFrom.toISOString().split('T')[0];
+        document.getElementById('filterDateTo').value = dateTo.toISOString().split('T')[0];
+        
+        applyFilters();
+    }
+    
+    function setupSearch() {
+        let searchTimeout;
+        document.getElementById('searchBox').addEventListener('keyup', function() {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => renderTable(), 300);
+        });
+    }
+    
+    async function applyFilters() {
+        const dateFrom = document.getElementById('filterDateFrom').value;
+        const dateTo = document.getElementById('filterDateTo').value;
+        const classFilter = document.getElementById('filterClass').value;
+        const groupFilter = document.getElementById('filterGroup').value;
+        const search = document.getElementById('searchBox').value;
+        
+        try {
+            const params = new URLSearchParams({
+                date_from: dateFrom,
+                date_to: dateTo,
+                class: classFilter,
+                group: groupFilter,
+                search: search
+            });
+            
+            const response = await fetch(`/scoreboard/data?${params}`);
+            const data = await response.json();
+            
+            if (data.success) {
+                currentStudents = data.students;
+                currentDateFrom = new Date(data.date_from);
+                currentDateTo = new Date(data.date_to);
+                renderTable();
+                updateMonthTabs();
+            } else {
+                showAlert('Error: ' + data.error, 'error');
+            }
+        } catch (error) {
+            console.error('Error applying filters:', error);
+            showAlert('Error loading data', 'error');
+        }
+    }
+    
+    function updateMonthTabs() {
+        const tabs = document.querySelectorAll('.month-tab');
+        tabs.forEach(tab => tab.classList.remove('active'));
+        
+        const monthIndex = currentDateFrom.getMonth() + 1;
+        const year = currentDateFrom.getFullYear();
+        
+        tabs.forEach(tab => {
+            const textContent = tab.textContent;
+            if (textContent.includes(monthIndex.toString().padStart(2, '0')) && textContent.includes(year.toString())) {
+                tab.classList.add('active');
+            }
+        });
+    }
+    
+    function renderTable() {
+        const search = document.getElementById('searchBox').value.toLowerCase();
+        let filtered = currentStudents;
+        
+        if (search) {
+            filtered = currentStudents.filter(s =>
+                s.full_name.toLowerCase().includes(search) ||
+                s.roll_number.toLowerCase().includes(search)
+            );
+        }
+        
+        // Generate table header
+        const header = document.getElementById('tableHeader');
+        let headerHTML = '<tr><th style="width: 5%">Rank</th><th style="width: 15%">Name</th><th style="width: 10%">Roll</th><th style="width: 8%">Class</th><th style="width: 8%">Fees</th><th style="width: 8%">Vote Power</th>';
+        
+        // Add date columns
+        let current = new Date(currentDateFrom);
+        while (current <= currentDateTo) {
+            const dateStr = current.toISOString().split('T')[0];
+            const dayOfMonth = current.getDate();
+            headerHTML += `<th style="width: 6%; text-align: center;">${dayOfMonth}</th>`;
+            current.setDate(current.getDate() + 1);
+        }
+        
+        headerHTML += '<th style="width: 10%; text-align: center;">Total</th>';
+        headerHTML += '<th style="width: 8%; text-align: center;">Stars</th>';
+        headerHTML += '<th style="width: 8%; text-align: center;">Vetos</th>';
+        
+        if (isAdmin) {
+            headerHTML += '<th style="width: 10%">Actions</th>';
+        }
+        headerHTML += '</tr>';
+        
+        header.innerHTML = headerHTML;
+        
+        // Generate table body
+        const body = document.getElementById('tableBody');
+        let bodyHTML = '';
+        
+        filtered.forEach(student => {
+            const rank = student.rank;
+            const rankClass = rank <= 3 ? `rank-${rank}` : '';
+            
+            let rowHTML = `<tr>
+                <td><span class="rank-badge ${rankClass}">#${rank}</span></td>
+                <td><span class="student-name" onclick="openProfileModal(${student.id})">${student.full_name}</span></td>
+                <td>${student.roll_number}</td>
+                <td>${student.class}</td>
+                <td>${student.fees ?? '-'}</td>
+                <td>${student.vote_power ?? '-'}</td>`;
+            
+            // Add daily scores
+            let current = new Date(currentDateFrom);
+            while (current <= currentDateTo) {
+                const dateStr = current.toISOString().split('T')[0];
+                const dayData = student.daily_data[dateStr];
+                const score = dayData ? dayData.points : '-';
+                const cellClass = isAdmin ? 'score-cell score-editable' : 'score-cell';
+                const cellTitle = dayData && dayData.notes ? `title="${dayData.notes.replace(/\"/g, '&quot;')}"` : '';
+                const cellClick = isAdmin ? `onclick="openScoreModal(${student.id}, '${dateStr}')"` : '';
+                rowHTML += `<td class="${cellClass}" ${cellClick} ${cellTitle}>${score}</td>`;
+                current.setDate(current.getDate() + 1);
+            }
+            
+            // Add totals
+            const totalClass = student.total_points > 50 ? 'score-positive' : (student.total_points < 0 ? 'score-negative' : 'score-neutral');
+            rowHTML += `<td class="score-cell"><strong class="${totalClass}">${student.total_points}</strong></td>`;
+            rowHTML += `<td class="score-cell" style="color: gold;"><strong>${student.total_stars}</strong></td>`;
+            rowHTML += `<td class="score-cell" style="color: red;"><strong>${student.total_vetos}</strong></td>`;
+            
+            if (isAdmin) {
+                rowHTML += `<td><button class="delete-btn" onclick="deleteStudent(${student.id})">🗑️ Delete</button></td>`;
+            }
+            
+            rowHTML += '</tr>';
+            bodyHTML += rowHTML;
+        });
+        
+        body.innerHTML = bodyHTML;
+    }
+
+    function switchSidePanel(panelId, button) {
+        document.querySelectorAll('.side-panel-content').forEach(panel => {
+            panel.style.display = 'none';
+        });
+        document.getElementById(panelId).style.display = 'block';
+        document.querySelectorAll('.side-tab').forEach(tab => tab.classList.remove('active'));
+        if (button) {
+            button.classList.add('active');
+        }
+    }
+
+    async function loadSidePanels() {
+        await Promise.all([loadPartyData(), loadLeadershipData()]);
+        renderPartyTable();
+        renderLeadershipTable();
+        if (!isAdmin) {
+            document.getElementById('partyCodeInput').disabled = true;
+            document.getElementById('partyPowerInput').disabled = true;
+            document.getElementById('leadershipPostInput').disabled = true;
+            document.getElementById('leadershipHolderInput').disabled = true;
+        }
+    }
+
+    async function loadPartyData() {
+        try {
+            const response = await fetch('/scoreboard/party-data');
+            const data = await response.json();
+            if (data.success) {
+                partyData = data.parties || [];
+            }
+        } catch (error) {
+            console.error('Error loading party data:', error);
+        }
+    }
+
+    async function loadLeadershipData() {
+        try {
+            const response = await fetch('/scoreboard/leadership-data');
+            const data = await response.json();
+            if (data.success) {
+                leadershipData = data.leadership || [];
+            }
+        } catch (error) {
+            console.error('Error loading leadership data:', error);
+        }
+    }
+
+    function renderPartyTable() {
+        const tbody = document.getElementById('partyBody');
+        if (!partyData.length) {
+            tbody.innerHTML = '<tr><td colspan="3">No parties found</td></tr>';
+            return;
+        }
+        tbody.innerHTML = partyData.map(party => `
+            <tr>
+                <td>${party.code}</td>
+                <td>${party.power}</td>
+                <td class="side-actions">
+                    ${isAdmin ? `<button class="btn-action" onclick="editParty(${party.id})">Edit</button>` : ''}
+                    ${isAdmin ? `<button class="btn-action" onclick="deleteParty(${party.id})">Delete</button>` : ''}
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    function renderLeadershipTable() {
+        const tbody = document.getElementById('leadershipBody');
+        if (!leadershipData.length) {
+            tbody.innerHTML = '<tr><td colspan="3">No leadership posts found</td></tr>';
+            return;
+        }
+        tbody.innerHTML = leadershipData.map(post => `
+            <tr>
+                <td>${post.post}</td>
+                <td>${post.holder || '-'}</td>
+                <td class="side-actions">
+                    ${isAdmin ? `<button class="btn-action" onclick="editLeadership(${post.id})">Edit</button>` : ''}
+                    ${isAdmin ? `<button class="btn-action" onclick="deleteLeadership(${post.id})">Delete</button>` : ''}
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    async function saveParty() {
+        if (!isAdmin) return;
+        const code = document.getElementById('partyCodeInput').value.trim();
+        const powerValue = document.getElementById('partyPowerInput').value;
+        const power = powerValue === '' ? NaN : parseInt(powerValue);
+
+        if (!code || Number.isNaN(power)) {
+            showAlert('Enter party code and power', 'error');
+            return;
+        }
+
+        if (editingPartyId) {
+            const target = partyData.find(p => p.id === editingPartyId);
+            if (target) {
+                target.code = code;
+                target.power = power;
+            }
+        } else {
+            partyData.push({ id: Date.now(), code, power });
+        }
+
+        await persistPartyData();
+        clearPartyForm();
+        renderPartyTable();
+    }
+
+    async function persistPartyData() {
+        const response = await fetch('/scoreboard/party-data', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ parties: partyData })
+        });
+        const data = await response.json();
+        if (data.success) {
+            partyData = data.parties || [];
+        } else {
+            showAlert('Error saving party data', 'error');
+        }
+    }
+
+    function editParty(partyId) {
+        const party = partyData.find(p => p.id === partyId);
+        if (!party) return;
+        editingPartyId = partyId;
+        document.getElementById('partyCodeInput').value = party.code;
+        document.getElementById('partyPowerInput').value = party.power;
+    }
+
+    async function deleteParty(partyId) {
+        if (!confirm('Delete this party entry?')) return;
+        partyData = partyData.filter(p => p.id !== partyId);
+        await persistPartyData();
+        renderPartyTable();
+    }
+
+    function clearPartyForm() {
+        editingPartyId = null;
+        document.getElementById('partyCodeInput').value = '';
+        document.getElementById('partyPowerInput').value = '';
+    }
+
+    async function saveLeadership() {
+        if (!isAdmin) return;
+        const post = document.getElementById('leadershipPostInput').value.trim();
+        const holder = document.getElementById('leadershipHolderInput').value.trim();
+
+        if (!post) {
+            showAlert('Post name is required', 'error');
+            return;
+        }
+
+        if (editingLeadershipId) {
+            const target = leadershipData.find(p => p.id === editingLeadershipId);
+            if (target) {
+                target.post = post;
+                target.holder = holder;
+            }
+        } else {
+            leadershipData.push({ id: Date.now(), post, holder });
+        }
+
+        await persistLeadershipData();
+        clearLeadershipForm();
+        renderLeadershipTable();
+    }
+
+    async function persistLeadershipData() {
+        const response = await fetch('/scoreboard/leadership-data', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ leadership: leadershipData })
+        });
+        const data = await response.json();
+        if (data.success) {
+            leadershipData = data.leadership || [];
+        } else {
+            showAlert('Error saving leadership data', 'error');
+        }
+    }
+
+    function editLeadership(postId) {
+        const post = leadershipData.find(p => p.id === postId);
+        if (!post) return;
+        editingLeadershipId = postId;
+        document.getElementById('leadershipPostInput').value = post.post;
+        document.getElementById('leadershipHolderInput').value = post.holder || '';
+    }
+
+    async function deleteLeadership(postId) {
+        if (!confirm('Delete this leadership post?')) return;
+        leadershipData = leadershipData.filter(p => p.id !== postId);
+        await persistLeadershipData();
+        renderLeadershipTable();
+    }
+
+    function clearLeadershipForm() {
+        editingLeadershipId = null;
+        document.getElementById('leadershipPostInput').value = '';
+        document.getElementById('leadershipHolderInput').value = '';
+    }
+
+    function openScoreModal(studentId, dateStr) {
+        const student = currentStudents.find(s => s.id === studentId);
+        if (!student) return;
+        const dayData = student.daily_data[dateStr] || {};
+
+        document.getElementById('scoreEditStudentId').value = studentId;
+        document.getElementById('scoreEditDateValue').value = dateStr;
+        document.getElementById('scoreEditStudent').value = `${student.full_name} (${student.roll_number})`;
+        document.getElementById('scoreEditDate').value = dateStr;
+        document.getElementById('scoreEditPoints').value = dayData.points ?? '';
+        document.getElementById('scoreEditStars').value = dayData.stars ?? 0;
+        document.getElementById('scoreEditVetos').value = dayData.vetos ?? 0;
+        document.getElementById('scoreEditNotes').value = dayData.notes ?? '';
+
+        openModal('scoreEditModal');
+    }
+
+    async function submitScoreEdit(event) {
+        event.preventDefault();
+        const studentId = parseInt(document.getElementById('scoreEditStudentId').value);
+        const date = document.getElementById('scoreEditDateValue').value;
+        const pointsInput = document.getElementById('scoreEditPoints').value;
+        const starsInput = document.getElementById('scoreEditStars').value;
+        const vetosInput = document.getElementById('scoreEditVetos').value;
+
+        const payload = {
+            student_id: studentId,
+            date: date,
+            points: pointsInput === '' ? 0 : parseInt(pointsInput),
+            stars: starsInput === '' ? 0 : parseInt(starsInput),
+            vetos: vetosInput === '' ? 0 : parseInt(vetosInput),
+            notes: document.getElementById('scoreEditNotes').value || ''
+        };
+
+        try {
+            const response = await fetch('/scoreboard/add-points', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const data = await response.json();
+            if (data.success) {
+                showAlert('Score updated successfully!', 'success');
+                closeModal('scoreEditModal');
+                applyFilters();
+            } else {
+                showAlert('Error: ' + data.error, 'error');
+            }
+        } catch (error) {
+            console.error('Error updating score:', error);
+            showAlert('Error updating score', 'error');
+        }
+    }
+    
+    function openAddStudentModal() {
+        document.getElementById('addStudentForm').reset();
+        openModal('addStudentModal');
+    }
+    
+    async function submitAddStudent(event) {
+        event.preventDefault();
+        
+        const formData = {
+            roll_number: document.getElementById('newStudentRoll').value,
+            full_name: document.getElementById('newStudentName').value,
+            class: document.getElementById('newStudentClass').value,
+            group: document.getElementById('newStudentGroup').value,
+            fees: document.getElementById('newStudentFees').value || null,
+            vote_power: document.getElementById('newStudentVote').value || null
+        };
+        
+        try {
+            const response = await fetch('/scoreboard/add-student', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(formData)
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                showAlert('Student added successfully!', 'success');
+                closeModal('addStudentModal');
+                applyFilters();
+            } else {
+                showAlert('Error: ' + data.error, 'error');
+            }
+        } catch (error) {
+            console.error('Error adding student:', error);
+            showAlert('Error adding student', 'error');
+        }
+    }
+    
+    async function deleteStudent(studentId) {
+        if (!confirm('Are you sure you want to delete this student?')) {
+            return;
+        }
+        
+        try {
+            const response = await fetch(`/scoreboard/delete-student/${studentId}`, {
+                method: 'DELETE'
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                showAlert('Student deleted successfully!', 'success');
+                applyFilters();
+            } else {
+                showAlert('Error: ' + data.error, 'error');
+            }
+        } catch (error) {
+            console.error('Error deleting student:', error);
+            showAlert('Error deleting student', 'error');
+        }
+    }
+    
+    async function openProfileModal(studentId) {
+        currentEditingStudentId = studentId;
+        const student = currentStudents.find(s => s.id === studentId);
+        
+        if (!student) return;
+        
+        document.getElementById('profileModalTitle').textContent = `${student.full_name} - Profile`;
+        
+        const profileData = student.profile_data || {};
+        if (profileData.fees === undefined) profileData.fees = student.fees ?? '';
+        if (profileData.vote_power === undefined) profileData.vote_power = student.vote_power ?? '';
+        
+        let formHTML = `
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="pFullName">Full Name</label>
+                    <input type="text" id="pFullName" value="${student.full_name}">
+                </div>
+                <div class="form-group">
+                    <label for="pRoll">Roll Number</label>
+                    <input type="text" id="pRoll" value="${student.roll_number}" readonly>
+                </div>
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="pClass">Class</label>
+                    <input type="text" id="pClass" value="${student.class}">
+                </div>
+                <div class="form-group">
+                    <label for="pGroup">Group</label>
+                    <input type="text" id="pGroup" value="${student.group}">
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="pFees">Fees</label>
+                    <input type="number" id="pFees" value="${profileData.fees ?? ''}">
+                </div>
+                <div class="form-group">
+                    <label for="pVotePower">Vote Power</label>
+                    <input type="number" id="pVotePower" value="${profileData.vote_power ?? ''}">
+                </div>
+            </div>
+            
+            <hr style="margin: 20px 0;">
+            <h4>Personal Information</h4>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="pFatherName">Father's Name</label>
+                    <input type="text" id="pFatherName" value="${profileData.fatherName || ''}">
+                </div>
+                <div class="form-group">
+                    <label for="pMotherName">Mother's Name</label>
+                    <input type="text" id="pMotherName" value="${profileData.motherName || ''}">
+                </div>
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="pDOB">Date of Birth</label>
+                    <input type="date" id="pDOB" value="${profileData.dateOfBirth || ''}">
+                </div>
+                <div class="form-group">
+                    <label for="pBloodGroup">Blood Group</label>
+                    <select id="pBloodGroup">
+                        <option value="">Select</option>
+                        <option value="O+" ${profileData.bloodGroup === 'O+' ? 'selected' : ''}>O+</option>
+                        <option value="O-" ${profileData.bloodGroup === 'O-' ? 'selected' : ''}>O-</option>
+                        <option value="A+" ${profileData.bloodGroup === 'A+' ? 'selected' : ''}>A+</option>
+                        <option value="A-" ${profileData.bloodGroup === 'A-' ? 'selected' : ''}>A-</option>
+                        <option value="B+" ${profileData.bloodGroup === 'B+' ? 'selected' : ''}>B+</option>
+                        <option value="B-" ${profileData.bloodGroup === 'B-' ? 'selected' : ''}>B-</option>
+                        <option value="AB+" ${profileData.bloodGroup === 'AB+' ? 'selected' : ''}>AB+</option>
+                        <option value="AB-" ${profileData.bloodGroup === 'AB-' ? 'selected' : ''}>AB-</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label for="pAadhar">Aadhar Number</label>
+                <input type="text" id="pAadhar" value="${profileData.aadhar || ''}" placeholder="12-digit Aadhar number">
+            </div>
+            
+            <hr style="margin: 20px 0;">
+            <h4>Contact Information</h4>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="pPhone">Phone</label>
+                    <input type="tel" id="pPhone" value="${profileData.phone || ''}">
+                </div>
+                <div class="form-group">
+                    <label for="pEmail">Email</label>
+                    <input type="email" id="pEmail" value="${student.email || ''}">
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label for="pAddress">Address</label>
+                <textarea id="pAddress" rows="3">${profileData.address || ''}</textarea>
+            </div>
+            
+            <div class="form-group">
+                <label for="pParentPhone">Parent/Guardian Phone</label>
+                <input type="tel" id="pParentPhone" value="${profileData.parentPhone || ''}">
+            </div>
+            
+            <hr style="margin: 20px 0;">
+            <h4>Academic Information</h4>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="pAdmissionDate">Admission Date</label>
+                    <input type="date" id="pAdmissionDate" value="${profileData.admissionDate || ''}">
+                </div>
+                <div class="form-group">
+                    <label for="pAcademicYear">Academic Year</label>
+                    <input type="number" id="pAcademicYear" value="${profileData.academicYear || new Date().getFullYear()}">
+                </div>
+            </div>
+        `;
+        
+        document.getElementById('profileFormContent').innerHTML = formHTML;
+        openModal('profileModal');
+    }
+    
+    async function submitProfileForm(event) {
+        event.preventDefault();
+        
+        if (!currentEditingStudentId) return;
+        
+        const profileData = {
+            full_name: document.getElementById('pFullName').value,
+            class: document.getElementById('pClass').value,
+            group: document.getElementById('pGroup').value,
+            fees: document.getElementById('pFees').value || null,
+            vote_power: document.getElementById('pVotePower').value || null,
+            fatherName: document.getElementById('pFatherName').value,
+            motherName: document.getElementById('pMotherName').value,
+            dateOfBirth: document.getElementById('pDOB').value,
+            bloodGroup: document.getElementById('pBloodGroup').value,
+            aadhar: document.getElementById('pAadhar').value,
+            phone: document.getElementById('pPhone').value,
+            email: document.getElementById('pEmail').value,
+            address: document.getElementById('pAddress').value,
+            parentPhone: document.getElementById('pParentPhone').value,
+            admissionDate: document.getElementById('pAdmissionDate').value,
+            academicYear: parseInt(document.getElementById('pAcademicYear').value) || new Date().getFullYear()
+        };
+        
+        try {
+            const response = await fetch(`/scoreboard/update-profile/${currentEditingStudentId}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(profileData)
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                showAlert('Profile updated successfully!', 'success');
+                closeModal('profileModal');
+                applyFilters();
+            } else {
+                showAlert('Error: ' + data.error, 'error');
+            }
+        } catch (error) {
+            console.error('Error updating profile:', error);
+            showAlert('Error updating profile', 'error');
+        }
+    }
+    
+    async function handleExcelUpload(file) {
+        if (!file) return;
+        
+        if (!file.name.endsWith('.xlsx') && !file.name.endsWith('.xls')) {
+            showAlert('Please select an Excel file (.xlsx or .xls)', 'error');
+            return;
+        }
+        
+        const formData = new FormData();
+        formData.append('file', file);
+        
+        try {
+            const response = await fetch('/scoreboard/import-excel', {
+                method: 'POST',
+                body: formData
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                showAlert(`Successfully imported ${data.imported_count} records!`, 'success');
+                document.getElementById('excelInput').value = '';
+                applyFilters();
+                await loadSidePanels();
+            } else {
+                showAlert('Error: ' + data.error, 'error');
+            }
+        } catch (error) {
+            console.error('Error importing Excel:', error);
+            showAlert('Error importing Excel file', 'error');
+        }
+    }
+
+    async function seedFeb26() {
+        if (!isAdmin) return;
+        if (!confirm('This will sync the Feb 26 sheet data into the online module. Continue?')) {
+            return;
+        }
+        try {
+            const response = await fetch('/scoreboard/seed-feb26?mode=replace_unlinked', {
+                method: 'POST'
+            });
+            const data = await response.json();
+            if (data.success) {
+                showAlert(`Loaded Feb 26 data: ${data.students} students, ${data.scores} scores`, 'success');
+                applyFilters();
+                await loadSidePanels();
+            } else {
+                showAlert('Error: ' + data.error, 'error');
+            }
+        } catch (error) {
+            console.error('Error seeding Feb 26:', error);
+            showAlert('Error loading Feb 26 data', 'error');
+        }
+    }
+    
+    function openModal(modalId) {
+        document.getElementById(modalId).classList.add('show');
+    }
+    
+    function closeModal(modalId) {
+        document.getElementById(modalId).classList.remove('show');
+    }
+    
+    function showAlert(message, type) {
+        const alertBox = document.getElementById('alertBox');
+        const alertHTML = `<div class="alert alert-${type}">${message}</div>`;
+        alertBox.innerHTML = alertHTML;
+        
+        setTimeout(() => {
+            alertBox.innerHTML = '';
+        }, 5000);
+    }
+    
+    // Close modal when clicking outside
+    window.onclick = function(event) {
+        const modals = document.querySelectorAll('.modal');
+        modals.forEach(modal => {
+            if (event.target === modal) {
+                modal.classList.remove('show');
+            }
+        });
+    }
+</script>
+{% endblock %}

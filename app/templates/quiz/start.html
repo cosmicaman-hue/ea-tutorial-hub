@@ -1,0 +1,191 @@
+{% extends "base.html" %}
+
+{% block title %}{{ quiz.title }} - Start Quiz{% endblock %}
+
+{% block extra_css %}
+<style>
+    .question-container {
+        border-left: 4px solid #667eea;
+        padding-left: 20px;
+    }
+    .timer {
+        font-size: 1.5rem;
+        font-weight: bold;
+        color: #dc3545;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0">{{ quiz.title }}</h5>
+                    <div class="timer">
+                        <i class="fas fa-hourglass-half"></i> <span id="timer">{{ quiz.duration_minutes }}:00</span>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <form id="quizForm">
+                        {% for question in questions %}
+                        <div class="question-container mb-5" data-question-id="{{ question.id }}">
+                            <div class="d-flex justify-content-between align-items-start mb-3">
+                                <h6 class="mb-0">Question {{ loop.index }} of {{ questions|length }}</h6>
+                                <span class="badge bg-info">{{ question.points }} point{{ 's' if question.points > 1 else '' }}</span>
+                            </div>
+                            <p class="fs-5 fw-bold mb-3">{{ question.question_text }}</p>
+
+                            {% if question.question_type == 'multiple_choice' %}
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="q{{ question.id }}" id="q{{ question.id }}_a" value="A" required>
+                                    <label class="form-check-label" for="q{{ question.id }}_a">
+                                        <strong>A)</strong> {{ question.option_a }}
+                                    </label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="q{{ question.id }}" id="q{{ question.id }}_b" value="B" required>
+                                    <label class="form-check-label" for="q{{ question.id }}_b">
+                                        <strong>B)</strong> {{ question.option_b }}
+                                    </label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="q{{ question.id }}" id="q{{ question.id }}_c" value="C" required>
+                                    <label class="form-check-label" for="q{{ question.id }}_c">
+                                        <strong>C)</strong> {{ question.option_c }}
+                                    </label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="q{{ question.id }}" id="q{{ question.id }}_d" value="D" required>
+                                    <label class="form-check-label" for="q{{ question.id }}_d">
+                                        <strong>D)</strong> {{ question.option_d }}
+                                    </label>
+                                </div>
+                            {% elif question.question_type == 'true_false' %}
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="q{{ question.id }}" id="q{{ question.id }}_true" value="True" required>
+                                    <label class="form-check-label" for="q{{ question.id }}_true">
+                                        True
+                                    </label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="q{{ question.id }}" id="q{{ question.id }}_false" value="False" required>
+                                    <label class="form-check-label" for="q{{ question.id }}_false">
+                                        False
+                                    </label>
+                                </div>
+                            {% elif question.question_type == 'short_answer' %}
+                                <input type="text" class="form-control" name="q{{ question.id }}" placeholder="Enter your answer" required>
+                            {% endif %}
+                            <hr>
+                        </div>
+                        {% endfor %}
+
+                        <div class="d-grid gap-2 mt-4">
+                            <button type="button" class="btn btn-success btn-lg" id="submitBtn" onclick="submitQuiz()">
+                                <i class="fas fa-check-circle"></i> Submit Quiz
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card sticky-top" style="top: 20px;">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Progress</h5>
+                </div>
+                <div class="card-body">
+                    <div class="progress mb-3">
+                        <div class="progress-bar" id="progressBar" role="progressbar" style="width: 0%" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+                    </div>
+                    <p class="text-muted">Answering: <strong id="answeredCount">0</strong> / {{ questions|length }}</p>
+                    <div id="questionsList" class="list-group">
+                        {% for question in questions %}
+                        <button type="button" class="list-group-item list-group-item-action question-link" data-question-id="{{ question.id }}">
+                            Q{{ loop.index }} <span class="badge bg-secondary float-end">{{ question.points }}pt</span>
+                        </button>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const quizDuration = {{ quiz.duration_minutes }};
+    const quizId = {{ quiz.id }};
+    let timeRemaining = quizDuration * 60;
+
+    // Timer
+    function updateTimer() {
+        const minutes = Math.floor(timeRemaining / 60);
+        const seconds = timeRemaining % 60;
+        document.getElementById('timer').textContent = 
+            minutes + ':' + (seconds < 10 ? '0' : '') + seconds;
+        
+        if (timeRemaining <= 0) {
+            submitQuiz();
+        } else {
+            timeRemaining--;
+            setTimeout(updateTimer, 1000);
+        }
+    }
+
+    // Track answered questions
+    function updateProgress() {
+        const questions = document.querySelectorAll('[data-question-id]');
+        let answered = 0;
+        
+        questions.forEach(q => {
+            const qId = q.getAttribute('data-question-id');
+            const checked = document.querySelector(`input[name="q${qId}"]:checked`);
+            if (checked) {
+                answered++;
+            }
+        });
+        
+        const total = questions.length;
+        const percentage = (answered / total) * 100;
+        document.getElementById('progressBar').style.width = percentage + '%';
+        document.getElementById('answeredCount').textContent = answered;
+    }
+
+    // Submit quiz
+    function submitQuiz() {
+        const formData = new FormData(document.getElementById('quizForm'));
+        const answers = {};
+        
+        for (let [key, value] of formData.entries()) {
+            answers[key.replace('q', '')] = value;
+        }
+
+        fetch(`/quiz/${quizId}/submit`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({answers: answers})
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                window.location.href = data.redirect_url;
+            }
+        })
+        .catch(error => console.error('Error:', error));
+    }
+
+    // Event listeners
+    document.querySelectorAll('input[type="radio"], input[type="text"]').forEach(el => {
+        el.addEventListener('change', updateProgress);
+    });
+
+    // Initialize
+    updateTimer();
+    updateProgress();
+</script>
+{% endblock %}

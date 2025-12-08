@@ -1,0 +1,132 @@
+{% extends 'base.html' %}
+
+{% block title %}Activity Log - Admin{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row mb-4">
+        <div class="col">
+            <h2>Activity Log</h2>
+            <p class="text-muted">Monitor all user activities on the website</p>
+        </div>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ 'danger' if category == 'error' else 'success' }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <!-- Filter by Action Type -->
+    <div class="row mb-3">
+        <div class="col">
+            <div class="btn-group" role="group">
+                <a href="{{ url_for('admin.activity_log', action_type='all') }}" class="btn btn-sm {% if selected_action == 'all' %}btn-primary{% else %}btn-outline-primary{% endif %}">
+                    All Activities
+                </a>
+                {% for action_type, count in action_types %}
+                    <a href="{{ url_for('admin.activity_log', action_type=action_type) }}" class="btn btn-sm {% if selected_action == action_type %}btn-primary{% else %}btn-outline-primary{% endif %}">
+                        {{ action_type.replace('_', ' ').title() }} ({{ count }})
+                    </a>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Activity Table -->
+    <div class="table-responsive">
+        <table class="table table-hover table-bordered">
+            <thead class="table-light">
+                <tr>
+                    <th>Timestamp</th>
+                    <th>User</th>
+                    <th>Action Type</th>
+                    <th>Action</th>
+                    <th>IP Address</th>
+                    <th>Details</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if activities.items %}
+                    {% for activity in activities.items %}
+                        <tr>
+                            <td>
+                                <small>{{ activity.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</small>
+                            </td>
+                            <td>
+                                {% if activity.user_rel %}
+                                    <strong>{{ activity.user_rel.login_id }}</strong>
+                                    <br>
+                                    <small class="text-muted">{{ activity.user_rel.role.capitalize() }}</small>
+                                {% else %}
+                                    <small class="text-muted">System</small>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="badge bg-info">{{ activity.action_type.replace('_', ' ').title() }}</span>
+                            </td>
+                            <td>{{ activity.action }}</td>
+                            <td><small>{{ activity.ip_address }}</small></td>
+                            <td>
+                                {% if activity.details %}
+                                    <small>{{ activity.details }}</small>
+                                {% else %}
+                                    <small class="text-muted">-</small>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td colspan="6" class="text-center text-muted py-4">
+                            No activities found
+                        </td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Pagination -->
+    {% if activities.pages > 1 %}
+        <nav aria-label="Page navigation">
+            <ul class="pagination justify-content-center">
+                {% if activities.has_prev %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('admin.activity_log', page=activities.prev_num, action_type=selected_action) }}">Previous</a>
+                    </li>
+                {% endif %}
+
+                {% for page_num in activities.iter_pages() %}
+                    {% if page_num %}
+                        {% if page_num == activities.page %}
+                            <li class="page-item active">
+                                <span class="page-link">{{ page_num }}</span>
+                            </li>
+                        {% else %}
+                            <li class="page-item">
+                                <a class="page-link" href="{{ url_for('admin.activity_log', page=page_num, action_type=selected_action) }}">{{ page_num }}</a>
+                            </li>
+                        {% endif %}
+                    {% else %}
+                        <li class="page-item disabled">
+                            <span class="page-link">...</span>
+                        </li>
+                    {% endif %}
+                {% endfor %}
+
+                {% if activities.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('admin.activity_log', page=activities.next_num, action_type=selected_action) }}">Next</a>
+                    </li>
+                {% endif %}
+            </ul>
+        </nav>
+    {% endif %}
+</div>
+{% endblock %}

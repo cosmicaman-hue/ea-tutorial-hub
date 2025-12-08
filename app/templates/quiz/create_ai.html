@@ -1,0 +1,190 @@
+{% extends "base.html" %}
+
+{% block title %}Create Quiz with AI - EA Tutorial Hub{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <h2>🤖 Create Quiz with AI</h2>
+            <p class="text-muted">Upload a document and let AI generate quiz questions automatically</p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-8">
+            <!-- AI Provider Selection -->
+            <div class="card mb-4">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">🔧 AI Provider</h5>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <strong>Available AI Providers:</strong>
+                        <ul class="mb-0">
+                            <li><strong>OpenAI (GPT-3.5):</strong> Fast, reliable, great quality</li>
+                            <li><strong>Google Gemini:</strong> Advanced, multi-modal support</li>
+                            <li><strong>Anthropic Claude:</strong> Detailed explanations, nuanced understanding</li>
+                        </ul>
+                        <small class="text-muted">Requires API keys configured in environment variables</small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quiz Creation Form -->
+            <form method="POST" enctype="multipart/form-data" class="card">
+                <!-- Document Upload -->
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">📄 Upload Document</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label for="document" class="form-label">Select Document (Required)</label>
+                        <input type="file" class="form-control" id="document" name="document" required
+                               accept=".txt,.pdf,.docx,.md"
+                               help="Supported formats: TXT, PDF, DOCX, Markdown (Max 5MB)">
+                        <small class="form-text text-muted">
+                            📌 Supported: TXT, PDF, DOCX, Markdown files | Max size: 5MB
+                        </small>
+                    </div>
+
+                    <!-- Quiz Title -->
+                    <div class="mb-3">
+                        <label for="quiz_title" class="form-label">Quiz Title</label>
+                        <input type="text" class="form-control" id="quiz_title" name="quiz_title"
+                               placeholder="e.g., Mathematics Chapter 5" value="AI Generated Quiz">
+                    </div>
+
+                    <!-- Number of Questions -->
+                    <div class="mb-3">
+                        <label for="num_questions" class="form-label">Number of Questions (1-50)</label>
+                        <input type="number" class="form-control" id="num_questions" name="num_questions"
+                               min="1" max="50" value="10" required>
+                        <small class="form-text text-muted">AI will generate up to this many questions from your document</small>
+                    </div>
+
+                    <!-- Difficulty Level -->
+                    <div class="mb-3">
+                        <label for="difficulty" class="form-label">Difficulty Level</label>
+                        <select class="form-select" id="difficulty" name="difficulty" required>
+                            <option value="easy">Easy - Basic concepts</option>
+                            <option value="medium" selected>Medium - Standard difficulty</option>
+                            <option value="hard">Hard - Advanced concepts</option>
+                        </select>
+                    </div>
+
+                    <!-- AI Provider Selection -->
+                    <div class="mb-3">
+                        <label for="ai_provider" class="form-label">AI Provider</label>
+                        <select class="form-select" id="ai_provider" name="ai_provider" required>
+                            <option value="openai" selected>OpenAI (GPT-3.5) - Recommended</option>
+                            <option value="gemini">Google Gemini</option>
+                            <option value="claude">Anthropic Claude</option>
+                        </select>
+                        <small class="form-text text-muted">Make sure you have API keys configured</small>
+                    </div>
+                </div>
+
+                <!-- Submit Button -->
+                <div class="card-footer bg-light">
+                    <button type="submit" class="btn btn-primary btn-lg w-100">
+                        <i class="fas fa-magic"></i> Generate Quiz with AI
+                    </button>
+                </div>
+            </form>
+
+            <!-- Instructions -->
+            <div class="card mt-4">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">📋 How It Works</h5>
+                </div>
+                <div class="card-body">
+                    <ol>
+                        <li>Upload a document with content about your subject</li>
+                        <li>Select the number of questions and difficulty level</li>
+                        <li>Choose your preferred AI provider</li>
+                        <li>Click "Generate Quiz" - AI will analyze the document</li>
+                        <li>Review and customize questions if needed</li>
+                        <li>Publish the quiz for students to take</li>
+                    </ol>
+                </div>
+            </div>
+
+            <!-- Example Document Content -->
+            <div class="card mt-4">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0">💡 Tips for Best Results</h5>
+                </div>
+                <div class="card-body">
+                    <ul>
+                        <li><strong>Quality Content:</strong> Use well-written, clear documents</li>
+                        <li><strong>Comprehensive:</strong> Include enough content for the number of questions</li>
+                        <li><strong>Structured:</strong> Well-organized content produces better questions</li>
+                        <li><strong>Review:</strong> Always review and edit AI-generated questions</li>
+                        <li><strong>Multiple Formats:</strong> Combine text, PDFs, and documents for variety</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar -->
+        <div class="col-md-4">
+            <!-- Feature Overview -->
+            <div class="card mb-3">
+                <div class="card-header bg-dark text-white">
+                    <h5 class="mb-0">✨ Features</h5>
+                </div>
+                <div class="card-body">
+                    <ul class="list-unstyled">
+                        <li>✅ Automatic question generation</li>
+                        <li>✅ Multiple choice format</li>
+                        <li>✅ AI-generated explanations</li>
+                        <li>✅ Supports up to 50 questions</li>
+                        <li>✅ 3 AI providers</li>
+                        <li>✅ Multiple file formats</li>
+                        <li>✅ Difficulty level control</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- API Status -->
+            <div class="card">
+                <div class="card-header bg-secondary text-white">
+                    <h5 class="mb-0">🔑 API Configuration</h5>
+                </div>
+                <div class="card-body">
+                    <p class="small">Configure these environment variables:</p>
+                    <div class="bg-light p-2 rounded small font-monospace">
+                        OPENAI_API_KEY=your_key<br>
+                        GOOGLE_API_KEY=your_key<br>
+                        ANTHROPIC_API_KEY=your_key
+                    </div>
+                    <p class="small text-muted mt-2">Get API keys from official providers</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .card {
+        border: 1px solid #ddd;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .card-header {
+        font-weight: 600;
+    }
+    .btn-lg {
+        padding: 0.75rem 1.5rem;
+        font-size: 1.1rem;
+    }
+    input[type="file"]::file-selector-button {
+        background-color: #007bff;
+        color: white;
+        padding: 0.5rem 1rem;
+        border: none;
+        border-radius: 0.25rem;
+        cursor: pointer;
+    }
+</style>
+{% endblock %}
