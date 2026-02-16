@@ -3,16 +3,16 @@
 
 [SERVER_INFO]
 Hostname: ExcelAcademy
-IP_Address: 192.168.0.163
+IP_Address: 192.168.0.183
 Port: 5000
 
 [ACCESS_URLS]
-Main: http://192.168.0.163:5000
-Login: http://192.168.0.163:5000/auth/login
-Admin_Dashboard: http://192.168.0.163:5000/admin/dashboard
+Main: http://192.168.0.183:5000
+Login: http://192.168.0.183:5000/auth/login
+Admin_Dashboard: http://192.168.0.183:5000/admin/dashboard
 
 [DATABASE]
-Location: C:\Users\sujit\Desktop\Project EA\instance\ea_tutorial.db
+Location: C:\Users\sujit\OneDrive\Desktop\Project EA\instance\ea_tutorial.db
 Type: SQLite3
 
 [DEFAULT_CREDENTIALS]

@@ -16,8 +16,8 @@ def main():
     print("   Offline Student Scoring System")
     print("="*70 + "\n")
     
-    # Project directory
-    project_dir = r"C:\Users\sujit\Desktop\Project EA"
+    # Project directory - automatically detect from script location
+    project_dir = os.path.dirname(os.path.abspath(__file__))
     os.chdir(project_dir)
     
     print(f"📁 Project Directory: {project_dir}")

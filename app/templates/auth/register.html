@@ -14,6 +14,7 @@
                 </div>
                 <div class="card-body">
                     <form method="POST" action="{{ url_for('auth.register') }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                         <div class="mb-3">
                             <label for="login_id" class="form-label">Login ID</label>
                             <input type="text" class="form-control" id="login_id" name="login_id" placeholder="e.g., EA24A01" required>

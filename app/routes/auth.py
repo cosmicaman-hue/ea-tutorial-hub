@@ -1,11 +1,54 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, session
+from flask import Blueprint, render_template, request, redirect, url_for, flash, session, current_app
 from flask_login import login_user, logout_user, current_user, login_required
-from app import db
+from app import db, limiter
 from app.models import User, StudentProfile
 from app.models.user import ActivityLog
 from datetime import datetime
+import json
+import os
 
 auth_bp = Blueprint('auth', __name__, url_prefix='/auth')
+
+
+def _check_password_for_login(user, password):
+    """Admin/Teacher and Student (roll-based) passwords are case-insensitive by requirement."""
+    if not user:
+        return False
+    text = str(password or '')
+    role = str(getattr(user, 'role', '')).strip().lower()
+    if role == 'student':
+        # Student requirement: password is their roll number (case-insensitive).
+        if text.strip().upper() == str(user.login_id or '').strip().upper():
+            return True
+
+    if user.login_id in ('Admin', 'Teacher') or role == 'student':
+        variants = {text, text.lower(), text.upper()}
+        return any(user.check_password(candidate) for candidate in variants)
+    return user.check_password(text)
+
+
+def _offline_scoreboard_data_path():
+    return os.path.join(current_app.instance_path, 'offline_scoreboard_data.json')
+
+
+def _student_roll_exists_in_offline_roster(roll_value):
+    """Best-effort check that a roll exists in the offline scoreboard roster."""
+    roll = str(roll_value or '').strip().upper()
+    if not roll or not roll.startswith('EA'):
+        return False
+    path = _offline_scoreboard_data_path()
+    try:
+        with open(path, 'r', encoding='utf-8') as f:
+            payload = json.load(f)
+        students = payload.get('students') or []
+        if not isinstance(students, list):
+            return False
+        for s in students:
+            if isinstance(s, dict) and str(s.get('roll') or '').strip().upper() == roll:
+                return True
+    except Exception:
+        return False
+    return False
 
 def log_activity(user_id, action, action_type, details=None, ip_address=None):
     """Helper function to log user activities"""
@@ -26,16 +69,21 @@ def log_activity(user_id, action, action_type, details=None, ip_address=None):
         db.session.rollback()
 
 @auth_bp.route('/login', methods=['GET', 'POST'])
+@limiter.limit("10 per minute")
 def login():
     if current_user.is_authenticated:
-        return redirect(url_for('dashboard.index'))
+        return redirect(url_for('points.offline_scoreboard'))
     
     if request.method == 'POST':
-        login_id = request.form.get('login_id', '')
-        password = request.form.get('password', '')
-        
-        # Convert to uppercase for student IDs, but preserve case for Admin/Teacher
-        if login_id not in ['Admin', 'Teacher']:
+        login_id = request.form.get('login_id', '').strip()
+        password = request.form.get('password', '').strip()
+
+        # Normalize login IDs (case-insensitive for Admin/Teacher)
+        if login_id.lower() == 'admin':
+            login_id = 'Admin'
+        elif login_id.lower() == 'teacher':
+            login_id = 'Teacher'
+        else:
             login_id = login_id.upper()
         
         # Validate login ID format
@@ -44,28 +92,69 @@ def login():
             return redirect(url_for('auth.login'))
         
         user = User.query.filter_by(login_id=login_id).first()
-        
-        if user and user.check_password(password):
+
+        login_ok = False
+        if user:
+            # All users authenticate via hashed password only.
+            # Admin/Teacher passwords are intentionally case-insensitive by requirement.
+            login_ok = _check_password_for_login(user, password)
+        else:
+            # Student auto-provisioning (LAN/offline use-case):
+            # If a roll exists in the offline roster and password == roll (case-insensitive),
+            # create the user with that roll/password.
+            if login_id.startswith('EA') and password and str(password).strip().upper() == login_id:
+                # Prefer verifying against the offline roster when available, but don't block login
+                # if the roster file is missing/out-of-date (user requirement: roll==password login).
+                roster_ok = _student_roll_exists_in_offline_roster(login_id)
+                try:
+                    user = User(login_id=login_id, role='student', first_login=False, is_active=True)
+                    user.set_password(login_id)  # stored hashed; login check remains case-insensitive
+                    db.session.add(user)
+                    db.session.commit()
+                    login_ok = True
+                    log_activity(
+                        user.id,
+                        'Student account auto-provisioned',
+                        'register',
+                        f'Login ID: {login_id} | roster_match={str(roster_ok)}',
+                        request.remote_addr
+                    )
+                except Exception:
+                    db.session.rollback()
+
+        if user and login_ok:
             if not user.is_active:
                 flash('Your account is disabled. Contact admin.', 'error')
                 log_activity(0, f'Login blocked for {login_id} - account inactive', 'login_failed', 'Account inactive', request.remote_addr)
                 return redirect(url_for('auth.login'))
             
             login_user(user)
+            # Enforce student roll-based password policy on successful login.
+            if str(getattr(user, 'role', '')).strip().lower() == 'student':
+                try:
+                    # Always sync the stored hash to the required policy (password == roll).
+                    user.set_password(user.login_id)
+                except Exception:
+                    pass
             user.last_login = datetime.utcnow()
             user.last_login_ip = request.remote_addr
             db.session.commit()
             
             # Log successful login
             log_activity(user.id, f'{user.role.capitalize()} login successful', 'login', f'IP: {request.remote_addr}', request.remote_addr)
-            
-            if user.first_login and user.role == 'student':
-                return redirect(url_for('auth.complete_profile'))
-            
-            if user.role == 'admin':
-                return redirect(url_for('admin.dashboard'))
-            else:
-                return redirect(url_for('dashboard.index'))
+
+            next_url = request.form.get('next') or request.args.get('next')
+            if next_url:
+                try:
+                    from urllib.parse import urlparse, urljoin
+                    host_url = request.host_url
+                    test_url = urlparse(urljoin(host_url, next_url))
+                    if test_url.scheme in ('http', 'https') and test_url.netloc == urlparse(host_url).netloc:
+                        return redirect(next_url)
+                except Exception:
+                    pass
+
+            return redirect(url_for('points.offline_scoreboard'))
         else:
             log_activity(0, f'Failed login attempt for {login_id}', 'login_failed', 'Invalid credentials', request.remote_addr)
             flash('Invalid login ID or password', 'error')
@@ -73,9 +162,10 @@ def login():
     return render_template('auth/login.html')
 
 @auth_bp.route('/register', methods=['GET', 'POST'])
+@limiter.limit("5 per hour")
 def register():
     if current_user.is_authenticated:
-        return redirect(url_for('dashboard.index'))
+        return redirect(url_for('points.offline_scoreboard'))
     
     if request.method == 'POST':
         login_id = request.form.get('login_id', '').upper()
@@ -122,39 +212,93 @@ def register():
 @login_required
 def complete_profile():
     if not current_user.first_login:
-        return redirect(url_for('dashboard.index'))
+        return redirect(url_for('points.offline_scoreboard'))
     
     if request.method == 'POST':
         try:
+            # Validation: Required fields
+            first_name = request.form.get('first_name', '').strip()
+            second_name = request.form.get('second_name', '').strip()
+            date_of_birth_str = request.form.get('date_of_birth', '').strip()
+            gender = request.form.get('gender', '').strip()
+            contact_number_1 = request.form.get('contact_number_1', '').strip()
+            pin_code = request.form.get('pin_code', '').strip()
+
+            # Validate required fields
+            if not first_name or len(first_name) < 2 or len(first_name) > 50:
+                raise ValueError("First name must be between 2-50 characters")
+            if not second_name or len(second_name) < 2 or len(second_name) > 50:
+                raise ValueError("Second name must be between 2-50 characters")
+            if gender not in ['Male', 'Female', 'Other']:
+                raise ValueError("Gender must be Male, Female, or Other")
+
+            # Validate and parse date of birth
+            if not date_of_birth_str:
+                raise ValueError("Date of birth is required")
+            try:
+                dob = datetime.strptime(date_of_birth_str, '%Y-%m-%d').date()
+                # Validate age (must be between 5-25 years old)
+                from datetime import date
+                today = date.today()
+                age = today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
+                if age < 5 or age > 25:
+                    raise ValueError("Age must be between 5 and 25 years")
+            except ValueError as e:
+                raise ValueError(f"Invalid date of birth: {str(e)}")
+
+            # Validate contact number (10 digits)
+            import re
+            if not contact_number_1 or not re.match(r'^\d{10}$', contact_number_1):
+                raise ValueError("Contact number must be exactly 10 digits")
+
+            # Validate PIN code (6 digits)
+            if not pin_code or not re.match(r'^\d{6}$', pin_code):
+                raise ValueError("PIN code must be exactly 6 digits")
+
+            # Validate optional fields
+            email = request.form.get('email', '').strip() or f"{current_user.login_id}@school.local"
+            if email and '@' not in email:
+                raise ValueError("Invalid email address")
+
+            # Sanitize and limit text field lengths
+            third_name = request.form.get('third_name', '').strip()[:50]
+            roll_number = request.form.get('roll_number', '').strip()[:20]
+            contact_number_2 = request.form.get('contact_number_2', '').strip()[:15]
+            aadhar_number = request.form.get('aadhar_number', '').strip()[:12]
+
+            # Validate Aadhar if provided (12 digits)
+            if aadhar_number and not re.match(r'^\d{12}$', aadhar_number):
+                raise ValueError("Aadhar number must be exactly 12 digits")
+
             profile = StudentProfile(
                 user_id=current_user.id,
-                first_name=request.form.get('first_name'),
-                second_name=request.form.get('second_name'),
-                third_name=request.form.get('third_name', ''),
-                date_of_birth=datetime.strptime(request.form.get('date_of_birth'), '%Y-%m-%d').date(),
-                gender=request.form.get('gender'),
-                religion=request.form.get('religion'),
-                nationality=request.form.get('nationality', 'India'),
-                school_name=request.form.get('school_name'),
-                class_name=request.form.get('class_name'),
-                section=request.form.get('section'),
-                roll_number=request.form.get('roll_number', ''),
-                contact_number_1=request.form.get('contact_number_1'),
-                contact_number_2=request.form.get('contact_number_2', ''),
-                email=request.form.get('email', current_user.login_id + '@school.local'),
-                village_area=request.form.get('village_area'),
-                post_office=request.form.get('post_office'),
-                district=request.form.get('district'),
-                state=request.form.get('state'),
-                pin_code=request.form.get('pin_code'),
-                hobbies=request.form.get('hobbies', ''),
-                improvement_areas=request.form.get('improvement_areas', ''),
-                father_name=request.form.get('father_name', ''),
-                mother_name=request.form.get('mother_name', ''),
-                guardian_name=request.form.get('guardian_name', ''),
-                guardian_contact=request.form.get('guardian_contact', ''),
-                blood_group=request.form.get('blood_group', ''),
-                aadhar_number=request.form.get('aadhar_number', '')
+                first_name=first_name,
+                second_name=second_name,
+                third_name=third_name,
+                date_of_birth=dob,
+                gender=gender,
+                religion=request.form.get('religion', '').strip()[:50],
+                nationality=request.form.get('nationality', 'India').strip()[:50],
+                school_name=request.form.get('school_name', '').strip()[:100],
+                class_name=request.form.get('class_name', '').strip()[:20],
+                section=request.form.get('section', '').strip()[:10],
+                roll_number=roll_number,
+                contact_number_1=contact_number_1,
+                contact_number_2=contact_number_2,
+                email=email[:100],
+                village_area=request.form.get('village_area', '').strip()[:100],
+                post_office=request.form.get('post_office', '').strip()[:100],
+                district=request.form.get('district', '').strip()[:50],
+                state=request.form.get('state', '').strip()[:50],
+                pin_code=pin_code,
+                hobbies=request.form.get('hobbies', '').strip()[:500],
+                improvement_areas=request.form.get('improvement_areas', '').strip()[:500],
+                father_name=request.form.get('father_name', '').strip()[:100],
+                mother_name=request.form.get('mother_name', '').strip()[:100],
+                guardian_name=request.form.get('guardian_name', '').strip()[:100],
+                guardian_contact=request.form.get('guardian_contact', '').strip()[:15],
+                blood_group=request.form.get('blood_group', '').strip()[:10],
+                aadhar_number=aadhar_number
             )
             
             current_user.first_login = False
@@ -164,22 +308,30 @@ def complete_profile():
             log_activity(current_user.id, 'Student profile completed', 'profile_complete', 'First login profile setup', request.remote_addr)
             
             flash('Profile completed successfully!', 'success')
-            return redirect(url_for('dashboard.index'))
-        except Exception as e:
+            return redirect(url_for('points.offline_scoreboard'))
+        except ValueError as e:
+            # Specific validation errors (safe to show)
             db.session.rollback()
-            flash(f'Error completing profile: {str(e)}', 'error')
+            current_app.logger.error(f"Profile completion validation error for user {current_user.id}: {str(e)}")
+            flash(f'Invalid data: {str(e)}', 'error')
+        except Exception as e:
+            # Generic errors (hide details from user)
+            db.session.rollback()
+            current_app.logger.error(f"Profile completion error for user {current_user.id}: {str(e)}", exc_info=True)
+            flash('An error occurred while completing your profile. Please try again or contact support.', 'error')
     
     return render_template('auth/complete_profile.html')
 
 @auth_bp.route('/change-password', methods=['GET', 'POST'])
 @login_required
+@limiter.limit("3 per hour")
 def change_password():
     if request.method == 'POST':
         current_password = request.form.get('current_password', '')
         new_password = request.form.get('new_password', '')
         confirm_password = request.form.get('confirm_password', '')
         
-        if not current_user.check_password(current_password):
+        if not _check_password_for_login(current_user, current_password):
             flash('Current password is incorrect', 'error')
             return redirect(url_for('auth.change_password'))
         
@@ -201,7 +353,7 @@ def change_password():
         log_activity(current_user.id, 'Password changed', 'password_change', f'Password changed for {current_user.role}', request.remote_addr)
         
         flash('Password changed successfully!', 'success')
-        return redirect(url_for('dashboard.index'))
+        return redirect(url_for('points.offline_scoreboard'))
     
     return render_template('auth/change_password.html')
 

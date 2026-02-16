@@ -1,0 +1,18 @@
+<!-- REFINEMENT: Star/VETO Management System -->
+<!-- 
+CHANGES SUMMARY:
+1. Add explicit star/VETO removal UI in Students tab
+2. Implement smart star counter logic when positive marks are used to offset negative marks
+3. Conditional +100 bonus based on negative mark threshold (-50 vs -51)
+
+IMPLEMENTATION PLAN:
+1. Add "Remove Star/VETO" button in Students list
+2. Create removeStarVeto() function
+3. Add smartStarCounter() to handle conditional logic when points offset negatives
+4. Modify saveScore() to use smartStarCounter when appropriate
+
+LOGIC:
+- When a student has negative points and a star is "used" to counter:
+  - If points <= -50: Star replaces negative mark + adds +100 to next day
+  - If points > -50: Star replaces negative mark only, no +100 bonus
+-->

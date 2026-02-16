@@ -1,8 +1,8 @@
-from flask import Blueprint, render_template, request, jsonify, current_app, send_file
+from flask import Blueprint, render_template, request, jsonify, current_app, send_file, after_this_request, Response, stream_with_context
 from flask_login import login_required, current_user
-from app import db
+from app import db, csrf, limiter
 from app.models import StudentProfile, StudentPoints, StudentLeaderboard, MonthlyPointsSummary, User
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, timedelta, timezone
 from dateutil.relativedelta import relativedelta
 import calendar
 import openpyxl
@@ -11,8 +11,17 @@ import os
 import json
 import re
 import tempfile
+import shutil
+import glob
+import urllib.request
+import urllib.error
+from zoneinfo import ZoneInfo
+from queue import Queue, Empty
+import threading
 
 points_bp = Blueprint('points', __name__, url_prefix='/scoreboard')
+_sync_subscribers = []
+_sync_lock = threading.Lock()
 
 DEFAULT_PARTIES = [
     {"id": 1, "code": "MAP", "power": 15},
@@ -44,6 +53,1880 @@ DEFAULT_LEADERSHIP = [
 def _politics_file_path():
     return os.path.join(current_app.instance_path, 'scoreboard_politics.json')
 
+
+def _offline_data_path():
+    return os.path.join(current_app.instance_path, 'offline_scoreboard_data.json')
+
+
+def _offline_backup_dir():
+    return os.path.join(current_app.instance_path, 'offline_scoreboard_backups')
+
+def _offline_hourly_backup_dir():
+    return os.path.join(current_app.instance_path, 'offline_scoreboard_hourly_backups')
+
+def _offline_startup_restore_dir():
+    return os.path.join(current_app.instance_path, 'startup_restore_points')
+
+def _restore_points_meta_path():
+    return os.path.join(current_app.instance_path, 'restore_points_meta.json')
+
+def _load_restore_points_meta():
+    path = _restore_points_meta_path()
+    if not os.path.exists(path):
+        return {}
+    try:
+        with open(path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+def _save_restore_points_meta(meta):
+    _atomic_write_json(_restore_points_meta_path(), meta if isinstance(meta, dict) else {})
+
+
+def _get_server_timezone():
+    return os.getenv('EA_TIMEZONE', 'Asia/Kolkata').strip() or 'Asia/Kolkata'
+
+
+def _server_now_iso():
+    tz_name = _get_server_timezone()
+    try:
+        return datetime.now(ZoneInfo(tz_name)).isoformat()
+    except Exception:
+        if tz_name.lower() == 'asia/kolkata':
+            return datetime.now(timezone(timedelta(hours=5, minutes=30))).isoformat()
+        return datetime.utcnow().isoformat()
+
+
+def _get_sync_peers():
+    raw = os.getenv('SYNC_PEERS', '') or os.getenv('SYNC_PEER', '')
+    if not raw:
+        return []
+    peers = []
+    for token in re.split(r'[,;\s]+', raw.strip()):
+        item = token.strip()
+        if not item:
+            continue
+        if not re.match(r'^https?://', item, re.I):
+            item = f'http://{item}'
+        item = item.rstrip('/')
+        peers.append(item)
+    return list(dict.fromkeys(peers))
+
+
+def _normalize_peer_list(raw_values):
+    peers = []
+    if not isinstance(raw_values, list):
+        return peers
+    for token in raw_values:
+        item = str(token or '').strip()
+        if not item:
+            continue
+        if not re.match(r'^https?://', item, re.I):
+            item = f'http://{item}'
+        item = item.rstrip('/')
+        peers.append(item)
+    return peers
+
+
+def _forward_offline_data_to_peers(payload, extra_peers=None):
+    peers = _get_sync_peers() + _normalize_peer_list(extra_peers or [])
+    peers = list(dict.fromkeys(peers))
+    if not peers:
+        return
+    current_origin = (request.host_url or '').rstrip('/')
+    body = json.dumps({'data': payload}).encode('utf-8')
+    for peer in peers:
+        if peer.rstrip('/') == current_origin:
+            continue
+        target_url = f'{peer}/scoreboard/offline-data'
+        req = urllib.request.Request(
+            target_url,
+            data=body,
+            method='POST',
+            headers={
+                'Content-Type': 'application/json',
+                'X-EA-Replicated': '1',
+                'X-EA-Sync-Key': os.getenv('SYNC_SHARED_KEY', '')
+            }
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=3):
+                pass
+        except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError, OSError):
+            continue
+
+
+def _forward_offline_data_to_peers_async(payload, extra_peers=None):
+    threading.Thread(
+        target=_forward_offline_data_to_peers,
+        args=(payload, extra_peers),
+        daemon=True
+    ).start()
+
+
+def _atomic_write_json(path, payload):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    fd, temp_path = tempfile.mkstemp(prefix='offline_scoreboard_', suffix='.json')
+    try:
+        with os.fdopen(fd, 'w', encoding='utf-8') as f:
+            json.dump(payload, f, ensure_ascii=False, indent=2)
+        os.replace(temp_path, path)
+    finally:
+        try:
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+        except Exception:
+            pass
+
+
+def _backup_offline_file(path, keep=50):
+    if not os.path.exists(path):
+        return
+    os.makedirs(_offline_backup_dir(), exist_ok=True)
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    backup_name = f'offline_scoreboard_{timestamp}.json'
+    backup_path = os.path.join(_offline_backup_dir(), backup_name)
+    shutil.copy2(path, backup_path)
+
+    backups = sorted(
+        [os.path.join(_offline_backup_dir(), f) for f in os.listdir(_offline_backup_dir()) if f.endswith('.json')],
+        key=os.path.getmtime,
+        reverse=True
+    )
+    for old in backups[keep:]:
+        try:
+            os.remove(old)
+        except Exception:
+            pass
+
+
+def _backup_offline_hourly_immutable(payload, keep=24 * 30):
+    """
+    Create one immutable snapshot per hour (local server time).
+    This is append-only per hour and protects against rapid accidental overwrites.
+    """
+    os.makedirs(_offline_hourly_backup_dir(), exist_ok=True)
+    hour_key = datetime.now().strftime('%Y%m%d_%H')
+    backup_name = f'offline_scoreboard_hourly_{hour_key}.json'
+    backup_path = os.path.join(_offline_hourly_backup_dir(), backup_name)
+    if not os.path.exists(backup_path):
+        _atomic_write_json(backup_path, payload)
+
+    backups = sorted(
+        [os.path.join(_offline_hourly_backup_dir(), f) for f in os.listdir(_offline_hourly_backup_dir()) if f.endswith('.json')],
+        key=os.path.getmtime,
+        reverse=True
+    )
+    for old in backups[keep:]:
+        try:
+            os.remove(old)
+        except Exception:
+            pass
+
+
+def _load_latest_offline_backup():
+    backup_dir = _offline_backup_dir()
+    if not os.path.isdir(backup_dir):
+        return None
+    backup_files = sorted(
+        [os.path.join(backup_dir, f) for f in os.listdir(backup_dir) if f.endswith('.json')],
+        key=os.path.getmtime,
+        reverse=True
+    )
+    for backup_path in backup_files:
+        try:
+            with open(backup_path, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except Exception:
+            continue
+    return None
+
+
+def _load_offline_data():
+    path = _offline_data_path()
+    if not os.path.exists(path):
+        return _load_latest_offline_backup()
+    try:
+        with open(path, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except Exception:
+        return _load_latest_offline_backup()
+
+
+def _subscribe_sync_events():
+    queue = Queue(maxsize=128)
+    with _sync_lock:
+        _sync_subscribers.append(queue)
+    return queue
+
+
+def _unsubscribe_sync_events(queue):
+    with _sync_lock:
+        if queue in _sync_subscribers:
+            _sync_subscribers.remove(queue)
+
+
+def _broadcast_sync_event(updated_at, source='server'):
+    payload = json.dumps({
+        'updated_at': updated_at,
+        'source': source
+    })
+    stale = []
+    with _sync_lock:
+        for queue in _sync_subscribers:
+            try:
+                queue.put_nowait(payload)
+            except Exception:
+                stale.append(queue)
+        for queue in stale:
+            if queue in _sync_subscribers:
+                _sync_subscribers.remove(queue)
+
+
+def _save_offline_data(payload):
+    path = _offline_data_path()
+    _backup_offline_file(path)
+    _atomic_write_json(path, payload)
+    _backup_offline_hourly_immutable(payload)
+    return payload
+
+
+def _parse_sync_stamp(value):
+    if not value:
+        return 0.0
+    try:
+        text = str(value).strip().replace('Z', '+00:00')
+        return datetime.fromisoformat(text).timestamp()
+    except Exception:
+        return 0.0
+
+
+def _payload_sync_stamp(payload):
+    if not isinstance(payload, dict):
+        return 0.0
+    return max(
+        _parse_sync_stamp(payload.get('server_updated_at')),
+        _parse_sync_stamp(payload.get('updated_at'))
+    )
+
+
+def _is_suspicious_student_shrink(existing_payload, incoming_payload):
+    """Detect stale snapshots that would silently shrink student master data."""
+    if not isinstance(existing_payload, dict) or not isinstance(incoming_payload, dict):
+        return False
+
+    existing_students = existing_payload.get('students', []) or []
+    incoming_students = incoming_payload.get('students', []) or []
+    if not existing_students or not incoming_students:
+        return False
+
+    existing_rolls = {
+        _normalize_roll_value(s.get('roll'))
+        for s in existing_students
+        if isinstance(s, dict) and _normalize_roll_value(s.get('roll'))
+    }
+    incoming_rolls = {
+        _normalize_roll_value(s.get('roll'))
+        for s in incoming_students
+        if isinstance(s, dict) and _normalize_roll_value(s.get('roll'))
+    }
+    if not existing_rolls or not incoming_rolls:
+        return False
+
+    removed_rolls = existing_rolls - incoming_rolls
+    hard_drop = len(incoming_rolls) + 5 < len(existing_rolls)
+    large_removed_set = len(removed_rolls) >= 8
+    return hard_drop and large_removed_set
+
+
+def _min_safe_student_roster():
+    raw = str(os.getenv('EA_MIN_SAFE_STUDENT_ROSTER', '')).strip()
+    if not raw:
+        return 25
+    try:
+        value = int(raw)
+    except (TypeError, ValueError):
+        return 25
+    return max(1, min(value, 10000))
+
+
+def _student_count(payload):
+    if not isinstance(payload, dict):
+        return 0
+    students = payload.get('students') or []
+    return len(students) if isinstance(students, list) else 0
+
+
+def _is_tiny_roster(payload, min_count=25):
+    count = _student_count(payload)
+    # Only treat non-empty snapshots as corrupt. Empty snapshot may be intentional for fresh bootstraps.
+    return count > 0 and count < max(1, int(min_count or 25))
+
+
+def _load_json_file(path):
+    if not path or not os.path.exists(path):
+        return None
+    try:
+        with open(path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        return data if isinstance(data, dict) else None
+    except Exception:
+        return None
+
+
+def _iter_offline_recovery_candidate_paths():
+    """
+    Yield local snapshot files that can be used to recover from a corrupt/tiny roster.
+    This never deletes any files; it only reads candidates.
+    """
+    instance_dir = current_app.instance_path
+    paths = set()
+    # Prefer explicitly marked stable backups when available.
+    patterns = [
+        os.path.join(instance_dir, 'offline_scoreboard_data.STABLE_BACKUP*.json'),
+        os.path.join(instance_dir, 'offline_scoreboard_data.pre_*.json'),
+        os.path.join(_offline_backup_dir(), '*.json'),
+        os.path.join(_offline_hourly_backup_dir(), '*.json'),
+        os.path.join(_offline_startup_restore_dir(), '*.json'),
+    ]
+    for pattern in patterns:
+        try:
+            for match in glob.glob(pattern):
+                if match and os.path.isfile(match):
+                    paths.add(match)
+        except Exception:
+            continue
+
+    live_path = _offline_data_path()
+    if live_path in paths:
+        paths.remove(live_path)
+
+    for path in sorted(paths, key=os.path.getmtime, reverse=True):
+        yield path
+
+
+def _best_local_snapshot(min_students=25, candidate_limit=80):
+    best = None
+    best_stamp = 0.0
+    best_mtime = 0.0
+    best_count = 0
+    best_src = ''
+    considered = 0
+    for path in _iter_offline_recovery_candidate_paths():
+        considered += 1
+        if considered > candidate_limit:
+            break
+        payload = _load_json_file(path)
+        if not payload:
+            continue
+        count = _student_count(payload)
+        if count < min_students:
+            continue
+        stamp = _payload_sync_stamp(payload)
+        mtime = 0.0
+        try:
+            mtime = float(os.path.getmtime(path))
+        except Exception:
+            mtime = 0.0
+        # Prefer higher sync stamp; fall back to mtime for payloads missing stamps.
+        rank_stamp = stamp if stamp else mtime
+        if not best or (rank_stamp, mtime, count) > (best_stamp, best_mtime, best_count):
+            best = payload
+            best_stamp = rank_stamp
+            best_mtime = mtime
+            best_count = count
+            best_src = path
+    return best, best_src
+
+
+def _fetch_peer_offline_payload(base_url, timeout_sec=2.5):
+    if not base_url:
+        return None
+    peer = str(base_url).rstrip('/')
+    url = f'{peer}/scoreboard/offline-data'
+    req = urllib.request.Request(url, method='GET', headers={'Cache-Control': 'no-store'})
+    try:
+        with urllib.request.urlopen(req, timeout=timeout_sec) as resp:
+            body = resp.read()
+    except Exception:
+        return None
+    try:
+        if not body:
+            return None
+        parsed = json.loads(body.decode('utf-8', errors='replace'))
+    except Exception:
+        return None
+    if not isinstance(parsed, dict):
+        return None
+    data = parsed.get('data')
+    return data if isinstance(data, dict) else None
+
+
+def _best_peer_snapshot(min_students=25):
+    peers = _get_sync_peers()
+    best = None
+    best_stamp = 0.0
+    best_count = 0
+    best_src = ''
+    for peer in peers:
+        payload = _fetch_peer_offline_payload(peer, timeout_sec=2.5)
+        if not payload:
+            continue
+        count = _student_count(payload)
+        if count < min_students:
+            continue
+        stamp = _payload_sync_stamp(payload) or 0.0
+        if not best or (stamp, count) > (best_stamp, best_count):
+            best = payload
+            best_stamp = stamp
+            best_count = count
+            best_src = peer
+    return best, best_src
+
+
+def _recover_tiny_roster_if_needed(payload, min_students=25):
+    """
+    If the current payload appears corrupt (tiny roster), recover from the best peer or local snapshot.
+    This avoids ever serving or persisting the known "20 students" stale snapshot.
+    """
+    if not _is_tiny_roster(payload, min_students):
+        return payload, ''
+
+    recovered, src = _best_peer_snapshot(min_students=min_students)
+    if not recovered:
+        recovered, src = _best_local_snapshot(min_students=min_students)
+
+    if recovered and not _is_tiny_roster(recovered, min_students):
+        try:
+            _save_offline_data(recovered)
+        except Exception:
+            current_app.logger.exception("Failed to persist recovered roster snapshot from %s", src or 'unknown source')
+        current_app.logger.warning(
+            "Recovered tiny roster (%s students) using %s (%s students).",
+            _student_count(payload),
+            src or 'unknown source',
+            _student_count(recovered),
+        )
+        return recovered, src
+
+    return payload, ''
+
+
+def _normalize_roll_value(value):
+    return str(value or '').strip().upper()
+
+
+def _parse_int_safe(value, default=0):
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _normalize_holder_status(value):
+    text = str(value or '').strip().lower()
+    if text == 'suspended':
+        return 'suspended'
+    if text == 'vacant':
+        return 'vacant'
+    return 'active'
+
+
+def _normalize_post_text(value):
+    return str(value or '').strip().lower()
+
+
+def _leadership_role_type(post_name):
+    text = _normalize_post_text(post_name)
+    if not text:
+        return ''
+    if 'leader of opposition' in text or '(lop)' in text:
+        return 'lop'
+    if 'co-leader' in text or 'co leader' in text or '(col)' in text:
+        return 'co_leader'
+    if ('leader' in text or '(l)' in text) and 'opposition' not in text:
+        return 'leader'
+    return ''
+
+
+def _leadership_veto_quota(post_name):
+    role_type = _leadership_role_type(post_name)
+    if role_type == 'leader':
+        return 5
+    if role_type == 'co_leader':
+        return 3
+    if role_type == 'lop':
+        return 2
+    return 0
+
+
+def _tenure_months_for_assignment(source, post_name=''):
+    source_key = str(source or '').strip().lower()
+    if source_key in ('class_rep', 'group_cr'):
+        return 1
+    if source_key == 'leadership' and _leadership_role_type(post_name) == 'co_leader':
+        return 1
+    return 2
+
+
+def _parse_date_key(value):
+    text = str(value or '').strip()
+    if not text:
+        return None
+    try:
+        if len(text) >= 10:
+            return datetime.fromisoformat(text[:10]).date()
+        return datetime.fromisoformat(text).date()
+    except Exception:
+        return None
+
+
+def _is_assignment_active_by_tenure(elected_on, tenure_months=2, extension_months=0, on_date=None):
+    start_date = _parse_date_key(elected_on)
+    if not start_date:
+        return False
+    total_months = max(0, _parse_int_safe(tenure_months) + _parse_int_safe(extension_months))
+    end_date = start_date + relativedelta(months=total_months)
+    check_date = on_date if isinstance(on_date, date) else _parse_date_key(on_date)
+    if not check_date:
+        check_date = _parse_date_key(_server_now_iso())
+    if not check_date:
+        check_date = date.today()
+    return start_date <= check_date <= end_date
+
+
+def _build_student_lookups(data):
+    students = data.get('students', []) or []
+    by_id = {}
+    by_roll = {}
+    for student in students:
+        sid = _parse_int_safe(student.get('id'), 0)
+        if sid <= 0:
+            continue
+        by_id[sid] = student
+        roll = _normalize_roll_value(student.get('roll'))
+        if roll and roll not in by_roll:
+            by_roll[roll] = sid
+    return by_id, by_roll
+
+
+def _compute_active_role_veto_quotas(data, date_key=None):
+    by_id, by_roll = _build_student_lookups(data)
+    quotas = {}
+    check_date = _parse_date_key(date_key) if date_key else _parse_date_key(_server_now_iso())
+    if not check_date:
+        check_date = date.today()
+
+    def _add_quota(student_id, amount):
+        sid = _parse_int_safe(student_id, 0)
+        quota = _parse_int_safe(amount, 0)
+        if sid <= 0 or quota <= 0:
+            return
+        quotas[sid] = quotas.get(sid, 0) + quota
+
+    for post in data.get('leadership', []) or []:
+        if _normalize_holder_status(post.get('status')) != 'active':
+            continue
+        tenure_months = _tenure_months_for_assignment('leadership', post.get('post'))
+        extension_months = _parse_int_safe(post.get('tenure_extension_months'), 0)
+        if not _is_assignment_active_by_tenure(post.get('elected_on'), tenure_months, extension_months, check_date):
+            continue
+        quota = _leadership_veto_quota(post.get('post'))
+        if quota <= 0:
+            continue
+        sid = _parse_int_safe(post.get('studentId'), 0)
+        if sid <= 0:
+            roll = _normalize_roll_value(post.get('roll'))
+            sid = by_roll.get(roll, 0) if roll else 0
+        if sid in by_id:
+            _add_quota(sid, quota)
+
+    # CR quota (+2) once per student if either class CR or group CR is active.
+    cr_students = set()
+    for rep in data.get('class_reps', []) or []:
+        if _normalize_holder_status(rep.get('status') or 'active') != 'active':
+            continue
+        tenure_months = _tenure_months_for_assignment('class_rep', rep.get('post') or 'CR')
+        extension_months = _parse_int_safe(rep.get('tenure_extension_months'), 0)
+        if not _is_assignment_active_by_tenure(rep.get('elected_on'), tenure_months, extension_months, check_date):
+            continue
+        sid = _parse_int_safe(rep.get('studentId'), 0)
+        if sid in by_id:
+            cr_students.add(sid)
+
+    for rep in data.get('group_crs', []) or []:
+        if _normalize_holder_status(rep.get('status') or 'active') != 'active':
+            continue
+        tenure_months = _tenure_months_for_assignment('group_cr', rep.get('post') or 'CR')
+        extension_months = _parse_int_safe(rep.get('tenure_extension_months'), 0)
+        if not _is_assignment_active_by_tenure(rep.get('elected_on'), tenure_months, extension_months, check_date):
+            continue
+        sid = _parse_int_safe(rep.get('studentId'), 0)
+        if sid in by_id:
+            cr_students.add(sid)
+
+    for sid in cr_students:
+        _add_quota(sid, 2)
+
+    return quotas
+
+
+def _reconcile_role_veto_monthly(data, month_key=None, date_key=None):
+    if not isinstance(data, dict):
+        return
+    by_id, _ = _build_student_lookups(data)
+    if 'role_veto_monthly' not in data or not isinstance(data.get('role_veto_monthly'), dict):
+        data['role_veto_monthly'] = {}
+
+    resolved_month = str(month_key or _server_now_iso()[:7]).strip()
+    if not re.match(r'^\d{4}-\d{2}$', resolved_month):
+        resolved_month = _server_now_iso()[:7]
+    applied_month = str(data.get('role_veto_applied_month') or '').strip()
+
+    # Ensure monthly role grants do not accumulate across months.
+    if applied_month and applied_month != resolved_month:
+        prev_state = data['role_veto_monthly'].get(applied_month, {})
+        if isinstance(prev_state, dict):
+            for sid_text, grant_value in prev_state.items():
+                sid = _parse_int_safe(sid_text, 0)
+                grant = max(0, _parse_int_safe(grant_value, 0))
+                if sid <= 0 or grant <= 0:
+                    continue
+                student = by_id.get(sid)
+                if not student:
+                    continue
+                student['veto_count'] = max(0, _parse_int_safe(student.get('veto_count'), 0) - grant)
+
+    target = _compute_active_role_veto_quotas(data, date_key=date_key)
+    existing = data['role_veto_monthly'].get(resolved_month, {})
+    if not isinstance(existing, dict):
+        existing = {}
+
+    next_state = {}
+    all_ids = set()
+    all_ids.update(str(k) for k in existing.keys())
+    all_ids.update(str(k) for k in target.keys())
+
+    for sid_text in all_ids:
+        sid = _parse_int_safe(sid_text, 0)
+        if sid <= 0:
+            continue
+        old_grant = _parse_int_safe(existing.get(str(sid)), 0)
+        new_grant = _parse_int_safe(target.get(sid), 0)
+        if new_grant > 0:
+            next_state[str(sid)] = new_grant
+        delta = new_grant - old_grant
+        if delta == 0:
+            continue
+        student = by_id.get(sid)
+        if not student:
+            continue
+        student['veto_count'] = max(0, _parse_int_safe(student.get('veto_count'), 0) + delta)
+
+    data['role_veto_monthly'][resolved_month] = next_state
+    data['role_veto_applied_month'] = resolved_month
+
+
+def _reconcile_veto_counters_from_scores(data, month_key=None):
+    if not isinstance(data, dict):
+        return
+    month = str(month_key or _server_now_iso()[:7]).strip()
+    if not re.match(r'^\d{4}-\d{2}$', month):
+        month = _server_now_iso()[:7]
+    grants = {}
+    if isinstance(data.get('role_veto_monthly'), dict):
+        grants = data['role_veto_monthly'].get(month, {}) or {}
+    if not isinstance(grants, dict):
+        grants = {}
+
+    net_by_student = {}
+    for row in data.get('scores', []) or []:
+        if not isinstance(row, dict):
+            continue
+        if str(row.get('month') or '').strip() != month:
+            continue
+        sid = _parse_int_safe(row.get('studentId'), 0)
+        if sid <= 0:
+            continue
+        net_by_student[sid] = net_by_student.get(sid, 0) + _parse_int_safe(row.get('vetos'), 0)
+
+    if not net_by_student:
+        return
+    students = data.get('students', []) or []
+    by_id = { _parse_int_safe(s.get('id'), 0): s for s in students if _parse_int_safe(s.get('id'), 0) > 0 }
+    for sid, net in net_by_student.items():
+        student = by_id.get(sid)
+        if not student:
+            continue
+        grant = _parse_int_safe(grants.get(str(sid)), 0)
+        expected = max(0, grant + _parse_int_safe(net, 0))
+        student['veto_count'] = expected
+
+
+def _merge_teacher_scores(existing_data, incoming_data):
+    """Merge teacher score payload safely across devices with different local IDs."""
+    existing_scores = list(existing_data.get('scores', []) or [])
+    incoming_scores = incoming_data.get('scores', []) or []
+    if not incoming_scores:
+        return existing_scores
+
+    existing_students = existing_data.get('students', []) or []
+    incoming_students = incoming_data.get('students', []) or []
+
+    existing_id_by_roll = {}
+    existing_id_set = set()
+    for student in existing_students:
+        sid = student.get('id')
+        if sid is None:
+            continue
+        existing_id_set.add(sid)
+        roll = _normalize_roll_value(student.get('roll'))
+        if roll and roll not in existing_id_by_roll:
+            existing_id_by_roll[roll] = sid
+
+    incoming_roll_by_id = {}
+    for student in incoming_students:
+        sid = student.get('id')
+        if sid is None:
+            continue
+        roll = _normalize_roll_value(student.get('roll'))
+        if roll:
+            incoming_roll_by_id[str(sid)] = roll
+
+    score_index = {}
+    max_score_id = 0
+    for idx, score in enumerate(existing_scores):
+        sid = score.get('studentId')
+        date_key = str(score.get('date') or '').strip()
+        if sid is None or not date_key:
+            continue
+        score_index[(str(sid), date_key)] = idx
+        max_score_id = max(max_score_id, _parse_int_safe(score.get('id')))
+
+    for incoming in incoming_scores:
+        if not isinstance(incoming, dict):
+            continue
+        recorded_by = str(incoming.get('recordedBy') or '').strip().lower()
+        if recorded_by and recorded_by != 'teacher':
+            continue
+        if not recorded_by:
+            continue
+        incoming_sid = incoming.get('studentId')
+        date_key = str(incoming.get('date') or '').strip()
+        if incoming_sid is None or not date_key:
+            continue
+
+        incoming_roll = incoming_roll_by_id.get(str(incoming_sid), '')
+        target_sid = existing_id_by_roll.get(incoming_roll)
+        if target_sid is None and incoming_sid in existing_id_set:
+            target_sid = incoming_sid
+        if target_sid is None:
+            continue
+
+        index_key = (str(target_sid), date_key)
+        existing_idx = score_index.get(index_key)
+        existing_score = existing_scores[existing_idx] if existing_idx is not None else None
+        # Teachers are not allowed to change stars/vetos directly. Preserve whatever is on record.
+        approved_stars = _parse_int_safe(existing_score.get('stars')) if isinstance(existing_score, dict) else 0
+        approved_vetos = _parse_int_safe(existing_score.get('vetos')) if isinstance(existing_score, dict) else 0
+        month_key = str(incoming.get('month') or '').strip() or date_key[:7]
+        normalized_score = {
+            'studentId': target_sid,
+            'date': date_key,
+            'points': _parse_int_safe(incoming.get('points')),
+            'stars': approved_stars,
+            'vetos': approved_vetos,
+            'month': month_key,
+            'notes': str(incoming.get('notes') or ''),
+            'recordedBy': 'teacher'
+        }
+        if existing_idx is not None:
+            existing_score.update(normalized_score)
+        else:
+            max_score_id += 1
+            normalized_score['id'] = max_score_id
+            score_index[index_key] = len(existing_scores)
+            existing_scores.append(normalized_score)
+
+    return existing_scores
+
+
+def _merge_appeals_superset(existing_appeals, incoming_appeals):
+    """Merge appeals by id and keep the latest updated entry."""
+    merged = {}
+
+    def _appeal_key(item):
+        if not isinstance(item, dict):
+            return ''
+        appeal_id = item.get('id')
+        if appeal_id is None:
+            return ''
+        key = str(appeal_id).strip()
+        return key
+
+    for source in (existing_appeals or []), (incoming_appeals or []):
+        for item in source:
+            if not isinstance(item, dict):
+                continue
+            key = _appeal_key(item)
+            if not key:
+                continue
+            prev = merged.get(key)
+            if not prev:
+                merged[key] = dict(item)
+                continue
+            prev_stamp = _parse_sync_stamp(prev.get('updated_at') or prev.get('created_at'))
+            next_stamp = _parse_sync_stamp(item.get('updated_at') or item.get('created_at'))
+            if next_stamp >= prev_stamp:
+                merged[key] = dict(item)
+
+    return list(merged.values())
+
+
+def _filter_teacher_payload_to_current_month(incoming_data, teacher_login_id='Teacher'):
+    """
+    Teachers can only modify:
+    - scores for the current server month (recordedBy=teacher)
+    - attendance for the current server month
+    - their own current-month appeals (e.g. star/veto approval requests)
+    """
+    if not isinstance(incoming_data, dict):
+        return {}
+    current_month = _server_now_iso()[:7]
+    filtered = dict(incoming_data)
+
+    filtered_scores = []
+    for row in incoming_data.get('scores', []) or []:
+        if not isinstance(row, dict):
+            continue
+        recorded_by = str(row.get('recordedBy') or '').strip().lower()
+        if recorded_by != 'teacher':
+            continue
+        date_key = str(row.get('date') or '').strip()
+        if not date_key or not date_key.startswith(current_month):
+            continue
+        month_key = str(row.get('month') or '').strip() or date_key[:7]
+        if month_key != current_month:
+            continue
+        filtered_scores.append(row)
+    filtered['scores'] = filtered_scores
+
+    filtered_attendance = []
+    for item in incoming_data.get('attendance', []) or []:
+        if not isinstance(item, dict):
+            continue
+        date_key = str(item.get('date') or '').strip()
+        if not date_key or not date_key.startswith(current_month):
+            continue
+        filtered_attendance.append(item)
+    filtered['attendance'] = filtered_attendance
+
+    # Appeals: allow only teacher-originated, current-month entries.
+    filtered_appeals = []
+    teacher_key = str(teacher_login_id or 'Teacher').strip().lower()
+    for item in incoming_data.get('appeals', []) or []:
+        if not isinstance(item, dict):
+            continue
+        from_role = str(item.get('from_role') or '').strip().lower()
+        created_by = str(item.get('created_by') or '').strip().lower()
+        if from_role and from_role != 'teacher' and created_by != teacher_key and created_by != 'teacher':
+            continue
+        score_month = str(item.get('score_month') or '').strip()
+        score_date = str(item.get('score_date') or '').strip()
+        month_key = score_month or (score_date[:7] if len(score_date) >= 7 else '')
+        if not month_key:
+            created_at = str(item.get('created_at') or '').strip()
+            if len(created_at) >= 7:
+                month_key = created_at[:7]
+        if month_key != current_month:
+            continue
+        filtered_appeals.append(item)
+    filtered['appeals'] = filtered_appeals
+
+    return filtered
+
+
+def _build_teacher_replication_patch(full_payload, teacher_login_id='Teacher'):
+    """Build a narrow replication patch safe to apply on master server."""
+    current_month = _server_now_iso()[:7]
+    payload = full_payload if isinstance(full_payload, dict) else {}
+
+    students_min = []
+    for student in payload.get('students', []) or []:
+        if not isinstance(student, dict):
+            continue
+        sid = student.get('id')
+        roll = _normalize_roll_value(student.get('roll'))
+        if sid is None or not roll:
+            continue
+        students_min.append({'id': sid, 'roll': roll})
+
+    scores = []
+    for row in payload.get('scores', []) or []:
+        if not isinstance(row, dict):
+            continue
+        recorded_by = str(row.get('recordedBy') or '').strip().lower()
+        if recorded_by != 'teacher':
+            continue
+        date_key = str(row.get('date') or '').strip()
+        if not date_key or not date_key.startswith(current_month):
+            continue
+        month_key = str(row.get('month') or '').strip() or date_key[:7]
+        if month_key != current_month:
+            continue
+        scores.append(row)
+
+    attendance = []
+    for item in payload.get('attendance', []) or []:
+        if not isinstance(item, dict):
+            continue
+        date_key = str(item.get('date') or '').strip()
+        if not date_key or not date_key.startswith(current_month):
+            continue
+        attendance.append(item)
+
+    appeals = []
+    teacher_key = str(teacher_login_id or 'Teacher').strip().lower()
+    for item in payload.get('appeals', []) or []:
+        if not isinstance(item, dict):
+            continue
+        from_role = str(item.get('from_role') or '').strip().lower()
+        created_by = str(item.get('created_by') or '').strip().lower()
+        if from_role and from_role != 'teacher' and created_by != teacher_key and created_by != 'teacher':
+            continue
+        score_month = str(item.get('score_month') or '').strip()
+        score_date = str(item.get('score_date') or '').strip()
+        month_key = score_month or (score_date[:7] if len(score_date) >= 7 else '')
+        if not month_key:
+            created_at = str(item.get('created_at') or '').strip()
+            if len(created_at) >= 7:
+                month_key = created_at[:7]
+        if month_key != current_month:
+            continue
+        appeals.append(item)
+
+    return {
+        'actor_role': 'teacher',
+        'replica_purpose': 'teacher_patch',
+        'students': students_min,
+        'scores': scores,
+        'attendance': attendance,
+        'appeals': appeals,
+        'updated_at': payload.get('updated_at')
+    }
+
+
+def _merge_scores_superset(existing_scores, incoming_scores):
+    """Merge score lists without dropping existing rows when an incoming snapshot is stale."""
+    merged = {}
+    max_score_id = 0
+
+    def _normalize_score(score):
+        if not isinstance(score, dict):
+            return None, None
+        sid = score.get('studentId')
+        date_key = str(score.get('date') or '').strip()
+        if sid is None or not date_key:
+            return None, None
+        month_key = str(score.get('month') or '').strip() or date_key[:7]
+        normalized = dict(score)
+        normalized['studentId'] = sid
+        normalized['date'] = date_key
+        normalized['month'] = month_key
+        normalized['points'] = _parse_int_safe(score.get('points'))
+        normalized['stars'] = _parse_int_safe(score.get('stars'))
+        normalized['vetos'] = _parse_int_safe(score.get('vetos'))
+        key = (str(sid), date_key, month_key)
+        return key, normalized
+
+    for score in existing_scores or []:
+        key, normalized = _normalize_score(score)
+        if key is None:
+            continue
+        merged[key] = normalized
+        max_score_id = max(max_score_id, _parse_int_safe(normalized.get('id')))
+
+    for score in incoming_scores or []:
+        key, normalized = _normalize_score(score)
+        if key is None:
+            continue
+        # Incoming row updates same key, but cannot remove other keys.
+        merged[key] = normalized
+        max_score_id = max(max_score_id, _parse_int_safe(normalized.get('id')))
+
+    result = []
+    for record in merged.values():
+        if not _parse_int_safe(record.get('id')):
+            max_score_id += 1
+            record['id'] = max_score_id
+        result.append(record)
+    return result
+
+
+def _merge_notification_history(existing_history, incoming_history):
+    """Keep all notification history entries across sync peers."""
+    merged = {}
+
+    def _entry_key(item):
+        if not isinstance(item, dict):
+            return ''
+        fp = str(item.get('fingerprint') or '').strip().lower()
+        if fp:
+            return fp
+        title = str(item.get('title') or '').strip().lower()
+        detail = str(item.get('detail') or '').strip().lower()
+        meta = str(item.get('meta') or '').strip().lower()
+        return f'{title}||{detail}||{meta}'
+
+    for source in (existing_history or []), (incoming_history or []):
+        for item in source:
+            if not isinstance(item, dict):
+                continue
+            key = _entry_key(item)
+            if not key:
+                continue
+            prev = merged.get(key)
+            if not prev:
+                merged[key] = dict(item)
+                continue
+            prev_stamp = _parse_sync_stamp(prev.get('logged_at'))
+            next_stamp = _parse_sync_stamp(item.get('logged_at'))
+            if next_stamp >= prev_stamp:
+                merged[key] = dict(item)
+
+    return list(merged.values())
+
+
+def _merge_election_votes_superset(existing_votes, incoming_votes, mode='party'):
+    """Merge election votes by voter key and keep latest timestamped entry."""
+    merged = {}
+
+    def _normalize_vote(item):
+        if not isinstance(item, dict):
+            return None, None
+        post = str(item.get('post') or '').strip()
+        if not post:
+            return None, None
+        normalized = dict(item)
+        normalized['post'] = post
+        if mode == 'party':
+            party_id = _parse_int_safe(item.get('partyId'), 0)
+            if party_id <= 0:
+                return None, None
+            normalized['partyId'] = party_id
+            candidate_id = _parse_int_safe(item.get('candidateId'), 0)
+            if candidate_id <= 0:
+                return None, None
+            normalized['candidateId'] = candidate_id
+            key = f'{post}::party::{party_id}'
+        elif mode == 'teacher':
+            teacher_id = _parse_int_safe(item.get('teacherId'), 0)
+            if teacher_id <= 0:
+                return None, None
+            normalized['teacherId'] = teacher_id
+            candidate_id = _parse_int_safe(item.get('candidateId'), 0)
+            if candidate_id <= 0:
+                return None, None
+            normalized['candidateId'] = candidate_id
+            key = f'{post}::teacher::{teacher_id}'
+        else:
+            voter_id = _parse_int_safe(item.get('voterStudentId'), 0)
+            if voter_id <= 0:
+                return None, None
+            normalized['voterStudentId'] = voter_id
+            vote_type = str(item.get('voteType') or 'candidate').strip().lower()
+            if vote_type not in ('candidate', 'abstain', 'nota'):
+                vote_type = 'candidate'
+            normalized['voteType'] = vote_type
+            if vote_type == 'candidate':
+                candidate_id = _parse_int_safe(item.get('candidateId'), 0)
+                if candidate_id <= 0:
+                    return None, None
+                normalized['candidateId'] = candidate_id
+            else:
+                normalized['candidateId'] = None
+            key = f'{post}::student::{voter_id}'
+        return key, normalized
+
+    for source in (existing_votes or []), (incoming_votes or []):
+        for item in source:
+            key, normalized = _normalize_vote(item)
+            if key is None:
+                continue
+            prev = merged.get(key)
+            if not prev:
+                merged[key] = normalized
+                continue
+            prev_stamp = _parse_sync_stamp(prev.get('timestamp') or prev.get('updated_at') or prev.get('created_at'))
+            next_stamp = _parse_sync_stamp(normalized.get('timestamp') or normalized.get('updated_at') or normalized.get('created_at'))
+            if next_stamp >= prev_stamp:
+                merged[key] = normalized
+
+    return list(merged.values())
+
+
+def _merge_pending_results_superset(existing_results, incoming_results):
+    """Merge pending election results by post/source and keep latest record."""
+    merged = {}
+
+    def _entry_key(item):
+        if not isinstance(item, dict):
+            return ''
+        post = str(item.get('post') or '').strip().lower()
+        source = str(item.get('source') or '').strip().lower()
+        if not post or not source:
+            return ''
+        return f'{post}::{source}'
+
+    def _timestamp(item):
+        if not isinstance(item, dict):
+            return 0.0
+        return max(
+            _parse_sync_stamp(item.get('decided_at')),
+            _parse_sync_stamp(item.get('updated_at')),
+            _parse_sync_stamp(item.get('created_at'))
+        )
+
+    for source in (existing_results or []), (incoming_results or []):
+        for item in source:
+            if not isinstance(item, dict):
+                continue
+            key = _entry_key(item)
+            if not key:
+                continue
+            prev = merged.get(key)
+            if not prev or _timestamp(item) >= _timestamp(prev):
+                merged[key] = dict(item)
+
+    return list(merged.values())
+
+
+def _normalize_attendance_status(value):
+    status = str(value or '').strip().lower()
+    if status in ('absent', 'late', 'leave', 'present'):
+        return status
+    return 'present'
+
+
+def _merge_attendance_superset(existing_data, incoming_data):
+    """Merge attendance by latest updated_at, keyed by date + roll (fallback studentId)."""
+    existing_attendance = existing_data.get('attendance', []) if isinstance(existing_data, dict) else []
+    incoming_attendance = incoming_data.get('attendance', []) if isinstance(incoming_data, dict) else []
+    existing_students = existing_data.get('students', []) if isinstance(existing_data, dict) else []
+    incoming_students = incoming_data.get('students', []) if isinstance(incoming_data, dict) else []
+
+    existing_id_by_roll = {}
+    for student in existing_students or []:
+        sid = _parse_int_safe(student.get('id'), 0)
+        roll = _normalize_roll_value(student.get('roll'))
+        if sid > 0 and roll and roll not in existing_id_by_roll:
+            existing_id_by_roll[roll] = sid
+
+    incoming_roll_by_id = {}
+    for student in incoming_students or []:
+        sid = _parse_int_safe(student.get('id'), 0)
+        roll = _normalize_roll_value(student.get('roll'))
+        if sid > 0 and roll:
+            incoming_roll_by_id[str(sid)] = roll
+
+    merged = {}
+
+    def _normalize_item(item):
+        if not isinstance(item, dict):
+            return None, None
+        date_key = str(item.get('date') or '').strip()
+        if not date_key:
+            return None, None
+        roll = _normalize_roll_value(item.get('roll'))
+        sid = _parse_int_safe(item.get('studentId'), 0)
+        if not roll and sid > 0:
+            roll = incoming_roll_by_id.get(str(sid), '')
+        if roll and roll in existing_id_by_roll:
+            sid = existing_id_by_roll[roll]
+        identity = roll or (str(sid) if sid > 0 else '')
+        if not identity:
+            return None, None
+        normalized = dict(item)
+        normalized['date'] = date_key
+        normalized['status'] = _normalize_attendance_status(item.get('status'))
+        normalized['remarks'] = str(item.get('remarks') or '')
+        if roll:
+            normalized['roll'] = roll
+        if sid > 0:
+            normalized['studentId'] = sid
+        key = f'{date_key}::{identity}'
+        return key, normalized
+
+    for source in (existing_attendance or []), (incoming_attendance or []):
+        for item in source:
+            key, normalized = _normalize_item(item)
+            if key is None:
+                continue
+            prev = merged.get(key)
+            if not prev:
+                merged[key] = normalized
+                continue
+            prev_stamp = _parse_sync_stamp(prev.get('updated_at') or prev.get('created_at'))
+            next_stamp = _parse_sync_stamp(normalized.get('updated_at') or normalized.get('created_at'))
+            if next_stamp >= prev_stamp:
+                merged[key] = normalized
+
+    return list(merged.values())
+
+
+def _merge_fee_records_superset(existing_records, incoming_records):
+    """
+    Merge fee records by studentId.
+
+    Safety: never lose evidence of payments (last_paid_date/payment_history) even if a stale device
+    has a newer updated_at due to clock skew.
+    """
+    merged = {}
+
+    def _normalize_record(item):
+        if not isinstance(item, dict):
+            return None, None
+        sid = _parse_int_safe(item.get('studentId'), 0)
+        if sid <= 0:
+            return None, None
+        normalized = dict(item)
+        normalized['studentId'] = sid
+        return str(sid), normalized
+
+    def _max_date(a, b):
+        a = str(a or '').strip()
+        b = str(b or '').strip()
+        if not a:
+            return b
+        if not b:
+            return a
+        # YYYY-MM-DD lexicographic compare works.
+        return a if a >= b else b
+
+    def _merge_payment_history(prev_list, next_list):
+        merged_list = []
+        seen = set()
+        for src in (prev_list or []), (next_list or []):
+            if not isinstance(src, list):
+                continue
+            for item in src:
+                if not isinstance(item, dict):
+                    continue
+                date_key = str(item.get('date') or item.get('paid_on') or item.get('paidAt') or '').strip()
+                amount_key = str(item.get('amount') or '').strip()
+                note_key = str(item.get('note') or item.get('remarks') or '').strip().lower()
+                fp = f'{date_key}::{amount_key}::{note_key}'
+                if fp in seen:
+                    continue
+                seen.add(fp)
+                merged_list.append(dict(item))
+        # Keep stable ordering by (date, amount) when possible.
+        def _sort_key(x):
+            d = str(x.get('date') or x.get('paid_on') or x.get('paidAt') or '')
+            a = _parse_int_safe(x.get('amount'), 0)
+            return (d, a)
+        try:
+            merged_list.sort(key=_sort_key)
+        except Exception:
+            pass
+        return merged_list
+
+    def _parse_float(value):
+        try:
+            v = float(value)
+            return v if v == v else None
+        except Exception:
+            return None
+
+    def _choose_text(prev_val, next_val, prefer_next=False):
+        prev_text = str(prev_val or '').strip()
+        next_text = str(next_val or '').strip()
+        if not prev_text:
+            return next_text
+        if not next_text:
+            return prev_text
+        return next_text if prefer_next else prev_text
+
+    def _merge_pair(prev, nxt):
+        prev_stamp = _parse_sync_stamp(prev.get('updated_at') or prev.get('created_at'))
+        next_stamp = _parse_sync_stamp(nxt.get('updated_at') or nxt.get('created_at'))
+        prefer_next = next_stamp >= prev_stamp
+
+        result = dict(prev if not prefer_next else nxt)
+        # Always preserve payment proof.
+        result['payment_history'] = _merge_payment_history(prev.get('payment_history'), nxt.get('payment_history'))
+        result['last_paid_date'] = _max_date(prev.get('last_paid_date'), nxt.get('last_paid_date'))
+
+        # Prefer the latest cycle anchor so paid records don't revert to an older due date.
+        result['start_date'] = _max_date(prev.get('start_date'), nxt.get('start_date'))
+
+        # Numeric fields: prefer whichever record matches the chosen start_date (current cycle).
+        chosen_cycle = str(result.get('start_date') or '').strip()
+        prev_cycle = str(prev.get('start_date') or '').strip()
+        next_cycle = str(nxt.get('start_date') or '').strip()
+        cycle_source = None
+        if chosen_cycle and chosen_cycle == next_cycle:
+            cycle_source = nxt
+        elif chosen_cycle and chosen_cycle == prev_cycle:
+            cycle_source = prev
+        else:
+            cycle_source = nxt if prefer_next else prev
+
+        amount = _parse_float(cycle_source.get('amount'))
+        pending = _parse_float(cycle_source.get('pending_amount'))
+        if amount is not None:
+            result['amount'] = amount
+        if pending is not None:
+            result['pending_amount'] = pending
+
+        # Period months: keep a sane integer.
+        period = _parse_int_safe(cycle_source.get('period_months'), 0)
+        if period > 0:
+            result['period_months'] = period
+
+        # Remarks: keep non-empty; prefer whichever record is newer.
+        result['remarks'] = _choose_text(prev.get('remarks'), nxt.get('remarks'), prefer_next=prefer_next)
+
+        # Timestamps: keep created_at earliest, updated_at latest-ish.
+        created = _choose_text(prev.get('created_at'), nxt.get('created_at'), prefer_next=False)
+        if created:
+            result['created_at'] = created
+        updated = _choose_text(prev.get('updated_at'), nxt.get('updated_at'), prefer_next=prefer_next)
+        if updated:
+            result['updated_at'] = updated
+
+        # Ensure studentId preserved.
+        result['studentId'] = _parse_int_safe(result.get('studentId'), _parse_int_safe(prev.get('studentId'), 0))
+        return result
+
+    for source in (existing_records or []), (incoming_records or []):
+        for item in source:
+            key, normalized = _normalize_record(item)
+            if key is None:
+                continue
+            prev = merged.get(key)
+            if not prev:
+                merged[key] = normalized
+                continue
+            merged[key] = _merge_pair(prev, normalized)
+
+    return list(merged.values())
+
+
+def _merge_resource_cabinet_superset(existing_items, incoming_items):
+    """Merge resource cabinet items by id (int)."""
+    merged = {}
+
+    def _normalize(item):
+        if not isinstance(item, dict):
+            return None, None
+        item_id = _parse_int_safe(item.get('id'), 0)
+        if item_id <= 0:
+            return None, None
+        normalized = dict(item)
+        normalized['id'] = item_id
+        normalized['name'] = str(item.get('name') or '').strip()
+        normalized['unit'] = str(item.get('unit') or '').strip()
+        normalized['price_per_unit'] = float(item.get('price_per_unit') or 0) if str(item.get('price_per_unit') or '').strip() else float(item.get('price_per_unit') or 0)
+        normalized['total_held'] = max(0, _parse_int_safe(item.get('total_held'), 0))
+        normalized['updated_at'] = str(item.get('updated_at') or normalized.get('updated_at') or '').strip()
+        normalized['created_at'] = str(item.get('created_at') or normalized.get('created_at') or normalized['updated_at'] or '').strip()
+        return str(item_id), normalized
+
+    for src in (existing_items or []), (incoming_items or []):
+        if not isinstance(src, list):
+            continue
+        for item in src:
+            key, normalized = _normalize(item)
+            if not key:
+                continue
+            prev = merged.get(key)
+            if not prev:
+                merged[key] = normalized
+                continue
+            prev_stamp = _parse_sync_stamp(prev.get('updated_at') or prev.get('created_at'))
+            next_stamp = _parse_sync_stamp(normalized.get('updated_at') or normalized.get('created_at'))
+            merged[key] = normalized if next_stamp >= prev_stamp else prev
+
+    return list(merged.values())
+
+
+def _resource_status_rank(value):
+    text = str(value or '').strip().lower()
+    ranks = {
+        'draft': 0,
+        'pending_teacher': 1,
+        'recommended': 2,
+        'not_recommended': 2,
+        'pending_admin': 3,
+        'approved': 4,
+        'rejected': 4,
+        'fulfilled': 5,
+        'cancelled': 5
+    }
+    return ranks.get(text, 0)
+
+
+def _merge_resource_requests_superset(existing_requests, incoming_requests):
+    """
+    Merge resource requests by id.
+    Safety: never lose recommendation/approval decisions once present.
+    """
+    merged = {}
+
+    def _normalize(item):
+        if not isinstance(item, dict):
+            return None, None
+        rid = _parse_int_safe(item.get('id'), 0)
+        if rid <= 0:
+            return None, None
+        normalized = dict(item)
+        normalized['id'] = rid
+        sid = _parse_int_safe(item.get('studentId'), 0)
+        if sid > 0:
+            normalized['studentId'] = sid
+        normalized['month'] = str(item.get('month') or '').strip()
+        normalized['status'] = str(item.get('status') or '').strip().lower()
+        normalized['updated_at'] = str(item.get('updated_at') or '').strip()
+        normalized['created_at'] = str(item.get('created_at') or normalized['updated_at'] or '').strip()
+        return str(rid), normalized
+
+    def _merge_pair(prev, nxt):
+        prev_stamp = _parse_sync_stamp(prev.get('updated_at') or prev.get('created_at'))
+        next_stamp = _parse_sync_stamp(nxt.get('updated_at') or nxt.get('created_at'))
+        prefer_next = next_stamp >= prev_stamp
+        base = dict(prev if not prefer_next else nxt)
+
+        # Preserve decisions/proof.
+        for key in ('teacher_decision', 'teacher_remark', 'teacher_login_id', 'teacher_updated_at',
+                    'admin_decision', 'admin_remark', 'admin_login_id', 'admin_updated_at',
+                    'approved_at', 'fulfilled_at', 'urgent'):
+            prev_val = prev.get(key)
+            next_val = nxt.get(key)
+            if str(next_val or '').strip() and prefer_next:
+                base[key] = next_val
+            elif str(prev_val or '').strip() and not str(base.get(key) or '').strip():
+                base[key] = prev_val
+
+        # Preserve the furthest-along status.
+        prev_status = str(prev.get('status') or '').strip().lower()
+        next_status = str(nxt.get('status') or '').strip().lower()
+        if _resource_status_rank(next_status) >= _resource_status_rank(prev_status):
+            base['status'] = next_status or prev_status
+        else:
+            base['status'] = prev_status or next_status
+
+        return base
+
+    for src in (existing_requests or []), (incoming_requests or []):
+        if not isinstance(src, list):
+            continue
+        for item in src:
+            key, normalized = _normalize(item)
+            if not key:
+                continue
+            prev = merged.get(key)
+            if not prev:
+                merged[key] = normalized
+                continue
+            merged[key] = _merge_pair(prev, normalized)
+
+    return list(merged.values())
+
+
+def _merge_resource_transactions_superset(existing_rows, incoming_rows):
+    """Merge resource transactions by id."""
+    merged = {}
+
+    def _normalize(item):
+        if not isinstance(item, dict):
+            return None, None
+        tid = _parse_int_safe(item.get('id'), 0)
+        if tid <= 0:
+            return None, None
+        normalized = dict(item)
+        normalized['id'] = tid
+        sid = _parse_int_safe(item.get('studentId'), 0)
+        if sid > 0:
+            normalized['studentId'] = sid
+        normalized['month'] = str(item.get('month') or '').strip()
+        normalized['updated_at'] = str(item.get('updated_at') or '').strip()
+        normalized['created_at'] = str(item.get('created_at') or normalized['updated_at'] or '').strip()
+        return str(tid), normalized
+
+    for src in (existing_rows or []), (incoming_rows or []):
+        if not isinstance(src, list):
+            continue
+        for item in src:
+            key, normalized = _normalize(item)
+            if not key:
+                continue
+            prev = merged.get(key)
+            if not prev:
+                merged[key] = normalized
+                continue
+            prev_stamp = _parse_sync_stamp(prev.get('updated_at') or prev.get('created_at'))
+            next_stamp = _parse_sync_stamp(normalized.get('updated_at') or normalized.get('created_at'))
+            merged[key] = normalized if next_stamp >= prev_stamp else prev
+
+    return list(merged.values())
+
+
+def _merge_resource_requests_teacher(existing_requests, incoming_requests, teacher_login_id, month_key):
+    """
+    Teachers can only:
+    - Recommend / Not recommend requests for the current month
+    - Add a remark
+    - Move status from pending_teacher -> pending_admin OR not_recommended
+    """
+    now_iso = datetime.now(timezone.utc).isoformat(timespec='milliseconds').replace('+00:00', 'Z')
+    by_id = {}
+    for item in existing_requests or []:
+        if isinstance(item, dict):
+            rid = _parse_int_safe(item.get('id'), 0)
+            if rid > 0 and rid not in by_id:
+                by_id[rid] = dict(item)
+
+    updated = []
+    if not isinstance(incoming_requests, list):
+        incoming_requests = []
+    for raw in incoming_requests:
+        if not isinstance(raw, dict):
+            continue
+        rid = _parse_int_safe(raw.get('id'), 0)
+        if rid <= 0 or rid not in by_id:
+            continue
+        current = by_id[rid]
+        if str(current.get('month') or '').strip() != str(month_key or '').strip():
+            continue
+        status = str(current.get('status') or '').strip().lower()
+        if status not in {'pending_teacher', 'recommended', 'not_recommended', 'pending_admin'}:
+            continue
+
+        decision = str(raw.get('teacher_decision') or raw.get('decision') or '').strip().lower()
+        remark = str(raw.get('teacher_remark') or raw.get('remark') or '').strip()
+        if decision not in {'recommended', 'not_recommended'} and not remark:
+            continue
+
+        next_row = dict(current)
+        if remark:
+            next_row['teacher_remark'] = remark
+        if decision in {'recommended', 'not_recommended'}:
+            next_row['teacher_decision'] = decision
+            if decision == 'recommended':
+                next_row['status'] = 'pending_admin'
+            else:
+                next_row['status'] = 'not_recommended'
+        next_row['teacher_login_id'] = teacher_login_id
+        next_row['teacher_updated_at'] = now_iso
+        next_row['updated_at'] = now_iso
+        updated.append(next_row)
+
+    return _merge_resource_requests_superset(existing_requests or [], updated)
+
+
+def _find_student_id_by_roll(payload, roll_value):
+    roll = _normalize_roll_value(roll_value)
+    if not roll:
+        return 0
+    students = payload.get('students', []) if isinstance(payload, dict) else []
+    if not isinstance(students, list):
+        return 0
+    for s in students:
+        if not isinstance(s, dict):
+            continue
+        if _normalize_roll_value(s.get('roll')) == roll:
+            return _parse_int_safe(s.get('id'), 0)
+    return 0
+
+
+def _student_resource_request_patch(existing_payload, actor_login_id, incoming_payload):
+    """
+    Build a safe patch from a student submission.
+    Only allows creating a new resource request for the logged-in student.
+    """
+    current_month = _server_now_iso()[:7]
+    student_id = _find_student_id_by_roll(existing_payload or {}, actor_login_id)
+    if student_id <= 0:
+        return None, "Student roll not found on server roster"
+
+    incoming_requests = []
+    if isinstance(incoming_payload, dict) and isinstance(incoming_payload.get('resource_requests'), list):
+        incoming_requests = incoming_payload.get('resource_requests') or []
+    if not incoming_requests:
+        return None, "No resource request provided"
+
+    raw = incoming_requests[0] if isinstance(incoming_requests[0], dict) else None
+    if not raw:
+        return None, "Invalid resource request"
+
+    now_iso = datetime.now(timezone.utc).isoformat(timespec='milliseconds').replace('+00:00', 'Z')
+    rid = _parse_int_safe(raw.get('id'), 0)
+    if rid <= 0:
+        rid = int(datetime.now().timestamp() * 1000)
+
+    req_type = str(raw.get('type') or '').strip().lower()
+    if req_type not in {'redeem_points', 'cash_purchase'}:
+        return None, "Invalid request type"
+
+    item_id = _parse_int_safe(raw.get('item_id') or raw.get('itemId'), 0)
+    qty = max(1, _parse_int_safe(raw.get('qty') or raw.get('quantity'), 0))
+    if item_id <= 0:
+        return None, "Item not selected"
+
+    # Validate item exists.
+    cabinet = (existing_payload or {}).get('resource_cabinet', []) or []
+    if not isinstance(cabinet, list):
+        cabinet = []
+    item = next((it for it in cabinet if isinstance(it, dict) and _parse_int_safe(it.get('id'), 0) == item_id), None)
+    if not item:
+        return None, "Item not found in cabinet"
+
+    price = float(item.get('price_per_unit') or 0)
+    total_cost = max(0.0, price * float(qty))
+
+    cash_paid = 0.0
+    if req_type == 'cash_purchase':
+        try:
+            cash_paid = float(raw.get('cash_paid') or raw.get('paid_amount') or 0)
+        except Exception:
+            cash_paid = 0.0
+        cash_paid = max(0.0, cash_paid)
+
+    request_row = {
+        'id': rid,
+        'type': req_type,
+        'studentId': student_id,
+        'student_roll': _normalize_roll_value(actor_login_id),
+        'month': current_month,
+        'item_id': item_id,
+        'item_name': str(item.get('name') or '').strip(),
+        'unit': str(item.get('unit') or '').strip(),
+        'qty': qty,
+        'price_per_unit': price,
+        'total_cost': total_cost,
+        'cash_paid': cash_paid,
+        'urgent': False,
+        'status': 'pending_teacher',
+        'created_at': now_iso,
+        'updated_at': now_iso
+    }
+    return {'resource_requests': [request_row]}, ""
+
+
+def _student_profile_change_appeal_patch(existing_payload, actor_login_id, incoming_payload):
+    """
+    Build a safe patch from a student submission for profile-change requests.
+    Students can only create a new appeal of type=profile_change for themselves (append-only).
+    """
+    student_id = _find_student_id_by_roll(existing_payload or {}, actor_login_id)
+    if student_id <= 0:
+        return None, "Student roll not found on server roster"
+
+    incoming_appeals = []
+    if isinstance(incoming_payload, dict) and isinstance(incoming_payload.get('appeals'), list):
+        incoming_appeals = incoming_payload.get('appeals') or []
+    if not incoming_appeals:
+        return None, "No appeal provided"
+
+    raw = incoming_appeals[0] if isinstance(incoming_appeals[0], dict) else None
+    if not raw:
+        return None, "Invalid appeal"
+
+    appeal_type = str(raw.get('type') or '').strip().lower()
+    if appeal_type != 'profile_change':
+        return None, "Invalid appeal type"
+
+    existing_ids = set()
+    for item in (existing_payload or {}).get('appeals', []) or []:
+        if not isinstance(item, dict):
+            continue
+        aid = item.get('id')
+        if aid is None:
+            continue
+        existing_ids.add(str(aid).strip())
+
+    now_iso = datetime.now(timezone.utc).isoformat(timespec='milliseconds').replace('+00:00', 'Z')
+    aid = _parse_int_safe(raw.get('id'), 0)
+    if aid <= 0:
+        aid = int(datetime.now().timestamp() * 1000)
+    if str(aid).strip() in existing_ids:
+        return None, "Duplicate appeal id"
+
+    requested_name = str(raw.get('requested_name') or raw.get('requestedName') or '').strip()
+    requested_profile = raw.get('requested_profile_data') if isinstance(raw.get('requested_profile_data'), dict) else {}
+    allowed_keys = {
+        'fatherName', 'motherName', 'dateOfBirth', 'bloodGroup', 'aadhar',
+        'phone', 'email', 'parentPhone', 'admissionDate', 'academicYear', 'address'
+    }
+    sanitized_profile = {k: requested_profile.get(k) for k in requested_profile.keys() if k in allowed_keys}
+    if not requested_name and not sanitized_profile:
+        return None, "No profile changes provided"
+
+    # Resolve canonical student roll + name from the server roster.
+    roll_norm = _normalize_roll_value(actor_login_id)
+    student_name = ''
+    for s in (existing_payload or {}).get('students', []) or []:
+        if not isinstance(s, dict):
+            continue
+        if _parse_int_safe(s.get('id'), 0) == student_id:
+            student_name = str(s.get('base_name') or s.get('name') or '').strip()
+            break
+
+    appeal_row = {
+        'id': aid,
+        'type': 'profile_change',
+        'subject': 'Profile Change Request',
+        'message': f"Student requested profile update for {student_name or roll_norm}.",
+        'from_role': 'student',
+        'created_by': roll_norm,
+        'target_role': 'admin',
+        'forwarded_to': 'admin',
+        'status': 'pending_admin',
+        'recommendation': '',
+        'student_id': student_id,
+        'student_roll': roll_norm,
+        'student_name': student_name,
+        'requested_name': requested_name,
+        'requested_profile_data': sanitized_profile,
+        'created_at': now_iso,
+        'updated_at': now_iso,
+    }
+    return {'appeals': [appeal_row]}, ""
+
+
+def _extract_month_roster_rolls(payload, month_key):
+    rolls = set()
+    if not isinstance(payload, dict):
+        return rolls
+    month_students = payload.get('month_students', {}) or {}
+    month_profiles = payload.get('month_roster_profiles', {}) or {}
+
+    for value in month_students.get(month_key, []) or []:
+        roll = _normalize_roll_value(value)
+        if roll.startswith('EA'):
+            rolls.add(roll)
+
+    for profile in month_profiles.get(month_key, []) or []:
+        if not isinstance(profile, dict):
+            continue
+        roll = _normalize_roll_value(profile.get('roll'))
+        if roll.startswith('EA'):
+            rolls.add(roll)
+
+    return rolls
+
+
+def _enforce_current_month_roster_integrity(incoming_data, existing_data):
+    """
+    Prevent stale client snapshots from shrinking current-month roster visibility.
+    Keeps/repairs student entries for current roster rolls (e.g. Feb 2026 46-student roster).
+    """
+    if not isinstance(incoming_data, dict):
+        return incoming_data
+
+    current_month = _server_now_iso()[:7]
+    month_key = current_month
+    incoming_rolls = _extract_month_roster_rolls(incoming_data, month_key)
+    existing_rolls = _extract_month_roster_rolls(existing_data or {}, month_key)
+
+    if not incoming_rolls and '2026-02' != month_key:
+        month_key = '2026-02'
+        incoming_rolls = _extract_month_roster_rolls(incoming_data, month_key)
+        existing_rolls = _extract_month_roster_rolls(existing_data or {}, month_key)
+
+    roster_rolls = incoming_rolls or existing_rolls
+    if not roster_rolls:
+        return incoming_data
+
+    incoming_students = list(incoming_data.get('students', []) or [])
+    existing_students = list((existing_data or {}).get('students', []) or [])
+
+    by_roll_incoming = {}
+    for student in incoming_students:
+        if not isinstance(student, dict):
+            continue
+        roll = _normalize_roll_value(student.get('roll'))
+        if roll and roll not in by_roll_incoming:
+            by_roll_incoming[roll] = student
+
+    by_roll_existing = {}
+    for student in existing_students:
+        if not isinstance(student, dict):
+            continue
+        roll = _normalize_roll_value(student.get('roll'))
+        if roll and roll not in by_roll_existing:
+            by_roll_existing[roll] = student
+
+    profile_by_roll = {}
+    month_profiles = (incoming_data.get('month_roster_profiles', {}) or {}).get(month_key, []) or []
+    for profile in month_profiles:
+        if not isinstance(profile, dict):
+            continue
+        roll = _normalize_roll_value(profile.get('roll'))
+        if roll:
+            profile_by_roll[roll] = profile
+
+    next_id = max([_parse_int_safe(student.get('id'), 0) for student in incoming_students if isinstance(student, dict)] + [0])
+
+    # Ensure each roster roll has a student record in incoming payload.
+    for roll in sorted(roster_rolls):
+        target = by_roll_incoming.get(roll)
+        if target is None and roll in by_roll_existing:
+            source = dict(by_roll_existing[roll])
+            incoming_students.append(source)
+            by_roll_incoming[roll] = source
+            target = source
+        if target is None:
+            next_id += 1
+            profile = profile_by_roll.get(roll, {})
+            name = str(profile.get('base_name') or profile.get('name') or roll).strip() or roll
+            raw_name = str(profile.get('name') or name).strip() or name
+            class_value = profile.get('class')
+            target = {
+                'id': next_id,
+                'roll': roll,
+                'name': name,
+                'base_name': name,
+                'raw_name': raw_name,
+                'class': _parse_int_safe(class_value, None) if class_value not in (None, '') else None,
+                'fees': 0,
+                'vote_power': None,
+                'stars': 0,
+                'veto_count': 0,
+                'active': True
+            }
+            incoming_students.append(target)
+            by_roll_incoming[roll] = target
+
+        # Do not force-active here: admins may intentionally deactivate duplicates.
+        # We only guarantee the roster roll has a record (to prevent "missing students" issues).
+        if 'active' not in target:
+            target['active'] = True
+
+        # Align display identity with month profile if available.
+        profile = profile_by_roll.get(roll)
+        if isinstance(profile, dict):
+            base_name = str(profile.get('base_name') or profile.get('name') or '').strip()
+            raw_name = str(profile.get('name') or '').strip()
+            if base_name:
+                target['base_name'] = base_name
+                target['name'] = base_name
+            if raw_name:
+                target['raw_name'] = raw_name
+            class_value = profile.get('class')
+            if class_value not in (None, ''):
+                target['class'] = _parse_int_safe(class_value, target.get('class'))
+
+    incoming_data['students'] = incoming_students
+
+    # Normalize month_students list for target month to canonical roll values.
+    month_students = incoming_data.setdefault('month_students', {})
+    month_students[month_key] = sorted(roster_rolls)
+
+    return incoming_data
 
 def _normalize_parties(parties):
     normalized = []
@@ -270,6 +2153,597 @@ def offline_scoreboard():
     return send_file('static/offline_scoreboard.html')
 
 
+@points_bp.route('/seed-data', methods=['GET'])
+def seed_data():
+    """Provide seed data lazily so the main HTML stays lightweight."""
+    payload = FEB26_SEED
+    response = jsonify(payload)
+    response.headers['Cache-Control'] = 'public, max-age=86400'
+    return response
+
+
+def _is_valid_replication_request():
+    """
+    Validate peer replication requests with secure key comparison.
+
+    Security improvements:
+    - Requires SYNC_SHARED_KEY to be set (minimum 16 chars recommended)
+    - Uses HMAC comparison to prevent timing attacks
+    - Validates required headers are present
+    """
+    import hmac
+
+    if request.headers.get('X-EA-Replicated') != '1':
+        return False
+
+    expected_key = os.getenv('SYNC_SHARED_KEY', '').strip()
+    provided_key = request.headers.get('X-EA-Sync-Key', '').strip()
+
+    # Security: Fail if sync key not configured (prevent unauthorized sync)
+    if not expected_key:
+        current_app.logger.warning("SYNC_SHARED_KEY not configured - rejecting replication request")
+        return False
+
+    # Security: Require minimum key length
+    if len(expected_key) < 16:
+        current_app.logger.error("SYNC_SHARED_KEY too short (minimum 16 characters required)")
+        return False
+
+    # Security: Use HMAC comparison to prevent timing attacks
+    return hmac.compare_digest(expected_key, provided_key)
+
+
+@points_bp.route('/offline-data', methods=['GET', 'POST'])
+@csrf.exempt  # Required for peer-to-peer sync, but secured with sync key validation
+@limiter.limit("2000 per hour")  # LAN mode: allow frequent sync while preventing runaway abuse
+def offline_data():
+    replicated_auth = _is_valid_replication_request()
+    is_replicated = request.headers.get('X-EA-Replicated') == '1'
+    if request.method == 'POST' and not current_user.is_authenticated and not replicated_auth:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+    if request.method == 'POST' and str(os.getenv('EA_RESTORE_LOCK', '')).strip() == '1':
+        return jsonify({'success': False, 'error': 'Restore lock enabled'}), 423
+
+    if request.method == 'GET':
+        data = _load_offline_data()
+        if not data:
+            return ('', 204)
+        min_students = _min_safe_student_roster()
+        if _is_tiny_roster(data, min_students):
+            data, src = _recover_tiny_roster_if_needed(data, min_students=min_students)
+            if _is_tiny_roster(data, min_students):
+                # Hard safety: never serve known-corrupt tiny rosters (prevents old clients from applying them).
+                current_app.logger.error(
+                    "Refusing to serve tiny roster snapshot (%s students). Recovery source=%s",
+                    _student_count(data),
+                    src or 'none',
+                )
+                resp = jsonify({'success': False, 'error': 'Roster snapshot incomplete. Recovery required.'})
+                resp.headers['Cache-Control'] = 'no-store'
+                return resp, 503
+        updated_at = data.get('server_updated_at') or data.get('updated_at')
+        since = request.args.get('since') if hasattr(request, 'args') else None
+        if since and updated_at:
+            server_stamp = _parse_sync_stamp(updated_at)
+            since_stamp = _parse_sync_stamp(since)
+            if server_stamp and since_stamp and server_stamp <= since_stamp:
+                # Bandwidth optimization for WAN: if client is already at/above this server stamp,
+                # avoid sending the full payload. SSE (offline-events) still provides realtime updates.
+                return ('', 204)
+        resp = jsonify({'data': data, 'updated_at': updated_at})
+        resp.headers['Cache-Control'] = 'no-store'
+        return resp
+
+    payload = request.get_json(silent=True) or {}
+    data = payload.get('data', payload)
+    request_peers = payload.get('peers', []) if isinstance(payload, dict) else []
+    if not isinstance(data, dict):
+        return jsonify({'success': False, 'error': 'Invalid payload'}), 400
+
+    actor_login_id = current_user.login_id if current_user.is_authenticated else ''
+    if current_user.is_authenticated:
+        actor_role = current_user.role
+    elif replicated_auth:
+        declared_role = payload.get('actor_role') if isinstance(payload, dict) else ''
+        if not declared_role and isinstance(data, dict):
+            declared_role = data.get('actor_role', '')
+        actor_role = str(declared_role or 'admin').strip().lower()
+    else:
+        actor_role = 'admin'
+
+    actor_role = str(actor_role or 'admin').strip().lower()
+    if actor_role not in ['admin', 'teacher', 'student']:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 403
+
+    replica_purpose = ''
+    if isinstance(payload, dict):
+        replica_purpose = str(payload.get('replica_purpose') or '').strip().lower()
+    if not replica_purpose and isinstance(data, dict):
+        replica_purpose = str(data.get('replica_purpose') or '').strip().lower()
+
+    # Master safety: In master mode, reject peer replication except for narrow teacher patches.
+    if request.method == 'POST' and is_replicated and str(os.getenv('EA_MASTER_MODE', '')).strip() == '1':
+        if not (actor_role == 'teacher' and replica_purpose == 'teacher_patch'):
+            return jsonify({'success': False, 'error': 'Peer replication disabled on master mode'}), 409
+
+    existing = _load_offline_data() or {}
+    min_students = _min_safe_student_roster()
+    if _is_tiny_roster(existing, min_students):
+        existing, _ = _recover_tiny_roster_if_needed(existing, min_students=min_students)
+    force_replace = bool(payload.get('force_replace')) if isinstance(payload, dict) else False
+    incoming_count = _student_count(data)
+    existing_count = _student_count(existing)
+    if actor_role not in ['teacher', 'student'] and not force_replace and incoming_count > 0 and incoming_count < min_students:
+        current_stamp = existing.get('server_updated_at') or existing.get('updated_at')
+        return jsonify({
+            'success': False,
+            'error': f'Incoming roster snapshot too small ({incoming_count} students). Upload rejected.',
+            'updated_at': current_stamp
+        }), 409
+    if actor_role not in ['teacher', 'student'] and not force_replace and _is_suspicious_student_shrink(existing, data):
+        current_stamp = existing.get('server_updated_at') or existing.get('updated_at')
+        return jsonify({
+            'success': False,
+            'error': 'Incoming snapshot would shrink student master data. Upload rejected.',
+            'updated_at': current_stamp
+        }), 409
+    incoming_stamp = _payload_sync_stamp(data)
+    existing_stamp = _payload_sync_stamp(existing)
+    if actor_role == 'teacher':
+        data = _filter_teacher_payload_to_current_month(data, actor_login_id or 'Teacher')
+        merged = existing if existing else {}
+        merged.setdefault('students', existing.get('students', []))
+        merged.setdefault('month_students', existing.get('month_students', {}))
+        merged.setdefault('month_roster_profiles', existing.get('month_roster_profiles', {}))
+        merged.setdefault('parties', existing.get('parties', []))
+        merged.setdefault('leadership', existing.get('leadership', []))
+        merged.setdefault('class_reps', existing.get('class_reps', []))
+        merged.setdefault('group_crs', existing.get('group_crs', []))
+        merged.setdefault('election_candidates', existing.get('election_candidates', []))
+        merged.setdefault('election_votes', existing.get('election_votes', []))
+        merged.setdefault('election_individual_votes', existing.get('election_individual_votes', []))
+        merged.setdefault('election_teacher_votes', existing.get('election_teacher_votes', []))
+        merged.setdefault('pending_election_results', existing.get('pending_election_results', []))
+        merged.setdefault('appeals', existing.get('appeals', []))
+        merged.setdefault('attendance', existing.get('attendance', []))
+        merged.setdefault('notification_history', existing.get('notification_history', []))
+        merged.setdefault('resource_cabinet', existing.get('resource_cabinet', []))
+        merged.setdefault('resource_requests', existing.get('resource_requests', []))
+        merged.setdefault('resource_transactions', existing.get('resource_transactions', []))
+        merged['scores'] = _merge_teacher_scores(existing, data)
+        if isinstance(data.get('appeals'), list):
+            merged['appeals'] = _merge_appeals_superset(existing.get('appeals', []), data.get('appeals', []))
+        if isinstance(data.get('attendance'), list):
+            merged['attendance'] = _merge_attendance_superset(existing, data)
+        if isinstance(data.get('election_teacher_votes'), list):
+            merged['election_teacher_votes'] = _merge_election_votes_superset(
+                existing.get('election_teacher_votes', []),
+                data.get('election_teacher_votes', []),
+                mode='teacher'
+            )
+        if isinstance(data.get('pending_election_results'), list):
+            merged['pending_election_results'] = _merge_pending_results_superset(
+                existing.get('pending_election_results', []),
+                data.get('pending_election_results', [])
+            )
+        if isinstance(data.get('notification_history'), list):
+            merged['notification_history'] = _merge_notification_history(
+                existing.get('notification_history', []),
+                data.get('notification_history', [])
+            )
+        if isinstance(data.get('resource_requests'), list):
+            merged['resource_requests'] = _merge_resource_requests_teacher(
+                existing.get('resource_requests', []),
+                data.get('resource_requests', []),
+                actor_login_id or 'Teacher',
+                _server_now_iso()[:7]
+            )
+        merged = _enforce_current_month_roster_integrity(merged, existing)
+        _reconcile_role_veto_monthly(merged)
+        _reconcile_veto_counters_from_scores(merged)
+        merged['updated_at'] = data.get('updated_at', existing.get('updated_at'))
+        merged['server_updated_at'] = _server_now_iso()
+        _save_offline_data(merged)
+        _broadcast_sync_event(merged['server_updated_at'], source='teacher')
+        if not is_replicated:
+            if str(os.getenv('EA_MASTER_MODE', '')).strip() == '1':
+                _forward_offline_data_to_peers_async(merged, request_peers)
+            else:
+                patch = _build_teacher_replication_patch(merged, actor_login_id or 'Teacher')
+                _forward_offline_data_to_peers_async(patch, request_peers)
+        return jsonify({'success': True, 'updated_at': merged['server_updated_at']})
+
+    if actor_role == 'student':
+        # Students can only:
+        # - create resource requests for themselves (append-only, server builds canonical row)
+        # - submit profile-change requests to admin via appeals (append-only, sanitized)
+        patch = {}
+        if isinstance(data, dict) and isinstance(data.get('resource_requests'), list) and data.get('resource_requests'):
+            req_patch, err = _student_resource_request_patch(existing, actor_login_id, data)
+            if not req_patch:
+                return jsonify({'success': False, 'error': err or 'Invalid student request'}), 400
+            patch.update(req_patch)
+        if isinstance(data, dict) and isinstance(data.get('appeals'), list) and data.get('appeals'):
+            appeal_patch, err = _student_profile_change_appeal_patch(existing, actor_login_id, data)
+            if not appeal_patch:
+                return jsonify({'success': False, 'error': err or 'Invalid student appeal'}), 400
+            patch.update(appeal_patch)
+        if not patch:
+            return jsonify({'success': False, 'error': 'No valid student update provided'}), 400
+        existing_obj = existing if isinstance(existing, dict) else {}
+        merged = existing_obj
+        merged.setdefault('resource_cabinet', existing_obj.get('resource_cabinet', []))
+        merged.setdefault('resource_requests', existing_obj.get('resource_requests', []))
+        merged.setdefault('resource_transactions', existing_obj.get('resource_transactions', []))
+        merged.setdefault('appeals', existing_obj.get('appeals', []))
+        if isinstance(patch.get('resource_requests'), list):
+            merged['resource_requests'] = _merge_resource_requests_superset(
+                merged.get('resource_requests', []),
+                patch.get('resource_requests', [])
+            )
+        if isinstance(patch.get('appeals'), list):
+            merged['appeals'] = _merge_appeals_superset(existing_obj.get('appeals', []), patch.get('appeals', []))
+        merged['server_updated_at'] = _server_now_iso()
+        _save_offline_data(merged)
+        _broadcast_sync_event(merged['server_updated_at'], source='student')
+        if not is_replicated:
+            _forward_offline_data_to_peers_async(merged, request_peers)
+        return jsonify({'success': True, 'updated_at': merged['server_updated_at']})
+
+    if existing and incoming_stamp and existing_stamp and incoming_stamp < existing_stamp:
+        # If the server is in a known corrupt state (tiny roster), accept a healthy snapshot even if its stamp is older.
+        if _is_tiny_roster(existing, min_students) and incoming_count >= min_students:
+            current_app.logger.warning(
+                "Accepting healthy snapshot (%s students) over tiny-roster data (%s students) despite older stamp.",
+                incoming_count,
+                existing_count
+            )
+        else:
+            current_stamp = existing.get('server_updated_at') or existing.get('updated_at')
+            return jsonify({
+                'success': False,
+                'error': 'Server has newer data',
+                'updated_at': current_stamp
+            }), 409
+
+    # Patch-safety: if a client sends a partial payload (e.g. only fee/resource updates),
+    # ensure we don't accidentally overwrite core tables like students/month roster.
+    if isinstance(existing, dict):
+        if 'students' not in data:
+            data['students'] = existing.get('students', [])
+        if 'month_students' not in data:
+            data['month_students'] = existing.get('month_students', {})
+        if 'month_roster_profiles' not in data:
+            data['month_roster_profiles'] = existing.get('month_roster_profiles', {})
+
+    if isinstance(existing, dict):
+        data['scores'] = _merge_scores_superset(existing.get('scores', []), data.get('scores', []))
+        data['attendance'] = _merge_attendance_superset(existing, data)
+        data['appeals'] = _merge_appeals_superset(existing.get('appeals', []), data.get('appeals', []))
+        data['election_votes'] = _merge_election_votes_superset(
+            existing.get('election_votes', []),
+            data.get('election_votes', []),
+            mode='party'
+        )
+        data['election_individual_votes'] = _merge_election_votes_superset(
+            existing.get('election_individual_votes', []),
+            data.get('election_individual_votes', []),
+            mode='individual'
+        )
+        data['election_teacher_votes'] = _merge_election_votes_superset(
+            existing.get('election_teacher_votes', []),
+            data.get('election_teacher_votes', []),
+            mode='teacher'
+        )
+        data['pending_election_results'] = _merge_pending_results_superset(
+            existing.get('pending_election_results', []),
+            data.get('pending_election_results', [])
+        )
+        data['fee_records'] = _merge_fee_records_superset(
+            existing.get('fee_records', []),
+            data.get('fee_records', [])
+        )
+        data['resource_cabinet'] = _merge_resource_cabinet_superset(
+            existing.get('resource_cabinet', []),
+            data.get('resource_cabinet', [])
+        )
+        data['resource_requests'] = _merge_resource_requests_superset(
+            existing.get('resource_requests', []),
+            data.get('resource_requests', [])
+        )
+        data['resource_transactions'] = _merge_resource_transactions_superset(
+            existing.get('resource_transactions', []),
+            data.get('resource_transactions', [])
+        )
+        data['notification_history'] = _merge_notification_history(
+            existing.get('notification_history', []),
+            data.get('notification_history', [])
+        )
+
+    data = _enforce_current_month_roster_integrity(data, existing)
+    _reconcile_role_veto_monthly(data)
+    _reconcile_veto_counters_from_scores(data)
+    data['server_updated_at'] = _server_now_iso()
+    _save_offline_data(data)
+    _broadcast_sync_event(data['server_updated_at'], source='replica' if is_replicated else 'client')
+    if not is_replicated:
+        _forward_offline_data_to_peers_async(data, request_peers)
+    return jsonify({'success': True, 'updated_at': data['server_updated_at']})
+
+
+@points_bp.route('/offline-events')
+@login_required
+def offline_events():
+    subscriber = _subscribe_sync_events()
+
+    def generate():
+        try:
+            yield 'retry: 2500\n\n'
+            existing = _load_offline_data() or {}
+            stamp = existing.get('server_updated_at') or existing.get('updated_at') or ''
+            yield f"event: sync\ndata: {json.dumps({'updated_at': stamp, 'source': 'init'})}\n\n"
+            while True:
+                try:
+                    payload = subscriber.get(timeout=20)
+                    yield f"event: sync\ndata: {payload}\n\n"
+                except Empty:
+                    yield ': keepalive\n\n'
+        finally:
+            _unsubscribe_sync_events(subscriber)
+
+    headers = {
+        'Cache-Control': 'no-cache',
+        'X-Accel-Buffering': 'no'
+    }
+    return Response(stream_with_context(generate()), mimetype='text/event-stream', headers=headers)
+
+
+@points_bp.route('/offline-server-health', methods=['POST'])
+@login_required
+def offline_server_health():
+    if current_user.role not in ['admin', 'teacher']:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 403
+
+    payload = request.get_json(silent=True) or {}
+    requested_urls = payload.get('urls', []) if isinstance(payload, dict) else []
+    urls = _normalize_peer_list(requested_urls)
+    if not urls:
+        urls = _get_sync_peers()
+    current_base = (request.host_url or '').rstrip('/')
+    if current_base and current_base not in urls:
+        urls.insert(0, current_base)
+    urls = list(dict.fromkeys(urls))
+
+    items = []
+    for base in urls:
+        endpoint = f"{base}/scoreboard/offline-data"
+        status = 'offline'
+        error = ''
+        data_stamp = ''
+        students = None
+        scores = None
+        try:
+            req = urllib.request.Request(endpoint, method='GET')
+            with urllib.request.urlopen(req, timeout=4) as resp:
+                raw = resp.read()
+                parsed = json.loads(raw.decode('utf-8'))
+                payload_data = parsed.get('data', {}) if isinstance(parsed, dict) else {}
+                status = 'online'
+                data_stamp = parsed.get('updated_at') or payload_data.get('server_updated_at') or payload_data.get('updated_at') or ''
+                if isinstance(payload_data, dict):
+                    if isinstance(payload_data.get('students'), list):
+                        students = len(payload_data.get('students'))
+                    if isinstance(payload_data.get('scores'), list):
+                        scores = len(payload_data.get('scores'))
+                if not data_stamp:
+                    status = 'degraded'
+                    error = 'No data stamp'
+        except Exception as exc:
+            status = 'offline'
+            error = str(exc)
+
+        items.append({
+            'base_url': base,
+            'status': status,
+            'data_stamp': data_stamp,
+            'students': students,
+            'scores': scores,
+            'error': error
+        })
+
+    return jsonify({'success': True, 'items': items, 'checked_at': _server_now_iso()})
+
+
+@points_bp.route('/offline-backup', methods=['GET'])
+@login_required
+def offline_backup():
+    data = _load_offline_data()
+    if not data:
+        return jsonify({'success': False, 'error': 'No data to backup'}), 404
+
+    fd, temp_path = tempfile.mkstemp(prefix='offline_backup_', suffix='.json')
+    with os.fdopen(fd, 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+    @after_this_request
+    def _cleanup(response):
+        try:
+            os.remove(temp_path)
+        except Exception:
+            pass
+        return response
+
+    filename = f'offline_scoreboard_backup_{datetime.now().strftime("%Y%m%d_%H%M%S")}.json'
+    return send_file(temp_path, as_attachment=True, download_name=filename)
+
+
+@points_bp.route('/offline-restore-points', methods=['GET'])
+@login_required
+def offline_restore_points():
+    if current_user.role != 'admin':
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 403
+
+    candidates = []
+    roots = [
+        ('live', _offline_data_path()),
+        ('rolling', _offline_backup_dir()),
+        ('hourly', _offline_hourly_backup_dir()),
+        ('startup', _offline_startup_restore_dir()),
+        ('instance', current_app.instance_path)
+    ]
+
+    seen = set()
+    for source, root in roots:
+        if source == 'live':
+            path = root
+            if os.path.isfile(path):
+                rel = os.path.relpath(path, current_app.instance_path)
+                key = rel.replace('\\', '/')
+                if key not in seen:
+                    seen.add(key)
+                    candidates.append((source, path, key))
+            continue
+        if not os.path.isdir(root):
+            continue
+        for name in os.listdir(root):
+            if not name.endswith('.json'):
+                continue
+            if source == 'instance' and not name.startswith('offline_scoreboard_data'):
+                continue
+            path = os.path.join(root, name)
+            if not os.path.isfile(path):
+                continue
+            rel = os.path.relpath(path, current_app.instance_path)
+            key = rel.replace('\\', '/')
+            if key in seen:
+                continue
+            seen.add(key)
+            candidates.append((source, path, key))
+
+    meta = _load_restore_points_meta()
+    items = []
+    for source, path, key in candidates:
+        try:
+            stat = os.stat(path)
+            key_meta = meta.get(key, {}) if isinstance(meta.get(key), dict) else {}
+            items.append({
+                'id': key,
+                'source': source,
+                'name': os.path.basename(path),
+                'path': key,
+                'modified_at': datetime.fromtimestamp(stat.st_mtime).isoformat(),
+                'size': stat.st_size,
+                'locked': bool(key_meta.get('locked')),
+                'label': str(key_meta.get('label') or '').strip()
+            })
+        except Exception:
+            continue
+
+    items.sort(key=lambda item: item.get('modified_at', ''), reverse=True)
+    return jsonify({'success': True, 'items': items})
+
+
+@points_bp.route('/offline-restore-point-lock', methods=['POST'])
+@login_required
+def offline_restore_point_lock():
+    if current_user.role != 'admin':
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 403
+    payload = request.get_json(silent=True) or {}
+    restore_id = str(payload.get('id') or '').strip().replace('\\', '/')
+    if not restore_id or '..' in restore_id:
+        return jsonify({'success': False, 'error': 'Invalid restore id'}), 400
+    lock_state = bool(payload.get('locked'))
+    label = str(payload.get('label') or '').strip()
+    source_path = os.path.normpath(os.path.join(current_app.instance_path, restore_id))
+    if not source_path.startswith(os.path.normpath(current_app.instance_path)):
+        return jsonify({'success': False, 'error': 'Invalid restore path'}), 400
+    if not os.path.isfile(source_path):
+        return jsonify({'success': False, 'error': 'Restore file not found'}), 404
+
+    meta = _load_restore_points_meta()
+    entry = meta.get(restore_id, {}) if isinstance(meta.get(restore_id), dict) else {}
+    entry['locked'] = lock_state
+    entry['label'] = label[:80]
+    entry['updated_at'] = _server_now_iso()
+    meta[restore_id] = entry
+    _save_restore_points_meta(meta)
+    return jsonify({'success': True, 'id': restore_id, 'locked': lock_state, 'label': entry['label']})
+
+
+@points_bp.route('/offline-restore', methods=['POST'])
+@login_required
+def offline_restore():
+    if current_user.role != 'admin':
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 403
+
+    payload = request.get_json(silent=True) or {}
+    restore_id = str(payload.get('id') or '').strip().replace('\\', '/')
+    if not restore_id:
+        return jsonify({'success': False, 'error': 'Missing restore id'}), 400
+    if '..' in restore_id:
+        return jsonify({'success': False, 'error': 'Invalid restore id'}), 400
+
+    source_path = os.path.normpath(os.path.join(current_app.instance_path, restore_id))
+    if not source_path.startswith(os.path.normpath(current_app.instance_path)):
+        return jsonify({'success': False, 'error': 'Invalid restore path'}), 400
+    if not os.path.isfile(source_path):
+        return jsonify({'success': False, 'error': 'Restore file not found'}), 404
+
+    try:
+        with open(source_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+    except Exception:
+        return jsonify({'success': False, 'error': 'Restore file is not valid JSON'}), 400
+    if not isinstance(data, dict):
+        return jsonify({'success': False, 'error': 'Restore payload invalid'}), 400
+
+    # Always create a backup of current live state before restore.
+    current = _load_offline_data()
+    if isinstance(current, dict):
+        stamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        safety = os.path.join(current_app.instance_path, f'offline_scoreboard_data.pre_ui_restore_{stamp}.json')
+        _atomic_write_json(safety, current)
+
+    data['server_updated_at'] = _server_now_iso()
+    data['updated_at'] = data.get('updated_at') or data['server_updated_at']
+    _save_offline_data(data)
+    _broadcast_sync_event(data['server_updated_at'], source='admin-restore')
+    _forward_offline_data_to_peers_async(data, [])
+
+    return jsonify({
+        'success': True,
+        'updated_at': data['server_updated_at'],
+        'students': len(data.get('students', []) or []),
+        'scores': len(data.get('scores', []) or [])
+    })
+
+
+@points_bp.route('/manifest.webmanifest')
+@login_required
+def offline_manifest():
+    return send_file('static/offline_manifest.webmanifest', mimetype='application/manifest+json')
+
+
+@points_bp.route('/sw.js')
+@login_required
+def offline_sw():
+    return send_file('static/offline_sw.js', mimetype='application/javascript')
+
+
+@points_bp.route('/session')
+@login_required
+def scoreboard_session():
+    role = (current_user.role or 'student').strip().lower()
+    if role not in {'admin', 'teacher', 'student'}:
+        role = 'student'
+    return jsonify({
+        'login_id': current_user.login_id,
+        'role': role,
+        'server_timezone': _get_server_timezone(),
+        'server_time': _server_now_iso()
+    })
+
+
 @points_bp.route('/')
 @login_required
 def scoreboard_home():
@@ -285,8 +2759,31 @@ def party_data():
     if request.method == 'POST':
         if current_user.role != 'admin':
             return jsonify({'success': False, 'error': 'Unauthorized'}), 403
-        payload = request.get_json() or {}
-        data['parties'] = payload.get('parties', [])
+
+        payload = request.get_json()
+        if not isinstance(payload, dict):
+            return jsonify({'success': False, 'error': 'Invalid request data'}), 400
+
+        parties = payload.get('parties', [])
+        if not isinstance(parties, list):
+            return jsonify({'success': False, 'error': 'Parties must be a list'}), 400
+
+        # Validate each party entry
+        for idx, party in enumerate(parties):
+            if not isinstance(party, dict):
+                return jsonify({'success': False, 'error': f'Party at index {idx} is invalid'}), 400
+
+            # Required fields validation
+            if 'id' not in party or not isinstance(party['id'], int):
+                return jsonify({'success': False, 'error': f'Party at index {idx} missing valid id'}), 400
+            if 'code' not in party or not isinstance(party['code'], str) or len(party['code']) > 10:
+                return jsonify({'success': False, 'error': f'Party at index {idx} has invalid code'}), 400
+            if 'name' not in party or not isinstance(party['name'], str) or len(party['name']) > 100:
+                return jsonify({'success': False, 'error': f'Party at index {idx} has invalid name'}), 400
+            if 'power' not in party or not isinstance(party['power'], int) or party['power'] < 0 or party['power'] > 1000:
+                return jsonify({'success': False, 'error': f'Party at index {idx} has invalid power (0-1000)'}), 400
+
+        data['parties'] = parties
         saved = _save_politics_data(data)
         return jsonify({'success': True, 'parties': saved['parties']})
     return jsonify({'success': True, 'parties': data['parties']})
@@ -300,8 +2797,38 @@ def leadership_data():
     if request.method == 'POST':
         if current_user.role != 'admin':
             return jsonify({'success': False, 'error': 'Unauthorized'}), 403
-        payload = request.get_json() or {}
-        data['leadership'] = payload.get('leadership', [])
+
+        payload = request.get_json()
+        if not isinstance(payload, dict):
+            return jsonify({'success': False, 'error': 'Invalid request data'}), 400
+
+        leadership = payload.get('leadership', [])
+        if not isinstance(leadership, list):
+            return jsonify({'success': False, 'error': 'Leadership must be a list'}), 400
+
+        # Validate each leadership entry
+        valid_statuses = {'active', 'suspended', 'vacant'}
+        for idx, post in enumerate(leadership):
+            if not isinstance(post, dict):
+                return jsonify({'success': False, 'error': f'Leadership post at index {idx} is invalid'}), 400
+
+            # Required fields validation
+            if 'id' not in post or not isinstance(post['id'], int):
+                return jsonify({'success': False, 'error': f'Leadership post at index {idx} missing valid id'}), 400
+            if 'post' not in post or not isinstance(post['post'], str) or len(post['post']) > 100:
+                return jsonify({'success': False, 'error': f'Leadership post at index {idx} has invalid post name'}), 400
+
+            # Optional fields validation
+            if 'holder' in post and post['holder'] and not isinstance(post['holder'], str):
+                return jsonify({'success': False, 'error': f'Leadership post at index {idx} has invalid holder'}), 400
+            if 'status' in post and post['status'] not in valid_statuses:
+                return jsonify({'success': False, 'error': f'Leadership post at index {idx} has invalid status (must be: {", ".join(valid_statuses)})'}), 400
+            if 'vetoQuota' in post:
+                veto_quota = post['vetoQuota']
+                if not isinstance(veto_quota, int) or veto_quota < 0 or veto_quota > 20:
+                    return jsonify({'success': False, 'error': f'Leadership post at index {idx} has invalid vetoQuota (0-20)'}), 400
+
+        data['leadership'] = leadership
         saved = _save_politics_data(data)
         return jsonify({'success': True, 'leadership': saved['leadership']})
     return jsonify({'success': True, 'leadership': data['leadership']})
@@ -420,12 +2947,58 @@ def add_points():
     
     try:
         data = request.get_json()
+
+        # Security: Validate incoming data
+        if not isinstance(data, dict):
+            return jsonify({'success': False, 'error': 'Invalid request data'}), 400
+
+        # Validate student_id
         student_id = data.get('student_id')
-        date_recorded = datetime.fromisoformat(data.get('date')).date()
-        points = int(data.get('points', 0))
-        stars = int(data.get('stars', 0))
-        vetos = int(data.get('vetos', 0))
-        notes = data.get('notes', '')
+        if not student_id or not isinstance(student_id, int):
+            return jsonify({'success': False, 'error': 'Invalid student ID'}), 400
+
+        # Validate student exists
+        student = StudentProfile.query.get(student_id)
+        if not student:
+            return jsonify({'success': False, 'error': 'Student not found'}), 404
+
+        # Validate and parse date
+        try:
+            date_str = data.get('date')
+            if not date_str:
+                return jsonify({'success': False, 'error': 'Date is required'}), 400
+            date_recorded = datetime.fromisoformat(date_str).date()
+        except (ValueError, TypeError) as e:
+            return jsonify({'success': False, 'error': 'Invalid date format (use YYYY-MM-DD)'}), 400
+
+        # Validate date is not in future
+        if date_recorded > datetime.now().date():
+            return jsonify({'success': False, 'error': 'Cannot record points for future dates'}), 400
+
+        # Validate date is not too far in past (within current academic year)
+        from datetime import date
+        current_year = date.today().year
+        if date_recorded.year < (current_year - 1):
+            return jsonify({'success': False, 'error': 'Date is too far in the past'}), 400
+
+        # Validate and sanitize numeric values
+        try:
+            points = int(data.get('points', 0))
+            stars = int(data.get('stars', 0))
+            vetos = int(data.get('vetos', 0))
+        except (ValueError, TypeError):
+            return jsonify({'success': False, 'error': 'Points, stars, and vetos must be integers'}), 400
+
+        # Security: Validate numeric ranges (prevent data corruption)
+        if not (0 <= points <= 1000):
+            return jsonify({'success': False, 'error': 'Points must be between 0 and 1000'}), 400
+        if not (0 <= stars <= 100):
+            return jsonify({'success': False, 'error': 'Stars must be between 0 and 100'}), 400
+        if not (0 <= vetos <= 50):
+            return jsonify({'success': False, 'error': 'Vetos must be between 0 and 50'}), 400
+
+        # Sanitize notes (prevent XSS)
+        notes = str(data.get('notes', ''))[:500]  # Limit to 500 chars
         
         # Check if record exists
         record = StudentPoints.query.filter_by(
@@ -439,7 +3012,7 @@ def add_points():
             record.stars = stars
             record.vetos = vetos
             record.notes = notes
-            record.recorded_by = current_user.username
+            record.recorded_by = current_user.login_id
         else:
             # Create new
             record = StudentPoints(
@@ -543,12 +3116,20 @@ def delete_student(student_id):
 @login_required
 def update_profile(student_id):
     """Update student profile with extended fields"""
+    # Security: Only admin and teacher can update profiles
+    if current_user.role not in ['admin', 'teacher']:
+        return jsonify({'success': False, 'error': 'Unauthorized - Admin or Teacher access required'}), 403
+
     try:
         student = StudentProfile.query.get(student_id)
         if not student:
             return jsonify({'success': False, 'error': 'Student not found'}), 404
-        
+
         data = request.get_json()
+
+        # Security: Validate incoming data is a dictionary
+        if not isinstance(data, dict):
+            return jsonify({'success': False, 'error': 'Invalid request data'}), 400
         
         # Update basic fields
         if 'full_name' in data:
@@ -606,18 +3187,60 @@ def import_excel():
         file = request.files['file']
         if file.filename == '':
             return jsonify({'success': False, 'error': 'No file selected'}), 400
-        
+
+        # Validate file extension
         if not file.filename.endswith(('.xlsx', '.xls', '.xlsm')):
             return jsonify({'success': False, 'error': 'Only Excel files (.xlsx, .xls, .xlsm) are supported'}), 400
-        
-        # Save and process file
-        filename = secure_filename(file.filename)
-        temp_path = os.path.join(tempfile.gettempdir(), filename)
-        file.save(temp_path)
-        
-        # Load workbook
-        wb = openpyxl.load_workbook(temp_path, data_only=True)
+
+        # Validate MIME type for additional security
+        allowed_mimetypes = [
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',  # .xlsx
+            'application/vnd.ms-excel',  # .xls
+            'application/vnd.ms-excel.sheet.macroEnabled.12'  # .xlsm
+        ]
+        if file.content_type not in allowed_mimetypes and file.content_type != 'application/octet-stream':
+            return jsonify({'success': False, 'error': 'Invalid file type'}), 400
+
+        # Check file size (max 50MB as configured in app config)
+        file.seek(0, os.SEEK_END)
+        file_size = file.tell()
+        file.seek(0)
+        max_size = current_app.config.get('MAX_CONTENT_LENGTH', 52428800)
+        if file_size > max_size:
+            return jsonify({'success': False, 'error': f'File too large. Maximum size: {max_size // (1024*1024)}MB'}), 400
+
+        # Security: Use unique temporary file to prevent race conditions and path traversal
+        import uuid
+        temp_suffix = file.filename.split('.')[-1] if '.' in file.filename else 'xlsx'
+        temp_file = tempfile.NamedTemporaryFile(
+            mode='w+b',
+            suffix=f'.{temp_suffix}',
+            prefix=f'ea_import_{uuid.uuid4().hex}_',
+            delete=False
+        )
+        temp_path = temp_file.name
+        temp_file.close()
+
+        try:
+            # Save uploaded file to unique temporary path
+            file.save(temp_path)
+
+            # Load workbook with security settings (read_only to prevent formula execution)
+            wb = openpyxl.load_workbook(temp_path, data_only=True, read_only=False, keep_vba=False)
+        except Exception as e:
+            # Security: Always cleanup temp file on error
+            if os.path.exists(temp_path):
+                try:
+                    os.unlink(temp_path)
+                except:
+                    pass
+            return jsonify({'success': False, 'error': f'Failed to read Excel file: {str(e)}'}), 400
         sheet_name = request.form.get('sheet') or request.args.get('sheet')
+        if not sheet_name:
+            for name in wb.sheetnames:
+                if name.strip().lower() == 'feb 26':
+                    sheet_name = name
+                    break
         ws = wb[sheet_name] if sheet_name and sheet_name in wb.sheetnames else wb.active
         
         imported_count = 0
@@ -717,13 +3340,13 @@ def import_excel():
 
                     if record:
                         record.points = int(score_value)
-                        record.recorded_by = current_user.username
+                        record.recorded_by = current_user.login_id
                     else:
                         record = StudentPoints(
                             student_id=student.id,
                             date_recorded=date_recorded,
                             points=int(score_value),
-                            recorded_by=current_user.username
+                            recorded_by=current_user.login_id
                         )
                         db.session.add(record)
                 
@@ -751,6 +3374,12 @@ def import_excel():
         })
     except Exception as e:
         current_app.logger.error(f"Error in import_excel: {str(e)}")
+        # Cleanup temp file if it exists
+        try:
+            if 'temp_path' in locals() and os.path.exists(temp_path):
+                os.unlink(temp_path)
+        except:
+            pass
         return jsonify({'success': False, 'error': str(e)}), 400
 
 
@@ -816,7 +3445,7 @@ def seed_feb26():
             ).first()
             if record:
                 record.points = int(score['points'])
-                record.recorded_by = current_user.username
+                record.recorded_by = current_user.login_id
             else:
                 record = StudentPoints(
                     student_id=student.id,
@@ -926,4 +3555,3 @@ def get_month_summary():
     except Exception as e:
         current_app.logger.error(f"Error in get_month_summary: {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 400
-

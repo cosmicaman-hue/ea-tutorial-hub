@@ -20,8 +20,6 @@ class User(UserMixin, db.Model):
     
     # Relationships
     student_profile = db.relationship('StudentProfile', backref='user', uselist=False, cascade='all, delete-orphan')
-    uploaded_notes = db.relationship('Notes', backref='uploaded_by_rel', foreign_keys='Notes.uploaded_by', cascade='all, delete-orphan')
-    quiz_responses = db.relationship('QuizAnswer', backref='student', cascade='all, delete-orphan')
     activity_logs = db.relationship('ActivityLog', backref='user_rel', cascade='all, delete-orphan')
     
     def set_password(self, password):

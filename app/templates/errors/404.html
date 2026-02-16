@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="error-container" style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 60vh; padding: 40px 20px; text-align: center;">
+    <h1 style="font-size: 72px; font-weight: bold; color: #dc3545; margin: 0;">404</h1>
+    <h2 style="color: #495057; margin: 10px 0;">Page Not Found</h2>
+    <p style="color: #6c757d; font-size: 18px; margin: 20px 0;">
+        The page you're looking for doesn't exist or has been moved.
+    </p>
+    
+    {% if url %}
+    <p style="color: #999; font-size: 14px; margin: 10px 0;">
+        Requested URL: <code>{{ url }}</code>
+    </p>
+    {% endif %}
+    
+    <div style="margin-top: 30px;">
+        <a href="{{ url_for('points.offline_scoreboard') }}" class="btn btn-primary" style="background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block; margin: 5px;">
+            Go to Scoreboard
+        </a>
+        <a href="{{ url_for('auth.login') }}" class="btn btn-secondary" style="background-color: #6c757d; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block; margin: 5px;">
+            Go to Login
+        </a>
+    </div>
+</div>
+{% endblock %}

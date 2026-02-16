@@ -1,0 +1,40 @@
+services:
+  - type: pserv
+    name: project-ea-db
+    plan: free
+    ipAllowList: []
+    disk:
+      name: project-ea-db-data
+      mountPath: /var/lib/postgresql/data
+      sizeGB: 1
+
+  - type: web
+    name: project-ea
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn --workers=1 --threads=8 --timeout=120 --bind=0.0.0.0:$PORT wsgi:app
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.11
+      - key: FLASK_DEBUG
+        value: "0"
+      - key: ENABLE_RATE_LIMITING
+        value: "0"
+      - key: EA_INIT_ON_BOOT
+        value: "1"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: project-ea-db
+          property: connectionString
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: TEACHER_PASSWORD
+        sync: false
+      - key: SYNC_SHARED_KEY
+        sync: false
+      - key: EA_MASTER_MODE
+        value: "1"

@@ -1,0 +1,16 @@
+# EA Tutorial Hub - Server Launcher (PowerShell)
+# This script starts the Flask application for network access
+
+$ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+Set-Location $ScriptDir
+
+$env:EA_TIMEZONE = if ($env:EA_TIMEZONE) { $env:EA_TIMEZONE } else { 'Asia/Kolkata' }
+if (-not $env:SYNC_PEERS) { $env:SYNC_PEERS = 'http://192.168.0.207:5000' }  # Backup LAN server
+if (-not $env:SYNC_SHARED_KEY) { $env:SYNC_SHARED_KEY = 'EA_SYNC_KEY_917511_2026' }
+
+$pythonPath = Join-Path $ScriptDir '.venv\Scripts\python.exe'
+if (-not (Test-Path $pythonPath)) {
+    $pythonPath = 'python'
+}
+
+& $pythonPath run.py

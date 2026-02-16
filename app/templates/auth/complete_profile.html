@@ -15,6 +15,7 @@
                 <div class="card-body">
                     <p class="text-muted">Please fill all required information to complete your registration.</p>
                     <form method="POST" action="{{ url_for('auth.complete_profile') }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                         <div class="row">
                             <div class="col-md-4 mb-3">
                                 <label for="first_name" class="form-label">First Name *</label>
