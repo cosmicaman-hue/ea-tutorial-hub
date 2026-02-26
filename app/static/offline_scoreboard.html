@@ -540,9 +540,8 @@
             overflow-x: auto;
             overflow-y: hidden;
             max-height: none;
-            padding-bottom: 140px;
+            padding-bottom: 0;
             position: relative;
-            scroll-padding-bottom: 140px;
             background-color: #0f172a;
             isolation: isolate;
             scroll-behavior: auto;
@@ -567,21 +566,21 @@
 
         #scoreboard-tab .scoreboard-wrapper {
             overflow: visible;
-            margin-bottom: 140px;
+            margin-bottom: 24px;
         }
 
         #scoreboard-tab .scoreboard-scroll {
             overflow-x: scroll;
-            overflow-y: hidden;
-            max-height: none;
-            padding-bottom: 140px;
-            scroll-padding-bottom: 140px;
+            overflow-y: auto;
+            max-height: calc(100vh - 300px);
+            min-height: 220px;
+            padding-bottom: 0;
         }
 
         @media (max-width: 980px) {
-            .scoreboard-scroll {
-                max-height: none;
-                padding-bottom: 92px;
+            #scoreboard-tab .scoreboard-scroll {
+                max-height: calc(100vh - 220px);
+                min-height: 180px;
             }
         }
 
@@ -11140,9 +11139,10 @@
                     hasPendingLocalWrites = !!pendingSyncPayload;
                 }
             }
-            // forceFull=true (explicit refresh / page-load) always bypasses WAL check so
-            // teachers and students get a clean authoritative pull regardless of pending writes.
-            const preferAuthoritativeServerApply = roleNeedsAuthoritativeSync && (!hasPendingLocalWrites || forceFull);
+            // Teachers/students get authoritative replace only when they have no pending local writes.
+            // When forceFull=true but local writes are pending, merge mode is used to preserve
+            // unsaved attendance edits (e.g. 'absent' marks not yet pushed to server).
+            const preferAuthoritativeServerApply = roleNeedsAuthoritativeSync && !hasPendingLocalWrites;
 
             const shouldApplyRemote =
                 forceFull ||                       // explicit refresh/master-update must always evaluate remote snapshot
