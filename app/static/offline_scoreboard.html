@@ -963,6 +963,23 @@
             color: #ecfeff !important;
         }
 
+        /* ── Sticky header row: pins column/date labels while scrolling down ── */
+        #scoreboardTable thead th {
+            position: sticky !important;
+            top: 0;
+            z-index: 55;
+        }
+        /* Corner cells (horizontally + vertically sticky) → highest z-index */
+        #scoreboardTable thead th.sticky-left,
+        #scoreboardTable thead th.sticky-right,
+        #scoreboardTable thead th.extra-fixed {
+            z-index: 80 !important;
+        }
+        /* Visual drop-shadow to separate sticky header from scrolling body rows */
+        #scoreboardTable thead tr:last-child th {
+            box-shadow: 0 3px 8px rgba(0, 0, 0, 0.45);
+        }
+
         .vote-cell {
             font-weight: 700;
             color: #38bdf8;
