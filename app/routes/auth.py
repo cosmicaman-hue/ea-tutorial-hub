@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session, current_app
 from flask_login import login_user, logout_user, current_user, login_required
 from app import db, limiter
-from app.models import User, StudentProfile
+from app.models import User
 from app.models.user import ActivityLog
 from datetime import datetime
 import json
@@ -194,7 +194,7 @@ def register():
             flash('Password must be at least 6 characters', 'error')
             return redirect(url_for('auth.register'))
         
-        user = User(login_id=login_id, role='student', first_login=True)
+        user = User(login_id=login_id, role='student', first_login=False)
         user.set_password(password)
         
         db.session.add(user)
@@ -207,120 +207,6 @@ def register():
     
     return render_template('auth/register.html')
 
-
-@auth_bp.route('/complete-profile', methods=['GET', 'POST'])
-@login_required
-def complete_profile():
-    if not current_user.first_login:
-        return redirect(url_for('points.offline_scoreboard'))
-    
-    if request.method == 'POST':
-        try:
-            # Validation: Required fields
-            first_name = request.form.get('first_name', '').strip()
-            second_name = request.form.get('second_name', '').strip()
-            date_of_birth_str = request.form.get('date_of_birth', '').strip()
-            gender = request.form.get('gender', '').strip()
-            contact_number_1 = request.form.get('contact_number_1', '').strip()
-            pin_code = request.form.get('pin_code', '').strip()
-
-            # Validate required fields
-            if not first_name or len(first_name) < 2 or len(first_name) > 50:
-                raise ValueError("First name must be between 2-50 characters")
-            if not second_name or len(second_name) < 2 or len(second_name) > 50:
-                raise ValueError("Second name must be between 2-50 characters")
-            if gender not in ['Male', 'Female', 'Other']:
-                raise ValueError("Gender must be Male, Female, or Other")
-
-            # Validate and parse date of birth
-            if not date_of_birth_str:
-                raise ValueError("Date of birth is required")
-            try:
-                dob = datetime.strptime(date_of_birth_str, '%Y-%m-%d').date()
-                # Validate age (must be between 5-25 years old)
-                from datetime import date
-                today = date.today()
-                age = today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
-                if age < 5 or age > 25:
-                    raise ValueError("Age must be between 5 and 25 years")
-            except ValueError as e:
-                raise ValueError(f"Invalid date of birth: {str(e)}")
-
-            # Validate contact number (10 digits)
-            import re
-            if not contact_number_1 or not re.match(r'^\d{10}$', contact_number_1):
-                raise ValueError("Contact number must be exactly 10 digits")
-
-            # Validate PIN code (6 digits)
-            if not pin_code or not re.match(r'^\d{6}$', pin_code):
-                raise ValueError("PIN code must be exactly 6 digits")
-
-            # Validate optional fields
-            email = request.form.get('email', '').strip() or f"{current_user.login_id}@school.local"
-            if email and '@' not in email:
-                raise ValueError("Invalid email address")
-
-            # Sanitize and limit text field lengths
-            third_name = request.form.get('third_name', '').strip()[:50]
-            roll_number = request.form.get('roll_number', '').strip()[:20]
-            contact_number_2 = request.form.get('contact_number_2', '').strip()[:15]
-            aadhar_number = request.form.get('aadhar_number', '').strip()[:12]
-
-            # Validate Aadhar if provided (12 digits)
-            if aadhar_number and not re.match(r'^\d{12}$', aadhar_number):
-                raise ValueError("Aadhar number must be exactly 12 digits")
-
-            profile = StudentProfile(
-                user_id=current_user.id,
-                first_name=first_name,
-                second_name=second_name,
-                third_name=third_name,
-                date_of_birth=dob,
-                gender=gender,
-                religion=request.form.get('religion', '').strip()[:50],
-                nationality=request.form.get('nationality', 'India').strip()[:50],
-                school_name=request.form.get('school_name', '').strip()[:100],
-                class_name=request.form.get('class_name', '').strip()[:20],
-                section=request.form.get('section', '').strip()[:10],
-                roll_number=roll_number,
-                contact_number_1=contact_number_1,
-                contact_number_2=contact_number_2,
-                email=email[:100],
-                village_area=request.form.get('village_area', '').strip()[:100],
-                post_office=request.form.get('post_office', '').strip()[:100],
-                district=request.form.get('district', '').strip()[:50],
-                state=request.form.get('state', '').strip()[:50],
-                pin_code=pin_code,
-                hobbies=request.form.get('hobbies', '').strip()[:500],
-                improvement_areas=request.form.get('improvement_areas', '').strip()[:500],
-                father_name=request.form.get('father_name', '').strip()[:100],
-                mother_name=request.form.get('mother_name', '').strip()[:100],
-                guardian_name=request.form.get('guardian_name', '').strip()[:100],
-                guardian_contact=request.form.get('guardian_contact', '').strip()[:15],
-                blood_group=request.form.get('blood_group', '').strip()[:10],
-                aadhar_number=aadhar_number
-            )
-            
-            current_user.first_login = False
-            db.session.add(profile)
-            db.session.commit()
-            
-            log_activity(current_user.id, 'Student profile completed', 'profile_complete', 'First login profile setup', request.remote_addr)
-            
-            flash('Profile completed successfully!', 'success')
-            return redirect(url_for('points.offline_scoreboard'))
-        except ValueError as e:
-            # Specific validation errors (safe to show)
-            db.session.rollback()
-            current_app.logger.error(f"Profile completion validation error for user {current_user.id}: {str(e)}")
-            flash(f'Invalid data: {str(e)}', 'error')
-        except Exception as e:
-            # Generic errors (hide details from user)
-            db.session.rollback()
-            current_app.logger.error(f"Profile completion error for user {current_user.id}: {str(e)}", exc_info=True)
-            flash('An error occurred while completing your profile. Please try again or contact support.', 'error')
-    
-    return render_template('auth/complete_profile.html')
 
 @auth_bp.route('/change-password', methods=['GET', 'POST'])
 @login_required
@@ -362,5 +248,7 @@ def change_password():
 def logout():
     log_activity(current_user.id, f'{current_user.role.capitalize()} logout', 'logout', f'IP: {request.remote_addr}', request.remote_addr)
     logout_user()
+    # Clear server-side session data
+    session.clear()
     flash('You have been logged out', 'success')
     return redirect(url_for('auth.login'))

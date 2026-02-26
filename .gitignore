@@ -23,9 +23,13 @@ share/python-wheels/
 *.egg
 MANIFEST
 
-# Flask
+# Flask / instance data (database, snapshots, locks)
 instance/
 .webassets-cache
+
+# Backup / temp files
+*.backup_*
+*.bak_*
 
 # Virtual environments
 .venv
@@ -45,10 +49,14 @@ venv.bak/
 # OS
 .DS_Store
 Thumbs.db
-.env.local
 
-# Database (keep the committed one)
-# instance/ea_tutorial.db
+# Environment / secrets — NEVER commit real passwords to git
+.env
+.env.local
+.env.*
+
+# Claude internal
+.claude/
 
 # Logs
 *.log

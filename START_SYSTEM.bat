@@ -1,14 +1,22 @@
 @echo off
-REM START_SYSTEM.bat - Simplest possible launcher
-REM This file launches the Flask server in the background
+REM START_SYSTEM.bat - Safe launcher
+REM Uses run.py (single-instance lock + integrity guards), not flask run.
 
-cd /d "C:\Users\sujit\Desktop\Project EA"
+cd /d "%~dp0"
+set "EA_TIMEZONE=Asia/Kolkata"
+if not defined EA_MASTER_MODE set "EA_MASTER_MODE=1"
+if not defined SYNC_PEERS set "SYNC_PEERS=http://192.168.0.163:5000"
+if not defined SYNC_SHARED_KEY set "SYNC_SHARED_KEY=EA_SYNC_KEY_917511_2026"
+set "FLASK_ENV=production"
+set "FLASK_DEBUG=0"
+set "FLASK_USE_RELOADER=0"
 
-REM Start Python in background
-start "" pythonw -m flask run --host=0.0.0.0 --port=5000
-timeout /t 3 /nobreak
+if exist "%~dp0.venv\Scripts\python.exe" (
+  start "" "%~dp0.venv\Scripts\python.exe" run.py
+) else (
+  start "" python run.py
+)
 
-REM Open the HTML launcher in default browser
-start LAUNCHER.html
-
+timeout /t 2 /nobreak >nul
+start "" http://127.0.0.1:5000/scoreboard/offline
 exit

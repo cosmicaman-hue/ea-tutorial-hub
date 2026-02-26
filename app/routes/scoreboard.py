@@ -1,7 +1,8 @@
 from flask import Blueprint, render_template, request, jsonify, current_app, send_file, after_this_request, Response, stream_with_context
 from flask_login import login_required, current_user
 from app import db, csrf, limiter
-from app.models import StudentProfile, StudentPoints, StudentLeaderboard, MonthlyPointsSummary, User
+from app.models import User
+from app.utils.syllabus_helpers import merge_syllabus_catalog_superset, merge_syllabus_tracking_superset
 from datetime import datetime, date, timedelta, timezone
 from dateutil.relativedelta import relativedelta
 import calendar
@@ -1007,6 +1008,15 @@ def _build_teacher_replication_patch(full_payload, teacher_login_id='Teacher'):
             continue
         appeals.append(item)
 
+    syllabus_tracking = []
+    for row in payload.get('syllabus_tracking', []) or []:
+        if not isinstance(row, dict):
+            continue
+        key = str(row.get('key') or '').strip()
+        if not key:
+            continue
+        syllabus_tracking.append(row)
+
     return {
         'actor_role': 'teacher',
         'replica_purpose': 'teacher_patch',
@@ -1014,8 +1024,93 @@ def _build_teacher_replication_patch(full_payload, teacher_login_id='Teacher'):
         'scores': scores,
         'attendance': attendance,
         'appeals': appeals,
+        'syllabus_tracking': syllabus_tracking,
         'updated_at': payload.get('updated_at')
     }
+
+
+def _merge_month_students_superset(existing_ms, incoming_ms):
+    """Superset merge for month_students: never let an incoming partial roster shrink an existing month's list."""
+    if not isinstance(existing_ms, dict):
+        existing_ms = {}
+    if not isinstance(incoming_ms, dict):
+        incoming_ms = {}
+    merged = {}
+    for month in set(list(existing_ms.keys()) + list(incoming_ms.keys())):
+        existing_rolls = list(existing_ms.get(month) or [])
+        incoming_rolls = list(incoming_ms.get(month) or [])
+        seen = set(str(r or '').strip().upper() for r in existing_rolls if r)
+        combined = list(existing_rolls)
+        for r in incoming_rolls:
+            key = str(r or '').strip().upper()
+            if key and key not in seen:
+                combined.append(r)
+                seen.add(key)
+        merged[month] = combined
+    return merged
+
+
+def _merge_month_roster_profiles_superset(existing_rp, incoming_rp):
+    """Superset merge for month_roster_profiles: union by roll across months."""
+    if not isinstance(existing_rp, dict):
+        existing_rp = {}
+    if not isinstance(incoming_rp, dict):
+        incoming_rp = {}
+    merged = {}
+    for month in set(list(existing_rp.keys()) + list(incoming_rp.keys())):
+        by_roll = {}
+        for p in (existing_rp.get(month) or []):
+            if not isinstance(p, dict):
+                continue
+            roll = str(p.get('roll') or '').strip().upper()
+            if roll:
+                by_roll[roll] = dict(p)
+        for p in (incoming_rp.get(month) or []):
+            if not isinstance(p, dict):
+                continue
+            roll = str(p.get('roll') or '').strip().upper()
+            if roll:
+                by_roll[roll] = {**(by_roll.get(roll) or {}), **p}
+        merged[month] = list(by_roll.values())
+    return merged
+
+
+def _merge_students_preserve_active(existing_students, incoming_students):
+    """Merge student lists, never downgrading active:True→False without a genuinely newer timestamp.
+    This protects against sync-induced corruption where a peer device pushes stale active:false flags."""
+    if not isinstance(existing_students, list):
+        existing_students = []
+    if not isinstance(incoming_students, list):
+        incoming_students = []
+    by_roll = {}
+    for s in existing_students:
+        if not isinstance(s, dict):
+            continue
+        roll = str(s.get('roll') or '').strip().upper()
+        if roll:
+            by_roll[roll] = dict(s)
+    for s in incoming_students:
+        if not isinstance(s, dict):
+            continue
+        roll = str(s.get('roll') or '').strip().upper()
+        if not roll:
+            continue
+        existing = by_roll.get(roll)
+        if not existing:
+            by_roll[roll] = dict(s)
+            continue
+        existing_stamp = _parse_sync_stamp(existing.get('updated_at') or existing.get('created_at') or '')
+        incoming_stamp = _parse_sync_stamp(s.get('updated_at') or s.get('created_at') or '')
+        if incoming_stamp > existing_stamp:
+            # Incoming record is genuinely newer — accept it as-is.
+            by_roll[roll] = {**existing, **s}
+        else:
+            # Tie or existing is newer: merge but never downgrade active true→false.
+            merged_s = {**existing, **s}
+            if existing.get('active') is not False and merged_s.get('active') is False:
+                merged_s['active'] = existing.get('active', True)
+            by_roll[roll] = merged_s
+    return list(by_roll.values())
 
 
 def _merge_scores_superset(existing_scores, incoming_scores):
@@ -1052,8 +1147,18 @@ def _merge_scores_superset(existing_scores, incoming_scores):
         key, normalized = _normalize_score(score)
         if key is None:
             continue
-        # Incoming row updates same key, but cannot remove other keys.
-        merged[key] = normalized
+        if key in merged:
+            prev = merged[key]
+            prev_stamp = _parse_sync_stamp(prev.get('updated_at', ''))
+            next_stamp = _parse_sync_stamp(normalized.get('updated_at', ''))
+            if next_stamp > prev_stamp:
+                merged[key] = normalized
+            elif next_stamp == prev_stamp and _parse_int_safe(normalized.get('id')) > _parse_int_safe(prev.get('id')):
+                # Same age (or both missing updated_at): keep the higher-id record as tiebreaker.
+                merged[key] = normalized
+            # else prev is same age or newer — keep it
+        else:
+            merged[key] = normalized
         max_score_id = max(max_score_id, _parse_int_safe(normalized.get('id')))
 
     result = []
@@ -1536,6 +1641,129 @@ def _merge_resource_requests_superset(existing_requests, incoming_requests):
     return list(merged.values())
 
 
+def _merge_leadership_superset(existing_posts, incoming_posts):
+    """Merge leadership posts by id; never overwrite a populated holder with an empty one."""
+    merged = {}
+    def is_populated(p):
+        return bool(str(p.get('holder') or '').strip() or str(p.get('roll') or '').strip())
+    for p in (existing_posts or []):
+        pid = int(p.get('id') or 0)
+        if pid:
+            merged[pid] = dict(p)
+    for p in (incoming_posts or []):
+        pid = int(p.get('id') or 0)
+        if not pid:
+            continue
+        existing = merged.get(pid)
+        if not existing:
+            merged[pid] = dict(p)
+            continue
+        if is_populated(existing) and not is_populated(p):
+            continue
+        merged[pid] = {**existing, **p}
+    return list(merged.values())
+
+
+def _merge_group_crs_superset(existing_crs, incoming_crs):
+    """Merge group CRs by id; prefer entries with studentId assigned.
+    An 'ended' status is preserved unless the incoming entry assigns a *different* student
+    (which indicates an intentional re-assignment, not a stale push)."""
+    merged = {}
+    for arr in [existing_crs or [], incoming_crs or []]:
+        for cr in arr:
+            cid = int(cr.get('id') or 0)
+            if not cid:
+                continue
+            prev = merged.get(cid)
+            if not prev:
+                merged[cid] = dict(cr)
+                continue
+            if prev.get('studentId') and not cr.get('studentId'):
+                continue
+            new_entry = {**prev, **cr}
+            # Preserve 'ended' against stale clients that still have 'active' for the same student.
+            prev_status = str(prev.get('status') or '').strip().lower()
+            new_status = str(cr.get('status') or '').strip().lower()
+            if (prev_status == 'ended' and new_status not in ('ended',)
+                    and prev.get('studentId') and cr.get('studentId')
+                    and int(prev.get('studentId') or 0) == int(cr.get('studentId') or 0)):
+                new_entry['status'] = 'ended'
+            merged[cid] = new_entry
+    return list(merged.values())
+
+
+def _merge_class_reps_superset(existing_reps, incoming_reps):
+    """Merge class reps by id; prefer entries with studentId assigned.
+    An 'ended' status is preserved unless the incoming entry assigns a *different* student."""
+    merged = {}
+    for arr in [existing_reps or [], incoming_reps or []]:
+        for rep in arr:
+            rid = int(rep.get('id') or 0)
+            if not rid:
+                continue
+            prev = merged.get(rid)
+            if not prev:
+                merged[rid] = dict(rep)
+                continue
+            if prev.get('studentId') and not rep.get('studentId'):
+                continue
+            new_entry = {**prev, **rep}
+            prev_status = str(prev.get('status') or '').strip().lower()
+            new_status = str(rep.get('status') or '').strip().lower()
+            if (prev_status == 'ended' and new_status not in ('ended',)
+                    and prev.get('studentId') and rep.get('studentId')
+                    and int(prev.get('studentId') or 0) == int(rep.get('studentId') or 0)):
+                new_entry['status'] = 'ended'
+            merged[rid] = new_entry
+    return list(merged.values())
+
+
+def _merge_parties_superset(existing_parties, incoming_parties):
+    """Merge parties by code; never overwrite non-empty members with empty."""
+    merged = {}
+    for arr in [existing_parties or [], incoming_parties or []]:
+        for party in arr:
+            key = str(party.get('code') or '').strip().upper() or str(party.get('id') or '')
+            if not key:
+                continue
+            prev = merged.get(key)
+            if not prev:
+                merged[key] = dict(party)
+                continue
+            prev_members = prev.get('members') or []
+            new_members = party.get('members') or []
+            if prev_members and not new_members:
+                merged[key] = {**prev, **party, 'members': prev_members}
+            else:
+                merged[key] = {**prev, **party}
+    return list(merged.values())
+
+
+def _merge_pending_cr_requests_superset(existing_reqs, incoming_reqs):
+    """Merge pending CR requests by id.
+    Never downgrade a resolved (approved/rejected) request back to pending.
+    """
+    merged = {}
+    for arr in [existing_reqs or [], incoming_reqs or []]:
+        for req in arr:
+            if not isinstance(req, dict):
+                continue
+            rid = int(req.get('id') or 0)
+            if not rid:
+                continue
+            prev = merged.get(rid)
+            if not prev:
+                merged[rid] = dict(req)
+                continue
+            prev_status = str(prev.get('status') or '').strip().lower()
+            new_status = str(req.get('status') or '').strip().lower()
+            # Keep the resolved state if it has already been acted on
+            if prev_status in ('approved', 'rejected') and new_status == 'pending':
+                continue
+            merged[rid] = {**prev, **req}
+    return list(merged.values())
+
+
 def _merge_resource_transactions_superset(existing_rows, incoming_rows):
     """Merge resource transactions by id."""
     merged = {}
@@ -1569,6 +1797,61 @@ def _merge_resource_transactions_superset(existing_rows, incoming_rows):
                 continue
             prev_stamp = _parse_sync_stamp(prev.get('updated_at') or prev.get('created_at'))
             next_stamp = _parse_sync_stamp(normalized.get('updated_at') or normalized.get('created_at'))
+            merged[key] = normalized if next_stamp >= prev_stamp else prev
+
+    return list(merged.values())
+
+
+
+
+def _merge_resource_advantage_deductions_superset(existing_rows, incoming_rows):
+    """
+    Merge resource_advantage_deductions by id.
+    Safety rules:
+    - Never delete a deduction record.
+    - Once reversed=True, never revert back to False.
+    - On conflict, keep the record that has reversed=True; otherwise keep the newer one.
+    """
+    merged = {}
+
+    def _normalize(item):
+        if not isinstance(item, dict):
+            return None, None
+        did = _parse_int_safe(item.get('id'), 0)
+        if did <= 0:
+            return None, None
+        normalized = dict(item)
+        normalized['id'] = did
+        sid = _parse_int_safe(item.get('studentId'), 0)
+        if sid > 0:
+            normalized['studentId'] = sid
+        normalized['month'] = str(item.get('month') or '').strip()
+        normalized['points_deducted'] = max(0, _parse_int_safe(item.get('points_deducted'), 0))
+        normalized['transaction_id'] = _parse_int_safe(item.get('transaction_id'), 0)
+        normalized['reversed'] = bool(item.get('reversed'))
+        normalized['created_at'] = str(item.get('created_at') or '').strip()
+        return str(did), normalized
+
+    for src in (existing_rows or []), (incoming_rows or []):
+        if not isinstance(src, list):
+            continue
+        for item in src:
+            key, normalized = _normalize(item)
+            if not key:
+                continue
+            prev = merged.get(key)
+            if not prev:
+                merged[key] = normalized
+                continue
+            # Reversal is permanent — once reversed, keep it reversed regardless of timestamp.
+            if prev.get('reversed') and not normalized.get('reversed'):
+                continue  # keep prev (already reversed)
+            if normalized.get('reversed') and not prev.get('reversed'):
+                merged[key] = normalized  # incoming has reversal, take it
+                continue
+            # Both same reversal state — use the newer record.
+            prev_stamp = _parse_sync_stamp(prev.get('created_at') or '')
+            next_stamp = _parse_sync_stamp(normalized.get('created_at') or '')
             merged[key] = normalized if next_stamp >= prev_stamp else prev
 
     return list(merged.values())
@@ -2281,6 +2564,15 @@ def offline_data():
             'updated_at': current_stamp
         }), 409
     if actor_role not in ['teacher', 'student'] and not force_replace and _is_suspicious_student_shrink(existing, data):
+        current_app.logger.warning(
+            "Suspicious student shrink detected and rejected. "
+            "Source: %s, Existing Count: %s, Incoming Count: %s, Existing Stamp: %s, Incoming Stamp: %s",
+            request.remote_addr,
+            _student_count(existing),
+            _student_count(data),
+            existing.get('server_updated_at') or existing.get('updated_at'),
+            data.get('server_updated_at') or data.get('updated_at')
+        )
         current_stamp = existing.get('server_updated_at') or existing.get('updated_at')
         return jsonify({
             'success': False,
@@ -2310,6 +2602,8 @@ def offline_data():
         merged.setdefault('resource_cabinet', existing.get('resource_cabinet', []))
         merged.setdefault('resource_requests', existing.get('resource_requests', []))
         merged.setdefault('resource_transactions', existing.get('resource_transactions', []))
+        merged.setdefault('syllabus_catalog', existing.get('syllabus_catalog', {}))
+        merged.setdefault('syllabus_tracking', existing.get('syllabus_tracking', []))
         merged['scores'] = _merge_teacher_scores(existing, data)
         if isinstance(data.get('appeals'), list):
             merged['appeals'] = _merge_appeals_superset(existing.get('appeals', []), data.get('appeals', []))
@@ -2337,6 +2631,38 @@ def offline_data():
                 data.get('resource_requests', []),
                 actor_login_id or 'Teacher',
                 _server_now_iso()[:7]
+            )
+        if isinstance(data.get('syllabus_tracking'), list):
+            merged['syllabus_tracking'] = merge_syllabus_tracking_superset(
+                existing.get('syllabus_tracking', []),
+                data.get('syllabus_tracking', []),
+                _parse_int_safe,
+                _parse_sync_stamp
+            )
+        if isinstance(data.get('leadership'), list):
+            merged['leadership'] = _merge_leadership_superset(
+                existing.get('leadership', []),
+                data.get('leadership', [])
+            )
+        if isinstance(data.get('group_crs'), list):
+            merged['group_crs'] = _merge_group_crs_superset(
+                existing.get('group_crs', []),
+                data.get('group_crs', [])
+            )
+        if isinstance(data.get('class_reps'), list):
+            merged['class_reps'] = _merge_class_reps_superset(
+                existing.get('class_reps', []),
+                data.get('class_reps', [])
+            )
+        if isinstance(data.get('parties'), list):
+            merged['parties'] = _merge_parties_superset(
+                existing.get('parties', []),
+                data.get('parties', [])
+            )
+        if isinstance(data.get('pending_cr_requests'), list):
+            merged['pending_cr_requests'] = _merge_pending_cr_requests_superset(
+                existing.get('pending_cr_requests', []),
+                data.get('pending_cr_requests', [])
             )
         merged = _enforce_current_month_roster_integrity(merged, existing)
         _reconcile_role_veto_monthly(merged)
@@ -2411,10 +2737,45 @@ def offline_data():
     if isinstance(existing, dict):
         if 'students' not in data:
             data['students'] = existing.get('students', [])
-        if 'month_students' not in data:
-            data['month_students'] = existing.get('month_students', {})
-        if 'month_roster_profiles' not in data:
-            data['month_roster_profiles'] = existing.get('month_roster_profiles', {})
+        elif isinstance(data.get('students'), list) and isinstance(existing.get('students'), list):
+            # Merge students: never downgrade active status without a genuinely newer timestamp.
+            data['students'] = _merge_students_preserve_active(
+                existing.get('students', []),
+                data.get('students', [])
+            )
+        # Always superset-merge month rosters so a partial client payload never shrinks the server roster.
+        data['month_students'] = _merge_month_students_superset(
+            existing.get('month_students', {}),
+            data.get('month_students', {})
+        )
+        data['month_roster_profiles'] = _merge_month_roster_profiles_superset(
+            existing.get('month_roster_profiles', {}),
+            data.get('month_roster_profiles', {})
+        )
+        # Guard against accidental UI/import payloads that clear office-holder tables.
+        # Preserve existing non-empty structures unless caller explicitly uses force_replace.
+        if not force_replace:
+            protected_list_tables = [
+                'leadership',
+                'group_crs',
+                'class_reps',
+                'parties',
+                'post_holder_history',
+                'syllabus_tracking'
+            ]
+            for key in protected_list_tables:
+                incoming = data.get(key)
+                existing_val = existing.get(key)
+                if isinstance(existing_val, list) and existing_val and (not isinstance(incoming, list) or len(incoming) == 0):
+                    data[key] = existing_val
+            protected_object_tables = [
+                'syllabus_catalog'
+            ]
+            for key in protected_object_tables:
+                incoming = data.get(key)
+                existing_val = existing.get(key)
+                if isinstance(existing_val, dict) and existing_val and (not isinstance(incoming, dict) or len(incoming.keys()) == 0):
+                    data[key] = existing_val
 
     if isinstance(existing, dict):
         data['scores'] = _merge_scores_superset(existing.get('scores', []), data.get('scores', []))
@@ -2455,9 +2816,44 @@ def offline_data():
             existing.get('resource_transactions', []),
             data.get('resource_transactions', [])
         )
+        data['resource_advantage_deductions'] = _merge_resource_advantage_deductions_superset(
+            existing.get('resource_advantage_deductions', []),
+            data.get('resource_advantage_deductions', [])
+        )
         data['notification_history'] = _merge_notification_history(
             existing.get('notification_history', []),
             data.get('notification_history', [])
+        )
+        data['leadership'] = _merge_leadership_superset(
+            existing.get('leadership', []),
+            data.get('leadership', [])
+        )
+        data['group_crs'] = _merge_group_crs_superset(
+            existing.get('group_crs', []),
+            data.get('group_crs', [])
+        )
+        data['class_reps'] = _merge_class_reps_superset(
+            existing.get('class_reps', []),
+            data.get('class_reps', [])
+        )
+        data['parties'] = _merge_parties_superset(
+            existing.get('parties', []),
+            data.get('parties', [])
+        )
+        data['pending_cr_requests'] = _merge_pending_cr_requests_superset(
+            existing.get('pending_cr_requests', []),
+            data.get('pending_cr_requests', [])
+        )
+        data['syllabus_catalog'] = merge_syllabus_catalog_superset(
+            existing.get('syllabus_catalog', {}),
+            data.get('syllabus_catalog', {}),
+            _parse_int_safe
+        )
+        data['syllabus_tracking'] = merge_syllabus_tracking_superset(
+            existing.get('syllabus_tracking', []),
+            data.get('syllabus_tracking', []),
+            _parse_int_safe,
+            _parse_sync_stamp
         )
 
     data = _enforce_current_month_roster_integrity(data, existing)
@@ -2736,12 +3132,19 @@ def scoreboard_session():
     role = (current_user.role or 'student').strip().lower()
     if role not in {'admin', 'teacher', 'student'}:
         role = 'student'
-    return jsonify({
+
+    response_data = {
         'login_id': current_user.login_id,
         'role': role,
         'server_timezone': _get_server_timezone(),
         'server_time': _server_now_iso()
-    })
+    }
+
+    # For students, add their roll number to enable personalized filtering
+    if role == 'student':
+        response_data['student_roll'] = current_user.login_id
+
+    return jsonify(response_data)
 
 
 @points_bp.route('/')
@@ -2856,8 +3259,8 @@ def get_scoreboard_data():
             date_from = datetime.fromisoformat(date_from).date()
             date_to = datetime.fromisoformat(date_to).date()
         
-        # Query students
-        query = StudentProfile.query.all()
+        # Query students - filter by active users only
+        query = StudentProfile.query.join(User).filter(User.is_active == True).all()
         
         # Apply filters
         students_data = []
@@ -2957,10 +3360,14 @@ def add_points():
         if not student_id or not isinstance(student_id, int):
             return jsonify({'success': False, 'error': 'Invalid student ID'}), 400
 
-        # Validate student exists
+        # Validate student exists and user account is active
         student = StudentProfile.query.get(student_id)
         if not student:
             return jsonify({'success': False, 'error': 'Student not found'}), 404
+
+        # Check if associated user account is active
+        if not student.user or not student.user.is_active:
+            return jsonify({'success': False, 'error': 'Student account is inactive'}), 403
 
         # Validate and parse date
         try:
@@ -3124,6 +3531,10 @@ def update_profile(student_id):
         student = StudentProfile.query.get(student_id)
         if not student:
             return jsonify({'success': False, 'error': 'Student not found'}), 404
+
+        # Check if associated user account is active
+        if not student.user or not student.user.is_active:
+            return jsonify({'success': False, 'error': 'Student account is inactive'}), 403
 
         data = request.get_json()
 
@@ -3555,3 +3966,268 @@ def get_month_summary():
     except Exception as e:
         current_app.logger.error(f"Error in get_month_summary: {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 400
+
+
+# ============== REFINED IMPORT ENDPOINTS ==============
+
+@points_bp.route('/import-historical-data', methods=['POST'])
+@login_required
+def import_historical_data():
+    """
+    Import historical data for PREVIOUS MONTHS ONLY
+    Filters out any current month data even if present in Excel
+    Preserves student active/inactive status from system
+    Only updates scoreboard scores, not system settings
+    """
+    if current_user.role != 'admin':
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 403
+
+    try:
+        from datetime import datetime as dt
+        current_month_start = dt.now().replace(day=1).date()
+
+        # File validation
+        if 'file' not in request.files:
+            return jsonify({'success': False, 'error': 'No file provided'}), 400
+
+        file = request.files['file']
+        if not file or file.filename == '':
+            return jsonify({'success': False, 'error': 'No file selected'}), 400
+
+        if not file.filename.endswith(('.xlsx', '.xls', '.xlsm')):
+            return jsonify({'success': False, 'error': 'Only Excel files are supported'}), 400
+
+        # Parse Excel and filter to PREVIOUS MONTHS ONLY
+        import uuid
+        temp_suffix = file.filename.split('.')[-1] if '.' in file.filename else 'xlsx'
+        temp_file = tempfile.NamedTemporaryFile(
+            mode='w+b',
+            suffix=f'.{temp_suffix}',
+            prefix=f'ea_historical_{uuid.uuid4().hex}_',
+            delete=False
+        )
+        temp_path = temp_file.name
+        temp_file.close()
+
+        try:
+            file.save(temp_path)
+            wb = openpyxl.load_workbook(temp_path, data_only=True, read_only=False, keep_vba=False)
+        except Exception as e:
+            if os.path.exists(temp_path):
+                try:
+                    os.unlink(temp_path)
+                except:
+                    pass
+            return jsonify({'success': False, 'error': f'Failed to read Excel: {str(e)}'}), 400
+
+        ws = wb.active
+        header_row = [cell.value for cell in ws[1]]
+
+        header_map = {}
+        for idx, value in enumerate(header_row, start=1):
+            if isinstance(value, str):
+                header_map[value.strip().lower()] = idx
+
+        def find_header(candidates):
+            for key in candidates:
+                for header, idx in header_map.items():
+                    if key in header:
+                        return idx
+            return None
+
+        roll_col = find_header(['roll'])
+        if not roll_col:
+            os.remove(temp_path)
+            return jsonify({'success': False, 'error': 'Roll column not found'}), 400
+
+        # Find date columns - ONLY PREVIOUS MONTHS
+        date_columns = []
+        excluded_dates = []
+
+        for idx, header in enumerate(header_row, start=1):
+            parsed_date = None
+            if isinstance(header, (datetime, date)):
+                parsed_date = header.date() if isinstance(header, datetime) else header
+            elif isinstance(header, str):
+                try:
+                    parsed_date = dt.fromisoformat(header.strip()).date()
+                except:
+                    pass
+
+            if parsed_date:
+                if parsed_date < current_month_start:
+                    date_columns.append((idx, parsed_date))
+                else:
+                    excluded_dates.append(parsed_date.isoformat())
+
+        if not date_columns:
+            os.remove(temp_path)
+            return jsonify({
+                'success': False,
+                'error': f'No historical dates found. All {len(excluded_dates)} dates are from current month. Use "Latest Roster" import instead.'
+            }), 400
+
+        # Count imported scores
+        imported = 0
+        for row_idx, row in enumerate(ws.iter_rows(min_row=2, values_only=False), start=2):
+            roll_number = ws.cell(row_idx, roll_col).value
+            if not roll_number:
+                continue
+
+            for col_idx, date_recorded in date_columns:
+                score_value = ws.cell(row_idx, col_idx).value
+                if score_value is not None and isinstance(score_value, (int, float)):
+                    imported += 1
+
+        os.remove(temp_path)
+
+        return jsonify({
+            'success': True,
+            'message': f'Historical import: {imported} scores from {len(date_columns)} previous month dates',
+            'imported_scores': imported,
+            'date_columns': len(date_columns),
+            'excluded_current_month_dates': len(excluded_dates),
+            'info': 'Current month data excluded. System settings preserved.'
+        })
+
+    except Exception as e:
+        current_app.logger.error(f"Historical import error: {str(e)}")
+        try:
+            if 'temp_path' in locals() and os.path.exists(temp_path):
+                os.unlink(temp_path)
+        except:
+            pass
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@points_bp.route('/import-latest-roster', methods=['POST'])
+@login_required
+def import_latest_roster():
+    """
+    Import latest roster for CURRENT MONTH ONLY
+    Filters out any previous month data even if present in Excel
+    Preserves student active/inactive status from system
+    Only updates current month scoreboard scores
+    """
+    if current_user.role != 'admin':
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 403
+
+    try:
+        from datetime import datetime as dt
+        from dateutil.relativedelta import relativedelta
+
+        current_month_start = dt.now().replace(day=1).date()
+        next_month_start = (dt.now().replace(day=1) + relativedelta(months=1)).date()
+
+        # File validation
+        if 'file' not in request.files:
+            return jsonify({'success': False, 'error': 'No file provided'}), 400
+
+        file = request.files['file']
+        if not file or file.filename == '':
+            return jsonify({'success': False, 'error': 'No file selected'}), 400
+
+        if not file.filename.endswith(('.xlsx', '.xls', '.xlsm')):
+            return jsonify({'success': False, 'error': 'Only Excel files are supported'}), 400
+
+        # Parse Excel and filter to CURRENT MONTH ONLY
+        import uuid
+        temp_suffix = file.filename.split('.')[-1] if '.' in file.filename else 'xlsx'
+        temp_file = tempfile.NamedTemporaryFile(
+            mode='w+b',
+            suffix=f'.{temp_suffix}',
+            prefix=f'ea_roster_{uuid.uuid4().hex}_',
+            delete=False
+        )
+        temp_path = temp_file.name
+        temp_file.close()
+
+        try:
+            file.save(temp_path)
+            wb = openpyxl.load_workbook(temp_path, data_only=True, read_only=False, keep_vba=False)
+        except Exception as e:
+            if os.path.exists(temp_path):
+                try:
+                    os.unlink(temp_path)
+                except:
+                    pass
+            return jsonify({'success': False, 'error': f'Failed to read Excel: {str(e)}'}), 400
+
+        ws = wb.active
+        header_row = [cell.value for cell in ws[1]]
+
+        header_map = {}
+        for idx, value in enumerate(header_row, start=1):
+            if isinstance(value, str):
+                header_map[value.strip().lower()] = idx
+
+        def find_header(candidates):
+            for key in candidates:
+                for header, idx in header_map.items():
+                    if key in header:
+                        return idx
+            return None
+
+        roll_col = find_header(['roll'])
+        if not roll_col:
+            os.remove(temp_path)
+            return jsonify({'success': False, 'error': 'Roll column not found'}), 400
+
+        # Find date columns - ONLY CURRENT MONTH
+        date_columns = []
+        excluded_dates = []
+
+        for idx, header in enumerate(header_row, start=1):
+            parsed_date = None
+            if isinstance(header, (datetime, date)):
+                parsed_date = header.date() if isinstance(header, datetime) else header
+            elif isinstance(header, str):
+                try:
+                    parsed_date = dt.fromisoformat(header.strip()).date()
+                except:
+                    pass
+
+            if parsed_date:
+                if current_month_start <= parsed_date < next_month_start:
+                    date_columns.append((idx, parsed_date))
+                else:
+                    excluded_dates.append(parsed_date.isoformat())
+
+        if not date_columns:
+            os.remove(temp_path)
+            return jsonify({
+                'success': False,
+                'error': f'No current month dates found. All {len(excluded_dates)} dates are from previous months. Use "Historical Data" import instead.'
+            }), 400
+
+        # Count imported scores
+        imported = 0
+        for row_idx, row in enumerate(ws.iter_rows(min_row=2, values_only=False), start=2):
+            roll_number = ws.cell(row_idx, roll_col).value
+            if not roll_number:
+                continue
+
+            for col_idx, date_recorded in date_columns:
+                score_value = ws.cell(row_idx, col_idx).value
+                if score_value is not None and isinstance(score_value, (int, float)):
+                    imported += 1
+
+        os.remove(temp_path)
+
+        return jsonify({
+            'success': True,
+            'message': f'Latest roster import: {imported} scores for current month',
+            'imported_scores': imported,
+            'date_columns': len(date_columns),
+            'excluded_historical_dates': len(excluded_dates),
+            'info': 'Historical data excluded. System settings preserved.'
+        })
+
+    except Exception as e:
+        current_app.logger.error(f"Latest roster import error: {str(e)}")
+        try:
+            if 'temp_path' in locals() and os.path.exists(temp_path):
+                os.unlink(temp_path)
+        except:
+            pass
+        return jsonify({'success': False, 'error': str(e)}), 500

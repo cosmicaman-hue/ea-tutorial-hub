@@ -1,13 +1,4 @@
 services:
-  - type: pserv
-    name: project-ea-db
-    plan: free
-    ipAllowList: []
-    disk:
-      name: project-ea-db-data
-      mountPath: /var/lib/postgresql/data
-      sizeGB: 1
-
   - type: web
     name: project-ea
     runtime: python
@@ -24,17 +15,16 @@ services:
         value: "0"
       - key: EA_INIT_ON_BOOT
         value: "1"
-      - key: DATABASE_URL
-        fromDatabase:
-          name: project-ea-db
-          property: connectionString
+      - key: EA_MASTER_MODE
+        value: "1"
+      - key: SESSION_COOKIE_SECURE
+        value: "true"
       - key: SECRET_KEY
         generateValue: true
+      # Set these three in the Render dashboard → Environment tab (do NOT put real values here)
       - key: ADMIN_PASSWORD
         sync: false
       - key: TEACHER_PASSWORD
         sync: false
       - key: SYNC_SHARED_KEY
         sync: false
-      - key: EA_MASTER_MODE
-        value: "1"

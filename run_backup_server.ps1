@@ -15,6 +15,9 @@ if (-not $env:BACKUP_PORT) {
 }
 $env:EA_TIMEZONE = if ($env:EA_TIMEZONE) { $env:EA_TIMEZONE } else { 'Asia/Kolkata' }
 $env:EA_MASTER_MODE = '0'
+$env:FLASK_ENV = 'production'
+$env:FLASK_DEBUG = '0'
+$env:FLASK_USE_RELOADER = '0'
 if (-not $env:SYNC_PEERS) { $env:SYNC_PEERS = 'http://192.168.0.183:5000' } # Primary LAN server
 if (-not $env:SYNC_SHARED_KEY) { $env:SYNC_SHARED_KEY = 'EA_SYNC_KEY_917511_2026' }
 

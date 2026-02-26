@@ -3,12 +3,14 @@ import json
 import re
 import urllib.request
 import urllib.error
+import atexit
 from datetime import datetime
 from pathlib import Path
 from app import create_app, db
 from app.models import User, StudentProfile, ActivityLog
 
 app = create_app()
+_SERVER_LOCK_FD = None
 
 
 def create_startup_restore_point(flask_app, keep=200):
@@ -33,6 +35,61 @@ def create_startup_restore_point(flask_app, keep=200):
             old.unlink()
         except Exception:
             pass
+
+
+def _pid_is_running(pid):
+    try:
+        os.kill(int(pid), 0)
+        return True
+    except Exception:
+        return False
+
+
+def acquire_single_instance_lock(flask_app):
+    """Ensure a single run.py writer process per machine."""
+    global _SERVER_LOCK_FD
+    lock_path = Path(flask_app.instance_path) / '.server_main.lock'
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    this_pid = os.getpid()
+
+    # Clear stale lock if previous PID is gone.
+    if lock_path.exists():
+        try:
+            existing_pid = int(lock_path.read_text(encoding='utf-8').strip())
+        except Exception:
+            existing_pid = 0
+        if existing_pid and _pid_is_running(existing_pid):
+            print(f'Another server instance is already running (pid {existing_pid}). Exiting duplicate launcher.')
+            return False
+        try:
+            lock_path.unlink()
+        except Exception:
+            pass
+
+    try:
+        _SERVER_LOCK_FD = os.open(str(lock_path), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        os.write(_SERVER_LOCK_FD, str(this_pid).encode('utf-8'))
+        os.fsync(_SERVER_LOCK_FD)
+    except FileExistsError:
+        print('Another server instance is already running. Exiting duplicate launcher.')
+        return False
+
+    def _release():
+        global _SERVER_LOCK_FD
+        try:
+            if _SERVER_LOCK_FD is not None:
+                os.close(_SERVER_LOCK_FD)
+        except Exception:
+            pass
+        _SERVER_LOCK_FD = None
+        try:
+            if lock_path.exists():
+                lock_path.unlink()
+        except Exception:
+            pass
+
+    atexit.register(_release)
+    return True
 
 
 def _parse_sync_peers():
@@ -175,6 +232,8 @@ def initialize_runtime(flask_app):
     flask_app.config['_EA_RUNTIME_INIT_DONE'] = True
 
 if __name__ == '__main__':
+    if not acquire_single_instance_lock(app):
+        raise SystemExit(0)
     initialize_runtime(app)
     port_value = os.getenv('PORT') or os.getenv('BACKUP_PORT') or '5000'
     try:
@@ -182,4 +241,16 @@ if __name__ == '__main__':
     except (TypeError, ValueError):
         port = 5000
     debug = str(os.getenv('FLASK_DEBUG', '0')).strip().lower() in ('1', 'true', 'yes', 'on')
-    app.run(debug=debug, host='0.0.0.0', port=port)
+    # Integrity safety: avoid Flask reloader double-process mode on server PCs,
+    # which can create duplicate writers and race-prone startup side effects.
+    use_reloader = str(os.getenv('FLASK_USE_RELOADER', '0')).strip().lower() in ('1', 'true', 'yes', 'on')
+    prefer_waitress = str(os.getenv('EA_USE_WAITRESS', '1')).strip().lower() in ('1', 'true', 'yes', 'on')
+    if prefer_waitress:
+        try:
+            from waitress import serve
+            threads = int(os.getenv('WAITRESS_THREADS', '16'))
+            serve(app, host='0.0.0.0', port=port, threads=max(4, threads))
+            raise SystemExit(0)
+        except Exception:
+            pass
+    app.run(debug=debug, use_reloader=use_reloader, host='0.0.0.0', port=port)

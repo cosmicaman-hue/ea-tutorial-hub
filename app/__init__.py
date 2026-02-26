@@ -1,7 +1,7 @@
 import os
-from flask import Flask, redirect, url_for, request
+from flask import Flask, redirect, url_for, request, flash
 from flask_sqlalchemy import SQLAlchemy
-from flask_login import LoginManager
+from flask_login import LoginManager, current_user
 from flask_wtf.csrf import CSRFProtect
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
@@ -37,6 +37,14 @@ def create_app():
     # LAN deployment: allow unlimited/repeated requests from classroom devices.
     # Set ENABLE_RATE_LIMITING=1 in environment if you want throttling again.
     app.config['RATELIMIT_ENABLED'] = str(os.getenv('ENABLE_RATE_LIMITING', '0')).strip().lower() in ('1', 'true', 'yes', 'on')
+
+    # Session security configuration
+    app.config['SESSION_COOKIE_HTTPONLY'] = True
+    app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+    app.config['PERMANENT_SESSION_LIFETIME'] = 86400  # 24 hours
+    app.config['SESSION_COOKIE_SECURE'] = str(os.getenv('SESSION_COOKIE_SECURE', 'False')).lower() in ('true', '1', 'yes')
+    app.config['REMEMBER_COOKIE_HTTPONLY'] = True
+    app.config['REMEMBER_COOKIE_DURATION'] = 86400  # 24 hours
     
     # Initialize extensions
     db.init_app(app)
@@ -72,6 +80,13 @@ def create_app():
     def login_shortlink():
         return redirect(url_for('auth.login'))
     
+    @app.before_request
+    def check_default_password():
+        if current_user.is_authenticated and current_user.login_id == 'Admin':
+            # Use a known default password that is unlikely to be chosen by a user
+            if current_user.check_password('admin123'):
+                flash('CRITICAL: You are using the default admin password ("admin123"). Please change it immediately for security reasons.', 'danger')
+
     # User loader
     from app.models import User
     
