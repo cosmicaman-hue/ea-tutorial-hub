@@ -71,6 +71,10 @@ def _offline_startup_restore_dir():
 def _restore_points_meta_path():
     return os.path.join(current_app.instance_path, 'restore_points_meta.json')
 
+
+def _device_log_path():
+    return os.path.join(current_app.instance_path, 'device_log.json')
+
 def _load_restore_points_meta():
     path = _restore_points_meta_path()
     if not os.path.exists(path):
@@ -3145,6 +3149,84 @@ def scoreboard_session():
         response_data['student_roll'] = current_user.login_id
 
     return jsonify(response_data)
+
+
+# ─── Device Monitoring ────────────────────────────────────────────────────────
+_DEVICE_LOG_MAX = 2000
+
+
+@points_bp.route('/device-checkin', methods=['POST', 'GET'])
+@login_required
+def device_checkin():
+    """POST: record a device check-in. GET (admin-only): return full log."""
+    log_path = _device_log_path()
+
+    if request.method == 'GET':
+        if current_user.role != 'admin':
+            return jsonify({'error': 'Unauthorized'}), 403
+        try:
+            with open(log_path, 'r', encoding='utf-8') as f:
+                log = json.load(f)
+            if not isinstance(log, list):
+                log = []
+        except Exception:
+            log = []
+        return jsonify({'log': log, 'count': len(log)})
+
+    # POST — record check-in from any logged-in user
+    data = request.get_json(silent=True) or {}
+
+    def _s(val, maxlen=100):
+        return str(val or '')[:maxlen].strip()
+
+    entry = {
+        'ts': datetime.now(timezone.utc).isoformat(),
+        'login_id': current_user.login_id,
+        'role': current_user.role or 'student',
+        'ip': (_s(request.headers.get('X-Forwarded-For', '') or request.remote_addr or '', 90)
+               .split(',')[0].strip())[:45],
+        'device_id': _s(data.get('device_id'), 64),
+        'device_name': _s(data.get('device_name'), 100),
+        'os': _s(data.get('os'), 80),
+        'browser': _s(data.get('browser'), 80),
+        'screen': _s(data.get('screen'), 20),
+        'event': _s(data.get('event', 'login'), 20),
+    }
+
+    try:
+        try:
+            with open(log_path, 'r', encoding='utf-8') as f:
+                log = json.load(f)
+            if not isinstance(log, list):
+                log = []
+        except Exception:
+            log = []
+
+        log.append(entry)
+        if len(log) > _DEVICE_LOG_MAX:
+            log = log[-_DEVICE_LOG_MAX:]
+
+        with open(log_path, 'w', encoding='utf-8') as f:
+            json.dump(log, f)
+    except Exception as e:
+        current_app.logger.error('device_checkin write error: %s', e)
+
+    return jsonify({'ok': True})
+
+
+@points_bp.route('/device-log/clear', methods=['POST'])
+@login_required
+def device_log_clear():
+    """Admin: wipe the device connection log."""
+    if current_user.role != 'admin':
+        return jsonify({'error': 'Unauthorized'}), 403
+    log_path = _device_log_path()
+    try:
+        with open(log_path, 'w', encoding='utf-8') as f:
+            json.dump([], f)
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)}), 500
+    return jsonify({'ok': True})
 
 
 @points_bp.route('/')

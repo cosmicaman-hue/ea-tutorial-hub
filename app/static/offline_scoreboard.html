@@ -5303,6 +5303,91 @@
                 </div>
                 <pre id="restorePreview" style="margin-top:10px; white-space:pre-wrap; background:rgba(2,6,23,0.55); border:1px solid rgba(148,163,184,0.2); border-radius:8px; padding:10px; font-size:12px; max-height:180px; overflow:auto;"></pre>
             </div>
+
+            <!-- ── Device Monitoring Panel (Admin only) ─────────────────────── -->
+            <div class="form-card" id="deviceMonitorCard" style="display:none">
+                <h3><i class="fas fa-network-wired"></i> Connected Devices Log</h3>
+                <p style="color:var(--text-muted);font-size:13px;margin-bottom:12px">
+                    Every login from any device is recorded here with device name, OS, browser, IP and a persistent
+                    <strong>Device UUID</strong> (browser-local ID).
+                    <em>Note: Browser security prevents reading MAC addresses; the UUID uniquely identifies each browser instance instead.</em>
+                </p>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;align-items:center">
+                    <button class="secondary" onclick="loadDeviceLog()"><i class="fas fa-sync"></i> Refresh</button>
+                    <button class="secondary" onclick="exportDeviceLog('csv')"><i class="fas fa-file-csv"></i> Export CSV</button>
+                    <button class="secondary" onclick="exportDeviceLog('json')"><i class="fas fa-code"></i> Export JSON</button>
+                    <button class="danger" onclick="clearDeviceLog()" style="margin-left:auto"><i class="fas fa-trash"></i> Clear Log</button>
+                </div>
+                <div style="display:flex;gap:12px;margin-bottom:14px;flex-wrap:wrap;align-items:center">
+                    <input type="text" id="deviceLogFilter" placeholder="Search user, device, OS, IP…" oninput="filterDeviceLog()" style="flex:1;min-width:200px;max-width:320px">
+                    <select id="deviceLogRoleFilter" onchange="filterDeviceLog()" style="min-width:130px">
+                        <option value="">All Roles</option>
+                        <option value="admin">Admin</option>
+                        <option value="teacher">Teacher</option>
+                        <option value="student">Student</option>
+                    </select>
+                </div>
+                <!-- Summary stats -->
+                <div id="deviceSummaryStats" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px"></div>
+                <!-- Unique devices table -->
+                <h4 style="margin-bottom:8px;font-size:14px"><i class="fas fa-laptop"></i> Unique Devices (Last Seen)</h4>
+                <div class="scoreboard-wrapper" style="margin-bottom:16px">
+                    <div class="scoreboard-scroll">
+                        <table class="scoreboard" id="deviceSummaryTable">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Device Name</th>
+                                    <th>OS</th>
+                                    <th>Browser</th>
+                                    <th>Screen</th>
+                                    <th>Last User</th>
+                                    <th>Role</th>
+                                    <th>Last IP</th>
+                                    <th>Last Seen</th>
+                                    <th>Visits</th>
+                                    <th>Device UUID</th>
+                                </tr>
+                            </thead>
+                            <tbody id="deviceSummaryBody">
+                                <tr><td colspan="11" class="text-center" style="padding:16px;color:var(--text-muted)">Click <strong>Refresh</strong> to load device data.</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <!-- Full connection log (collapsible) -->
+                <details id="deviceFullLogDetails">
+                    <summary style="cursor:pointer;font-weight:600;font-size:14px;padding:10px 0;border-top:1px solid var(--border);list-style:none;display:flex;align-items:center;gap:8px">
+                        <i class="fas fa-list"></i> Full Connection Log
+                        <span id="deviceFullLogCount" style="font-weight:400;font-size:12px;color:var(--text-muted)"></span>
+                    </summary>
+                    <div class="scoreboard-wrapper" style="margin-top:10px">
+                        <div class="scoreboard-scroll">
+                            <table class="scoreboard" id="deviceFullLogTable">
+                                <thead>
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Timestamp (IST)</th>
+                                        <th>User</th>
+                                        <th>Role</th>
+                                        <th>Event</th>
+                                        <th>Device</th>
+                                        <th>OS</th>
+                                        <th>Browser</th>
+                                        <th>Screen</th>
+                                        <th>IP</th>
+                                        <th style="min-width:260px">Device UUID</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="deviceFullLogBody">
+                                    <tr><td colspan="11" class="text-center">—</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </details>
+            </div>
+            <!-- ── End Device Monitoring Panel ──────────────────────────────── -->
         </div>
     </div>
 
@@ -5480,6 +5565,81 @@
         const LOCAL_BACKUP_MAX_BYTES = 900000;
         const LOCAL_BACKUP_INTERVAL = 5 * 60 * 1000;
         const AUTO_SYNC_INTERVAL_MS = 15 * 1000;
+
+        // ── Device fingerprinting ─────────────────────────────────────────────────────
+        const DEVICE_UUID_KEY = 'ea_device_uuid';
+
+        function getOrCreateDeviceUUID() {
+            let id = localStorage.getItem(DEVICE_UUID_KEY);
+            if (!id) {
+                id = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+                    const r = Math.random() * 16 | 0;
+                    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+                });
+                localStorage.setItem(DEVICE_UUID_KEY, id);
+            }
+            return id;
+        }
+
+        function parseDeviceInfo() {
+            const ua = navigator.userAgent;
+            // OS
+            let os = 'Unknown OS';
+            if (/Windows NT 1[01]/.test(ua)) os = 'Windows 10/11';
+            else if (/Windows NT 6\.3/.test(ua)) os = 'Windows 8.1';
+            else if (/Windows NT 6\.1/.test(ua)) os = 'Windows 7';
+            else if (/Android/.test(ua)) {
+                const m = ua.match(/Android\s([\d.]+)/);
+                os = m ? `Android ${m[1]}` : 'Android';
+            }
+            else if (/iPhone|iPad|iPod/.test(ua)) {
+                const m = ua.match(/OS\s([\d_]+)/);
+                os = m ? `iOS ${m[1].replace(/_/g, '.')}` : 'iOS';
+            }
+            else if (/Mac OS X/.test(ua)) os = 'macOS';
+            else if (/Linux/.test(ua)) os = 'Linux';
+            // Browser
+            let browser = 'Unknown';
+            if (/Edg\//.test(ua)) browser = 'Edge';
+            else if (/OPR\//.test(ua)) browser = 'Opera';
+            else if (/SamsungBrowser\//.test(ua)) browser = 'Samsung';
+            else if (/Chrome\//.test(ua)) browser = 'Chrome';
+            else if (/Firefox\//.test(ua)) browser = 'Firefox';
+            else if (/Safari\//.test(ua)) browser = 'Safari';
+            // Device name
+            let deviceName = 'Unknown Device';
+            if (/iPhone/.test(ua)) deviceName = 'iPhone';
+            else if (/iPad/.test(ua)) deviceName = 'iPad';
+            else if (/Android/.test(ua)) {
+                const m = ua.match(/;\s*([^;()]+)\sBuild\//);
+                deviceName = m ? m[1].trim() : 'Android Device';
+            }
+            else if (/Windows/.test(ua)) deviceName = 'Windows PC';
+            else if (/Mac OS X/.test(ua)) deviceName = 'Mac';
+            else if (/Linux/.test(ua)) deviceName = 'Linux PC';
+            const screen = `${window.screen.width}×${window.screen.height}`;
+            return { os, browser, screen, deviceName };
+        }
+
+        async function checkinDevice(event = 'login') {
+            if (!SERVER_SYNC.enabled) return;
+            try {
+                const info = parseDeviceInfo();
+                await fetch('/scoreboard/device-checkin', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        device_id: getOrCreateDeviceUUID(),
+                        device_name: info.deviceName,
+                        os: info.os,
+                        browser: info.browser,
+                        screen: info.screen,
+                        event: event
+                    })
+                });
+            } catch (e) { /* non-critical — ignore */ }
+        }
         // ── Undo stack ───────────────────────────────────────────────────────────────
         const _MAX_UNDO_STEPS = 15;        // max snapshots kept in memory
         let   _undoStack      = [];        // [{ label, snapshot, ts }, ...]
@@ -9524,6 +9684,10 @@
             setTabVisibility('leadership', isAdmin);
             setTabVisibility('tools', isAdmin);
             setTabVisibility('cr', isAdmin || isTeacher);
+
+            // Device monitor card — admin only
+            const devCard = document.getElementById('deviceMonitorCard');
+            if (devCard) devCard.style.display = isAdmin ? '' : 'none';
 
             const isStudent = !isAdmin && !isTeacher;
             setTabVisibility('my-dashboard', isStudent);
@@ -22438,6 +22602,208 @@
             };
         }
 
+        // ══════════════════════════════════════════════════════════════════════
+        // Device Monitoring Panel (Admin only)
+        // ══════════════════════════════════════════════════════════════════════
+        let _deviceLogCache = [];   // last-fetched raw log entries
+
+        async function loadDeviceLog() {
+            if (!SERVER_SYNC.enabled) {
+                showToast('Server not connected — device log unavailable.', 'warning');
+                return;
+            }
+            const tbody = document.getElementById('deviceSummaryBody');
+            if (tbody) tbody.innerHTML = '<tr><td colspan="11" class="text-center loading">Loading…</td></tr>';
+            try {
+                const resp = await fetch('/scoreboard/device-checkin', {
+                    cache: 'no-store', credentials: 'include'
+                });
+                if (!resp.ok) { showToast('Failed to load device log.', 'danger'); return; }
+                const json = await resp.json();
+                _deviceLogCache = Array.isArray(json.log) ? json.log : [];
+                filterDeviceLog();
+            } catch (e) {
+                showToast('Error loading device log: ' + e.message, 'danger');
+            }
+        }
+
+        function filterDeviceLog() {
+            const q = (document.getElementById('deviceLogFilter')?.value || '').toLowerCase().trim();
+            const roleF = (document.getElementById('deviceLogRoleFilter')?.value || '').toLowerCase();
+            let entries = _deviceLogCache;
+            if (roleF) entries = entries.filter(e => (e.role || '').toLowerCase() === roleF);
+            if (q) entries = entries.filter(e =>
+                (e.login_id || '').toLowerCase().includes(q) ||
+                (e.device_name || '').toLowerCase().includes(q) ||
+                (e.os || '').toLowerCase().includes(q) ||
+                (e.browser || '').toLowerCase().includes(q) ||
+                (e.ip || '').toLowerCase().includes(q) ||
+                (e.device_id || '').toLowerCase().includes(q)
+            );
+            _renderDeviceSummary(entries);
+            _renderDeviceFullLog(entries);
+        }
+
+        function _renderDeviceSummary(entries) {
+            // Build unique-device map (keyed by device_id)
+            const deviceMap = new Map();
+            for (const e of entries) {
+                const key = e.device_id || ('noid_' + (e.login_id || ''));
+                if (!deviceMap.has(key)) {
+                    deviceMap.set(key, { ...e, visits: 0, allUsers: new Set() });
+                }
+                const rec = deviceMap.get(key);
+                rec.visits++;
+                rec.allUsers.add(e.login_id || '');
+                // Keep most-recent entry (entries are chronological, last = most recent)
+                if (!rec.latest_ts || e.ts > rec.latest_ts) {
+                    rec.latest_ts = e.ts;
+                    rec.login_id = e.login_id;
+                    rec.role = e.role;
+                    rec.ip = e.ip;
+                }
+            }
+            const devices = [...deviceMap.values()];
+
+            // Summary stats
+            const statsEl = document.getElementById('deviceSummaryStats');
+            if (statsEl) {
+                const admins = new Set(entries.filter(e => e.role === 'admin').map(e => e.login_id)).size;
+                const teachers = new Set(entries.filter(e => e.role === 'teacher').map(e => e.login_id)).size;
+                const students = new Set(entries.filter(e => e.role === 'student').map(e => e.login_id)).size;
+                statsEl.innerHTML = [
+                    { label: 'Total Visits', val: entries.length, color: '#6ee7b7' },
+                    { label: 'Unique Devices', val: devices.length, color: '#93c5fd' },
+                    { label: 'Admins', val: admins, color: '#fbbf24' },
+                    { label: 'Teachers', val: teachers, color: '#c4b5fd' },
+                    { label: 'Students', val: students, color: '#6ee7b7' },
+                ].map(s => `
+                    <div style="background:rgba(30,41,59,0.6);border:1px solid var(--border);border-radius:8px;padding:8px 16px;min-width:100px;text-align:center">
+                        <div style="font-size:22px;font-weight:700;color:${s.color}">${s.val}</div>
+                        <div style="font-size:11px;color:var(--text-muted);margin-top:2px">${s.label}</div>
+                    </div>`).join('');
+            }
+
+            const tbody = document.getElementById('deviceSummaryBody');
+            if (!tbody) return;
+            if (!devices.length) {
+                tbody.innerHTML = '<tr><td colspan="11" class="text-center" style="padding:16px;color:var(--text-muted)">No devices found.</td></tr>';
+                return;
+            }
+            // Sort: most recent first
+            devices.sort((a, b) => (b.latest_ts || '').localeCompare(a.latest_ts || ''));
+            tbody.innerHTML = devices.map((d, i) => {
+                const ts = d.latest_ts ? _fmtTs(d.latest_ts) : '—';
+                const roleColor = d.role === 'admin' ? '#fbbf24' : d.role === 'teacher' ? '#c4b5fd' : '#6ee7b7';
+                const uuidShort = d.device_id ? d.device_id.substring(0, 8) + '…' : '—';
+                return `<tr>
+                    <td class="rank-cell">${i + 1}</td>
+                    <td><strong>${_esc(d.device_name || '?')}</strong></td>
+                    <td>${_esc(d.os || '—')}</td>
+                    <td>${_esc(d.browser || '—')}</td>
+                    <td style="font-size:12px">${_esc(d.screen || '—')}</td>
+                    <td><strong>${_esc(d.login_id || '—')}</strong></td>
+                    <td><span style="color:${roleColor};font-size:12px;font-weight:600">${_esc(d.role || '—')}</span></td>
+                    <td style="font-size:12px;font-family:monospace">${_esc(d.ip || '—')}</td>
+                    <td style="font-size:12px;white-space:nowrap">${ts}</td>
+                    <td style="text-align:center">${d.visits}</td>
+                    <td style="font-size:11px;font-family:monospace;color:var(--text-muted)"
+                        title="${_esc(d.device_id || '')}">${uuidShort}</td>
+                </tr>`;
+            }).join('');
+        }
+
+        function _renderDeviceFullLog(entries) {
+            const countEl = document.getElementById('deviceFullLogCount');
+            if (countEl) countEl.textContent = `— ${entries.length} entries`;
+            const tbody = document.getElementById('deviceFullLogBody');
+            if (!tbody) return;
+            if (!entries.length) {
+                tbody.innerHTML = '<tr><td colspan="11" class="text-center" style="padding:12px;color:var(--text-muted)">No entries.</td></tr>';
+                return;
+            }
+            // Show last 200 (most recent first)
+            const slice = [...entries].reverse().slice(0, 200);
+            tbody.innerHTML = slice.map((e, i) => {
+                const roleColor = e.role === 'admin' ? '#fbbf24' : e.role === 'teacher' ? '#c4b5fd' : '#6ee7b7';
+                const eventColor = e.event === 'login' ? '#6ee7b7' : '#93c5fd';
+                return `<tr>
+                    <td class="rank-cell" style="color:var(--text-muted)">${i + 1}</td>
+                    <td style="font-size:12px;white-space:nowrap">${_fmtTs(e.ts)}</td>
+                    <td><strong>${_esc(e.login_id || '—')}</strong></td>
+                    <td><span style="color:${roleColor};font-size:12px;font-weight:600">${_esc(e.role || '—')}</span></td>
+                    <td><span style="color:${eventColor};font-size:11px">${_esc(e.event || '—')}</span></td>
+                    <td>${_esc(e.device_name || '—')}</td>
+                    <td>${_esc(e.os || '—')}</td>
+                    <td>${_esc(e.browser || '—')}</td>
+                    <td style="font-size:12px">${_esc(e.screen || '—')}</td>
+                    <td style="font-size:12px;font-family:monospace">${_esc(e.ip || '—')}</td>
+                    <td style="font-size:11px;font-family:monospace;color:var(--text-muted)">${_esc(e.device_id || '—')}</td>
+                </tr>`;
+            }).join('');
+        }
+
+        function _fmtTs(isoStr) {
+            if (!isoStr) return '—';
+            try {
+                return new Date(isoStr).toLocaleString('en-IN', {
+                    timeZone: serverTimezone || 'Asia/Kolkata',
+                    day: '2-digit', month: 'short', year: 'numeric',
+                    hour: '2-digit', minute: '2-digit', second: '2-digit'
+                });
+            } catch { return isoStr; }
+        }
+
+        function _esc(s) {
+            return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        }
+
+        function exportDeviceLog(format) {
+            const entries = _deviceLogCache;
+            if (!entries.length) { showToast('No data to export. Click Refresh first.', 'warning'); return; }
+            let content, mime, ext;
+            if (format === 'json') {
+                content = JSON.stringify(entries, null, 2);
+                mime = 'application/json';
+                ext = 'json';
+            } else {
+                // CSV
+                const headers = ['timestamp_utc','login_id','role','event','device_name','os','browser','screen','ip','device_uuid'];
+                const rows = entries.map(e => headers.map(h => {
+                    const val = (h === 'device_uuid' ? e.device_id : e[h === 'timestamp_utc' ? 'ts' : h]) || '';
+                    return '"' + String(val).replace(/"/g, '""') + '"';
+                }).join(','));
+                content = [headers.join(','), ...rows].join('\r\n');
+                mime = 'text/csv';
+                ext = 'csv';
+            }
+            const blob = new Blob([content], { type: mime });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `ea_device_log_${formatDateKey(new Date())}.${ext}`;
+            a.click();
+            URL.revokeObjectURL(url);
+            showToast(`Device log exported as ${ext.toUpperCase()}.`, 'success');
+        }
+
+        async function clearDeviceLog() {
+            if (!confirm('Clear the entire device connection log? This cannot be undone.')) return;
+            try {
+                const resp = await fetch('/scoreboard/device-log/clear', {
+                    method: 'POST', credentials: 'include',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                if (!resp.ok) { showToast('Failed to clear log.', 'danger'); return; }
+                _deviceLogCache = [];
+                filterDeviceLog();
+                showToast('Device log cleared.', 'success');
+            } catch (e) {
+                showToast('Error: ' + e.message, 'danger');
+            }
+        }
+        // ══════════════════════════════════════════════════════════════════════
+
         function backupData() {
             const data = db.getData();
             const backup = {
@@ -23147,6 +23513,7 @@
 
             if (SERVER_SYNC.enabled) {
                 await loadSessionContext(3);
+                checkinDevice('login'); // fire-and-forget: log this device/session
             }
             updateRoleBadge();
             applyRolePermissions();
