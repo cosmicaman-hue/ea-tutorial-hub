@@ -32,16 +32,23 @@
             --spring:      cubic-bezier(0.34, 1.56, 0.64, 1.00);
             --spring-soft: cubic-bezier(0.16, 1.00, 0.30, 1.00);
             --dur-xxs: 70ms;
-            --dur-xs:  90ms;
-            --dur-sm:  160ms;
-            --dur-md:  220ms;
-            --dur-lg:  320ms;
+            --dur-xs:  120ms;
+            --dur-sm:  280ms;
+            --dur-md:  380ms;
+            --dur-lg:  500ms;
         }
 
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
+            backface-visibility: hidden;
+            -webkit-font-smoothing: antialiased;
+            -webkit-backface-visibility: hidden;
+        }
+
+        html {
+            scroll-behavior: auto;
         }
 
         body {
@@ -57,6 +64,12 @@
             -webkit-font-smoothing: antialiased;
             -moz-osx-font-smoothing: grayscale;
             text-rendering: optimizeLegibility;
+            scroll-behavior: smooth;
+        }
+
+        /* Disable animations during scroll for smooth performance */
+        body.scrolling * {
+            animation-play-state: paused !important;
         }
 
         .container {
@@ -64,6 +77,7 @@
             margin: 0 auto;
             padding: 0 15px;
             padding-bottom: calc(120px + env(safe-area-inset-bottom, 0px));
+            contain: layout style paint;
         }
 
         /* HEADER */
@@ -86,12 +100,13 @@
                         radial-gradient(900px circle at 50% 80%, rgba(16, 185, 129, 0.18), transparent 55%);
             opacity: 0.6;
             pointer-events: none;
-            animation: floatGlow 12s ease-in-out infinite alternate;
+            animation: floatGlow 18s ease-in-out infinite alternate;
+            will-change: auto;
         }
 
         @keyframes floatGlow {
-            from { transform: translateY(0px); }
-            to { transform: translateY(-12px); }
+            from { transform: translateY(0); }
+            to { transform: translateY(-6px); }
         }
 
         .header .container {
@@ -208,7 +223,8 @@
             border-radius: 6px;
             font-size: 16px;
             font-family: inherit;
-            transition: border-color var(--dur-xs) var(--ease-out), box-shadow var(--dur-sm) var(--ease-out), background-color var(--dur-xs) var(--ease-out), color var(--dur-xs) var(--ease-out);
+            transition: transform 80ms var(--spring), box-shadow 200ms var(--ease-out);
+            contain: layout style;
         }
 
         input, select {
@@ -221,7 +237,7 @@
             outline: none;
             border-color: var(--primary);
             box-shadow: 0 0 0 3px var(--glow);
-            transition: border-color var(--dur-xs) var(--spring-soft), box-shadow var(--dur-sm) var(--spring-soft);
+            transition: border-color var(--dur-sm) var(--ease-out), box-shadow var(--dur-sm) var(--ease-out);
         }
 
         /* ── iOS tap feedback: fast scale-down, spring recovery ─────────── */
@@ -252,30 +268,51 @@
             align-items: center;
             justify-content: center;
             gap: 8px;
+            will-change: transform;
+            transform: translateZ(0);
+            contain: layout style;
         }
 
-        button:hover {
+        button:hover:not(:disabled) {
             background: var(--primary-dark);
-            transform: translateY(-1px);
-            box-shadow: 0 10px 22px rgba(37, 99, 235, 0.35);
+            box-shadow: 0 6px 12px rgba(37, 99, 235, 0.25);
+            transform: translateY(-1px) translateZ(0);
+        }
+
+        button:active:not(:disabled) {
+            transform: translateY(0) translateZ(0);
         }
 
         button.secondary {
             background: var(--bg-elevated);
             color: var(--text);
             border: 1px solid var(--border);
+            transition: background-color var(--dur-sm) var(--ease-out), border-color var(--dur-sm) var(--ease-out), transform var(--dur-xs) var(--spring);
         }
 
-        button.secondary:hover {
+        button.secondary:hover:not(:disabled) {
             background: rgba(148, 163, 184, 0.12);
+            border-color: var(--primary);
+            transform: translateY(-2px);
+        }
+
+        button.secondary:active:not(:disabled) {
+            transform: translateY(-1px);
         }
 
         button.danger {
             background: var(--danger);
+            transition: background-color var(--dur-sm) var(--ease-out), box-shadow var(--dur-md) var(--spring-soft), transform var(--dur-xs) var(--spring);
         }
 
-        button.danger:hover {
+        button.danger:hover:not(:disabled) {
             background: #ef4444;
+            box-shadow: 0 12px 28px rgba(248, 113, 113, 0.4);
+            transform: translateY(-2px);
+        }
+
+        button.danger:active:not(:disabled) {
+            transform: translateY(-1px);
         }
 
         .score-input {
@@ -287,6 +324,8 @@
             color: var(--text);
             font-family: var(--number-font);
             font-size: 16px;
+            transition: border-color var(--dur-sm) var(--ease-out), box-shadow var(--dur-sm) var(--ease-out), background-color var(--dur-sm) var(--ease-out);
+            will-change: auto;
         }
         .veto-reason-input {
             width: 220px;
@@ -302,6 +341,7 @@
             border-color: #22c55e;
             background: rgba(34, 197, 94, 0.24);
             box-shadow: inset 0 0 0 1px rgba(34, 197, 94, 0.4);
+            transition: border-color var(--dur-sm) var(--ease-out), background-color var(--dur-sm) var(--ease-out), box-shadow var(--dur-sm) var(--ease-out);
         }
         .score-input-wrapper {
             position: relative;
@@ -320,6 +360,8 @@
             vertical-align: middle;
             min-width: 28px;
             text-align: center;
+            transition: transform var(--dur-xs) var(--spring), box-shadow var(--dur-sm) var(--ease-out);
+            will-change: transform, box-shadow;
         }
         .stored-score-badge {
             background: linear-gradient(135deg, rgba(34, 197, 94, 0.35), rgba(22, 163, 74, 0.5));
@@ -366,10 +408,17 @@
             padding: 8px 10px;
             font-weight: 700;
             cursor: pointer;
-            box-shadow: 0 6px 16px rgba(22, 163, 74, 0.25);
+            box-shadow: 0 6px 16px rgba(22, 163, 74, 0.3);
+            transition: box-shadow var(--dur-sm) var(--ease-out), transform var(--dur-xxs) var(--spring);
+            will-change: transform;
+            transform: translateZ(0);
         }
-        .score-save-btn:hover {
-            filter: brightness(1.05);
+        .score-save-btn:hover:not(:disabled) {
+            box-shadow: 0 10px 24px rgba(22, 163, 74, 0.35);
+            transform: translateY(-1px) translateZ(0);
+        }
+        .score-save-btn:active:not(:disabled) {
+            transform: translateY(0) translateZ(0);
         }
         @media (max-width: 1100px) {
             #add-score-tab .controls {
@@ -440,7 +489,8 @@
             font-weight: 600;
             border-bottom: 3px solid transparent;
             margin-bottom: -2px;
-            transition: color var(--dur-xs) var(--ease-out), border-bottom-color var(--dur-xs) var(--ease-out), transform var(--dur-xs) var(--spring);
+            transition: color 200ms var(--ease-out), border-bottom-color 200ms var(--ease-out);
+            will-change: color;
         }
 
         .tab-button i {
@@ -467,10 +517,12 @@
 
         .score-cell.editable {
             cursor: pointer;
+            will-change: auto;
+            transition: background-color var(--dur-sm) var(--ease-out);
         }
 
         .score-cell.editable:hover {
-            background: rgba(56, 189, 248, 0.15);
+            background: rgba(56, 189, 248, 0.2) !important;
         }
 
         /* MONTH SELECTOR */
@@ -503,11 +555,13 @@
             border-radius: 8px;
             cursor: pointer;
             font-weight: 600;
-            transition: background-color var(--dur-xs) var(--ease-out), border-color var(--dur-xs) var(--ease-out), color var(--dur-xs) var(--ease-out), box-shadow var(--dur-sm) var(--ease-out), transform var(--dur-xs) var(--spring);
+            transition: background-color var(--dur-sm) var(--ease-out), border-color var(--dur-sm) var(--ease-out), box-shadow var(--dur-sm) var(--ease-out), transform var(--dur-xxs) var(--spring);
             font-size: 13px;
             font-family: var(--number-font);
             color: var(--text-secondary);
             letter-spacing: 0.2px;
+            will-change: transform;
+            transform: translateZ(0);
         }
 
         .month-button.active {
@@ -534,6 +588,7 @@
             border: 1px solid rgba(148, 163, 184, 0.18);
             box-shadow: 0 18px 40px rgba(0,0,0,0.35);
             overflow: hidden;
+            contain: layout style;
         }
 
         .scoreboard-scroll {
@@ -558,13 +613,12 @@
             margin: 0 0 6px;
             background: rgba(30, 41, 59, 0.85);
             border-radius: 6px;
-            border: 1px solid rgba(99, 102, 241, 0.25);
+            border: 1px solid rgba(148, 163, 184, 0.25);
         }
         .scoreboard-scroll-top-spacer {
             height: 1px;
             min-width: 1px;
         }
-
         #scoreboard-tab .scoreboard-wrapper {
             overflow: visible;
             margin-bottom: 24px;
@@ -576,6 +630,7 @@
             max-height: calc(100vh - 300px);
             min-height: 220px;
             padding-bottom: 0;
+            scroll-behavior: auto;
         }
 
         @media (max-width: 980px) {
@@ -645,6 +700,18 @@
             letter-spacing: 0.2px;
             box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
             cursor: pointer;
+            transition: box-shadow var(--dur-md) var(--spring-soft), transform var(--dur-sm) var(--spring), filter var(--dur-xs) var(--ease-out);
+            will-change: transform, box-shadow;
+        }
+
+        .master-update-btn:hover:not(:disabled) {
+            box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+            transform: translateY(-4px);
+            filter: brightness(1.05);
+        }
+
+        .master-update-btn:active:not(:disabled) {
+            transform: translateY(-2px);
         }
 
         .master-update-btn:disabled {
@@ -752,6 +819,8 @@
         }
         .scoreboard tbody tr td {
             background: #0f172a;
+            transition: background-color 200ms var(--ease-out);
+            contain: layout style paint;
         }
         .scoreboard tbody tr:nth-child(even) td {
             background: #0b1220;
@@ -1012,11 +1081,12 @@
             top: 0;
             z-index: 55;
         }
-        /* Corner cells (horizontally + vertically sticky) → highest z-index */
+        /* Corner cells (horizontally + vertically sticky) → highest z-index + opaque header bg */
         #scoreboardTable thead th.sticky-left,
         #scoreboardTable thead th.sticky-right,
         #scoreboardTable thead th.extra-fixed {
             z-index: 80 !important;
+            background: linear-gradient(135deg, rgb(30, 64, 175), rgb(14, 116, 144)) !important;
         }
         /* Visual drop-shadow to separate sticky header from scrolling body rows */
         #scoreboardTable thead tr:last-child th {
@@ -1125,6 +1195,16 @@
             border-right: 1px solid rgba(148, 163, 184, 0.45) !important;
             overflow: hidden;
         }
+        /* Header sticky-left cells must keep header gradient (not body sticky bg). */
+        #scoreboardTable thead th.sticky-left,
+        #scoreboardTable thead th.sticky-left-1,
+        #scoreboardTable thead th.sticky-left-2,
+        #scoreboardTable thead th.sticky-left-3,
+        #scoreboardTable thead th.sticky-left-4 {
+            background: linear-gradient(135deg, rgb(14, 116, 144), rgb(30, 64, 175)) !important;
+            background-color: transparent !important;
+            background-image: linear-gradient(135deg, rgb(14, 116, 144), rgb(30, 64, 175)) !important;
+        }
         #scoreboardTable th.rank-cell.sticky-left,
         #scoreboardTable td.rank-cell.sticky-left {
             z-index: 45 !important;
@@ -1150,6 +1230,15 @@
             z-index: 41 !important;
             left: calc(var(--sb-rank-w) + var(--sb-roll-w) + var(--sb-name-w) + var(--sb-class-w)) !important;
         }
+        /* Keep top-left header corner cells above body sticky cells while vertical scrolling. */
+        #scoreboardTable thead th.rank-cell.sticky-left {
+            z-index: 92 !important;
+            top: 0 !important;
+        }
+        #scoreboardTable thead th.sticky-left-1 { z-index: 91 !important; top: 0 !important; }
+        #scoreboardTable thead th.sticky-left-2 { z-index: 90 !important; top: 0 !important; }
+        #scoreboardTable thead th.sticky-left-3 { z-index: 89 !important; top: 0 !important; }
+        #scoreboardTable thead th.sticky-left-4 { z-index: 88 !important; top: 0 !important; }
 
         /* Sticky left offsets are controlled by #scoreboardTable CSS variables above. */
 
@@ -1643,12 +1732,20 @@
             margin-bottom: 25px;
             backdrop-filter: blur(2px);
             -webkit-backdrop-filter: blur(2px);
+            transition: border-color var(--dur-md) var(--spring-soft), box-shadow var(--dur-md) var(--ease-out);
+            will-change: border-color, box-shadow;
+        }
+
+        .form-card:hover {
+            border-color: rgba(148, 163, 184, 0.4);
+            box-shadow: 0 24px 48px rgba(0,0,0,0.4);
         }
 
         .form-card h3 {
             margin-bottom: 20px;
             color: var(--primary);
             font-size: 18px;
+            transition: color var(--dur-md) var(--ease-out);
         }
 
         .form-grid {
@@ -1667,6 +1764,7 @@
         .form-group label {
             font-weight: 600;
             color: var(--text);
+            transition: color var(--dur-xs) var(--ease-out);
         }
 
         .form-group input,
@@ -1679,6 +1777,15 @@
             font-size: 16px;
             background: var(--bg-elevated);
             color: var(--text);
+            transition: border-color var(--dur-sm) var(--spring-soft), background-color var(--dur-xs) var(--ease-out), box-shadow var(--dur-md) var(--spring-soft);\n            will-change: border-color, box-shadow, background-color;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px var(--glow);
+            background: rgba(15, 23, 42, 0.95);
         }
 
         .form-group textarea {
@@ -1707,11 +1814,13 @@
             border-radius: 10px;
             box-shadow: 0 14px 32px rgba(0,0,0,0.35);
             transition: transform var(--dur-sm) var(--spring-soft), box-shadow var(--dur-sm) var(--ease-out);
+            will-change: transform;
+            transform: translateZ(0);
         }
 
         .stat-card:hover {
-            transform: translateY(-3px) scale(1.012);
-            box-shadow: 0 22px 44px rgba(0,0,0,0.45);
+            transform: translateY(-2px) translateZ(0);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.4);
         }
 
         .stat-card h4 {
@@ -2019,7 +2128,9 @@
             display: flex;
             align-items: center;
             gap: 10px;
-            animation: iosSlideUp var(--dur-sm) var(--spring-soft) both;
+            animation: iosSlideUp 280ms var(--spring-soft) both;
+            will-change: auto;
+            contain: layout style paint;
         }
 
         @keyframes slideIn {
@@ -2058,6 +2169,8 @@
             justify-content: center;
             z-index: 10000;
             animation: iosFadeIn var(--dur-sm) var(--ease-out) both;
+            backdrop-filter: blur(3px);
+            -webkit-backdrop-filter: blur(3px);
         }
 
         .validation-modal.hidden {
@@ -2073,16 +2186,23 @@
             background: var(--bg-card);
             border: 2px solid var(--border);
             border-radius: 12px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+            box-shadow: 0 25px 80px rgba(0, 0, 0, 0.6);
             max-width: 500px;
             width: 90%;
             padding: 0;
-            animation: iosSlideUp var(--dur-md) var(--spring-soft) both;
+            animation: iosSlideUp var(--dur-sm) var(--spring-soft) both;
+            will-change: transform;
+            transform: translateZ(0);
         }
 
-        @keyframes slideUp {
-            from { opacity: 0; transform: translateY(40px); }
-            to   { opacity: 1; transform: translateY(0); }
+        @keyframes iosFadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes iosSlideUp {
+            from { opacity: 0; transform: translateY(12px); }
+            to { opacity: 1; transform: translateY(0); }
         }
 
         .validation-modal-header {
@@ -2388,7 +2508,26 @@
             to { transform: rotate(360deg); }
         }
 
-        .hidden { display: none !important; }
+        @keyframes iosTabFadeIn {
+            from { 
+                opacity: 0; 
+                transform: translateY(8px);
+            }
+            to { 
+                opacity: 1; 
+                transform: translateY(0); 
+            }
+        }
+
+        .tab-content {
+            animation: iosTabFadeIn var(--dur-md) var(--spring-soft) both;
+        }
+
+        .hidden { 
+            display: none !important; 
+            opacity: 0;
+        }
+
         .text-center { text-align: center; }
         .mt-20 { margin-top: 20px; }
         .mb-20 { margin-bottom: 20px; }
@@ -3112,7 +3251,7 @@
                                 <th class="sticky-left sticky-left-1" style="width: 92px;">Roll No.</th>
                                 <th class="sticky-left sticky-left-2" style="width: 320px;">Student Name</th>
                                 <th class="sticky-left sticky-left-3" style="width: 60px;">Class</th>
-                                <th class="sticky-left sticky-left-4" style="width: 60px;" data-col="fees">Fees</th>
+                                <th class="sticky-left sticky-left-4" style="width: 70px;" data-col="fees">Fees</th>
                                 <th class="sticky-right sticky-right-1 total-cell" style="width: 150px; background: #fbbf24 !important;">Total<br>Score</th>
                                 <th class="sticky-right vote-cell" style="width: 96px;">Vote<br>Power</th>
                             </tr>
@@ -6715,6 +6854,10 @@
             return String(value || '').trim().toUpperCase();
         }
 
+        function normalizeAttendanceRoll(value) {
+            return normalizeRoll(value).replace(/[^A-Z0-9]/g, '');
+        }
+
         function findStudentByRoll(rollValue) {
             const roll = normalizeRoll(rollValue);
             if (!roll) return null;
@@ -8515,7 +8658,7 @@
                 data.attendance = data.attendance || [];
                 const targetDate = String(record.date || '');
                 const targetStudent = String(record.studentId);
-                const normalizedRoll = normalizeRoll(record.roll || '');
+                const normalizedRoll = normalizeAttendanceRoll(record.roll || '');
                 const normalizedRecord = {
                     ...record,
                     date: targetDate,
@@ -10269,21 +10412,21 @@
             (Array.isArray(existingStudents) ? existingStudents : []).forEach(student => {
                 if (!student || typeof student !== 'object') return;
                 const sid = parseInt(student.id, 10);
-                const roll = normalizeRoll(student.roll || '');
+                const roll = normalizeAttendanceRoll(student.roll || '');
                 if (!sid || !roll || existingIdByRoll.has(roll)) return;
                 existingIdByRoll.set(roll, sid);
             });
             (Array.isArray(incomingStudents) ? incomingStudents : []).forEach(student => {
                 if (!student || typeof student !== 'object') return;
                 const sid = parseInt(student.id, 10);
-                const roll = normalizeRoll(student.roll || '');
+                const roll = normalizeAttendanceRoll(student.roll || '');
                 if (!sid || !roll) return;
                 incomingRollById.set(String(sid), roll);
             });
             const buildKey = (item) => {
                 if (!item || typeof item !== 'object') return '';
                 const date = String(item.date || '').trim();
-                let roll = normalizeRoll(item.roll || '');
+                let roll = normalizeAttendanceRoll(item.roll || '');
                 let sid = parseInt(item.studentId, 10);
                 if (!roll && sid) {
                     roll = incomingRollById.get(String(sid)) || '';
@@ -10305,7 +10448,7 @@
                     status: normalizeStatus(item.status),
                     remarks: String(item.remarks || '')
                 };
-                const normalizedRoll = normalizeRoll(item.roll || '');
+                const normalizedRoll = normalizeAttendanceRoll(item.roll || '');
                 const normalizedStudentId = parseInt(item.studentId, 10);
                 if (normalizedRoll) {
                     normalized.roll = normalizedRoll;
@@ -10937,6 +11080,8 @@
                 pullFromServer(false).catch(() => {});
                 return false;
             }
+            // Mark outbound payload immediately so concurrent pulls do not overwrite unsynced local edits.
+            pendingSyncPayload = data;
             updateSyncStatus('syncing', 'Syncing');
             // If we're already pushing now, cancel any scheduled push to avoid duplicate POSTs.
             if (pendingPushTimer) {
@@ -11212,7 +11357,7 @@
             const shouldApplyRemote =
                 forceFull ||                       // explicit refresh/master-update must always evaluate remote snapshot
                 preferAuthoritativeServerApply ||
-                roleNeedsAuthoritativeSync ||        // teachers/students always pull server data
+                (roleNeedsAuthoritativeSync && !hasPendingLocalWrites) ||
                 remoteOfficeLooksMoreComplete ||
                 remoteLooksBetterRoster ||
                 remoteHasHealthierActiveSet ||
@@ -11596,24 +11741,8 @@
         function getVisibleDateWindowIndices(allDates, month) {
             const dates = Array.isArray(allDates) ? allDates : [];
             if (!dates.length) return [];
-            const monthKey = String(month || '').trim();
-            if (!/^\d{4}-\d{2}$/.test(monthKey) || monthKey !== getCurrentMonthKey()) {
-                return dates.map((_, index) => index);
-            }
-
-            const today = formatDateKey(new Date());
-            let currentIndex = dates.findIndex(date => String(date || '').trim() === today);
-            if (currentIndex < 0) {
-                const nextIndex = dates.findIndex(date => String(date || '').trim() > today);
-                currentIndex = nextIndex === -1 ? dates.length - 1 : Math.max(0, nextIndex - 1);
-            }
-            const start = Math.max(0, currentIndex - 5);
-            const end = Math.min(dates.length - 1, currentIndex + 2);
-            const indices = [];
-            for (let i = start; i <= end; i += 1) {
-                indices.push(i);
-            }
-            return indices;
+            // Always return all dates for proper horizontal scrolling
+            return dates.map((_, index) => index);
         }
 
         function addMonths(dateStr, months) {
@@ -11689,36 +11818,102 @@
         let scoreboardScrollSyncBound = false;
         let scoreboardScrollSyncBusy = false;
         let _sbLastHeaderKey = '';
+        function getScoreboardDayScrollMetrics(bottom, headerRow) {
+            const bottomMax = Math.max(0, (bottom && bottom.scrollWidth ? bottom.scrollWidth : 0) - (bottom && bottom.clientWidth ? bottom.clientWidth : 0));
+            if (!bottom || !headerRow) {
+                return {
+                    dayStart: 0,
+                    dayMax: bottomMax,
+                    bottomMax,
+                    stickyLeftWidth: 0,
+                    stickyRightWidth: 0,
+                    dayWidth: 0,
+                    dayViewport: Math.max(0, (bottom && bottom.clientWidth) ? bottom.clientWidth : 0)
+                };
+            }
+            const dateHeaders = Array.from(headerRow.querySelectorAll('th[data-score-date]'));
+            if (!dateHeaders.length) {
+                return {
+                    dayStart: 0,
+                    dayMax: bottomMax,
+                    bottomMax,
+                    stickyLeftWidth: 0,
+                    stickyRightWidth: 0,
+                    dayWidth: 0,
+                    dayViewport: Math.max(0, (bottom && bottom.clientWidth) ? bottom.clientWidth : 0)
+                };
+            }
+            const first = dateHeaders[0];
+            const last = dateHeaders[dateHeaders.length - 1];
+            const stickyLeftWidth = Array.from(headerRow.querySelectorAll('th.sticky-left'))
+                .reduce((sum, th) => sum + (th.offsetWidth || 0), 0);
+            const stickyRightWidth = Array.from(headerRow.querySelectorAll('th.sticky-right'))
+                .reduce((sum, th) => sum + (th.offsetWidth || 0), 0);
+            const firstLeft = first ? (first.offsetLeft || 0) : 0;
+            const lastRight = last ? ((last.offsetLeft || 0) + (last.offsetWidth || 0)) : firstLeft;
+            const totalDayWidth = Math.max(0, lastRight - firstLeft);
+            const visibleDayWidth = Math.max(0, (bottom.clientWidth || 0) - stickyLeftWidth - stickyRightWidth);
+            const dayMax = Math.max(0, totalDayWidth - visibleDayWidth);
+            const dayStart = Math.max(0, firstLeft - stickyLeftWidth);
+            return {
+                dayStart,
+                dayMax,
+                bottomMax,
+                stickyLeftWidth,
+                stickyRightWidth,
+                dayWidth: totalDayWidth,
+                dayViewport: visibleDayWidth
+            };
+        }
         function syncScoreboardDualScrollbars() {
             const top = document.getElementById('scoreboardTopScroll');
             const spacer = document.getElementById('scoreboardTopScrollSpacer');
             const bottom = document.getElementById('scoreboardBottomScroll');
             const table = document.getElementById('scoreboardTable');
+            const headerRow = document.getElementById('scoreboardHeaderRow');
             if (!top || !spacer || !bottom || !table) return;
 
-            const scrollWidth = Math.max(table.scrollWidth, bottom.scrollWidth, bottom.clientWidth);
-            spacer.style.width = `${scrollWidth}px`;
+            const metrics = getScoreboardDayScrollMetrics(bottom, headerRow);
+            // Top scrollbar is for day columns only: align it over day viewport.
+            if (metrics.dayViewport > 0) {
+                top.style.marginLeft = `${metrics.stickyLeftWidth}px`;
+                top.style.marginRight = `${metrics.stickyRightWidth}px`;
+            } else {
+                top.style.marginLeft = '0px';
+                top.style.marginRight = '0px';
+            }
+            const effectiveViewport = Math.max(0, metrics.dayViewport || top.clientWidth || 0);
+            const topWidth = Math.max(metrics.dayWidth || 0, effectiveViewport + 1);
+            spacer.style.width = `${topWidth}px`;
             // Always show the top scrollbar so users can see it without scrolling to the bottom.
             top.style.display = 'block';
 
             if (!scoreboardScrollSyncBound) {
                 top.addEventListener('scroll', () => {
                     if (scoreboardScrollSyncBusy) return;
+                    const activeHeaderRow = document.getElementById('scoreboardHeaderRow');
+                    const activeMetrics = getScoreboardDayScrollMetrics(bottom, activeHeaderRow);
                     scoreboardScrollSyncBusy = true;
-                    bottom.scrollLeft = top.scrollLeft;
+                    const nextTop = Math.max(0, Math.min(top.scrollLeft, activeMetrics.dayMax));
+                    const nextBottom = Math.max(0, Math.min(activeMetrics.dayStart + nextTop, activeMetrics.bottomMax));
+                    bottom.scrollLeft = nextBottom;
                     scoreboardScrollSyncBusy = false;
                 }, { passive: true });
                 bottom.addEventListener('scroll', () => {
                     if (scoreboardScrollSyncBusy) return;
+                    const activeHeaderRow = document.getElementById('scoreboardHeaderRow');
+                    const activeMetrics = getScoreboardDayScrollMetrics(bottom, activeHeaderRow);
                     scoreboardScrollSyncBusy = true;
-                    top.scrollLeft = bottom.scrollLeft;
+                    const mappedTop = Math.max(0, Math.min((bottom.scrollLeft || 0) - activeMetrics.dayStart, activeMetrics.dayMax));
+                    top.scrollLeft = mappedTop;
                     scoreboardScrollSyncBusy = false;
                 }, { passive: true });
                 scoreboardScrollSyncBound = true;
             }
 
-            if (top.scrollLeft !== bottom.scrollLeft) {
-                top.scrollLeft = bottom.scrollLeft;
+            const mappedTop = Math.max(0, Math.min((bottom.scrollLeft || 0) - metrics.dayStart, metrics.dayMax));
+            if (Math.abs((top.scrollLeft || 0) - mappedTop) > 1) {
+                top.scrollLeft = mappedTop;
             }
         }
 
@@ -11760,7 +11955,8 @@
             }
             nextLeft = Math.max(0, Math.min(nextLeft, maxScroll));
             bottom.scrollLeft = nextLeft;
-            top.scrollLeft = nextLeft;
+            const metrics = getScoreboardDayScrollMetrics(bottom, headerRow);
+            top.scrollLeft = Math.max(0, Math.min(nextLeft - metrics.dayStart, metrics.dayMax));
         }
 
         function formatDateLabel(dateStr) {
@@ -12315,7 +12511,7 @@
                     <th class="sticky-left sticky-left-1" style="width: 92px;">Roll No.</th>
                     <th class="sticky-left sticky-left-2" style="width: 320px;">Student Name</th>
                     <th class="sticky-left sticky-left-3" style="width: 60px;">Class</th>
-                    <th style="width: 70px;" data-col="fees">Fees</th>
+                    <th class="sticky-left sticky-left-4" style="width: 70px;" data-col="fees">Fees</th>
                     ${dateHeaders}
                     ${extraHeaders}
                     <th class="sticky-right sticky-right-1 total-cell" style="width: 150px; background: #fbbf24 !important;">Total<br>Score</th>
@@ -12487,7 +12683,7 @@
                     <td class="sticky-left sticky-left-1 ${isOfficeHolderStudent(row.student, month) ? 'office-holder-roll' : ''}"><strong>${formatRollDisplay(row.student.roll)}</strong></td>
                     <td class="sticky-left sticky-left-2">${renderStudentName(row.student, month)}</td>
                     <td class="sticky-left sticky-left-3">${row.student.class}</td>
-                    <td data-col="fees">${coalesce(row.student.fees, '-')}</td>
+                    <td class="sticky-left sticky-left-4" data-col="fees">${coalesce(row.student.fees, '-')}</td>
                     ${scores}
                     ${extraValues}
                     <td class="score-cell total sticky-right sticky-right-1 total-cell ${blinkClass}">${row.total}</td>
@@ -18970,7 +19166,7 @@
             const targetDate = String(date || '');
             const targetStudent = String(studentId);
             const student = db.getStudents().find(s => parseInt(s.id, 10) === parseInt(studentId, 10));
-            const targetRoll = normalizeRoll(student && student.roll ? student.roll : '');
+            const targetRoll = normalizeAttendanceRoll(student && student.roll ? student.roll : '');
             let latest = null;
             let latestStamp = 0;
             for (const item of records) {
@@ -18985,7 +19181,7 @@
             if (!latest && targetRoll) {
                 for (const item of records) {
                     if (String(item.date || '') !== targetDate) continue;
-                    const roll = normalizeRoll(item.roll || '');
+                    const roll = normalizeAttendanceRoll(item.roll || '');
                     if (!roll || roll !== targetRoll) continue;
                     const stamp = Date.parse(item.updated_at || item.created_at || '') || 0;
                     if (!latest || stamp >= latestStamp) {
@@ -19002,7 +19198,7 @@
             const fromDate = String(options.fromDate || '').trim();
             const toDate = String(options.toDate || '').trim();
             const studentId = parseInt(student && student.id, 10);
-            const studentRoll = normalizeRoll(student && student.roll ? student.roll : '');
+            const studentRoll = normalizeAttendanceRoll(student && student.roll ? student.roll : '');
             if (!studentId && !studentRoll) return [];
             const latestByDate = new Map();
             (db.getAttendance() || []).forEach(item => {
@@ -19013,7 +19209,7 @@
                 if (fromDate && dateValue < fromDate) return;
                 if (toDate && dateValue > toDate) return;
                 const sameId = studentId && String(item.studentId) === String(studentId);
-                const sameRoll = studentRoll && normalizeRoll(item.roll || '') === studentRoll;
+                const sameRoll = studentRoll && normalizeAttendanceRoll(item.roll || '') === studentRoll;
                 if (!sameId && !sameRoll) return;
                 const prev = latestByDate.get(dateValue);
                 if (!prev) {
@@ -19259,19 +19455,23 @@
                 if (savedRecord) changedRows.push(savedRecord);
                 writes += 1;
             }
+            if (!changedRows.length) {
+                showAlert('No bulk attendance changes to save', 'info');
+                return;
+            }
 
             if (SERVER_SYNC.enabled && (currentUserRole === 'admin' || currentUserRole === 'teacher')) {
                 const studentsPatch = [{
                     id: student.id,
-                    roll: normalizeRoll(student.roll || '')
+                    roll: normalizeAttendanceRoll(student.roll || '')
                 }].filter(item => item.roll);
                 const attendancePatch = {
                     attendance: changedRows,
                     students: studentsPatch
                 };
-                const pushed = await pushToServer(attendancePatch, { silent: true, allowPatch: true });
-                if (pushed) {
-                    await pullFromServer(false, true);
+                const pushed = await pushAttendancePatchReliable(attendancePatch, changedRows);
+                if (!pushed) {
+                    showAlert('Bulk attendance saved locally, but server sync is pending. It will retry automatically.', 'warning');
                 }
             }
             loadAttendanceTab();
@@ -19414,7 +19614,7 @@
                         <td>${student.class || '-'}</td>
                         <td>${getStudentGroup(student) || '-'}</td>
                         <td>
-                            <select class="${controlClass}" data-attendance-student="${student.id}" data-attendance-roll="${normalizeRoll(student.roll || '')}" onchange="handleAttendanceStatusChange(this)" ${currentUserRole === 'student' ? 'disabled' : ''}>
+                            <select class="${controlClass}" data-attendance-student="${student.id}" data-attendance-roll="${normalizeAttendanceRoll(student.roll || '')}" onchange="handleAttendanceStatusChange(this)" ${currentUserRole === 'student' ? 'disabled' : ''}>
                                 <option value="present" ${status === 'present' ? 'selected' : ''}>Present</option>
                                 <option value="absent" ${status === 'absent' ? 'selected' : ''}>Absent</option>
                                 <option value="late" ${status === 'late' ? 'selected' : ''}>Late</option>
@@ -19422,7 +19622,7 @@
                             </select>
                         </td>
                         <td>
-                            <input class="${controlClass}" type="text" data-attendance-remarks="${student.id}" data-attendance-roll="${normalizeRoll(student.roll || '')}" value="${remarks}" placeholder="Remarks" ${currentUserRole === 'student' ? 'disabled' : ''}>
+                            <input class="${controlClass}" type="text" data-attendance-remarks="${student.id}" data-attendance-roll="${normalizeAttendanceRoll(student.roll || '')}" value="${remarks}" placeholder="Remarks" ${currentUserRole === 'student' ? 'disabled' : ''}>
                         </td>
                     </tr>
                 `;
@@ -19430,7 +19630,7 @@
             if (!students.length) {
                 tbody.innerHTML = `<tr><td colspan="6" class="text-center" style="padding: 30px;">No students for selected filters</td></tr>`;
             }
-            document.querySelectorAll('[data-attendance-student]').forEach(select => handleAttendanceStatusChange(select));
+            document.querySelectorAll('[data-attendance-student]').forEach(select => applyAttendanceStatusClass(select));
             document.querySelectorAll('[data-attendance-remarks]').forEach(input => {
                 input.addEventListener('input', () => handleAttendanceRemarkChange(input));
             });
@@ -19457,15 +19657,18 @@
             return '';
         }
 
-        function handleAttendanceStatusChange(selectEl) {
+        function applyAttendanceStatusClass(selectEl) {
             if (!selectEl) return;
             const row = selectEl.closest('tr');
             if (!row) return;
             row.classList.remove('attendance-status-present', 'attendance-status-absent', 'attendance-status-leave', 'attendance-status-late');
             const statusClass = getAttendanceStatusClass(selectEl.value);
-            if (statusClass) {
-                row.classList.add(statusClass);
-            }
+            if (statusClass) row.classList.add(statusClass);
+        }
+
+        function handleAttendanceStatusChange(selectEl) {
+            if (!selectEl) return;
+            applyAttendanceStatusClass(selectEl);
             const studentId = parseInt(selectEl.getAttribute('data-attendance-student'), 10);
             if (studentId) {
                 attendanceDraftState.lastEditAt = Date.now();
@@ -19482,6 +19685,96 @@
             const statusSelect = document.querySelector(`[data-attendance-student="${studentId}"]`);
             const status = statusSelect ? statusSelect.value : 'present';
             setAttendanceDraft(studentId, status, String(inputEl.value || ''));
+        }
+
+        function attendanceRowsMatch(rows) {
+            const list = Array.isArray(rows) ? rows : [];
+            for (const row of list) {
+                if (!row || typeof row !== 'object') continue;
+                const sid = parseInt(row.studentId, 10);
+                const dateKey = String(row.date || '').trim();
+                if (!sid || !dateKey) continue;
+                const expectedStatus = normalizeAttendanceStatus(row.status);
+                const expectedRemarks = String(row.remarks || '').trim();
+                const saved = getAttendanceRecord(sid, dateKey);
+                if (!saved) return false;
+                const actualStatus = normalizeAttendanceStatus(saved.status);
+                const actualRemarks = String(saved.remarks || '').trim();
+                if (actualStatus !== expectedStatus) return false;
+                if (actualRemarks !== expectedRemarks) return false;
+            }
+            return true;
+        }
+
+        function attendanceRowKey(row) {
+            if (!row || typeof row !== 'object') return '';
+            const dateKey = String(row.date || '').trim();
+            const sid = parseInt(row.studentId, 10);
+            const roll = normalizeAttendanceRoll(row.roll || '');
+            if (!dateKey) return '';
+            if (sid) return `${dateKey}::sid:${sid}`;
+            if (roll) return `${dateKey}::roll:${roll}`;
+            return '';
+        }
+
+        function attendanceRowsMatchSnapshot(expectedRows, snapshotRows) {
+            const expected = Array.isArray(expectedRows) ? expectedRows : [];
+            const actual = Array.isArray(snapshotRows) ? snapshotRows : [];
+            const byKey = new Map();
+            actual.forEach(item => {
+                const key = attendanceRowKey(item);
+                if (!key) return;
+                const prev = byKey.get(key);
+                if (!prev) {
+                    byKey.set(key, item);
+                    return;
+                }
+                const prevStamp = parseSyncStamp(prev.updated_at || prev.created_at || '');
+                const nextStamp = parseSyncStamp(item.updated_at || item.created_at || '');
+                if (nextStamp >= prevStamp) byKey.set(key, item);
+            });
+            for (const row of expected) {
+                const key = attendanceRowKey(row);
+                if (!key) continue;
+                const matched = byKey.get(key);
+                if (!matched) return false;
+                const expectedStatus = normalizeAttendanceStatus(row.status);
+                const expectedRemarks = String(row.remarks || '').trim();
+                const actualStatus = normalizeAttendanceStatus(matched.status);
+                const actualRemarks = String(matched.remarks || '').trim();
+                if (actualStatus !== expectedStatus) return false;
+                if (actualRemarks !== expectedRemarks) return false;
+            }
+            return true;
+        }
+
+        async function verifyAttendancePatchOnServer(expectedRows) {
+            if (!SERVER_SYNC.enabled) return true;
+            try {
+                const resp = await fetchWithTimeout(SERVER_SYNC.dataUrl, { cache: 'no-store', credentials: 'include' }, 9000);
+                if (!resp.ok) return false;
+                const payload = await resp.json();
+                const serverData = payload && payload.data ? payload.data : null;
+                if (!serverData || typeof serverData !== 'object') return false;
+                return attendanceRowsMatchSnapshot(expectedRows, serverData.attendance || []);
+            } catch (err) {
+                return false;
+            }
+        }
+
+        async function pushAttendancePatchReliable(attendancePatch, expectedRows) {
+            const maxAttempts = 3;
+            for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+                const pushed = await pushToServer(attendancePatch, { silent: attempt < maxAttempts, allowPatch: true });
+                await pullFromServer(false, true);
+                const localOk = attendanceRowsMatch(expectedRows);
+                const serverOk = pushed ? await verifyAttendancePatchOnServer(expectedRows) : false;
+                if (localOk && serverOk) {
+                    return true;
+                }
+                await new Promise(resolve => setTimeout(resolve, 250 * attempt));
+            }
+            return false;
         }
 
         async function saveAttendance() {
@@ -19511,31 +19804,43 @@
                 if (!studentId) return;
                 const remarksInput = document.querySelector(`[data-attendance-remarks="${studentId}"]`);
                 const rollAttr = select.getAttribute('data-attendance-roll') || (remarksInput ? remarksInput.getAttribute('data-attendance-roll') : '');
+                const nextStatus = normalizeAttendanceStatus(select.value);
+                const nextRemarks = remarksInput ? String(remarksInput.value || '').trim() : '';
+                const existingRecord = getAttendanceRecord(studentId, date);
+                const currentStatus = normalizeAttendanceStatus(existingRecord && existingRecord.status ? existingRecord.status : 'present');
+                const currentRemarks = String(existingRecord && existingRecord.remarks ? existingRecord.remarks : '').trim();
+                if (currentStatus === nextStatus && currentRemarks === nextRemarks) {
+                    return;
+                }
                 db.upsertAttendance({
                     date,
                     studentId,
                     roll: rollAttr,
-                    status: select.value,
-                    remarks: remarksInput ? String(remarksInput.value || '').trim() : '',
+                    status: nextStatus,
+                    remarks: nextRemarks,
                     marked_by: currentLoginId || currentUserRole
                 }, { skipSync: true });
                 const savedRecord = getAttendanceRecord(studentId, date);
                 if (savedRecord) changedRows.push(savedRecord);
                 saved += 1;
             });
+            if (!changedRows.length) {
+                showAlert('No attendance changes to save', 'info');
+                return;
+            }
             if (SERVER_SYNC.enabled && (currentUserRole === 'admin' || currentUserRole === 'teacher')) {
                 const studentIdSet = new Set(changedRows.map(row => String(row && row.studentId || '')).filter(Boolean));
                 const studentsPatch = (db.getStudents() || [])
                     .filter(student => studentIdSet.has(String(student && student.id || '')))
-                    .map(student => ({ id: student.id, roll: normalizeRoll(student.roll || '') }))
+                    .map(student => ({ id: student.id, roll: normalizeAttendanceRoll(student.roll || '') }))
                     .filter(student => !!student.roll);
                 const attendancePatch = {
                     attendance: changedRows,
                     students: studentsPatch
                 };
-                const pushed = await pushToServer(attendancePatch, { silent: true, allowPatch: true });
-                if (pushed) {
-                    await pullFromServer(false, true);
+                const pushed = await pushAttendancePatchReliable(attendancePatch, changedRows);
+                if (!pushed) {
+                    showAlert('Attendance saved locally, but server sync is pending. It will retry automatically.', 'warning');
                 }
             }
             resetAttendanceDraft(date, getElementValue('attendanceMonth') || date.substring(0, 7));
@@ -24210,6 +24515,22 @@
             if (logoutBtn) {
                 logoutBtn.addEventListener('click', clearUserDataOnLogout);
             }
+
+            // Scroll Performance Optimization - disable animations during scroll
+            let scrollTimeout;
+            let isScrolling = false;
+            function onScroll() {
+                if (!isScrolling) {
+                    document.body.classList.add('scrolling');
+                    isScrolling = true;
+                }
+                clearTimeout(scrollTimeout);
+                scrollTimeout = setTimeout(() => {
+                    document.body.classList.remove('scrolling');
+                    isScrolling = false;
+                }, 150);
+            }
+            window.addEventListener('scroll', onScroll, { passive: true });
         });
 
     </script>

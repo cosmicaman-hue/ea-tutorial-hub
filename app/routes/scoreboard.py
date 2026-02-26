@@ -519,6 +519,80 @@ def _recover_tiny_roster_if_needed(payload, min_students=25):
     return payload, ''
 
 
+def _recover_stale_snapshot_if_needed(payload, min_students=25, min_newer_seconds=30, allow_local_scan=False):
+    """
+    If a peer has a clearly newer healthy snapshot, adopt it locally.
+    This heals nodes that remain stuck on an older server_updated_at.
+    """
+    if not isinstance(payload, dict):
+        return payload, ''
+
+    local_stamp = _payload_sync_stamp(payload) or 0.0
+    best_payload = None
+    best_src = ''
+    best_stamp = local_stamp
+
+    # Prefer a newer peer snapshot first when peers are configured.
+    peer_payload, peer_src = _best_peer_snapshot(min_students=min_students)
+    peer_stamp = _payload_sync_stamp(peer_payload) if peer_payload else 0.0
+    if peer_payload and peer_stamp > best_stamp:
+        best_payload = peer_payload
+        best_src = peer_src
+        best_stamp = peer_stamp
+
+    # Optional local backup scan (expensive): disabled on hot sync paths by default.
+    if allow_local_scan:
+        local_payload, local_src = _best_local_snapshot(min_students=min_students)
+        local_best_stamp = _payload_sync_stamp(local_payload) if local_payload else 0.0
+        if local_payload and local_best_stamp > best_stamp:
+            best_payload = local_payload
+            best_src = local_src
+            best_stamp = local_best_stamp
+
+    if best_payload and best_stamp >= (local_stamp + float(min_newer_seconds or 0)):
+        try:
+            _save_offline_data(best_payload)
+        except Exception:
+            current_app.logger.exception("Failed to persist stale-recovery snapshot from %s", best_src or 'unknown source')
+        current_app.logger.warning(
+            "Recovered stale snapshot from %s (local=%s, recovered=%s).",
+            best_src or 'unknown source',
+            payload.get('server_updated_at') or payload.get('updated_at') or '',
+            best_payload.get('server_updated_at') or best_payload.get('updated_at') or '',
+        )
+        return best_payload, best_src
+
+    return payload, ''
+
+
+def _ensure_score_timestamps(payload):
+    """
+    Backfill missing score timestamps for legacy rows so client-side merge logic
+    can consistently prefer the newest snapshot.
+    """
+    if not isinstance(payload, dict):
+        return False
+    scores = payload.get('scores')
+    if not isinstance(scores, list):
+        return False
+
+    changed = False
+    fallback = str(payload.get('server_updated_at') or payload.get('updated_at') or _server_now_iso()).strip() or _server_now_iso()
+    for row in scores:
+        if not isinstance(row, dict):
+            continue
+        updated_at = str(row.get('updated_at') or '').strip()
+        created_at = str(row.get('created_at') or '').strip()
+        if not updated_at:
+            row['updated_at'] = created_at or fallback
+            updated_at = str(row.get('updated_at') or '').strip()
+            changed = True
+        if not created_at:
+            row['created_at'] = updated_at or fallback
+            changed = True
+    return changed
+
+
 def _normalize_roll_value(value):
     return str(value or '').strip().upper()
 
@@ -776,6 +850,7 @@ def _merge_teacher_scores(existing_data, incoming_data):
     incoming_scores = incoming_data.get('scores', []) or []
     if not incoming_scores:
         return existing_scores
+    now_iso = _server_now_iso()
 
     existing_students = existing_data.get('students', []) or []
     incoming_students = incoming_data.get('students', []) or []
@@ -845,13 +920,21 @@ def _merge_teacher_scores(existing_data, incoming_data):
             'vetos': approved_vetos,
             'month': month_key,
             'notes': str(incoming.get('notes') or ''),
-            'recordedBy': 'teacher'
+            'recordedBy': 'teacher',
+            # Critical for client convergence: without updated_at, stale local rows can
+            # win tie-breaks and keep showing old points after a valid teacher update.
+            'updated_at': str(incoming.get('updated_at') or now_iso).strip() or now_iso
         }
         if existing_idx is not None:
+            # Keep the earliest known created_at when updating an existing record.
+            existing_created = str(existing_score.get('created_at') or '').strip() if isinstance(existing_score, dict) else ''
+            incoming_created = str(incoming.get('created_at') or '').strip()
+            normalized_score['created_at'] = existing_created or incoming_created or normalized_score['updated_at']
             existing_score.update(normalized_score)
         else:
             max_score_id += 1
             normalized_score['id'] = max_score_id
+            normalized_score['created_at'] = str(incoming.get('created_at') or normalized_score['updated_at']).strip() or normalized_score['updated_at']
             score_index[index_key] = len(existing_scores)
             existing_scores.append(normalized_score)
 
@@ -949,6 +1032,11 @@ def _filter_teacher_payload_to_current_month(incoming_data, teacher_login_id='Te
             continue
         filtered_appeals.append(item)
     filtered['appeals'] = filtered_appeals
+
+    # CRITICAL FIX: Ensure students are preserved for attendance merge identity lookup
+    # The merge function needs student ID->roll mappings to properly identify attendance records
+    if 'students' not in filtered and isinstance(incoming_data.get('students'), list):
+        filtered['students'] = incoming_data.get('students', [])
 
     return filtered
 
@@ -1326,17 +1414,22 @@ def _merge_attendance_superset(existing_data, incoming_data):
     existing_students = existing_data.get('students', []) if isinstance(existing_data, dict) else []
     incoming_students = incoming_data.get('students', []) if isinstance(incoming_data, dict) else []
 
+    def _normalize_att_roll(value):
+        # Attendance payloads from older clients may contain formatted rolls
+        # (spaces or separators). Normalize aggressively for stable identity mapping.
+        return re.sub(r'[^A-Z0-9]', '', _normalize_roll_value(value))
+
     existing_id_by_roll = {}
     for student in existing_students or []:
         sid = _parse_int_safe(student.get('id'), 0)
-        roll = _normalize_roll_value(student.get('roll'))
+        roll = _normalize_att_roll(student.get('roll'))
         if sid > 0 and roll and roll not in existing_id_by_roll:
             existing_id_by_roll[roll] = sid
 
     incoming_roll_by_id = {}
     for student in incoming_students or []:
         sid = _parse_int_safe(student.get('id'), 0)
-        roll = _normalize_roll_value(student.get('roll'))
+        roll = _normalize_att_roll(student.get('roll'))
         if sid > 0 and roll:
             incoming_roll_by_id[str(sid)] = roll
 
@@ -1348,7 +1441,7 @@ def _merge_attendance_superset(existing_data, incoming_data):
         date_key = str(item.get('date') or '').strip()
         if not date_key:
             return None, None
-        roll = _normalize_roll_value(item.get('roll'))
+        roll = _normalize_att_roll(item.get('roll'))
         sid = _parse_int_safe(item.get('studentId'), 0)
         if not roll and sid > 0:
             roll = incoming_roll_by_id.get(str(sid), '')
@@ -1381,6 +1474,15 @@ def _merge_attendance_superset(existing_data, incoming_data):
             next_stamp = _parse_sync_stamp(normalized.get('updated_at') or normalized.get('created_at'))
             if next_stamp >= prev_stamp:
                 merged[key] = normalized
+
+    # SAFEGUARD: Ensure all merged attendance records have timestamps for proper sync ordering
+    now_iso = _server_now_iso()
+    for item in merged.values():
+        if isinstance(item, dict):
+            if not item.get('updated_at'):
+                item['updated_at'] = item.get('created_at', now_iso)
+            if not item.get('created_at'):
+                item['created_at'] = now_iso
 
     return list(merged.values())
 
@@ -1768,6 +1870,50 @@ def _merge_pending_cr_requests_superset(existing_reqs, incoming_reqs):
     return list(merged.values())
 
 
+def _merge_pending_cr_requests_teacher(existing_reqs, incoming_reqs, teacher_login_id):
+    """Teacher-safe merge for pending CR requests.
+    Teachers can only create new pending requests; they cannot resolve existing ones.
+    """
+    now_iso = datetime.now(timezone.utc).isoformat(timespec='milliseconds').replace('+00:00', 'Z')
+    existing = existing_reqs if isinstance(existing_reqs, list) else []
+    by_id = {
+        _parse_int_safe(req.get('id'), 0): dict(req)
+        for req in existing
+        if isinstance(req, dict) and _parse_int_safe(req.get('id'), 0) > 0
+    }
+
+    sanitized_new = []
+    if not isinstance(incoming_reqs, list):
+        incoming_reqs = []
+    for raw in incoming_reqs:
+        if not isinstance(raw, dict):
+            continue
+        rid = _parse_int_safe(raw.get('id'), 0)
+        if rid <= 0 or rid in by_id:
+            continue
+        group = str(raw.get('group') or '').strip().upper()
+        student_id = _parse_int_safe(raw.get('studentId'), 0)
+        elected_on = str(raw.get('elected_on') or '').strip()[:10]
+        if not group or student_id <= 0:
+            continue
+        post = str(raw.get('post') or f'CR - Group {group}').strip() or f'CR - Group {group}'
+        note = str(raw.get('note') or '').strip()[:250]
+        sanitized_new.append({
+            'id': rid,
+            'group': group,
+            'post': post,
+            'studentId': student_id,
+            'elected_on': elected_on,
+            'note': note,
+            'requested_by': teacher_login_id or 'Teacher',
+            'requested_at': str(raw.get('requested_at') or now_iso).strip() or now_iso,
+            'status': 'pending',
+            'updated_at': now_iso,
+        })
+
+    return _merge_pending_cr_requests_superset(existing, sanitized_new)
+
+
 def _merge_resource_transactions_superset(existing_rows, incoming_rows):
     """Merge resource transactions by id."""
     merged = {}
@@ -1861,16 +2007,94 @@ def _merge_resource_advantage_deductions_superset(existing_rows, incoming_rows):
     return list(merged.values())
 
 
-def _merge_resource_requests_teacher(existing_requests, incoming_requests, teacher_login_id, month_key):
+def _build_teacher_resource_request(existing_payload, raw, teacher_login_id, month_key, now_iso):
+    """Sanitize a teacher-created resource request row."""
+    if not isinstance(existing_payload, dict) or not isinstance(raw, dict):
+        return None
+
+    rid = _parse_int_safe(raw.get('id'), 0)
+    if rid <= 0:
+        return None
+
+    mode = str(raw.get('type') or '').strip().lower()
+    if mode not in {'redeem_points', 'cash_purchase'}:
+        return None
+
+    month = str(raw.get('month') or month_key or '').strip()
+    if month != str(month_key or '').strip():
+        return None
+
+    student_id = _parse_int_safe(raw.get('studentId'), 0)
+    student_roll = _normalize_roll_value(raw.get('student_roll') or raw.get('studentRoll') or '')
+    if student_id <= 0 and student_roll:
+        student_id = _find_student_id_by_roll(existing_payload, student_roll)
+    if student_id <= 0:
+        return None
+
+    students = existing_payload.get('students', []) if isinstance(existing_payload.get('students'), list) else []
+    student_obj = next((s for s in students if _parse_int_safe((s or {}).get('id'), 0) == student_id), None)
+    if not student_roll and isinstance(student_obj, dict):
+        student_roll = _normalize_roll_value(student_obj.get('roll'))
+
+    item_id = _parse_int_safe(raw.get('item_id') or raw.get('itemId'), 0)
+    if item_id <= 0:
+        return None
+
+    cabinet = existing_payload.get('resource_cabinet', []) if isinstance(existing_payload.get('resource_cabinet'), list) else []
+    cabinet_item = next((it for it in cabinet if _parse_int_safe((it or {}).get('id'), 0) == item_id), None)
+    if not isinstance(cabinet_item, dict):
+        return None
+
+    qty = max(1, _parse_int_safe(raw.get('qty'), 1))
+
+    def _float_or(value, default_value):
+        try:
+            return float(value)
+        except Exception:
+            return float(default_value)
+
+    unit_price = max(0.0, _float_or(raw.get('price_per_unit'), cabinet_item.get('price_per_unit') or 0))
+    total_cost = max(0.0, _float_or(raw.get('total_cost'), unit_price * qty))
+    points_cost = max(0, _parse_int_safe(raw.get('points_cost'), 0))
+    cash_paid = max(0, _parse_int_safe(raw.get('cash_paid'), 0))
+
+    return {
+        'id': rid,
+        'type': mode,
+        'studentId': student_id,
+        'student_roll': student_roll,
+        'month': month,
+        'item_id': item_id,
+        'item_name': str(raw.get('item_name') or cabinet_item.get('name') or '').strip(),
+        'unit': str(raw.get('unit') or cabinet_item.get('unit') or '').strip(),
+        'qty': qty,
+        'price_per_unit': unit_price,
+        'total_cost': total_cost,
+        'points_cost': points_cost if mode == 'redeem_points' else 0,
+        'cash_paid': cash_paid if mode == 'cash_purchase' else 0,
+        'urgent': False,
+        'admin_veto': False,
+        'status': 'pending_teacher',
+        'teacher_decision': '',
+        'teacher_remark': '',
+        'created_by_login_id': teacher_login_id,
+        'created_at': now_iso,
+        'updated_at': now_iso,
+    }
+
+
+def _merge_resource_requests_teacher(existing_payload, incoming_requests, teacher_login_id, month_key):
     """
     Teachers can only:
-    - Recommend / Not recommend requests for the current month
-    - Add a remark
-    - Move status from pending_teacher -> pending_admin OR not_recommended
+    - create new pending_teacher requests for the current server month
+    - recommend / not recommend existing requests for the current month
+    - add teacher remark
     """
     now_iso = datetime.now(timezone.utc).isoformat(timespec='milliseconds').replace('+00:00', 'Z')
+    existing_obj = existing_payload if isinstance(existing_payload, dict) else {}
+    existing_requests = existing_obj.get('resource_requests', []) if isinstance(existing_obj.get('resource_requests'), list) else []
     by_id = {}
-    for item in existing_requests or []:
+    for item in existing_requests:
         if isinstance(item, dict):
             rid = _parse_int_safe(item.get('id'), 0)
             if rid > 0 and rid not in by_id:
@@ -1883,8 +2107,15 @@ def _merge_resource_requests_teacher(existing_requests, incoming_requests, teach
         if not isinstance(raw, dict):
             continue
         rid = _parse_int_safe(raw.get('id'), 0)
-        if rid <= 0 or rid not in by_id:
+        if rid <= 0:
             continue
+
+        if rid not in by_id:
+            created = _build_teacher_resource_request(existing_obj, raw, teacher_login_id, month_key, now_iso)
+            if created:
+                updated.append(created)
+            continue
+
         current = by_id[rid]
         if str(current.get('month') or '').strip() != str(month_key or '').strip():
             continue
@@ -1911,7 +2142,7 @@ def _merge_resource_requests_teacher(existing_requests, incoming_requests, teach
         next_row['updated_at'] = now_iso
         updated.append(next_row)
 
-    return _merge_resource_requests_superset(existing_requests or [], updated)
+    return _merge_resource_requests_superset(existing_requests, updated)
 
 
 def _find_student_id_by_roll(payload, roll_value):
@@ -2508,6 +2739,12 @@ def offline_data():
                 resp = jsonify({'success': False, 'error': 'Roster snapshot incomplete. Recovery required.'})
                 resp.headers['Cache-Control'] = 'no-store'
                 return resp, 503
+        data, _ = _recover_stale_snapshot_if_needed(data, min_students=min_students)
+        if _ensure_score_timestamps(data):
+            try:
+                _save_offline_data(data)
+            except Exception:
+                current_app.logger.exception("Failed to persist score timestamp normalization on GET")
         updated_at = data.get('server_updated_at') or data.get('updated_at')
         since = request.args.get('since') if hasattr(request, 'args') else None
         if since and updated_at:
@@ -2517,6 +2754,14 @@ def offline_data():
                 # Bandwidth optimization for WAN: if client is already at/above this server stamp,
                 # avoid sending the full payload. SSE (offline-events) still provides realtime updates.
                 return ('', 204)
+        
+        # DIAGNOSTIC FIX: Ensure attendance records are present in GET response
+        attendance_records = data.get('attendance', [])
+        if not attendance_records:
+            current_app.logger.debug(f"GET /offline-data: No attendance records in snapshot (students: {len(data.get('students', []))}, scores: {len(data.get('scores', []))})")
+        else:
+            current_app.logger.debug(f"GET /offline-data: Returning {len(attendance_records)} attendance records")
+        
         resp = jsonify({'data': data, 'updated_at': updated_at})
         resp.headers['Cache-Control'] = 'no-store'
         return resp
@@ -2557,6 +2802,7 @@ def offline_data():
     min_students = _min_safe_student_roster()
     if _is_tiny_roster(existing, min_students):
         existing, _ = _recover_tiny_roster_if_needed(existing, min_students=min_students)
+    existing, _ = _recover_stale_snapshot_if_needed(existing, min_students=min_students)
     force_replace = bool(payload.get('force_replace')) if isinstance(payload, dict) else False
     incoming_count = _student_count(data)
     existing_count = _student_count(existing)
@@ -2612,7 +2858,15 @@ def offline_data():
         if isinstance(data.get('appeals'), list):
             merged['appeals'] = _merge_appeals_superset(existing.get('appeals', []), data.get('appeals', []))
         if isinstance(data.get('attendance'), list):
+            incoming_attendance_count = len(data.get('attendance', []))
+            existing_attendance_count = len(existing.get('attendance', []))
             merged['attendance'] = _merge_attendance_superset(existing, data)
+            merged_attendance_count = len(merged.get('attendance', []))
+            current_app.logger.info(
+                f"[TEACHER SYNC] Attendance merged | "
+                f"incoming: {incoming_attendance_count}, existing: {existing_attendance_count}, result: {merged_attendance_count} | "
+                f"teacher: {actor_login_id or 'Teacher'}"
+            )
         if isinstance(data.get('election_teacher_votes'), list):
             merged['election_teacher_votes'] = _merge_election_votes_superset(
                 existing.get('election_teacher_votes', []),
@@ -2631,7 +2885,7 @@ def offline_data():
             )
         if isinstance(data.get('resource_requests'), list):
             merged['resource_requests'] = _merge_resource_requests_teacher(
-                existing.get('resource_requests', []),
+                existing,
                 data.get('resource_requests', []),
                 actor_login_id or 'Teacher',
                 _server_now_iso()[:7]
@@ -2643,34 +2897,18 @@ def offline_data():
                 _parse_int_safe,
                 _parse_sync_stamp
             )
-        if isinstance(data.get('leadership'), list):
-            merged['leadership'] = _merge_leadership_superset(
-                existing.get('leadership', []),
-                data.get('leadership', [])
-            )
-        if isinstance(data.get('group_crs'), list):
-            merged['group_crs'] = _merge_group_crs_superset(
-                existing.get('group_crs', []),
-                data.get('group_crs', [])
-            )
-        if isinstance(data.get('class_reps'), list):
-            merged['class_reps'] = _merge_class_reps_superset(
-                existing.get('class_reps', []),
-                data.get('class_reps', [])
-            )
-        if isinstance(data.get('parties'), list):
-            merged['parties'] = _merge_parties_superset(
-                existing.get('parties', []),
-                data.get('parties', [])
-            )
+        # Teachers cannot directly modify post-holder source tables.
+        # They must submit approval requests that Admin applies.
         if isinstance(data.get('pending_cr_requests'), list):
-            merged['pending_cr_requests'] = _merge_pending_cr_requests_superset(
+            merged['pending_cr_requests'] = _merge_pending_cr_requests_teacher(
                 existing.get('pending_cr_requests', []),
-                data.get('pending_cr_requests', [])
+                data.get('pending_cr_requests', []),
+                actor_login_id or 'Teacher'
             )
         merged = _enforce_current_month_roster_integrity(merged, existing)
         _reconcile_role_veto_monthly(merged)
         _reconcile_veto_counters_from_scores(merged)
+        _ensure_score_timestamps(merged)
         merged['updated_at'] = data.get('updated_at', existing.get('updated_at'))
         merged['server_updated_at'] = _server_now_iso()
         _save_offline_data(merged)
@@ -2713,6 +2951,7 @@ def offline_data():
             )
         if isinstance(patch.get('appeals'), list):
             merged['appeals'] = _merge_appeals_superset(existing_obj.get('appeals', []), patch.get('appeals', []))
+        _ensure_score_timestamps(merged)
         merged['server_updated_at'] = _server_now_iso()
         _save_offline_data(merged)
         _broadcast_sync_event(merged['server_updated_at'], source='student')
@@ -2863,6 +3102,7 @@ def offline_data():
     data = _enforce_current_month_roster_integrity(data, existing)
     _reconcile_role_veto_monthly(data)
     _reconcile_veto_counters_from_scores(data)
+    _ensure_score_timestamps(data)
     data['server_updated_at'] = _server_now_iso()
     _save_offline_data(data)
     _broadcast_sync_event(data['server_updated_at'], source='replica' if is_replicated else 'client')
