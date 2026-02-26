@@ -19,7 +19,6 @@ class User(UserMixin, db.Model):
     password_changed_at = db.Column(db.DateTime)
     
     # Relationships
-    student_profile = db.relationship('StudentProfile', backref='user', uselist=False, cascade='all, delete-orphan')
     activity_logs = db.relationship('ActivityLog', backref='user_rel', cascade='all, delete-orphan')
     
     def set_password(self, password):
