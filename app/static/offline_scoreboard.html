@@ -554,10 +554,11 @@
             overflow-x: scroll;
             overflow-y: hidden;
             -webkit-overflow-scrolling: touch;
-            height: 16px;
-            margin: 0 0 8px;
-            background: rgba(15, 23, 42, 0.6);
-            border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+            height: 20px;
+            margin: 0 0 6px;
+            background: rgba(30, 41, 59, 0.85);
+            border-radius: 6px;
+            border: 1px solid rgba(99, 102, 241, 0.25);
         }
         .scoreboard-scroll-top-spacer {
             height: 1px;
@@ -582,6 +583,48 @@
                 max-height: calc(100vh - 220px);
                 min-height: 180px;
             }
+        }
+
+        /* ── Custom scrollbar — always visible, high-contrast, all platforms ── */
+        #scoreboardBottomScroll {
+            scrollbar-width: thin;
+            scrollbar-color: #6366f1 rgba(30, 41, 59, 0.8);
+        }
+        #scoreboardBottomScroll::-webkit-scrollbar {
+            height: 12px;
+            width: 8px;
+        }
+        #scoreboardBottomScroll::-webkit-scrollbar-track {
+            background: rgba(30, 41, 59, 0.85);
+            border-radius: 6px;
+        }
+        #scoreboardBottomScroll::-webkit-scrollbar-thumb {
+            background: linear-gradient(90deg, #6366f1, #4f46e5);
+            border-radius: 6px;
+            border: 2px solid rgba(15, 23, 42, 0.8);
+            min-width: 40px;
+        }
+        #scoreboardBottomScroll::-webkit-scrollbar-thumb:hover {
+            background: linear-gradient(90deg, #818cf8, #6366f1);
+        }
+        #scoreboardTopScroll {
+            scrollbar-width: thin;
+            scrollbar-color: #6366f1 rgba(30, 41, 59, 0.8);
+        }
+        #scoreboardTopScroll::-webkit-scrollbar {
+            height: 12px;
+        }
+        #scoreboardTopScroll::-webkit-scrollbar-track {
+            background: rgba(30, 41, 59, 0.85);
+            border-radius: 6px;
+        }
+        #scoreboardTopScroll::-webkit-scrollbar-thumb {
+            background: linear-gradient(90deg, #6366f1, #4f46e5);
+            border-radius: 6px;
+            min-width: 40px;
+        }
+        #scoreboardTopScroll::-webkit-scrollbar-thumb:hover {
+            background: linear-gradient(90deg, #818cf8, #6366f1);
         }
 
         .master-update-btn {
@@ -5604,7 +5647,7 @@
         const LOCAL_BACKUP_LIMIT = 1;
         const LOCAL_BACKUP_MAX_BYTES = 900000;
         const LOCAL_BACKUP_INTERVAL = 5 * 60 * 1000;
-        const AUTO_SYNC_INTERVAL_MS = 15 * 1000;
+        const AUTO_SYNC_INTERVAL_MS = 10 * 1000;
 
         // ── Device fingerprinting ─────────────────────────────────────────────────────
         const DEVICE_UUID_KEY = 'ea_device_uuid';
@@ -8797,7 +8840,7 @@
                             notesByDate[date] = noteText;
                         }
                     });
-                    const attendancePenalties = attendancePenaltyMap.get(student.id) || {};
+                    const attendancePenalties = attendancePenaltyMap.get(parseInt(student.id, 10)) || {};
                     Object.entries(attendancePenalties).forEach(([date, penalty]) => {
                         pointsByDate[date] = (pointsByDate[date] || 0) + (parseInt(penalty, 10) || 0);
                         hasEntryByDate[date] = true;
@@ -9226,6 +9269,11 @@
             else if (tabName === 'profile') loadProfileTab();
             else if (tabName === 'homework') loadHomeworkTab();
             else if (tabName === 'leadership') loadLeadership();
+            // When not on scoreboard, silently refresh it in background so penalty
+            // and score changes are reflected immediately when the user switches to it.
+            if (tabName !== 'scoreboard' && !document.hidden) {
+                setTimeout(loadScoreboard, 400);
+            }
             updateAppealsTabNotification();
             updateHomeworkTabNotification();
             updateNotificationsTabNotification();
@@ -11650,8 +11698,8 @@
 
             const scrollWidth = Math.max(table.scrollWidth, bottom.scrollWidth, bottom.clientWidth);
             spacer.style.width = `${scrollWidth}px`;
-            const needsHorizontal = scrollWidth > (bottom.clientWidth + 2);
-            top.style.display = needsHorizontal ? 'block' : 'none';
+            // Always show the top scrollbar so users can see it without scrolling to the bottom.
+            top.style.display = 'block';
 
             if (!scoreboardScrollSyncBound) {
                 top.addEventListener('scroll', () => {
@@ -19492,6 +19540,8 @@
             }
             resetAttendanceDraft(date, getElementValue('attendanceMonth') || date.substring(0, 7));
             loadAttendanceReport();
+            // Immediately refresh scoreboard so penalty is visible when switching tabs.
+            loadScoreboard();
             showAlert(`Attendance saved for ${saved} students`, 'success');
         }
 
