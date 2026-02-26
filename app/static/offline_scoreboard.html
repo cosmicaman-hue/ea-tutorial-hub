@@ -183,6 +183,12 @@
             color: #f87171;
         }
 
+        .sync-pill.stale {
+            background: rgba(245, 158, 11, 0.15);
+            border-color: rgba(245, 158, 11, 0.4);
+            color: #fbbf24;
+        }
+
         .sync-meta {
             font-size: 12px;
             color: var(--text-muted);
@@ -2872,6 +2878,12 @@
             <span id="syncStatus" class="sync-pill offline">Offline</span>
             <span id="roleBadge" class="sync-pill">Role: -</span>
             <span id="lastSyncTime" class="sync-meta" style="flex:1;min-width:120px">Last sync: -</span>
+            <button id="globalPublishBtn" class="secondary" data-allow="true"
+                onclick="forcePublishNow()"
+                style="padding:5px 12px;font-size:12px;display:none"
+                title="Admin only: publish this device snapshot to server now">
+                <i class="fas fa-upload"></i> Force Publish
+            </button>
             <button id="globalRefreshBtn" class="secondary" data-allow="true"
                 onclick="pullFromServer(true, true)"
                 style="padding:5px 12px;font-size:12px;display:none"
@@ -3656,6 +3668,7 @@
                 </div>
                 <div class="form-buttons">
                     <button onclick="submitResourceRequest()" data-allow="true"><i class="fas fa-paper-plane"></i> Submit Request</button>
+                    <button class="secondary" onclick="clearResourceRequestForm()" data-allow="true"><i class="fas fa-xmark"></i> Cancel</button>
                     <button class="secondary" onclick="loadResourcesTab()" data-allow="true"><i class="fas fa-rotate"></i> Refresh</button>
                     <button class="secondary" onclick="adminQuickCashPurchase('full_paid')" data-role-only="admin" data-allow="true"><i class="fas fa-money-bill-wave"></i> Cash Full Paid</button>
                     <button class="secondary" onclick="adminQuickCashPurchase('half_paid')" data-role-only="admin" data-allow="true"><i class="fas fa-percent"></i> Cash Half Paid</button>
@@ -3743,7 +3756,7 @@
                 </div>
             </div>
 
-            <div class="form-card">
+            <div class="form-card" id="resourceTransactionsCard">
                 <h3><i class="fas fa-file-invoice"></i> Transactions (Approved/Fulfilled)</h3>
                 <div class="controls">
                     <div class="control-group">
@@ -5667,10 +5680,14 @@
         let realtimeReconnectTimer = null;
         let pullInFlightPromise = null;
         let pullQueuedToast = false;
+        let pullQueuedForceFull = false;
         let pullDebounceTimer = null;
         let pullDebouncedToast = false;
+        let pullDebouncedForceFull = false;
         let lastKnownRemoteStamp = 0;
         let masterUpdateRunning = false;
+        let forcePublishRunning = false;
+        let adminAutoPublishAttempted = false;
         let pendingPushTimer = null;
         const AUTO_PUSH_DELAY_MS = 800;
         let rosterRecoveryInProgress = false;
@@ -8434,7 +8451,7 @@
                 return this.getData().attendance || [];
             }
 
-            upsertAttendance(record) {
+            upsertAttendance(record, options = {}) {
                 const data = this.getData();
                 data.attendance = data.attendance || [];
                 const targetDate = String(record.date || '');
@@ -8476,7 +8493,7 @@
                     }
                 });
                 data.attendance = Array.from(latestByKey.values());
-                this.saveData(data, { allowTeacher: true });
+                this.saveData(data, { allowTeacher: true, skipSync: options.skipSync === true });
             }
 
             getSyllabusCatalog() {
@@ -8764,12 +8781,14 @@
                             notesByDate[date] = noteText;
                         }
                     });
-                    const absentPenalties = attendancePenaltyMap.get(student.id) || {};
-                    Object.entries(absentPenalties).forEach(([date, penalty]) => {
+                    const attendancePenalties = attendancePenaltyMap.get(student.id) || {};
+                    Object.entries(attendancePenalties).forEach(([date, penalty]) => {
                         pointsByDate[date] = (pointsByDate[date] || 0) + (parseInt(penalty, 10) || 0);
                         hasEntryByDate[date] = true;
                         const existingNote = String(notesByDate[date] || '').trim();
-                        const penaltyNote = 'Attendance: Absent (-30)';
+                        let penaltyNote = `Attendance Penalty (${penalty})`;
+                        if ((parseInt(penalty, 10) || 0) === -20) penaltyNote = 'Attendance: Absent (-20)';
+                        if ((parseInt(penalty, 10) || 0) === -5) penaltyNote = 'Attendance: Late (-5)';
                         notesByDate[date] = existingNote ? `${existingNote} | ${penaltyNote}` : penaltyNote;
                         datesSet.add(date);
                     });
@@ -9387,12 +9406,15 @@
             const penaltyByStudent = new Map();
             latestByKey.forEach(record => {
                 const status = normalizeAttendanceStatus(record.status);
-                if (status !== 'absent') return;
+                let penaltyPoints = 0;
+                if (status === 'absent') penaltyPoints = -20;
+                else if (status === 'late') penaltyPoints = -5;
+                if (!penaltyPoints) return;
                 const studentId = parseInt(record.studentId, 10);
                 const dateKey = String(record.date || '').trim();
                 if (!studentId || !dateKey) return;
                 if (!penaltyByStudent.has(studentId)) penaltyByStudent.set(studentId, {});
-                penaltyByStudent.get(studentId)[dateKey] = -30;
+                penaltyByStudent.get(studentId)[dateKey] = penaltyPoints;
             });
             return penaltyByStudent;
         }
@@ -9703,6 +9725,9 @@
             // Global Refresh button — visible to all logged-in users (admin/teacher/student)
             const refreshBtn = document.getElementById('globalRefreshBtn');
             if (refreshBtn) refreshBtn.style.display = SERVER_SYNC.enabled ? '' : 'none';
+            // Force Publish button — admin only
+            const publishBtn = document.getElementById('globalPublishBtn');
+            if (publishBtn) publishBtn.style.display = (SERVER_SYNC.enabled && isAdmin) ? '' : 'none';
 
             const isStudent = !isAdmin && !isTeacher;
             setTabVisibility('my-dashboard', isStudent);
@@ -9888,6 +9913,15 @@
             } catch (err) {
                 meta.textContent = `Last sync: ${time.toLocaleString()}`;
             }
+            // Warn when server data is more than 12 hours old — prompts user to refresh or admin to push
+            const staleMs = 12 * 60 * 60 * 1000;
+            const syncBadge = document.getElementById('syncStatus');
+            if (syncBadge && (Date.now() - time.getTime()) > staleMs) {
+                syncBadge.classList.remove('online');
+                syncBadge.classList.add('stale');
+                syncBadge.textContent = 'Data Stale';
+                meta.title = 'Server data is more than 12 hours old. Ask Admin to run Master Update, or click Refresh.';
+            }
         }
 
         function updateRoleBadge() {
@@ -10032,7 +10066,7 @@
             updateSyncStatus('syncing', 'Recovering');
 
             try {
-                await pullFromServer(false);
+                await pullFromServer(false, true);  // forceFull: skip ?since to guarantee fresh snapshot
             } catch (err) {
                 // ignore; status updates handled by pullFromServer
             } finally {
@@ -10051,7 +10085,8 @@
             renderRosterRecoveryPlaceholder('Waiting for Master Server (safe roster required)...');
         }
 
-        function mergeScoreRowsSuperset(existingScores, incomingScores) {
+        function mergeScoreRowsSuperset(existingScores, incomingScores, options = {}) {
+            const preferIncomingOnTie = options.preferIncomingOnTie === true;
             const merged = new Map();
             let maxId = 0;
             const addRow = (row) => {
@@ -10072,8 +10107,12 @@
                     const nextStamp = parseSyncStamp(next.updated_at || '');
                     if (nextStamp > prevStamp) {
                         merged.set(key, next);
-                    } else if (nextStamp === prevStamp && (parseInt(next.id, 10) || 0) > (parseInt(prev.id, 10) || 0)) {
-                        merged.set(key, next);
+                    } else if (nextStamp === prevStamp) {
+                        const prevId = parseInt(prev.id, 10) || 0;
+                        const nextId = parseInt(next.id, 10) || 0;
+                        if (preferIncomingOnTie || nextId > prevId) {
+                            merged.set(key, next);
+                        }
                     }
                     // else keep prev (it is the same age or newer)
                 } else {
@@ -10747,48 +10786,62 @@
             return result;
         }
 
-        function applyRemoteSnapshot(serverData, serverUpdatedAt, showToast = false) {
+        function applyRemoteSnapshot(serverData, serverUpdatedAt, showToast = false, options = {}) {
             if (!serverData) return false;
             if (isLikelyCorruptRoster(serverData)) {
                 showAlert(`Rejected remote snapshot due to incomplete roster (${getStudentRosterCount(serverData)} students). Waiting for Master Server snapshot.`, 'warning');
                 return false;
             }
             const localData = db.getData() || {};
-            if (isSuspiciousStudentShrink(localData, serverData)) {
+            const allowShrinkOverride = options.allowShrinkOverride === true;
+            if (!allowShrinkOverride && isSuspiciousStudentShrink(localData, serverData)) {
                 showAlert('Rejected remote snapshot due to suspicious student-list shrink. Local data retained.', 'warning');
                 return false;
             }
-            const mergedData = {
-                ...localData,
-                ...serverData,
-                // ↑ serverData spread is a baseline; the explicit merges below OVERRIDE it for protected tables.
-                students: mergeStudentsSuperset(localData.students || [], serverData.students || []),
-                month_students: mergeMonthStudentsSuperset(localData.month_students || {}, serverData.month_students || {}),
-                month_roster_profiles: mergeMonthRosterProfilesSuperset(localData.month_roster_profiles || {}, serverData.month_roster_profiles || {}),
-                 scores: mergeScoreRowsSuperset(localData.scores || [], serverData.scores || []),
-                 attendance: mergeAttendanceSuperset(
-                    localData.attendance || [],
-                    serverData.attendance || [],
-                    localData.students || [],
-                    serverData.students || []
-                 ),
-                 fee_records: mergeFeeRecordsSuperset(localData.fee_records || [], serverData.fee_records || []),
-                 leadership: mergeLeadershipSuperset(localData.leadership || [], serverData.leadership || []),
-                 group_crs: mergeGroupCRsSuperset(localData.group_crs || [], serverData.group_crs || []),
-                 class_reps: mergeClassRepsSuperset(localData.class_reps || [], serverData.class_reps || []),
-                 parties: mergePartiesSuperset(localData.parties || [], serverData.parties || []),
-                 resource_cabinet: mergeResourceCabinetSuperset(localData.resource_cabinet || [], serverData.resource_cabinet || []),
-                 resource_requests: mergeResourceRequestsSuperset(localData.resource_requests || [], serverData.resource_requests || []),
-                 resource_transactions: mergeResourceTransactionsSuperset(localData.resource_transactions || [], serverData.resource_transactions || []),
-                 syllabus_catalog: mergeSyllabusCatalogForSync(localData.syllabus_catalog || {}, serverData.syllabus_catalog || {}),
-                 syllabus_tracking: mergeSyllabusTrackingForSync(localData.syllabus_tracking || [], serverData.syllabus_tracking || []),
-                 election_candidates: mergeCandidatesSuperset(localData.election_candidates || [], serverData.election_candidates || []),
-                 election_votes: mergeElectionVotesSuperset(localData.election_votes || [], serverData.election_votes || [], 'party'),
-                 election_individual_votes: mergeElectionVotesSuperset(localData.election_individual_votes || [], serverData.election_individual_votes || [], 'individual'),
-                 election_teacher_votes: mergeElectionVotesSuperset(localData.election_teacher_votes || [], serverData.election_teacher_votes || [], 'teacher'),
-                pending_election_results: mergePendingResultsSuperset(localData.pending_election_results || [], serverData.pending_election_results || []),
-                notification_history: mergeNotificationHistorySuperset(localData.notification_history || [], serverData.notification_history || [])
-            };
+            const preferServerConflicts = options.preferServerConflicts === true;
+            const authoritativeReplace = options.authoritativeReplace === true;
+            let mergedData;
+            if (authoritativeReplace) {
+                const baseline = (db && typeof db.getDefaultData === 'function') ? db.getDefaultData() : {};
+                mergedData = {
+                    ...baseline,
+                    ...serverData,
+                    server_updated_at: serverData.server_updated_at || serverUpdatedAt || baseline.server_updated_at || '',
+                    updated_at: serverData.updated_at || serverUpdatedAt || baseline.updated_at || ''
+                };
+            } else {
+                mergedData = {
+                    ...localData,
+                    ...serverData,
+                    // ↑ serverData spread is a baseline; the explicit merges below OVERRIDE it for protected tables.
+                    students: mergeStudentsSuperset(localData.students || [], serverData.students || []),
+                    month_students: mergeMonthStudentsSuperset(localData.month_students || {}, serverData.month_students || {}),
+                    month_roster_profiles: mergeMonthRosterProfilesSuperset(localData.month_roster_profiles || {}, serverData.month_roster_profiles || {}),
+                    scores: mergeScoreRowsSuperset(localData.scores || [], serverData.scores || [], { preferIncomingOnTie: preferServerConflicts }),
+                    attendance: mergeAttendanceSuperset(
+                        localData.attendance || [],
+                        serverData.attendance || [],
+                        localData.students || [],
+                        serverData.students || []
+                    ),
+                    fee_records: mergeFeeRecordsSuperset(localData.fee_records || [], serverData.fee_records || []),
+                    leadership: mergeLeadershipSuperset(localData.leadership || [], serverData.leadership || []),
+                    group_crs: mergeGroupCRsSuperset(localData.group_crs || [], serverData.group_crs || []),
+                    class_reps: mergeClassRepsSuperset(localData.class_reps || [], serverData.class_reps || []),
+                    parties: mergePartiesSuperset(localData.parties || [], serverData.parties || []),
+                    resource_cabinet: mergeResourceCabinetSuperset(localData.resource_cabinet || [], serverData.resource_cabinet || []),
+                    resource_requests: mergeResourceRequestsSuperset(localData.resource_requests || [], serverData.resource_requests || []),
+                    resource_transactions: mergeResourceTransactionsSuperset(localData.resource_transactions || [], serverData.resource_transactions || []),
+                    syllabus_catalog: mergeSyllabusCatalogForSync(localData.syllabus_catalog || {}, serverData.syllabus_catalog || {}),
+                    syllabus_tracking: mergeSyllabusTrackingForSync(localData.syllabus_tracking || [], serverData.syllabus_tracking || []),
+                    election_candidates: mergeCandidatesSuperset(localData.election_candidates || [], serverData.election_candidates || []),
+                    election_votes: mergeElectionVotesSuperset(localData.election_votes || [], serverData.election_votes || [], 'party'),
+                    election_individual_votes: mergeElectionVotesSuperset(localData.election_individual_votes || [], serverData.election_individual_votes || [], 'individual'),
+                    election_teacher_votes: mergeElectionVotesSuperset(localData.election_teacher_votes || [], serverData.election_teacher_votes || [], 'teacher'),
+                    pending_election_results: mergePendingResultsSuperset(localData.pending_election_results || [], serverData.pending_election_results || []),
+                    notification_history: mergeNotificationHistorySuperset(localData.notification_history || [], serverData.notification_history || [])
+                };
+            }
             db.saveData(mergedData, { system: true, skipSync: true, preserveTimestamp: true, skipBackup: true });
             if (currentUserRole === 'admin' || currentUserRole === 'teacher') {
                 // Safety: pull should not trigger a write-back loop.
@@ -10811,7 +10864,8 @@
 
         async function pushToServer(data, options = {}) {
             if (!SERVER_SYNC.enabled) return;
-            if (isLikelyCorruptRoster(data)) {
+            const allowPatch = options.allowPatch === true;
+            if (!allowPatch && isLikelyCorruptRoster(data)) {
                 updateSyncStatus('offline', 'Offline');
                 if (!options.silent) {
                     showAlert('Local roster looks incomplete. Sync upload blocked to protect master data. Pulling from Master Server...', 'warning');
@@ -10828,13 +10882,15 @@
             const baseUrls = getSyncBaseUrls();
             // Browser fetches must be same-origin (cross-origin peer fetches are blocked by CORS on LAN).
             // Server will forward replication to peers using SYNC_PEERS.
-            const writeTargets = [getCurrentSyncBaseUrl()].filter(Boolean);
+            const writeTargets = [getCurrentSyncBaseUrl() || getPrimarySyncBaseUrl()].filter(Boolean);
             if (!writeTargets.length) {
                 updateSyncStatus('offline', 'Offline');
                 return false;
             }
             let successCount = 0;
             let conflictCount = 0;
+            let authFailureCount = 0;
+            let respondedCount = 0;
             let newestStamp = 0;
             let newestIso = '';
             for (const baseUrl of writeTargets) {
@@ -10844,8 +10900,10 @@
                         headers: { 'Content-Type': 'application/json' },
                         credentials: 'include',
                         body: JSON.stringify({ data, peers: baseUrls })
-                    }, 4500);
+                    }, 9000);
+                    respondedCount += 1;
                     if (resp.status === 401 || resp.status === 403) {
+                        authFailureCount += 1;
                         if (!options.silent) {
                             showAlert('Sync failed: please re-login on this device.', 'warning');
                         }
@@ -10885,11 +10943,23 @@
             }
             if (conflictCount > 0) {
                 updateSyncStatus('online', 'Online (refreshing)');
-                await pullFromServer(false);
+                await pullFromServer(false, true);
                 // After merging server data locally, re-push so any local-only entries
                 // (e.g. CR assignments, leadership posts) that were newer than server reach the server.
                 scheduleServerPush(db.getData());
                 return true;
+            }
+            if (authFailureCount > 0) {
+                updateSyncStatus('online', 'Online (login required)');
+                return false;
+            }
+            if (respondedCount > 0) {
+                updateSyncStatus('online', 'Online (sync rejected)');
+                if (!options.silent) {
+                    showAlert('Server reachable, but sync payload was rejected. Pulling latest snapshot now.', 'warning');
+                }
+                await pullFromServer(false, true);
+                return false;
             }
             // ── Write-ahead log ──────────────────────────────────────────────────────
             // All targets were unreachable. Persist the payload to a WAL slot in
@@ -10905,9 +10975,10 @@
             return false;
         }
 
-        function schedulePullFromServer(showToast = false, delayMs = 220) {
+        function schedulePullFromServer(showToast = false, delayMs = 220, forceFull = false) {
             if (!SERVER_SYNC.enabled) return;
             pullDebouncedToast = pullDebouncedToast || showToast;
+            pullDebouncedForceFull = pullDebouncedForceFull || forceFull;
             if (pullDebounceTimer) {
                 clearTimeout(pullDebounceTimer);
             }
@@ -10915,8 +10986,10 @@
             pullDebounceTimer = setTimeout(() => {
                 pullDebounceTimer = null;
                 const toast = pullDebouncedToast;
+                const queuedForceFull = pullDebouncedForceFull;
                 pullDebouncedToast = false;
-                pullFromServer(toast);
+                pullDebouncedForceFull = false;
+                pullFromServer(toast, queuedForceFull);
             }, waitMs);
         }
 
@@ -10926,6 +10999,7 @@
             if (!SERVER_SYNC.enabled) return;
             if (pullInFlightPromise) {
                 pullQueuedToast = pullQueuedToast || showToast;
+                pullQueuedForceFull = pullQueuedForceFull || forceFull;
                 return pullInFlightPromise;
             }
             pullInFlightPromise = (async () => {
@@ -10933,7 +11007,7 @@
             const baseUrls = getSyncBaseUrls();
             // Same-origin only: avoids CORS failures when the UI is opened from a backup node.
             // Backup nodes should receive replicated updates from master and serve them locally.
-            const readTargets = [getCurrentSyncBaseUrl()].filter(Boolean);
+            const readTargets = [getCurrentSyncBaseUrl() || getPrimarySyncBaseUrl()].filter(Boolean);
             if (!readTargets.length) {
                 updateSyncStatus('offline', 'Offline');
                 return false;
@@ -10961,7 +11035,7 @@
             const readPath = canUseSince ? `${SERVER_SYNC.dataUrl}?since=${encodeURIComponent(since)}` : SERVER_SYNC.dataUrl;
             const fetchTasks = readTargets.map(async (baseUrl) => {
                 try {
-                    const resp = await fetchWithTimeout(buildSyncUrl(baseUrl, readPath), { cache: 'no-store', credentials: 'include' }, 4500);
+                    const resp = await fetchWithTimeout(buildSyncUrl(baseUrl, readPath), { cache: 'no-store', credentials: 'include' }, 9000);
                     if (resp.status === 204) {
                         return { baseUrl, notModified: true };
                     }
@@ -10989,11 +11063,18 @@
                 return true;
             }
 
+            const roleNeedsAuthoritativeSync = currentUserRole === 'teacher' || currentUserRole === 'student';
+            const canOverrideShrinkGuard = forceFull || roleNeedsAuthoritativeSync;
             const shrinkRejected = snapshots.filter(item => isSuspiciousStudentShrink(localData, item.data));
             const tinyRosterRejected = snapshots.filter(item => isLikelyCorruptRoster(item.data));
-            const safeSnapshots = snapshots
+            let safeSnapshots = snapshots
                 .filter(item => !isSuspiciousStudentShrink(localData, item.data))
                 .filter(item => !isLikelyCorruptRoster(item.data));
+            if (!safeSnapshots.length && canOverrideShrinkGuard) {
+                // Authoritative/explicit pulls may recover from locally bloated/stale caches.
+                // Tiny roster protection still applies.
+                safeSnapshots = snapshots.filter(item => !isLikelyCorruptRoster(item.data));
+            }
             if (shrinkRejected.length) {
                 console.warn('[SYNC] Ignored snapshot(s) with shrinking student roster');
             }
@@ -11002,7 +11083,7 @@
             }
 
             if (!safeSnapshots.length) {
-                updateSyncStatus('offline', 'Offline');
+                updateSyncStatus('online', 'Online (waiting master snapshot)');
                 if (showToast) {
                     showAlert('Servers reachable, but all snapshots were rejected as unsafe/incomplete. Waiting for Master Server.', 'warning');
                 }
@@ -11050,8 +11131,23 @@
                 (remoteLeadershipCount > 0 && localLeadershipCount === 0) ||
                 (remoteGroupCRCount > 0 && localGroupCRCount === 0) ||
                 (remotePartiesCount > 0 && localPartiesCount === 0);
+            let hasPendingLocalWrites = !!pendingSyncPayload;
+            if (!hasPendingLocalWrites) {
+                try {
+                    const walRaw = localStorage.getItem(WAL_KEY);
+                    hasPendingLocalWrites = !!(walRaw && walRaw.trim().length);
+                } catch (e) {
+                    hasPendingLocalWrites = !!pendingSyncPayload;
+                }
+            }
+            // forceFull=true (explicit refresh / page-load) always bypasses WAL check so
+            // teachers and students get a clean authoritative pull regardless of pending writes.
+            const preferAuthoritativeServerApply = roleNeedsAuthoritativeSync && (!hasPendingLocalWrites || forceFull);
 
             const shouldApplyRemote =
+                forceFull ||                       // explicit refresh/master-update must always evaluate remote snapshot
+                preferAuthoritativeServerApply ||
+                roleNeedsAuthoritativeSync ||        // teachers/students always pull server data
                 remoteOfficeLooksMoreComplete ||
                 remoteLooksBetterRoster ||
                 remoteHasHealthierActiveSet ||
@@ -11059,9 +11155,19 @@
                 latestStamp > localStamp ||
                 (!hasLocalData && safeSnapshots.length > 0);
             if (shouldApplyRemote) {
-                applyRemoteSnapshot(latest.data, newestIso, showToast);
-            } else if (!localLooksShrunk && localStamp > latestStamp && (currentUserRole === 'admin' || currentUserRole === 'teacher')) {
-                // Local copy is newer; queue a push instead of overwriting local data.
+                applyRemoteSnapshot(latest.data, newestIso, showToast, {
+                    preferServerConflicts: preferAuthoritativeServerApply,
+                    authoritativeReplace: preferAuthoritativeServerApply,
+                    allowShrinkOverride: canOverrideShrinkGuard
+                });
+            } else if (
+                !forceFull &&
+                !preferAuthoritativeServerApply &&
+                !localLooksShrunk &&
+                localStamp > latestStamp &&
+                currentUserRole === 'admin'          // teachers must NOT silently overwrite server data
+            ) {
+                // Local admin copy is newer; queue a push instead of overwriting local data.
                 scheduleServerPush(localData);
             }
 
@@ -11101,10 +11207,12 @@
                 return await pullInFlightPromise;
             } finally {
                 pullInFlightPromise = null;
-                if (pullQueuedToast) {
+                if (pullQueuedToast || pullQueuedForceFull) {
                     const toast = pullQueuedToast;
+                    const queuedForceFull = pullQueuedForceFull;
                     pullQueuedToast = false;
-                    schedulePullFromServer(toast, 80);
+                    pullQueuedForceFull = false;
+                    schedulePullFromServer(toast, 80, queuedForceFull);
                 }
             }
         }
@@ -11137,9 +11245,9 @@
                     if (stamp) {
                         lastKnownRemoteStamp = stamp;
                     }
-                    schedulePullFromServer(false, 120);
+                    schedulePullFromServer(false, 120, true);
                 } catch (err) {
-                    schedulePullFromServer(false, 120);
+                    schedulePullFromServer(false, 120, true);
                 }
             });
             realtimeSyncSource.onerror = () => {
@@ -11150,6 +11258,96 @@
                 if (realtimeReconnectTimer) clearTimeout(realtimeReconnectTimer);
                 realtimeReconnectTimer = setTimeout(() => startRealtimeSync(), 2500);
             };
+        }
+
+        async function forcePublishNow() {
+            if (forcePublishRunning) return;
+            if (!SERVER_SYNC.enabled) {
+                showAlert('Force Publish requires LAN server mode (http://...).', 'warning');
+                return;
+            }
+            if (currentUserRole !== 'admin') {
+                showAlert('Only Admin can use Force Publish.', 'warning');
+                return;
+            }
+            forcePublishRunning = true;
+            const btn = document.getElementById('globalPublishBtn');
+            const prevHtml = btn ? btn.innerHTML : '';
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fas fa-sync fa-spin"></i> Publishing';
+            }
+            try {
+                const pushed = await withTimeout(pushToServer(db.getData(), { silent: false }), 4000);
+                await withTimeout(pullFromServer(true, true), 4000);
+                if (!pushed) {
+                    showAlert('Force Publish could not reach server. Local data remains safe.', 'warning');
+                } else {
+                    showAlert('Force Publish complete. Server snapshot updated and reloaded.', 'success');
+                }
+            } catch (err) {
+                showAlert('Force Publish failed. Local data remains safe.', 'warning');
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = prevHtml || '<i class="fas fa-upload"></i> Force Publish';
+                }
+                forcePublishRunning = false;
+            }
+        }
+
+        async function maybeAutoPublishAdminSnapshot() {
+            if (adminAutoPublishAttempted) return;
+            adminAutoPublishAttempted = true;
+            if (!SERVER_SYNC.enabled || currentUserRole !== 'admin') return;
+            if (masterUpdateRunning || forcePublishRunning) return;
+
+            const localData = db.getData() || {};
+            if (isLikelyCorruptRoster(localData)) return;
+
+            const localStudents = getStudentRosterCount(localData);
+            const localScores = Array.isArray(localData.scores) ? localData.scores.length : 0;
+            if (localStudents < MIN_SAFE_STUDENT_ROSTER) return;
+
+            let remoteData = null;
+            let remoteUpdatedAt = '';
+            try {
+                const resp = await fetchWithTimeout(SERVER_SYNC.dataUrl, { cache: 'no-store', credentials: 'include' }, 4500);
+                if (!resp.ok) return;
+                const payload = await resp.json();
+                if (!payload || !payload.data || typeof payload.data !== 'object') return;
+                remoteData = payload.data;
+                remoteUpdatedAt = payload.updated_at || '';
+            } catch (err) {
+                return;
+            }
+
+            const remoteStudents = getStudentRosterCount(remoteData);
+            const remoteScores = Array.isArray(remoteData.scores) ? remoteData.scores.length : 0;
+            const localStamp = getDataStamp(localData);
+            const remoteStamp = getDataStamp(remoteData, remoteUpdatedAt);
+
+            // Never auto-publish if local appears to shrink a healthy remote roster.
+            if (!isLikelyCorruptRoster(remoteData) && isSuspiciousStudentShrink(remoteData, localData)) {
+                return;
+            }
+
+            const localNotBehindCounts = localStudents >= remoteStudents && localScores >= Math.floor(remoteScores * 0.9);
+            const localClearlyAheadByCount = localStudents >= remoteStudents && localScores >= (remoteScores + 50);
+            const remoteLikelyBad = isLikelyCorruptRoster(remoteData) && !isLikelyCorruptRoster(localData);
+            const localLikelyAhead = localNotBehindCounts && (localStamp > remoteStamp || localClearlyAheadByCount || remoteLikelyBad);
+
+            if (!localLikelyAhead) return;
+
+            try {
+                const pushed = await pushToServer(localData, { silent: true });
+                if (pushed) {
+                    await pullFromServer(false, true);
+                    showAlert('Admin data was ahead of server and has been auto-published.', 'success');
+                }
+            } catch (err) {
+                // silent safety path
+            }
         }
 
         function syncNow() {
@@ -11208,7 +11406,7 @@
                     if (canPush) {
                         await withTimeout(pushToServer(db.getData(), { silent: true }), 2500);
                     }
-                    await withTimeout(pullFromServer(false), 2500);
+                    await withTimeout(pullFromServer(false, true), 2500);
                 }
 
                 const remainingFinal = Math.max(0, Math.ceil((totalWindowMs - (Date.now() - startedAt)) / 1000));
@@ -11251,6 +11449,13 @@
                 return visible.filter(student => student.active === false);
             }
             return visible;
+        }
+
+        function getAttendanceStudentsByStatus(students, status) {
+            const all = Array.isArray(students) ? students.filter(Boolean) : [];
+            if (status === 'active') return all.filter(student => student.active !== false);
+            if (status === 'inactive') return all.filter(student => student.active === false);
+            return all;
         }
 
         function getRecordScoreStudentCandidates(month, statusFilter) {
@@ -16017,12 +16222,165 @@
             showAlert('Post holder update saved', 'success');
         }
 
+        function _resolvePostHolderActionTarget(data, table, targetId) {
+            const id = parseInt(targetId, 10) || 0;
+            const key = String(table || '').trim().toLowerCase();
+            if (!id || !key) return null;
+            if (key === 'leadership') {
+                const post = (data.leadership || []).find(item => item.id === id);
+                if (!post) return null;
+                const holder = resolveLeadershipStudent(post);
+                const holderLabel = holder ? (holder.base_name || holder.name || '-') : String(post.holder || '-').trim();
+                return {
+                    table: key,
+                    id,
+                    status: normalizePostHolderStatus(post.status || 'active'),
+                    label: `${String(post.post || 'Leadership').trim()} (${holderLabel})`
+                };
+            }
+            if (key === 'group_crs') {
+                const rep = (data.group_crs || []).find(item => item.id === id);
+                if (!rep) return null;
+                const student = (data.students || []).find(s => parseInt(s.id, 10) === parseInt(rep.studentId, 10));
+                const holderLabel = student ? (student.base_name || student.name || '-') : `Student #${rep.studentId || '-'}`;
+                return {
+                    table: key,
+                    id,
+                    status: normalizePostHolderStatus(rep.status || 'active'),
+                    label: `Group ${String(rep.group || '-').trim().toUpperCase()} CR (${holderLabel})`
+                };
+            }
+            if (key === 'class_reps') {
+                const rep = (data.class_reps || []).find(item => item.id === id);
+                if (!rep) return null;
+                const student = (data.students || []).find(s => parseInt(s.id, 10) === parseInt(rep.studentId, 10));
+                const holderLabel = student ? (student.base_name || student.name || '-') : `Student #${rep.studentId || '-'}`;
+                return {
+                    table: key,
+                    id,
+                    status: normalizePostHolderStatus(rep.status || 'active'),
+                    label: `Class ${String(rep.class || '-').trim()} CR (${holderLabel})`
+                };
+            }
+            if (key === 'party') {
+                const party = (data.parties || []).find(item => item.id === id);
+                if (!party) return null;
+                const member = (party.members || []).find(item => isPartyPresidentDesignation(item.designation));
+                if (!member) return null;
+                const student = (data.students || []).find(s => parseInt(s.id, 10) === parseInt(member.studentId, 10));
+                const holderLabel = student ? (student.base_name || student.name || '-') : `Student #${member.studentId || '-'}`;
+                return {
+                    table: key,
+                    id,
+                    status: normalizePostHolderStatus(member.status || 'active'),
+                    label: `Party ${formatPartyCode(party.code)} PP (${holderLabel})`
+                };
+            }
+            return null;
+        }
+
+        function submitPostHolderActionRequest(table, targetId, requestedStatus) {
+            if (currentUserRole !== 'teacher') return false;
+            const desired = normalizePostHolderStatus(requestedStatus);
+            if (desired !== 'active' && desired !== 'suspended') return false;
+            const data = db.getData();
+            const target = _resolvePostHolderActionTarget(data, table, targetId);
+            if (!target) {
+                showAlert('Post holder record not found.', 'warning');
+                return false;
+            }
+            if (normalizePostHolderStatus(target.status) === desired) {
+                showAlert(`This post is already ${desired}.`, 'info');
+                return false;
+            }
+            const pendingExists = (db.getAppeals() || []).some(appeal => {
+                const status = String(appeal && appeal.status || '').trim().toLowerCase();
+                if (status !== 'pending_admin' && status !== 'recommended') return false;
+                return (
+                    String(appeal && appeal.type || '').trim().toLowerCase() === 'post_holder_action' &&
+                    String(appeal && appeal.target_table || '').trim().toLowerCase() === target.table &&
+                    (parseInt(appeal && appeal.target_id, 10) || 0) === target.id &&
+                    normalizePostHolderStatus(appeal && appeal.requested_status || '') === desired
+                );
+            });
+            if (pendingExists) {
+                showAlert('A similar request is already pending Admin approval.', 'info');
+                return false;
+            }
+
+            const nowIso = new Date().toISOString();
+            const actionLabel = desired === 'suspended' ? 'Suspend' : 'Resume';
+            db.addAppeal({
+                type: 'post_holder_action',
+                subject: `Post Holder ${actionLabel} Request`,
+                message: `Teacher requested ${actionLabel.toLowerCase()} for ${target.label}.`,
+                from_role: 'teacher',
+                created_by: currentLoginId || 'Teacher',
+                target_role: 'admin',
+                forwarded_to: 'admin',
+                status: 'pending_admin',
+                recommendation: '',
+                target_table: target.table,
+                target_id: target.id,
+                target_label: target.label,
+                current_status: normalizePostHolderStatus(target.status || 'active'),
+                requested_status: desired,
+                created_at: nowIso,
+                updated_at: nowIso
+            });
+            updateAppealsTabNotification();
+            showAlert(`${actionLabel} request submitted for Admin approval.`, 'success');
+            return true;
+        }
+
+        function applyApprovedPostHolderAction(appeal) {
+            if (!appeal || appeal.type !== 'post_holder_action') return false;
+            const table = String(appeal.target_table || '').trim().toLowerCase();
+            const targetId = parseInt(appeal.target_id, 10) || 0;
+            const desired = normalizePostHolderStatus(appeal.requested_status || '');
+            if (!targetId || (desired !== 'active' && desired !== 'suspended')) return false;
+            const data = db.getData();
+            let applied = false;
+
+            if (table === 'leadership') {
+                const post = (data.leadership || []).find(item => item.id === targetId);
+                if (!post) return false;
+                post.status = desired;
+                applied = true;
+            } else if (table === 'group_crs') {
+                const rep = (data.group_crs || []).find(item => item.id === targetId);
+                if (!rep) return false;
+                rep.status = desired;
+                applied = true;
+            } else if (table === 'class_reps') {
+                const rep = (data.class_reps || []).find(item => item.id === targetId);
+                if (!rep) return false;
+                rep.status = desired;
+                applied = true;
+            } else if (table === 'party') {
+                const party = (data.parties || []).find(item => item.id === targetId);
+                if (!party) return false;
+                const member = (party.members || []).find(item => isPartyPresidentDesignation(item.designation));
+                if (!member) return false;
+                member.status = desired;
+                applied = true;
+            }
+
+            if (!applied) return false;
+            savePostHolderData(data);
+            return true;
+        }
+
         function toggleLeadershipSuspension(postId) {
             if (!(currentUserRole === 'admin' || currentUserRole === 'teacher')) return;
             const data = db.getData();
             const post = (data.leadership || []).find(item => item.id === postId);
             if (!post) return;
             const isSuspending = normalizePostHolderStatus(post.status) !== 'suspended';
+            if (currentUserRole === 'teacher') {
+                submitPostHolderActionRequest('leadership', postId, isSuspending ? 'suspended' : 'active');
+                return;
+            }
             pushUndoSnapshot(isSuspending ? 'Suspend leader' : 'Reinstate leader');
             post.status = isSuspending ? 'suspended' : 'active';
             savePostHolderData(data);
@@ -16144,6 +16502,11 @@
             const data = db.getData();
             const rep = (data.class_reps || []).find(item => item.id === repId);
             if (!rep) return;
+            const isSuspending = normalizePostHolderStatus(rep.status) !== 'suspended';
+            if (currentUserRole === 'teacher') {
+                submitPostHolderActionRequest('class_reps', repId, isSuspending ? 'suspended' : 'active');
+                return;
+            }
             rep.status = normalizePostHolderStatus(rep.status) === 'suspended' ? 'active' : 'suspended';
             savePostHolderData(data);
         }
@@ -16153,6 +16516,11 @@
             const data = db.getData();
             const rep = (data.group_crs || []).find(item => item.id === repId);
             if (!rep) return;
+            const isSuspending = normalizePostHolderStatus(rep.status) !== 'suspended';
+            if (currentUserRole === 'teacher') {
+                submitPostHolderActionRequest('group_crs', repId, isSuspending ? 'suspended' : 'active');
+                return;
+            }
             rep.status = normalizePostHolderStatus(rep.status) === 'suspended' ? 'active' : 'suspended';
             savePostHolderData(data);
         }
@@ -16165,6 +16533,11 @@
             const member = (party.members || []).find(item => isPartyPresidentDesignation(item.designation));
             if (!member) {
                 showAlert('No party president is currently assigned for this party.', 'warning');
+                return;
+            }
+            const isSuspending = normalizePostHolderStatus(member.status) !== 'suspended';
+            if (currentUserRole === 'teacher') {
+                submitPostHolderActionRequest('party', partyId, isSuspending ? 'suspended' : 'active');
                 return;
             }
             member.status = normalizePostHolderStatus(member.status) === 'suspended' ? 'active' : 'suspended';
@@ -18125,6 +18498,17 @@
                     Fields: ${escapeHtml(fieldsLabel)}
                 `;
             }
+            if (appeal.type === 'post_holder_action') {
+                const action = normalizePostHolderStatus(appeal.requested_status || '') === 'suspended' ? 'Suspend' : 'Resume';
+                const target = String(appeal.target_label || appeal.message || '').trim();
+                const by = String(appeal.created_by || '').trim();
+                return `
+                    <strong>Post Holder Action Request</strong><br>
+                    Action: ${escapeHtml(action)}<br>
+                    Target: ${escapeHtml(target || '-')}<br>
+                    Requested by: ${escapeHtml(by || '-')}
+                `;
+            }
             return `<strong>${escapeHtml(appeal.subject || 'Appeal')}</strong><br>${escapeHtml(appeal.message || '')}`;
         }
 
@@ -18420,11 +18804,19 @@
         function adminDecisionAppeal(appealId, decision) {
             const appeal = db.getAppeals().find(item => item.id === appealId) || null;
             const now = new Date().toISOString();
-            if (currentUserRole === 'admin' && appeal && appeal.type === 'profile_change' && decision === 'approved') {
-                const applied = applyApprovedProfileChange(appeal);
-                if (!applied) {
-                    showAlert('Unable to apply profile change request (invalid or missing data).', 'danger');
-                    return;
+            if (currentUserRole === 'admin' && appeal && decision === 'approved') {
+                if (appeal.type === 'profile_change') {
+                    const applied = applyApprovedProfileChange(appeal);
+                    if (!applied) {
+                        showAlert('Unable to apply profile change request (invalid or missing data).', 'danger');
+                        return;
+                    }
+                } else if (appeal.type === 'post_holder_action') {
+                    const applied = applyApprovedPostHolderAction(appeal);
+                    if (!applied) {
+                        showAlert('Unable to apply post holder action (missing/invalid target).', 'danger');
+                        return;
+                    }
                 }
             }
 
@@ -18432,13 +18824,17 @@
                 status: decision,
                 admin_decision_by: currentLoginId || 'Admin',
                 admin_decision_at: now,
-                applied_at: (appeal && appeal.type === 'profile_change' && decision === 'approved') ? now : (appeal && appeal.applied_at ? appeal.applied_at : '')
+                applied_at: (appeal && (appeal.type === 'profile_change' || appeal.type === 'post_holder_action') && decision === 'approved')
+                    ? now
+                    : (appeal && appeal.applied_at ? appeal.applied_at : '')
             });
             loadAppealsTab();
             if (appeal && appeal.type === 'profile_change' && decision === 'approved') {
                 loadProfileTab();
                 loadStudents();
                 loadScoreboard();
+            } else if (appeal && appeal.type === 'post_holder_action' && decision === 'approved') {
+                loadOfficeHolders();
             }
             showAlert(`Appeal ${decision}`, decision === 'approved' ? 'success' : 'danger');
         }
@@ -18577,7 +18973,7 @@
             const groupFilter = getElementValue('bulkAttendanceGroupFilter') || 'all';
             const studentStatus = getElementValue('bulkAttendanceStudentStatus') || 'active';
             const profileMap = getMonthRosterProfileMap(monthValue);
-            let students = filterStudentsByStatus(db.getStudents(), studentStatus, monthValue)
+            let students = getAttendanceStudentsByStatus(db.getStudents(), studentStatus)
                 .map(student => getMonthAwareStudent(student, monthValue, profileMap));
             if (groupFilter !== 'all') {
                 students = students.filter(student => getStudentGroup(student) === groupFilter);
@@ -18793,7 +19189,7 @@
                     status,
                     remarks: bulkRemarks,
                     marked_by: currentLoginId || currentUserRole
-                });
+                }, { skipSync: true });
                 const savedRecord = getAttendanceRecord(student.id, date);
                 if (savedRecord) changedRows.push(savedRecord);
                 writes += 1;
@@ -18808,9 +19204,9 @@
                     attendance: changedRows,
                     students: studentsPatch
                 };
-                const pushed = await pushToServer(attendancePatch, { silent: true });
+                const pushed = await pushToServer(attendancePatch, { silent: true, allowPatch: true });
                 if (pushed) {
-                    await pullFromServer(false);
+                    await pullFromServer(false, true);
                 }
             }
             loadAttendanceTab();
@@ -18933,9 +19329,10 @@
             const groupFilter = getElementValue('attendanceGroupFilter') || 'all';
             const statusFilter = getElementValue('attendanceStatusFilter') || 'active';
             const profileMap = getMonthRosterProfileMap(monthValue);
-            const students = filterStudentsByStatus(db.getStudents(), statusFilter, monthValue)
+            const students = getAttendanceStudentsByStatus(db.getStudents(), statusFilter)
                 .map(student => getMonthAwareStudent(student, monthValue, profileMap))
-                .filter(student => groupFilter === 'all' || getStudentGroup(student) === groupFilter);
+                .filter(student => groupFilter === 'all' || getStudentGroup(student) === groupFilter)
+                .sort(compareRecordStudentsByRollSuffix);
 
             const tbody = document.getElementById('attendanceBody');
             tbody.innerHTML = students.map(student => {
@@ -18952,7 +19349,7 @@
                         <td>${student.class || '-'}</td>
                         <td>${getStudentGroup(student) || '-'}</td>
                         <td>
-                            <select class="${controlClass}" data-attendance-student="${student.id}" data-attendance-roll="${formatRollDisplay(student.roll)}" onchange="handleAttendanceStatusChange(this)" ${currentUserRole === 'student' ? 'disabled' : ''}>
+                            <select class="${controlClass}" data-attendance-student="${student.id}" data-attendance-roll="${normalizeRoll(student.roll || '')}" onchange="handleAttendanceStatusChange(this)" ${currentUserRole === 'student' ? 'disabled' : ''}>
                                 <option value="present" ${status === 'present' ? 'selected' : ''}>Present</option>
                                 <option value="absent" ${status === 'absent' ? 'selected' : ''}>Absent</option>
                                 <option value="late" ${status === 'late' ? 'selected' : ''}>Late</option>
@@ -18960,7 +19357,7 @@
                             </select>
                         </td>
                         <td>
-                            <input class="${controlClass}" type="text" data-attendance-remarks="${student.id}" data-attendance-roll="${formatRollDisplay(student.roll)}" value="${remarks}" placeholder="Remarks" ${currentUserRole === 'student' ? 'disabled' : ''}>
+                            <input class="${controlClass}" type="text" data-attendance-remarks="${student.id}" data-attendance-roll="${normalizeRoll(student.roll || '')}" value="${remarks}" placeholder="Remarks" ${currentUserRole === 'student' ? 'disabled' : ''}>
                         </td>
                     </tr>
                 `;
@@ -19056,7 +19453,7 @@
                     status: select.value,
                     remarks: remarksInput ? String(remarksInput.value || '').trim() : '',
                     marked_by: currentLoginId || currentUserRole
-                });
+                }, { skipSync: true });
                 const savedRecord = getAttendanceRecord(studentId, date);
                 if (savedRecord) changedRows.push(savedRecord);
                 saved += 1;
@@ -19071,9 +19468,9 @@
                     attendance: changedRows,
                     students: studentsPatch
                 };
-                const pushed = await pushToServer(attendancePatch, { silent: true });
+                const pushed = await pushToServer(attendancePatch, { silent: true, allowPatch: true });
                 if (pushed) {
-                    await pullFromServer(false);
+                    await pullFromServer(false, true);
                 }
             }
             resetAttendanceDraft(date, getElementValue('attendanceMonth') || date.substring(0, 7));
@@ -19158,9 +19555,10 @@
             const groupFilter = getElementValue('attendanceGroupFilter') || 'all';
             const statusFilter = getElementValue('attendanceStatusFilter') || 'active';
             const profileMap = getMonthRosterProfileMap(month);
-            const students = filterStudentsByStatus(db.getStudents(), statusFilter, month)
+            const students = getAttendanceStudentsByStatus(db.getStudents(), statusFilter)
                 .map(student => getMonthAwareStudent(student, month, profileMap))
-                .filter(student => groupFilter === 'all' || getStudentGroup(student) === groupFilter);
+                .filter(student => groupFilter === 'all' || getStudentGroup(student) === groupFilter)
+                .sort(compareRecordStudentsByRollSuffix);
             const studentMap = new Map(students.map(s => [s.id, s]));
             const records = db.getAttendance().filter(record => String(record.date || '').startsWith(month));
 
@@ -19218,7 +19616,7 @@
             const reportDateTo = getElementValue('attendanceStudentReportTo') || '';
 
             const reportProfileMap = getMonthRosterProfileMap(reportMonthFilter || month);
-            let studentReportList = filterStudentsByStatus(db.getStudents(), statusFilter, reportMonthFilter || month)
+            let studentReportList = getAttendanceStudentsByStatus(db.getStudents(), statusFilter)
                 .map(student => getMonthAwareStudent(student, reportMonthFilter || month, reportProfileMap));
             if (groupFilter !== 'all') {
                 studentReportList = studentReportList.filter(student => getStudentGroup(student) === groupFilter);
@@ -19229,6 +19627,7 @@
             if (reportClassFilter) {
                 studentReportList = studentReportList.filter(student => String(student.class || '') === String(reportClassFilter));
             }
+            studentReportList = studentReportList.sort(compareRecordStudentsByRollSuffix);
 
             const studentStats = studentReportList.map(student => {
                 const stat = { present: 0, absent: 0, late: 0, leave: 0, totalMarked: 0 };
@@ -20031,7 +20430,7 @@
                 });
             });
             data.updated_at = new Date().toISOString();
-            db.saveData(data, { allowTeacher: false });
+            db.saveData(data, currentUserRole === 'teacher' ? { allowTeacher: true } : {});
             // Push full data to server in background
             if (SERVER_SYNC.enabled) {
                 pushToServer(db.getData(), { silent: true }).catch(() => {});
@@ -20142,7 +20541,7 @@
             if (currentUserRole === 'student') {
                 return findStudentByRollLocal(currentLoginId);
             }
-            if (currentUserRole === 'admin') {
+            if (currentUserRole === 'admin' || currentUserRole === 'teacher') {
                 const select = document.getElementById('resourceContextStudent');
                 const sid = parseInt(select && select.value, 10) || 0;
                 if (!sid) return null;
@@ -20152,7 +20551,7 @@
         }
 
         function populateResourceContextClassOptions() {
-            if (currentUserRole !== 'admin') return;
+            if (currentUserRole !== 'admin' && currentUserRole !== 'teacher') return;
             const select = document.getElementById('resourceStudentClassFilter');
             if (!select) return;
             // Hardcoded list (2–10) matching every other class filter in the app,
@@ -20165,7 +20564,7 @@
         }
 
         function populateResourceContextStudents() {
-            if (currentUserRole !== 'admin') return;
+            if (currentUserRole !== 'admin' && currentUserRole !== 'teacher') return;
             const select = document.getElementById('resourceContextStudent');
             if (!select) return;
             const statusFilter = String(getElementValue('resourceStudentStatusFilter') || 'active').trim().toLowerCase();
@@ -20246,7 +20645,7 @@
                         (halfCashEligible ? 'Cash half rule eligible (>=250).' : 'Cash half rule not eligible (<250).');
                 }
             } else {
-                if (actorLabel) actorLabel.textContent = currentUserRole === 'admin'
+                if (actorLabel) actorLabel.textContent = (currentUserRole === 'admin' || currentUserRole === 'teacher')
                     ? 'Select a student to process a request.'
                     : '';
                 if (nameBox) nameBox.value = '-';
@@ -20260,10 +20659,19 @@
         function applyResourcesRoleUi() {
             const isAdmin = currentUserRole === 'admin';
             const isTeacher = currentUserRole === 'teacher';
+            const canSelectAnyStudent = isAdmin || isTeacher;
 
             // Show/hide admin-only controls inside the Resources tab.
             document.querySelectorAll('#resources-tab [data-role-only="admin"]').forEach(el => {
                 el.style.display = isAdmin ? '' : 'none';
+            });
+
+            // Teacher can initiate requests on behalf of any student.
+            ['resourceStudentStatusFilter', 'resourceStudentClassFilter', 'resourceContextStudent', 'resourceContextStudentName'].forEach(id => {
+                const input = document.getElementById(id);
+                const wrapper = input ? input.closest('.control-group') : null;
+                if (wrapper) wrapper.style.display = canSelectAnyStudent ? '' : 'none';
+                if (input) input.disabled = !canSelectAnyStudent;
             });
 
             const cabinetCard = document.getElementById('resourceCabinetCard');
@@ -20275,10 +20683,15 @@
 
             const requestCard = document.getElementById('resourceRequestCard');
             if (requestCard) {
-                const allowSubmit = currentUserRole === 'student' || currentUserRole === 'admin';
+                const allowSubmit = currentUserRole === 'student' || currentUserRole === 'admin' || currentUserRole === 'teacher';
                 requestCard.querySelectorAll('input, select, button').forEach(el => {
                     el.disabled = !allowSubmit;
                 });
+            }
+
+            const transactionsCard = document.getElementById('resourceTransactionsCard');
+            if (transactionsCard) {
+                transactionsCard.style.display = isTeacher ? 'none' : '';
             }
 
             const queueFilter = document.getElementById('resourceQueueFilter');
@@ -20393,6 +20806,28 @@
                 }
             }
             if (hintEl) hintEl.textContent = lines.join(' ');
+        }
+
+        function clearResourceRequestForm() {
+            const modeEl = document.getElementById('resourceRequestMode');
+            const itemEl = document.getElementById('resourceRequestItem');
+            const qtyEl = document.getElementById('resourceRequestQty');
+            const cashEl = document.getElementById('resourceRequestCashPaid');
+            const urgentEl = document.getElementById('resourceRequestUrgent');
+            const vetoEl = document.getElementById('resourceAdminVeto');
+
+            if (modeEl) modeEl.value = 'redeem_points';
+            if (qtyEl) qtyEl.value = '1';
+            if (cashEl) cashEl.value = '0';
+            if (urgentEl) urgentEl.value = 'no';
+            if (vetoEl) vetoEl.value = 'off';
+            if (itemEl && itemEl.options && itemEl.options.length > 0) {
+                itemEl.selectedIndex = 0;
+            }
+
+            updateResourceContext();
+            updateResourceRequestPreview();
+            showAlert('Request form cleared', 'info');
         }
 
         function renderResourceEligibility() {
@@ -21079,8 +21514,8 @@
             const urgent = currentUserRole === 'admin' && String(urgentSelect && urgentSelect.value || 'no').trim().toLowerCase() === 'yes';
             const adminVeto = currentUserRole === 'admin' && String(getElementValue('resourceAdminVeto') || 'off').trim().toLowerCase() === 'on';
 
-            if (currentUserRole !== 'student' && currentUserRole !== 'admin') {
-                showAlert('Only Student or Admin can submit requests.', 'warning');
+            if (currentUserRole !== 'student' && currentUserRole !== 'admin' && currentUserRole !== 'teacher') {
+                showAlert('Only Student, Teacher, or Admin can submit requests.', 'warning');
                 return;
             }
             if (!itemId) {
@@ -21242,6 +21677,54 @@
                 return;
             }
 
+            if (currentUserRole === 'teacher') {
+                const monthTotal = getStudentMonthTotalPoints(student.id, monthKey);
+                const cashPricing = computeResourceCashPricing(totalCashCost, monthTotal);
+                const charged = mode === 'cash_purchase' ? cashPricing.charged : 0;
+                const confirmHtml = `
+                    <div class="confirm-details">
+                        <div class="row"><div class="k">Student</div><div class="v">${escapeHtml(String(student.base_name || student.name || '').trim())} (${escapeHtml(formatRollDisplay(student.roll))})</div></div>
+                        <div class="row"><div class="k">Month</div><div class="v">${escapeHtml(monthKey)}</div></div>
+                        <div class="row"><div class="k">Mode</div><div class="v">${escapeHtml(mode)}</div></div>
+                        <div class="row"><div class="k">Item</div><div class="v">${escapeHtml(String(item.name || '').trim())} x${qty}</div></div>
+                        ${mode === 'redeem_points'
+                            ? `<div class="row"><div class="k">Points Cost (GST+50%)</div><div class="v">${Math.round(totalPointsCost)} pts</div></div>`
+                            : `<div class="row"><div class="k">Cash Charged</div><div class="v">₹${Math.round(charged)}</div></div>
+                               <div class="row"><div class="k">Cash Paid</div><div class="v">₹${Math.round(cashPaid)}</div></div>`
+                        }
+                    </div>
+                    <p style="margin-top: 10px; color: var(--text-muted);">This request will enter <strong>Pending Teacher</strong>. You can then recommend it to Admin from the Requests Queue.</p>
+                `;
+                const confirmed = await openConfirmModal('Submit Teacher Request', confirmHtml);
+                if (!confirmed) return;
+                const reqRow = {
+                    id: Date.now(),
+                    type: mode,
+                    studentId: parseInt(student.id, 10),
+                    student_roll: normalizeRoll(student.roll),
+                    month: monthKey,
+                    item_id: itemId,
+                    item_name: String(item.name || '').trim(),
+                    unit: String(item.unit || '').trim(),
+                    qty,
+                    price_per_unit: Number(item.price_per_unit) || 0,
+                    total_cost: totalCashCost,
+                    points_cost: mode === 'redeem_points' ? totalPointsCost : 0,
+                    cash_paid: mode === 'cash_purchase' ? cashPaid : 0,
+                    urgent: false,
+                    admin_veto: false,
+                    status: 'pending_teacher',
+                    requested_by_login_id: String(currentLoginId || 'Teacher').trim(),
+                    requested_by_role: 'teacher',
+                    created_at: nowIso,
+                    updated_at: nowIso
+                };
+                applyResourcePatchLocally({ resource_requests: [reqRow] });
+                loadResourcesTab();
+                showAlert('Teacher request added to queue. Recommend it to forward to Admin.', 'success');
+                return;
+            }
+
             // Student normal request: server will validate & build canonical row for the logged-in student.
             {
                 const monthTotal = getStudentMonthTotalPoints(student.id, monthKey);
@@ -21320,7 +21803,7 @@
                     teacher_remark: remark
                 }]
             };
-            await pushToServer(patch, { silent: true });
+            await pushToServer(patch, { silent: true, allowPatch: true });
             await pullFromServer(false);
             renderResourceRequests();
             showAlert('Teacher decision saved', 'success');
@@ -23563,20 +24046,24 @@
                     if (document.hidden) return;
                     if (hasActiveRecordScoreEdit() || hasActiveAttendanceEdit()) return;
                     // Pull-only background sync. Push uses explicit Master Update.
-                    schedulePullFromServer(false, 0);
+                    schedulePullFromServer(false, 0, currentUserRole === 'teacher' || currentUserRole === 'student');
                 }, AUTO_SYNC_INTERVAL_MS);
 
                 // Extra safety for WAN: pull immediately when the app regains focus or network.
                 let lastFocusPullAt = 0;
-                window.addEventListener('online', () => schedulePullFromServer(false, 0));
+                window.addEventListener('online', () => schedulePullFromServer(false, 0, currentUserRole === 'teacher' || currentUserRole === 'student'));
                 window.addEventListener('offline', () => updateSyncStatus('offline', 'Offline'));
                 document.addEventListener('visibilitychange', () => {
                     if (document.visibilityState !== 'visible') return;
                     const now = Date.now();
                     if (now - lastFocusPullAt < 1500) return;
                     lastFocusPullAt = now;
-                    schedulePullFromServer(false, 120);
+                    schedulePullFromServer(false, 120, currentUserRole === 'teacher' || currentUserRole === 'student');
                 });
+
+                // One-time admin safety: if local admin snapshot is clearly ahead of server,
+                // publish it so teacher/student devices converge to the same tally.
+                setTimeout(() => { maybeAutoPublishAdminSnapshot().catch(() => {}); }, 1500);
             } else {
                 updateSyncStatus('offline', 'Local Only');
             }
