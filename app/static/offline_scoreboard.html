@@ -585,46 +585,49 @@
             }
         }
 
-        /* ── Custom scrollbar — always visible, high-contrast, all platforms ── */
+        /* ── Custom scrollbar — amber thumb, high contrast against dark track ── */
         #scoreboardBottomScroll {
             scrollbar-width: thin;
-            scrollbar-color: #6366f1 rgba(30, 41, 59, 0.8);
+            scrollbar-color: #f59e0b #0f172a;
         }
         #scoreboardBottomScroll::-webkit-scrollbar {
-            height: 12px;
+            height: 14px;
             width: 8px;
         }
         #scoreboardBottomScroll::-webkit-scrollbar-track {
-            background: rgba(30, 41, 59, 0.85);
-            border-radius: 6px;
+            background: #0f172a;
+            border-radius: 7px;
+            border: 1px solid rgba(148, 163, 184, 0.15);
         }
         #scoreboardBottomScroll::-webkit-scrollbar-thumb {
-            background: linear-gradient(90deg, #6366f1, #4f46e5);
-            border-radius: 6px;
-            border: 2px solid rgba(15, 23, 42, 0.8);
-            min-width: 40px;
+            background: linear-gradient(90deg, #f59e0b, #fbbf24);
+            border-radius: 7px;
+            min-width: 50px;
+            border: 2px solid #0f172a;
         }
         #scoreboardBottomScroll::-webkit-scrollbar-thumb:hover {
-            background: linear-gradient(90deg, #818cf8, #6366f1);
+            background: linear-gradient(90deg, #fbbf24, #fde68a);
         }
         #scoreboardTopScroll {
             scrollbar-width: thin;
-            scrollbar-color: #6366f1 rgba(30, 41, 59, 0.8);
+            scrollbar-color: #f59e0b #0f172a;
         }
         #scoreboardTopScroll::-webkit-scrollbar {
-            height: 12px;
+            height: 14px;
         }
         #scoreboardTopScroll::-webkit-scrollbar-track {
-            background: rgba(30, 41, 59, 0.85);
-            border-radius: 6px;
+            background: #0f172a;
+            border-radius: 7px;
+            border: 1px solid rgba(148, 163, 184, 0.15);
         }
         #scoreboardTopScroll::-webkit-scrollbar-thumb {
-            background: linear-gradient(90deg, #6366f1, #4f46e5);
-            border-radius: 6px;
-            min-width: 40px;
+            background: linear-gradient(90deg, #f59e0b, #fbbf24);
+            border-radius: 7px;
+            min-width: 50px;
+            border: 2px solid #0f172a;
         }
         #scoreboardTopScroll::-webkit-scrollbar-thumb:hover {
-            background: linear-gradient(90deg, #818cf8, #6366f1);
+            background: linear-gradient(90deg, #fbbf24, #fde68a);
         }
 
         .master-update-btn {
@@ -662,11 +665,8 @@
         }
 
         .scoreboard thead {
-            background: linear-gradient(135deg, rgba(30, 64, 175, 0.95) 0%, rgba(14, 116, 144, 0.95) 100%);
+            background: linear-gradient(135deg, rgb(30, 64, 175) 0%, rgb(14, 116, 144) 100%);
             color: white;
-            position: sticky;
-            top: 0;
-            z-index: 12;
         }
 
         .scoreboard th {
@@ -681,14 +681,14 @@
             box-sizing: border-box;
         }
         #scoreboardTable thead th:nth-child(odd) {
-            background: linear-gradient(135deg, rgba(59, 130, 246, 0.85), rgba(14, 116, 144, 0.85));
+            background: linear-gradient(135deg, rgb(59, 130, 246), rgb(14, 116, 144));
         }
         #scoreboardTable thead th:nth-child(even) {
-            background: linear-gradient(135deg, rgba(30, 58, 138, 0.88), rgba(15, 118, 110, 0.85));
+            background: linear-gradient(135deg, rgb(30, 58, 138), rgb(15, 118, 110));
         }
         #scoreboardTable thead th.total-cell,
         #scoreboardTable thead th.vote-cell {
-            background: linear-gradient(135deg, rgba(245, 158, 11, 0.9), rgba(251, 191, 36, 0.9));
+            background: linear-gradient(135deg, rgb(245, 158, 11), rgb(251, 191, 36));
             color: #1f2937;
         }
 
@@ -991,18 +991,18 @@
             background: linear-gradient(90deg, rgba(250, 204, 21, 0.12), rgba(251, 191, 36, 0.06));
         }
         #scoreboardTable thead tr#scoreboardHeaderRow th {
-            background: linear-gradient(135deg, rgba(14, 116, 144, 0.96), rgba(30, 64, 175, 0.92)) !important;
+            background: linear-gradient(135deg, rgb(14, 116, 144), rgb(30, 64, 175)) !important;
             color: #e0f2fe !important;
             border-top: 2px solid rgba(56, 189, 248, 0.78) !important;
             border-bottom: 2px solid rgba(37, 99, 235, 0.6) !important;
             box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
         }
         #scoreboardTable thead tr#scoreboardHeaderRow th.total-cell {
-            background: linear-gradient(135deg, rgba(245, 158, 11, 0.95), rgba(251, 191, 36, 0.93)) !important;
+            background: linear-gradient(135deg, rgb(245, 158, 11), rgb(251, 191, 36)) !important;
             color: #1f2937 !important;
         }
         #scoreboardTable thead tr#scoreboardHeaderRow th.vote-cell {
-            background: linear-gradient(135deg, rgba(6, 182, 212, 0.95), rgba(2, 132, 199, 0.92)) !important;
+            background: linear-gradient(135deg, rgb(6, 182, 212), rgb(2, 132, 199)) !important;
             color: #ecfeff !important;
         }
 
