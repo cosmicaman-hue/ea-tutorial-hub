@@ -1503,6 +1503,22 @@
             border-left: 2px solid rgba(239, 68, 68, 0.45) !important;
         }
 
+        /* STUDENT SELF-ROW HIGHLIGHT */
+        tr.my-own-row td {
+            background: rgba(99, 102, 241, 0.10) !important;
+            border-top: 1px solid rgba(99, 102, 241, 0.25) !important;
+            border-bottom: 1px solid rgba(99, 102, 241, 0.25) !important;
+        }
+        tr.my-own-row td.rank-cell::after { content: ' 👤'; font-size: 11px; }
+
+        /* PRIVACY ELLIPSIS ROW */
+        tr.rank-ellipsis-row td {
+            background: transparent !important;
+            border: none !important;
+            padding: 6px 16px !important;
+            letter-spacing: 0.04em;
+        }
+
         .student-meta {
             display: inline-flex;
             flex-wrap: wrap;
@@ -2913,6 +2929,9 @@
             <button class="tab-button" onclick="switchTab('tools')" style="--tab-icon: #64748b;">
                 <i class="fas fa-tools"></i> Tools
             </button>
+            <button class="tab-button" id="myDashboardTabButton" onclick="switchTab('my-dashboard')" style="--tab-icon: #6ee7b7;display:none">
+                <i class="fas fa-user-circle"></i> My Dashboard
+            </button>
             <div class="tab-spacer"></div>
             <button class="tab-button right-tab" onclick="switchTab('leadership')" style="--tab-icon: #fbbf24;">
                 <i class="fas fa-crown"></i> Leadership Posts
@@ -3021,6 +3040,53 @@
                     </table>
                 </div>
             </div>
+        </div>
+
+        <!-- TAB: MY DASHBOARD (students only) -->
+        <div id="my-dashboard-tab" class="tab-content hidden">
+
+            <!-- Personal Stats -->
+            <div class="form-card" id="myStatsCard">
+                <h3><i class="fas fa-chart-line"></i> My Performance</h3>
+                <div id="myStatsContent"><p style="color:var(--text-muted)">Loading…</p></div>
+            </div>
+
+            <!-- Position Badges -->
+            <div class="form-card" id="myPositionCard" style="display:none">
+                <h3><i class="fas fa-id-badge"></i> My Role &amp; Position</h3>
+                <div id="myPositionContent"></div>
+            </div>
+
+            <!-- VETO Request -->
+            <div class="form-card" id="myVetoCard" style="display:none">
+                <h3><i class="fas fa-gavel"></i> Use My VETO</h3>
+                <div id="myVetoContent"></div>
+            </div>
+
+            <!-- CR / Class View -->
+            <div class="form-card" id="myCRCard" style="display:none">
+                <h3><i class="fas fa-user-check"></i> My Class — CR View</h3>
+                <div id="myCRContent"></div>
+            </div>
+
+            <!-- Group View -->
+            <div class="form-card" id="myGroupCard" style="display:none">
+                <h3><i class="fas fa-layer-group"></i> My Group Standings</h3>
+                <div id="myGroupContent"></div>
+            </div>
+
+            <!-- Party View -->
+            <div class="form-card" id="myPartyCard" style="display:none">
+                <h3><i class="fas fa-flag"></i> My Party</h3>
+                <div id="myPartyContent"></div>
+            </div>
+
+            <!-- My Appeals -->
+            <div class="form-card" id="myAppealsCard">
+                <h3><i class="fas fa-bullhorn"></i> My Appeals</h3>
+                <div id="myAppealsContent"><p style="color:var(--text-muted)">Loading…</p></div>
+            </div>
+
         </div>
 
         <!-- TAB: ADD SCORE -->
@@ -5443,6 +5509,7 @@
         let currentUserRole = 'student';
         let currentLoginId = '';
         let currentStudentRoll = '';
+        let currentStudentPositions = {};  // populated after session loads for students
         let isSelfProfileEditMode = false;
         let serverTimezone = 'Asia/Kolkata';
         const bulkAttendanceSelectionDates = {
@@ -9397,9 +9464,11 @@
         function isTabAccessibleForCurrentRole(tabName) {
             const isAdmin = currentUserRole === 'admin';
             const isTeacher = currentUserRole === 'teacher';
+            const isStudent = !isAdmin && !isTeacher;
+            if (tabName === 'my-dashboard') return isStudent;
             if (tabName === 'scoreboard') return true;
             if (tabName === 'group-scoreboard') return true;
-            if (tabName === 'cr') return true;
+            if (tabName === 'cr') return isAdmin || isTeacher;
             if (tabName === 'appeals') return true;
             if (tabName === 'notifications') return isAdmin || isTeacher;
             if (tabName === 'attendance') return true;
@@ -9448,14 +9517,21 @@
             setTabVisibility('voting', isAdmin);
             setTabVisibility('appeals', true);
             setTabVisibility('notifications', isAdmin || isTeacher);
-            setTabVisibility('attendance', true);
-            setTabVisibility('good-conduct', true);
-            setTabVisibility('profile', true);
+            setTabVisibility('attendance', isAdmin || isTeacher);
+            setTabVisibility('good-conduct', isAdmin || isTeacher);
+            setTabVisibility('profile', isAdmin || isTeacher);
             setTabVisibility('homework', isAdmin || isTeacher);
             setTabVisibility('leadership', isAdmin);
             setTabVisibility('tools', isAdmin);
+            setTabVisibility('cr', isAdmin || isTeacher);
 
             const isStudent = !isAdmin && !isTeacher;
+            setTabVisibility('my-dashboard', isStudent);
+            if (isStudent) {
+                // Detect positions and load dashboard on first call
+                currentStudentPositions = detectStudentPositions();
+                setTimeout(loadMyDashboard, 200);
+            }
             // Student login: attendance tab is report-only; hide marking modules.
             ['markAttendanceCard', 'bulkPastAttendanceCard', 'attendanceGroupReportCard'].forEach(id => {
                 const el = document.getElementById(id);
@@ -11741,13 +11817,21 @@
                         if (effectiveStatusFilter === 'active' && !isActive) return false;
                         if (effectiveStatusFilter !== 'active' && isActive) return false;
                     }
-                    if (currentUserRole === 'student' && currentStudentRoll) {
-                        if (!(row && row.student && row.student.roll &&
-                            String(row.student.roll).trim().toUpperCase() ===
-                            String(currentStudentRoll).trim().toUpperCase())) return false;
-                    }
                     return true;
                 });
+            }
+
+            // Student privacy: top 20 shown + own row appended if below rank 20
+            let _myExtraRow = null;
+            if (currentUserRole === 'student' && currentStudentRoll && !searchValue) {
+                const _myIdx = scoreboard.findIndex(r =>
+                    r.student && String(r.student.roll || '').trim().toUpperCase() === String(currentStudentRoll).trim().toUpperCase());
+                if (_myIdx >= 20) {
+                    _myExtraRow = { row: scoreboard[_myIdx], rank: _myIdx + 1, total: scoreboard.length };
+                    scoreboard = [...scoreboard.slice(0, 20), null, scoreboard[_myIdx]];
+                } else {
+                    scoreboard = scoreboard.slice(0, Math.max(20, _myIdx >= 0 ? _myIdx + 1 : 0));
+                }
             }
 
             const table = document.getElementById('scoreboardTable');
@@ -11896,6 +11980,11 @@
 
             // Populate table
             tbody.innerHTML = scoreboard.map((row, idx) => {
+                // null sentinel = ellipsis separator row (student privacy mode)
+                if (!row) {
+                    const colSpan = 3 + dates.length + extraPinnedMeta.length;
+                    return `<tr class="rank-ellipsis-row"><td colspan="${colSpan}" style="text-align:center;padding:8px 16px;color:var(--text-muted);font-style:italic;font-size:12px">· · · ranks 21 – ${_myExtraRow ? _myExtraRow.rank - 1 : '…'} not shown · · ·</td></tr>`;
+                }
                 const blinkClass = idx === 0 ? 'blink blink-first' : idx === 1 ? 'blink blink-second' : idx === 2 ? 'blink blink-third' : '';
                 const hasDisplay = Array.isArray(row.dailyDisplay) && Array.isArray(row.dailyClasses) && row.dailyDisplay.length === row.dailyScores.length;
                 const scores = dateWindowIndices.map((dateIndex) => {
@@ -11935,6 +12024,9 @@
                     rowClass += ' leader-rank-warning';
                 }
                 if (_depletedHolders.has(_sid)) rowClass += ' veto-depleted-holder';
+                if (currentUserRole === 'student' && currentStudentRoll && row.student &&
+                    String(row.student.roll || '').toUpperCase() === String(currentStudentRoll).toUpperCase())
+                    rowClass += ' my-own-row';
                 rowClass = rowClass.trim();
 
                 return `<tr class="${rowClass}">
@@ -13267,6 +13359,317 @@
             showAlert(`Restored 1 VETO for ${escapeHtml(name)} on ${date}. Press Ctrl+Z to undo.`, 'success');
             loadScoreboard();
         }
+
+        // ── Student position detection ──────────────────────────────────────────────
+        function detectStudentPositions() {
+            if (currentUserRole !== 'student' || !currentStudentRoll) return {};
+            const data = db.getData();
+            const students = db.getStudents();
+            const me = students.find(s => String(s.roll || '').trim().toUpperCase() === String(currentStudentRoll).trim().toUpperCase());
+            if (!me) return {};
+            const myId = parseInt(me.id, 10);
+            const pos = { studentId: myId, student: me };
+
+            const leadEntry = (data.leadership || []).find(l =>
+                parseInt(l.studentId, 10) === myId &&
+                normalizePostHolderStatus(l.status || '') === 'active');
+            if (leadEntry) pos.leadership_post = leadEntry.post;
+
+            const gcr = (data.group_crs || []).find(c =>
+                parseInt(c.studentId, 10) === myId &&
+                normalizePostHolderStatus(c.status || '') === 'active');
+            if (gcr) { pos.is_group_cr = true; pos.cr_group = gcr.group; pos.cr_class = gcr.class; }
+
+            const cr = (data.class_reps || []).find(c =>
+                parseInt(c.studentId, 10) === myId &&
+                normalizePostHolderStatus(c.status || '') === 'active');
+            if (cr) { pos.is_class_rep = true; pos.class_rep_class = cr.class; }
+
+            (data.parties || []).forEach(party => {
+                const mem = (party.members || []).find(m =>
+                    parseInt(m.studentId, 10) === myId &&
+                    normalizePostHolderStatus(m.status || '') === 'active');
+                if (mem) {
+                    pos.party_code = party.code;
+                    pos.party_name = party.full_name;
+                    pos.party_role = mem.designation;
+                    if (mem.designation === 'president') pos.is_party_leader = true;
+                }
+            });
+            return pos;
+        }
+
+        // ── Student dashboard loader ────────────────────────────────────────────────
+        function loadMyDashboard() {
+            if (currentUserRole !== 'student') return;
+            currentStudentPositions = detectStudentPositions();
+            const pos = currentStudentPositions;
+            const me = pos.student;
+
+            // ── Personal stats ──────────────────────────────────────────────────────
+            const month = getCurrentMonthKey();
+            const sb = db.getMonthlyScoreboard(month);
+            const myRow = sb.find(r => r.student && String(r.student.roll || '').toUpperCase() === String(currentStudentRoll).toUpperCase());
+            const myRank = myRow ? (sb.indexOf(myRow) + 1) : '—';
+            const myTotal = myRow ? myRow.total : '—';
+            const myStars = me ? (parseInt(me.stars, 10) || 0) : 0;
+            const myVetos = me ? (parseInt(me.veto_count, 10) || 0) : 0;
+
+            const statsEl = document.getElementById('myStatsContent');
+            if (statsEl) {
+                statsEl.innerHTML = `
+                    <div style="display:flex;flex-wrap:wrap;gap:14px;margin-top:10px">
+                        <div class="stat-pill" style="background:rgba(56,189,248,0.12);border:1px solid rgba(56,189,248,0.25);border-radius:10px;padding:14px 22px;text-align:center;min-width:110px">
+                            <div style="font-size:28px;font-weight:800;color:#38bdf8">#${myRank}</div>
+                            <div style="font-size:11px;color:var(--text-muted)">Rank this month</div>
+                        </div>
+                        <div class="stat-pill" style="background:rgba(34,197,94,0.12);border:1px solid rgba(34,197,94,0.25);border-radius:10px;padding:14px 22px;text-align:center;min-width:110px">
+                            <div style="font-size:28px;font-weight:800;color:#22c55e">${myTotal}</div>
+                            <div style="font-size:11px;color:var(--text-muted)">Points (${month})</div>
+                        </div>
+                        <div class="stat-pill" style="background:rgba(251,191,36,0.12);border:1px solid rgba(251,191,36,0.25);border-radius:10px;padding:14px 22px;text-align:center;min-width:110px">
+                            <div style="font-size:28px;font-weight:800;color:#fcd34d">${myStars >= 0 ? '+' : ''}${myStars} ★</div>
+                            <div style="font-size:11px;color:var(--text-muted)">Stars balance</div>
+                        </div>
+                        <div class="stat-pill" style="background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.25);border-radius:10px;padding:14px 22px;text-align:center;min-width:110px">
+                            <div style="font-size:28px;font-weight:800;color:#f87171">${myVetos} V</div>
+                            <div style="font-size:11px;color:var(--text-muted)">VETOs remaining</div>
+                        </div>
+                    </div>`;
+            }
+
+            // ── Position badges ─────────────────────────────────────────────────────
+            const posCard = document.getElementById('myPositionCard');
+            const posContent = document.getElementById('myPositionContent');
+            const badges = [];
+            if (pos.leadership_post) badges.push(`<span class="meta-badge" style="background:rgba(251,191,36,0.2);border:1px solid rgba(251,191,36,0.4);color:#fcd34d;padding:5px 12px;border-radius:20px;font-size:13px;font-weight:600"><i class="fas fa-crown"></i> ${escapeHtml(pos.leadership_post)}</span>`);
+            if (pos.is_group_cr || pos.is_class_rep) badges.push(`<span class="meta-badge" style="background:rgba(236,72,153,0.15);border:1px solid rgba(236,72,153,0.35);color:#f9a8d4;padding:5px 12px;border-radius:20px;font-size:13px;font-weight:600"><i class="fas fa-user-check"></i> Class Rep${pos.cr_class ? ' — Class ' + pos.cr_class : ''}${pos.cr_group ? ' / Group ' + pos.cr_group : ''}</span>`);
+            if (pos.party_code) badges.push(`<span class="meta-badge" style="background:rgba(249,115,22,0.15);border:1px solid rgba(249,115,22,0.35);color:#fdba74;padding:5px 12px;border-radius:20px;font-size:13px;font-weight:600"><i class="fas fa-flag"></i> ${escapeHtml(pos.party_name || pos.party_code)} ${pos.is_party_leader ? '(Leader)' : pos.party_role === 'deputy_president' ? '(Deputy)' : '(Member)'}</span>`);
+
+            if (posCard && badges.length > 0) {
+                posCard.style.display = '';
+                if (posContent) posContent.innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:8px">${badges.join('')}</div>`;
+            } else if (posCard) {
+                posCard.style.display = 'none';
+            }
+
+            // ── VETO request section ────────────────────────────────────────────────
+            const vetoCard = document.getElementById('myVetoCard');
+            if (vetoCard) vetoCard.style.display = (myVetos > 0) ? '' : 'none';
+            if (myVetos > 0) {
+                const vetoContent = document.getElementById('myVetoContent');
+                if (vetoContent) {
+                    const students = db.getStudents().filter(s => s.active !== false && (!me || s.roll !== me.roll));
+                    const studentOpts = students.map(s => `<option value="${s.id}">${escapeHtml(formatRollDisplay(s.roll))} — ${escapeHtml(s.base_name || s.name || '')}</option>`).join('');
+                    vetoContent.innerHTML = `
+                        <p style="color:var(--text-muted);font-size:13px;margin:0 0 14px">You have <strong style="color:#f87171">${myVetos} VETO${myVetos !== 1 ? 's' : ''}</strong> remaining. Use a VETO to block a score entry — subject to teacher/admin approval.</p>
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label>Target Student</label>
+                                <select id="myVetoTarget">${studentOpts}</select>
+                            </div>
+                            <div class="form-group">
+                                <label>Date to VETO</label>
+                                <input type="date" id="myVetoDate" value="${formatDateKey(new Date())}" max="${formatDateKey(new Date())}">
+                            </div>
+                        </div>
+                        <div class="form-group" style="margin-top:8px">
+                            <label>Reason</label>
+                            <textarea id="myVetoReason" rows="2" placeholder="Explain why you are using this VETO…" style="resize:vertical"></textarea>
+                        </div>
+                        <div class="form-buttons" style="margin-top:10px">
+                            <button onclick="submitStudentVetoRequest()"><i class="fas fa-gavel"></i> Submit VETO Request</button>
+                        </div>`;
+                }
+            }
+
+            // ── CR/Group view ───────────────────────────────────────────────────────
+            const crCard = document.getElementById('myCRCard');
+            if (crCard) {
+                if (pos.is_group_cr || pos.is_class_rep) {
+                    crCard.style.display = '';
+                    loadMyCRView(pos);
+                } else {
+                    crCard.style.display = 'none';
+                }
+            }
+
+            // ── Group leader ────────────────────────────────────────────────────────
+            const groupCard = document.getElementById('myGroupCard');
+            if (groupCard) {
+                if (me && (me.group || pos.cr_group)) {
+                    groupCard.style.display = '';
+                    loadMyGroupView(me.group || pos.cr_group);
+                } else {
+                    groupCard.style.display = 'none';
+                }
+            }
+
+            // ── Party view ──────────────────────────────────────────────────────────
+            const partyCard = document.getElementById('myPartyCard');
+            if (partyCard) {
+                if (pos.party_code) {
+                    partyCard.style.display = '';
+                    loadMyPartyView(pos.party_code);
+                } else {
+                    partyCard.style.display = 'none';
+                }
+            }
+
+            // ── My appeals ─────────────────────────────────────────────────────────
+            loadMyAppealsView();
+        }
+
+        function loadMyCRView(pos) {
+            const el = document.getElementById('myCRContent');
+            if (!el) return;
+            const filterClass = pos.cr_class || pos.class_rep_class;
+            const filterGroup = pos.cr_group;
+            const month = getCurrentMonthKey();
+            const sb = db.getMonthlyScoreboard(month).filter(r => {
+                if (filterClass && String(r.student.class) !== String(filterClass)) return false;
+                if (filterGroup && getStudentGroup(r.student) !== filterGroup) return false;
+                return true;
+            });
+            if (!sb.length) { el.innerHTML = '<p style="color:var(--text-muted)">No data for your class yet.</p>'; return; }
+            el.innerHTML = `<div class="scoreboard-wrapper"><div class="scoreboard-scroll"><table class="scoreboard">
+                <thead><tr><th>#</th><th>Roll</th><th>Student</th><th>Points (${month})</th></tr></thead>
+                <tbody>${sb.map((r, i) => `<tr><td>${i + 1}</td><td>${escapeHtml(formatRollDisplay(r.student.roll))}</td><td>${escapeHtml(r.student.base_name || r.student.name || '')}</td><td class="${r.total > 0 ? 'score-cell positive' : r.total < 0 ? 'score-cell negative' : 'score-cell'}">${r.total}</td></tr>`).join('')}</tbody>
+            </table></div></div>`;
+        }
+
+        function loadMyGroupView(group) {
+            const el = document.getElementById('myGroupContent');
+            if (!el || !group) return;
+            const month = getCurrentMonthKey();
+            const sb = db.getMonthlyScoreboard(month).filter(r => getStudentGroup(r.student) === group);
+            if (!sb.length) { el.innerHTML = '<p style="color:var(--text-muted)">No data for your group yet.</p>'; return; }
+            el.innerHTML = `<p style="color:var(--text-muted);font-size:13px;margin-bottom:10px">Group ${group} standings for ${month}</p>
+                <div class="scoreboard-wrapper"><div class="scoreboard-scroll"><table class="scoreboard">
+                <thead><tr><th>#</th><th>Roll</th><th>Student</th><th>Points</th><th>Stars</th></tr></thead>
+                <tbody>${sb.map((r, i) => `<tr class="${r.student.roll === currentStudentRoll ? 'my-own-row' : ''}"><td>${i + 1}</td><td>${escapeHtml(formatRollDisplay(r.student.roll))}</td><td>${escapeHtml(r.student.base_name || r.student.name || '')}</td><td class="${r.total > 0 ? 'score-cell positive' : r.total < 0 ? 'score-cell negative' : 'score-cell'}">${r.total}</td><td>${parseInt(r.student.stars, 10) || 0} ★</td></tr>`).join('')}</tbody>
+            </table></div></div>`;
+        }
+
+        function loadMyPartyView(partyCode) {
+            const el = document.getElementById('myPartyContent');
+            if (!el) return;
+            const data = db.getData();
+            const party = (data.parties || []).find(p => p.code === partyCode);
+            if (!party) { el.innerHTML = '<p style="color:var(--text-muted)">Party data not found.</p>'; return; }
+            const students = db.getStudents();
+            const month = getCurrentMonthKey();
+            const sb = db.getMonthlyScoreboard(month);
+            const activeMembers = (party.members || []).filter(m => normalizePostHolderStatus(m.status || '') === 'active');
+            const rows = activeMembers.map(m => {
+                const s = students.find(st => parseInt(st.id, 10) === parseInt(m.studentId, 10));
+                const sbRow = s ? sb.find(r => r.student && parseInt(r.student.id, 10) === parseInt(s.id, 10)) : null;
+                const pts = sbRow ? sbRow.total : '—';
+                const rank = sbRow ? (sb.indexOf(sbRow) + 1) : '—';
+                const name = s ? (s.base_name || s.name || '') : '(unknown)';
+                const roll = s ? formatRollDisplay(s.roll) : '—';
+                const desig = m.designation === 'president' ? '👑 President' : m.designation === 'deputy_president' ? 'Deputy' : 'Member';
+                const isMe = s && s.roll === currentStudentRoll;
+                return `<tr class="${isMe ? 'my-own-row' : ''}"><td>${rank}</td><td>${escapeHtml(roll)}</td><td>${escapeHtml(name)}</td><td style="color:var(--text-muted);font-size:12px">${desig}</td><td class="${typeof pts === 'number' && pts > 0 ? 'score-cell positive' : typeof pts === 'number' && pts < 0 ? 'score-cell negative' : 'score-cell'}">${pts}</td></tr>`;
+            }).join('');
+            el.innerHTML = `<p style="font-size:13px;color:var(--text-muted);margin-bottom:10px">${escapeHtml(party.full_name || party.code)} — ${activeMembers.length} active member${activeMembers.length !== 1 ? 's' : ''}</p>
+                <div class="scoreboard-wrapper"><div class="scoreboard-scroll"><table class="scoreboard">
+                <thead><tr><th>Rank</th><th>Roll</th><th>Student</th><th>Role</th><th>Points (${month})</th></tr></thead>
+                <tbody>${rows || '<tr><td colspan="5" class="text-center" style="color:var(--text-muted)">No members found.</td></tr>'}</tbody>
+            </table></div></div>`;
+        }
+
+        function loadMyAppealsView() {
+            const el = document.getElementById('myAppealsContent');
+            if (!el) return;
+            const data = db.getData();
+            const myAppeals = (data.appeals || []).filter(a => String(a.from_login_id || '') === String(currentLoginId || ''));
+            if (!myAppeals.length) {
+                el.innerHTML = `<p style="color:var(--text-muted);font-size:13px;margin-bottom:14px">You have no appeals yet.</p>${_myAppealForm()}`;
+                return;
+            }
+            const rows = myAppeals.map(a => {
+                const decision = a.admin_decision || 'pending';
+                const color = decision === 'approved' ? '#4ade80' : decision === 'rejected' ? '#f87171' : '#fcd34d';
+                return `<tr><td>${escapeHtml(a.type || '—')}</td><td>${escapeHtml((a.created_at || '').substring(0, 10))}</td><td style="color:${color};font-weight:600">${decision}</td><td style="font-size:12px;color:var(--text-muted)">${escapeHtml(a.message || '').substring(0, 60)}${(a.message || '').length > 60 ? '…' : ''}</td></tr>`;
+            }).join('');
+            el.innerHTML = `<div class="scoreboard-wrapper" style="margin-bottom:18px"><div class="scoreboard-scroll"><table class="scoreboard">
+                <thead><tr><th>Type</th><th>Date</th><th>Status</th><th>Message</th></tr></thead>
+                <tbody>${rows}</tbody>
+            </table></div></div>${_myAppealForm()}`;
+        }
+
+        function _myAppealForm() {
+            return `<h4 style="margin:0 0 10px;font-size:14px;color:var(--text-secondary)"><i class="fas fa-plus-circle"></i> Submit New Appeal</h4>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>Appeal Type</label>
+                    <select id="myAppealType">
+                        <option value="score_dispute">Score Dispute</option>
+                        <option value="profile_change">Profile Change</option>
+                        <option value="general">General</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group" style="margin-top:8px">
+                <label>Message</label>
+                <textarea id="myAppealMsg" rows="3" placeholder="Describe your appeal clearly…" style="resize:vertical"></textarea>
+            </div>
+            <div class="form-buttons" style="margin-top:10px">
+                <button onclick="submitStudentAppeal()"><i class="fas fa-paper-plane"></i> Submit Appeal</button>
+            </div>`;
+        }
+
+        function submitStudentVetoRequest() {
+            const targetId = parseInt((document.getElementById('myVetoTarget') || {}).value, 10);
+            const date = (document.getElementById('myVetoDate') || {}).value || '';
+            const reason = ((document.getElementById('myVetoReason') || {}).value || '').trim();
+            if (!targetId || !date) { showAlert('Please select a target student and date.', 'warning'); return; }
+            if (!reason) { showAlert('Please provide a reason for the VETO.', 'warning'); return; }
+            const pos = currentStudentPositions;
+            db.addAppeal({
+                id: Date.now(),
+                type: 'veto_request',
+                subject: 'VETO Request',
+                from_role: 'student',
+                from_login_id: currentLoginId,
+                to_role: 'teacher',
+                studentId: pos.studentId || 0,
+                target_studentId: targetId,
+                target_date: date,
+                message: reason,
+                admin_decision: 'pending',
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+            });
+            if (SERVER_SYNC.enabled) pushToServer(db.getData(), { silent: true });
+            showAlert('VETO request submitted — awaiting teacher/admin approval.', 'success');
+            loadMyDashboard();
+        }
+
+        function submitStudentAppeal() {
+            const type = (document.getElementById('myAppealType') || {}).value || 'general';
+            const msg = ((document.getElementById('myAppealMsg') || {}).value || '').trim();
+            if (!msg) { showAlert('Please write your appeal message.', 'warning'); return; }
+            const pos = currentStudentPositions;
+            db.addAppeal({
+                id: Date.now(),
+                type,
+                subject: type === 'score_dispute' ? 'Score Dispute' : type === 'profile_change' ? 'Profile Change Request' : 'General Appeal',
+                from_role: 'student',
+                from_login_id: currentLoginId,
+                to_role: 'admin',
+                studentId: pos.studentId || 0,
+                message: msg,
+                admin_decision: 'pending',
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+            });
+            if (SERVER_SYNC.enabled) pushToServer(db.getData(), { silent: true });
+            showAlert('Appeal submitted successfully.', 'success');
+            loadMyAppealsView();
+        }
+        // ───────────────────────────────────────────────────────────────────────────
 
         function clearScoreForm() {
             const _today = formatDateKey(new Date());

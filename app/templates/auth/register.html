@@ -16,7 +16,12 @@
                     <form method="POST" action="{{ url_for('auth.register') }}">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                         <div class="mb-3">
-                            <label for="login_id" class="form-label">Login ID</label>
+                            <label for="join_code" class="form-label">Join Code <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="join_code" name="join_code" placeholder="Get this from your Admin" required autocomplete="off">
+                            <small class="form-text text-muted">Required to create an account. Ask your Admin for the code.</small>
+                        </div>
+                        <div class="mb-3">
+                            <label for="login_id" class="form-label">Login ID (Roll Number)</label>
                             <input type="text" class="form-control" id="login_id" name="login_id" placeholder="e.g., EA24A01" required>
                             <small class="form-text text-muted">Format: EA + 2 digits (24+) + A/B/C/D/E/F/T/Z + 2 digits (01-99)</small>
                         </div>

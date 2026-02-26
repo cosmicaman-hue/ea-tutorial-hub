@@ -168,10 +168,17 @@ def register():
         return redirect(url_for('points.offline_scoreboard'))
     
     if request.method == 'POST':
+        # Join-code gate — optional but enforced when EA_JOIN_CODE is set
+        join_code = request.form.get('join_code', '').strip()
+        expected_code = os.getenv('EA_JOIN_CODE', '').strip()
+        if expected_code and join_code.lower() != expected_code.lower():
+            flash('Invalid join code. Please get the correct code from your Admin.', 'danger')
+            return render_template('auth/register.html')
+
         login_id = request.form.get('login_id', '').upper()
         password = request.form.get('password', '')
         confirm_password = request.form.get('confirm_password', '')
-        
+
         # Validate login_id is student format only
         if not login_id.startswith('EA') or login_id in ['Admin', 'Teacher']:
             flash('Students must use EA24A01 format login ID', 'error')
