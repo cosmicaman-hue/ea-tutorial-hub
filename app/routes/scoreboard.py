@@ -3156,6 +3156,7 @@ _DEVICE_LOG_MAX = 2000
 
 
 @points_bp.route('/device-checkin', methods=['POST', 'GET'])
+@csrf.exempt  # JSON API endpoint — secured by @login_required + role check
 @login_required
 def device_checkin():
     """POST: record a device check-in. GET (admin-only): return full log."""
@@ -3215,6 +3216,7 @@ def device_checkin():
 
 
 @points_bp.route('/device-log/clear', methods=['POST'])
+@csrf.exempt  # JSON API endpoint — secured by @login_required + role check
 @login_required
 def device_log_clear():
     """Admin: wipe the device connection log."""

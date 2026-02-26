@@ -5224,7 +5224,7 @@
                 </div>
                 <div style="display: flex; gap: 10px; flex-wrap: wrap;">
                     <button onclick="syncNow()"><i class="fas fa-bolt"></i> Master Update (3s)</button>
-                    <button class="secondary" data-allow="true" onclick="pullFromServer(true)"><i class="fas fa-cloud-download-alt"></i> Pull Latest</button>
+                    <button class="secondary" data-allow="true" onclick="pullFromServer(true, true)"><i class="fas fa-cloud-download-alt"></i> Pull Latest</button>
                     <button class="secondary" data-allow="true" onclick="downloadServerBackup()"><i class="fas fa-download"></i> Download Server Backup</button>
                     <button class="secondary" data-allow="true" id="installAppBtn" style="display: none;"><i class="fas fa-mobile-alt"></i> Install App</button>
                 </div>
@@ -10905,7 +10905,9 @@
             }, waitMs);
         }
 
-        async function pullFromServer(showToast = false) {
+        // forceFull=true → skip ?since so the server always returns the full snapshot.
+        // Use this for explicit user-triggered refreshes to guarantee fresh data.
+        async function pullFromServer(showToast = false, forceFull = false) {
             if (!SERVER_SYNC.enabled) return;
             if (pullInFlightPromise) {
                 pullQueuedToast = pullQueuedToast || showToast;
@@ -10938,7 +10940,9 @@
                     localActiveCountForSince > 0 &&
                     localActiveCountForSince < MIN_SAFE_STUDENT_ROSTER
                 );
-            const canUseSince = !!since && localRosterCount >= MIN_SAFE_STUDENT_ROSTER && !localLooksSuspiciousForSince;
+            // forceFull bypasses ?since — guarantees fresh full snapshot from server.
+            // Used for explicit pull requests so teachers/admins always see latest data.
+            const canUseSince = !forceFull && !!since && localRosterCount >= MIN_SAFE_STUDENT_ROSTER && !localLooksSuspiciousForSince;
             const readPath = canUseSince ? `${SERVER_SYNC.dataUrl}?since=${encodeURIComponent(since)}` : SERVER_SYNC.dataUrl;
             const fetchTasks = readTargets.map(async (baseUrl) => {
                 try {
@@ -11196,7 +11200,7 @@
                 if (remainingFinal > 0) {
                     await delay(remainingFinal * 1000);
                 }
-                await withTimeout(pullFromServer(false), 2500);
+                await withTimeout(pullFromServer(false, true), 2500); // forceFull on final pass
                 showAlert('Master update complete. Devices should converge within a few seconds.', 'success');
             } catch (err) {
                 showAlert('Master update encountered an error. Local data is safe.', 'warning');
@@ -23092,7 +23096,7 @@
                     throw new Error(payload.error || 'Restore failed');
                 }
                 showAlert(`Restore applied. Students: ${payload.students}, Scores: ${payload.scores}`, 'success');
-                await pullFromServer(true);
+                await pullFromServer(true, true);
                 loadScoreboard();
                 loadStudents();
                 loadRestorePoints();
