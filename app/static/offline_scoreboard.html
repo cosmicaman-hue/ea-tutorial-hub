@@ -2864,6 +2864,22 @@
             <i class="fas fa-bolt"></i> Master Update (3s)
         </button>
 
+        <!-- PERSISTENT SYNC BAR — visible to all roles -->
+        <div id="globalSyncBar" style="
+            display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+            padding:6px 4px 6px 2px;margin-bottom:4px;
+        ">
+            <span id="syncStatus" class="sync-pill offline">Offline</span>
+            <span id="roleBadge" class="sync-pill">Role: -</span>
+            <span id="lastSyncTime" class="sync-meta" style="flex:1;min-width:120px">Last sync: -</span>
+            <button id="globalRefreshBtn" class="secondary" data-allow="true"
+                onclick="pullFromServer(true, true)"
+                style="padding:5px 12px;font-size:12px;display:none"
+                title="Pull latest data from server">
+                <i class="fas fa-sync-alt"></i> Refresh
+            </button>
+        </div>
+
         <!-- TABS -->
         <div class="tabs">
             <button class="tab-button active" onclick="switchTab('scoreboard')" style="--tab-icon: #38bdf8;">
@@ -5217,11 +5233,6 @@
                 <p style="color: var(--text-muted); margin-bottom: 8px; font-size: 14px;">
                     Your work is saved locally and LAN sync runs in near real-time. Use Master Update for forced convergence across devices.
                 </p>
-                <div class="sync-row">
-                    <span id="syncStatus" class="sync-pill offline">Offline</span>
-                    <span id="roleBadge" class="sync-pill">Role: -</span>
-                    <span id="lastSyncTime" class="sync-meta">Last sync: -</span>
-                </div>
                 <div style="display: flex; gap: 10px; flex-wrap: wrap;">
                     <button onclick="syncNow()"><i class="fas fa-bolt"></i> Master Update (3s)</button>
                     <button class="secondary" data-allow="true" onclick="pullFromServer(true, true)"><i class="fas fa-cloud-download-alt"></i> Pull Latest</button>
@@ -9688,6 +9699,10 @@
             // Device monitor card — admin only
             const devCard = document.getElementById('deviceMonitorCard');
             if (devCard) devCard.style.display = isAdmin ? '' : 'none';
+
+            // Global Refresh button — visible to all logged-in users (admin/teacher/student)
+            const refreshBtn = document.getElementById('globalRefreshBtn');
+            if (refreshBtn) refreshBtn.style.display = SERVER_SYNC.enabled ? '' : 'none';
 
             const isStudent = !isAdmin && !isTeacher;
             setTabVisibility('my-dashboard', isStudent);
@@ -23538,9 +23553,9 @@
 
             if (SERVER_SYNC.enabled) {
                 updateSyncStatus('syncing', 'Connecting');
-                // Don't block UI load on slow/unreachable servers. Local data renders immediately,
-                // then the sync layer converges in the background with timeouts.
-                pullFromServer(false).catch(() => {});
+                // forceFull=true on initial load: skip ?since so every page refresh always
+                // fetches a fresh full snapshot — prevents stale data after ?since 204 responses.
+                pullFromServer(false, true).catch(() => {});
                 if (ENABLE_REALTIME_SYNC) {
                     startRealtimeSync();
                 }
