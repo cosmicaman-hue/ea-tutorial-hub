@@ -95,3 +95,14 @@ def create_app():
         return User.query.get(int(user_id))
     
     return app
+
+# Provide a direct WSGI entrypoint for platforms that use "gunicorn app:app".
+# This avoids Render misconfiguration issues when it targets the package name.
+app = create_app()
+if str(os.getenv('EA_INIT_ON_BOOT', '1')).strip().lower() in ('1', 'true', 'yes', 'on'):
+    try:
+        from run import initialize_runtime
+        initialize_runtime(app)
+    except Exception:
+        # Fallback: app should still load even if runtime init fails here.
+        pass
