@@ -252,12 +252,35 @@ def _load_latest_offline_backup():
 def _load_offline_data():
     path = _offline_data_path()
     if not os.path.exists(path):
-        return _load_latest_offline_backup()
+        data = _load_latest_offline_backup()
+        if data:
+            return data
+        # Fallback: seed snapshot so first-time Render deploys are not empty.
+        try:
+            payload = json.loads(json.dumps(FEB26_SEED))
+            stamp = datetime.now(timezone.utc).isoformat()
+            payload['server_updated_at'] = stamp
+            payload['updated_at'] = stamp
+            _atomic_write_json(path, payload)
+            return payload
+        except Exception:
+            return None
     try:
         with open(path, 'r', encoding='utf-8') as f:
             return json.load(f)
     except Exception:
-        return _load_latest_offline_backup()
+        data = _load_latest_offline_backup()
+        if data:
+            return data
+        try:
+            payload = json.loads(json.dumps(FEB26_SEED))
+            stamp = datetime.now(timezone.utc).isoformat()
+            payload['server_updated_at'] = stamp
+            payload['updated_at'] = stamp
+            _atomic_write_json(path, payload)
+            return payload
+        except Exception:
+            return None
 
 
 def _subscribe_sync_events():
