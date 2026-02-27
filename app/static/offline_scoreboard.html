@@ -11389,7 +11389,12 @@
             }
 
             const roleNeedsAuthoritativeSync = currentUserRole === 'teacher' || currentUserRole === 'student';
-            const canOverrideShrinkGuard = forceFull || roleNeedsAuthoritativeSync;
+            // Override shrink guard only when local data is missing/tiny.
+            // When admin has a healthy local roster (≥25 students), NEVER let a server snapshot
+            // with fewer students win — even on a forceFull pull.  This stops the FEB26_SEED
+            // (46 students) from overwriting a healthy 91-student local cache on page load.
+            const localLooksHealthy = localRosterCount >= MIN_SAFE_STUDENT_ROSTER;
+            const canOverrideShrinkGuard = roleNeedsAuthoritativeSync || (forceFull && !localLooksHealthy);
             const shrinkRejected = snapshots.filter(item => isSuspiciousStudentShrink(localData, item.data));
             const tinyRosterRejected = snapshots.filter(item => isLikelyCorruptRoster(item.data));
             let safeSnapshots = snapshots
@@ -11491,7 +11496,9 @@
                 !preferAuthoritativeServerApply &&
                 !localLooksShrunk &&
                 localStamp > latestStamp &&
-                currentUserRole === 'admin'          // teachers must NOT silently overwrite server data
+                currentUserRole === 'admin' &&         // teachers must NOT silently overwrite server data
+                !isLikelyCorruptRoster(localData) &&   // never auto-push an incomplete local roster
+                !isSuspiciousStudentShrink(latest.data, localData)  // don't push if pushing would shrink server
             ) {
                 // Local admin copy is newer; queue a push instead of overwriting local data.
                 scheduleServerPush(localData);

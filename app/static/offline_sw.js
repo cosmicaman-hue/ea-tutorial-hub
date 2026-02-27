@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ea-offline-v110';
+const CACHE_NAME = 'ea-offline-v111';
 const PRECACHE_URLS = [
   '/scoreboard/offline',
   '/scoreboard/manifest.webmanifest',
