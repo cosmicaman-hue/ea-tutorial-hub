@@ -968,9 +968,13 @@
 
         .score-cell.star-used-red {
             background: linear-gradient(135deg, #f87171 0%, #b91c1c 100%);
-            color: #7f1d1d;
+            color: #ffffff;
             font-weight: 800;
-            font-size: 20px;
+            font-size: 22px;
+            text-shadow: 0 0 6px rgba(0, 0, 0, 0.45);
+        }
+        .score-cell.star-used-red:hover {
+            background: transparent !important;
         }
 
         .score-cell.veto-used {
@@ -1280,6 +1284,10 @@
             width: 95px;
             text-align: center;
             border-left: 1px solid rgba(148, 163, 184, 0.34) !important;
+            font-size: 11px;
+            line-height: 1.1;
+            white-space: normal;
+            word-break: break-word;
         }
         .scoreboard th.extra-fixed {
             z-index: 33;
@@ -7786,11 +7794,14 @@
             const monthKey = String(month || '').trim();
             const globalStars = Math.max(0, parseInt(safeProp(student, 'stars'), 10) || 0);
             const globalVetos = Math.max(0, parseInt(safeProp(student, 'veto_count'), 10) || 0);
+            const isCurrentMonth = monthKey && monthKey === getCurrentMonthKey();
             let stars = globalStars;
             let vetos = globalVetos;
             if (monthKey && safeProp(student, 'id')) {
-                const monthStars = getStudentMonthStarAwardTotal(student.id, monthKey);
-                const monthVetos = getStudentMonthVetoAwardTotal(student.id, monthKey);
+                const monthProfileStars = !isCurrentMonth ? (parseInt(safeProp(student, '__month_star_count'), 10) || 0) : 0;
+                const monthProfileVetos = !isCurrentMonth ? (parseInt(safeProp(student, '__month_veto_count'), 10) || 0) : 0;
+                const monthStars = getStudentMonthStarAwardTotal(student.id, monthKey) + monthProfileStars;
+                const monthVetos = getStudentMonthVetoAwardTotal(student.id, monthKey) + monthProfileVetos;
                 const usedStars = getStudentMonthNegativeDeltaTotal(student.id, monthKey, 'stars');
                 const usedVetos = getStudentMonthNegativeDeltaTotal(student.id, monthKey, 'vetos');
                 // Show month awards when present; otherwise show global counters adjusted for usage.
@@ -7798,6 +7809,9 @@
                 vetos = monthVetos > 0 ? monthVetos : Math.max(0, globalVetos - usedVetos);
             }
             const designations = safeProp(student, 'id') ? getStudentDesignations(student.id, month) : [];
+            const monthDesignations = !isCurrentMonth && Array.isArray(safeProp(student, '__month_designations'))
+                ? safeProp(student, '__month_designations')
+                : [];
             const officeHolder = isOfficeHolderStudent(student, month);
             const dateKey = monthKey ? `${monthKey}-15` : formatDateKey(new Date());
             const suspended = isStudentPostHolderSuspended(student, dateKey);
@@ -7814,7 +7828,10 @@
             const badges = [];
             if (stars > 0) badges.push(`<span class="meta-star">*${stars}</span>`);
             if (vetos > 0) badges.push(`<span class="meta-veto">V${vetos}</span>`);
-            designations.forEach(designation => badges.push(`<span class="designation-chip">${designation}</span>`));
+            const designationSet = new Set();
+            (designations || []).forEach(d => { if (d) designationSet.add(d); });
+            (monthDesignations || []).forEach(d => { if (d) designationSet.add(String(d)); });
+            Array.from(designationSet).forEach(designation => badges.push(`<span class="designation-chip">${designation}</span>`));
 
             const nameClass = officeHolder ? 'student-name-core post-holder-name' : 'student-name-core';
             return `<span class="name-stack"><span class="${nameClass}">${escapeHtml(visibleBase)}</span>${badges.length ? `<span class="student-meta">${badges.join('')}</span>` : ''}</span>`;
@@ -8130,11 +8147,19 @@
                                 const baseName = String(profile && profile.base_name ? profile.base_name : extractNameMeta(rawName).baseName).trim();
                                 if (!isValidStudentName(baseName)) return null;
                                 const classVal = parseInt(profile && profile.class, 10);
+                                const starCount = parseInt(profile && profile.month_star_count, 10);
+                                const vetoCount = parseInt(profile && profile.month_veto_count, 10);
+                                const designations = Array.isArray(profile && profile.month_designations)
+                                    ? profile.month_designations.map(item => String(item || '').trim()).filter(Boolean)
+                                    : [];
                                 return {
                                     roll,
                                     name: rawName || baseName,
                                     base_name: baseName,
-                                    class: Number.isNaN(classVal) ? null : classVal
+                                    class: Number.isNaN(classVal) ? null : classVal,
+                                    month_star_count: Number.isNaN(starCount) ? 0 : Math.max(0, starCount),
+                                    month_veto_count: Number.isNaN(vetoCount) ? 0 : Math.max(0, vetoCount),
+                                    month_designations: designations
                                 };
                             })
                             .filter(Boolean);
@@ -9003,6 +9028,7 @@
                     const studentScores = scoreByStudent.get(student.id) || [];
                     const pointsByDate = {};
                     const starsByDate = {};
+                    const starUsageByDate = {};
                     const vetosByDate = {};
                     const notesByDate = {};
                     const hasEntryByDate = {};
@@ -9011,7 +9037,11 @@
                         if (!date) return;
                         hasEntryByDate[date] = true;
                         pointsByDate[date] = (pointsByDate[date] || 0) + (parseInt(s.points, 10) || 0);
-                        starsByDate[date] = (starsByDate[date] || 0) + (parseInt(s.stars, 10) || 0);
+                        const starDelta = parseInt(s.stars, 10) || 0;
+                        starsByDate[date] = (starsByDate[date] || 0) + starDelta;
+                        if (starDelta < 0) {
+                            starUsageByDate[date] = (starUsageByDate[date] || 0) + Math.abs(starDelta);
+                        }
                         vetosByDate[date] = (vetosByDate[date] || 0) + (parseInt(s.vetos, 10) || 0);
                         const noteText = String(coalesce(safeProp(s, 'notes'), '')).trim();
                         if (noteText) {
@@ -9033,13 +9063,14 @@
                     const starOverrides = {};
                     const starClasses = {};
                     const bonusByDate = {};
-                    const starDates = new Set([...Object.keys(pointsByDate), ...Object.keys(starsByDate)]);
+                    const starDates = new Set([...Object.keys(pointsByDate), ...Object.keys(starsByDate), ...Object.keys(starUsageByDate)]);
+                    const isCurrentMonth = String(month || '').trim() === getCurrentMonthKey();
                     starDates.forEach(date => {
                         const points = pointsByDate[date] || 0;
-                        const starDelta = starsByDate[date] || 0;
-                        if (starDelta < 0) {
-                            const uses = Math.abs(starDelta);
-                            const starText = '*';
+                        const usageCount = starUsageByDate[date] || 0;
+                        if (usageCount > 0) {
+                            const uses = usageCount;
+                            const starText = uses <= 3 ? '*'.repeat(uses) : `*x${uses}`; // show count for multi-use
                             starOverrides[date] = starText;
                             starClasses[date] = 'star-used-red';
                             if (points >= -50) {
@@ -9871,7 +9902,10 @@
                 __month_roll: profileRoll || student.roll,
                 __month_name: displayName,
                 __month_group: deriveGroupFromRoll(profileRoll || student.roll) || student.group || '',
-                __month_class: Number.isNaN(monthClass) ? student.class : monthClass
+                __month_class: Number.isNaN(monthClass) ? student.class : monthClass,
+                __month_star_count: parseInt(profile.month_star_count, 10) || 0,
+                __month_veto_count: parseInt(profile.month_veto_count, 10) || 0,
+                __month_designations: Array.isArray(profile.month_designations) ? profile.month_designations : []
             };
         }
 

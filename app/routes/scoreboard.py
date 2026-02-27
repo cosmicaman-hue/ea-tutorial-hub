@@ -172,8 +172,13 @@ def _forward_offline_data_to_peers_async(payload, extra_peers=None):
 
 
 def _atomic_write_json(path, payload):
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    fd, temp_path = tempfile.mkstemp(prefix='offline_scoreboard_', suffix='.json')
+    target_dir = os.path.dirname(path)
+    os.makedirs(target_dir, exist_ok=True)
+    # Use dir=target_dir so the temp file is on the same filesystem as the
+    # target.  Without this, tempfile.mkstemp() uses /tmp which is a separate
+    # mount on Render/Docker, causing os.replace() to raise:
+    #   [Errno 18] Invalid cross-device link
+    fd, temp_path = tempfile.mkstemp(dir=target_dir, prefix='offline_scoreboard_', suffix='.json')
     try:
         with os.fdopen(fd, 'w', encoding='utf-8') as f:
             json.dump(payload, f, ensure_ascii=False, indent=2)
@@ -261,7 +266,12 @@ def _load_offline_data():
             stamp = datetime.now(timezone.utc).isoformat()
             payload['server_updated_at'] = stamp
             payload['updated_at'] = stamp
-            _atomic_write_json(path, payload)
+            try:
+                _atomic_write_json(path, payload)
+            except Exception:
+                # Can't persist to disk (e.g. ephemeral FS, cross-device link on Render)
+                # but still return seed data so the client is not blank.
+                pass
             return payload
         except Exception:
             return None
@@ -281,7 +291,10 @@ def _load_offline_data():
             stamp = datetime.now(timezone.utc).isoformat()
             payload['server_updated_at'] = stamp
             payload['updated_at'] = stamp
-            _atomic_write_json(path, payload)
+            try:
+                _atomic_write_json(path, payload)
+            except Exception:
+                pass
             return payload
         except Exception:
             return None
