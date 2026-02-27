@@ -267,7 +267,11 @@ def _load_offline_data():
             return None
     try:
         with open(path, 'r', encoding='utf-8') as f:
-            return json.load(f)
+            data = json.load(f)
+            if _student_count(data) == 0:
+                # Treat empty snapshots as missing; seed to avoid blank UI.
+                raise ValueError('Empty offline snapshot')
+            return data
     except Exception:
         data = _load_latest_offline_backup()
         if data:
