@@ -5813,6 +5813,7 @@
         const SERVER_URLS_KEY = 'ea_server_sync_urls';
         const DEFAULT_PRIMARY_SERVER_URL = 'http://192.168.0.183:5000';
         const DEFAULT_BACKUP_SERVER_URL = 'http://192.168.0.163:5000';
+        const DEFAULT_RENDER_SERVER_URL = 'https://ea-tutorial-hub.onrender.com';
         // Guardrail: if a snapshot ever drops below this roster size, treat it as corrupt/stale.
         // This prevents the known "20 students" stale snapshot from being applied anywhere.
         const MIN_SAFE_STUDENT_ROSTER = 25;
@@ -5822,7 +5823,7 @@
         const LOCAL_BACKUP_LIMIT = 1;
         const LOCAL_BACKUP_MAX_BYTES = 900000;
         const LOCAL_BACKUP_INTERVAL = 5 * 60 * 1000;
-        const AUTO_SYNC_INTERVAL_MS = 10 * 1000;
+        const AUTO_SYNC_INTERVAL_MS = 4 * 1000;
 
         // ── Device fingerprinting ─────────────────────────────────────────────────────
         const DEVICE_UUID_KEY = 'ea_device_uuid';
@@ -6736,7 +6737,8 @@
         function getDefaultServerUrls() {
             return Array.from(new Set([
                 normalizeServerBaseUrl(DEFAULT_PRIMARY_SERVER_URL),
-                normalizeServerBaseUrl(DEFAULT_BACKUP_SERVER_URL)
+                normalizeServerBaseUrl(DEFAULT_BACKUP_SERVER_URL),
+                normalizeServerBaseUrl(DEFAULT_RENDER_SERVER_URL)
             ].filter(Boolean)));
         }
 
