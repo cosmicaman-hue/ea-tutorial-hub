@@ -2845,7 +2845,10 @@ def offline_data():
     min_students = _min_safe_student_roster()
     if _is_tiny_roster(existing, min_students):
         existing, _ = _recover_tiny_roster_if_needed(existing, min_students=min_students)
-    existing, _ = _recover_stale_snapshot_if_needed(existing, min_students=min_students)
+    # Skip stale-recovery peer fetch on POST — it adds network latency (Render cold-start can be
+    # 30+ seconds) and is unnecessary when we're already receiving a push from an authenticated client.
+    if request.method == 'GET':
+        existing, _ = _recover_stale_snapshot_if_needed(existing, min_students=min_students)
     force_replace = bool(payload.get('force_replace')) if isinstance(payload, dict) else False
     incoming_count = _student_count(data)
     existing_count = _student_count(existing)

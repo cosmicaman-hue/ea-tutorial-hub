@@ -11739,16 +11739,17 @@
                     setMasterUpdateButtonState(true, remaining);
 
                     if (canPush) {
-                        await withTimeout(pushToServer(db.getData(), { silent: true }), 2500);
+                        // 8 s timeout — server may need to contact Render peer on first request
+                        await withTimeout(pushToServer(db.getData(), { silent: true }), 8000);
                     }
-                    await withTimeout(pullFromServer(false, true), 2500);
+                    await withTimeout(pullFromServer(false, true), 8000);
                 }
 
                 const remainingFinal = Math.max(0, Math.ceil((totalWindowMs - (Date.now() - startedAt)) / 1000));
                 if (remainingFinal > 0) {
                     await delay(remainingFinal * 1000);
                 }
-                await withTimeout(pullFromServer(false, true), 2500); // forceFull on final pass
+                await withTimeout(pullFromServer(false, true), 8000); // forceFull on final pass
                 showAlert('Master update complete. Devices should converge within a few seconds.', 'success');
             } catch (err) {
                 showAlert('Master update encountered an error. Local data is safe.', 'warning');
