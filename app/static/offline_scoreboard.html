@@ -3488,6 +3488,7 @@
                                     <th style="width: 120px;" data-col="record-status">Status</th>
                                     <th style="width: 180px;">Points (Enter to Save)</th>
                                     <th style="width: 120px;">Stars +/-</th>
+                                    <th style="width: 230px;">Star Reason</th>
                                     <th style="width: 120px;">VETOs +/-</th>
                                     <th style="width: 230px;">VETO Reason</th>
                                     <th style="width: 90px;">Save</th>
@@ -3495,7 +3496,7 @@
                             </thead>
                             <tbody id="recordStudentsBody">
                                 <tr>
-                                    <td colspan="13" class="text-center loading">Loading...</td>
+                                    <td colspan="14" class="text-center loading">Loading...</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -13365,7 +13366,9 @@
                 const pointsValue = draft && draft.points != null ? draft.points : '';
                 const starsValue = draft && draft.stars != null ? draft.stars : '';
                 const vetosValue = draft && draft.vetos != null ? draft.vetos : '';
-                const vetoReasonRaw = draft && draft.reason != null ? draft.reason : '';
+                const starReasonRaw = draft && draft.starReason != null ? draft.starReason : '';
+                const vetoReasonRaw = draft && draft.vetoReason != null ? draft.vetoReason : '';
+                const starReasonValue = escapeHtml(String(starReasonRaw));
                 const vetoReasonValue = escapeHtml(String(vetoReasonRaw));
                 const hasExisting = !!dayScore;
                 const storedPoints = hasExisting ? (parseInt(safeProp(dayScore, 'points'), 10) || 0) : null;
@@ -13405,17 +13408,23 @@
                         </div>
                     </td>
                     <td>
+                        <input type="text" class="score-input" placeholder="Reason for +stars"
+                            value="${starReasonValue}"
+                            oninput="updateRecordScoreDraft(${student.id}, this, 2)"
+                            onkeydown="recordScoreKey(event, ${student.id})">
+                    </td>
+                    <td>
                         <div class="score-input-wrapper">${storedVetoBadge}
                         <input type="text" class="score-input" placeholder="${hasExisting && storedVetos ? '+/- VETOs' : 'V / -VV or 2'}"
                             value="${vetosValue}"
-                            oninput="updateRecordScoreDraft(${student.id}, this, 2)"
+                            oninput="updateRecordScoreDraft(${student.id}, this, 3)"
                             onkeydown="recordScoreKey(event, ${student.id})">
                         </div>
                     </td>
                     <td>
                         <input type="text" class="score-input veto-reason-input" placeholder="Reason for -VETO"
                             value="${vetoReasonValue}"
-                            oninput="updateRecordScoreDraft(${student.id}, this, 3)"
+                            oninput="updateRecordScoreDraft(${student.id}, this, 4)"
                             onkeydown="recordScoreKey(event, ${student.id})">
                     </td>
                     <td>
@@ -13426,7 +13435,7 @@
             }).join('');
 
             if (filtered.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="13" class="text-center" style="padding: 30px;">No students match the filters</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="14" class="text-center" style="padding: 30px;">No students match the filters</td></tr>`;
             }
             refreshStarTransferModule(true);
             applyRecordColumnsVisibility();
@@ -13486,7 +13495,8 @@
                 points: Object.prototype.hasOwnProperty.call(payload, 'points') ? String(coalesce(payload.points, '')) : existing.points,
                 stars: Object.prototype.hasOwnProperty.call(payload, 'stars') ? String(coalesce(payload.stars, '')) : existing.stars,
                 vetos: Object.prototype.hasOwnProperty.call(payload, 'vetos') ? String(coalesce(payload.vetos, '')) : existing.vetos,
-                reason: Object.prototype.hasOwnProperty.call(payload, 'reason') ? String(coalesce(payload.reason, '')) : existing.reason
+                starReason: Object.prototype.hasOwnProperty.call(payload, 'starReason') ? String(coalesce(payload.starReason, '')) : existing.starReason,
+                vetoReason: Object.prototype.hasOwnProperty.call(payload, 'vetoReason') ? String(coalesce(payload.vetoReason, '')) : existing.vetoReason
             };
         }
 
@@ -13503,8 +13513,9 @@
             recordScoreDraftState.lastEditAt = Date.now();
             if (index === 0) setRecordScoreDraft(studentId, { points: inputEl.value });
             else if (index === 1) setRecordScoreDraft(studentId, { stars: inputEl.value });
-            else if (index === 2) setRecordScoreDraft(studentId, { vetos: inputEl.value });
-            else if (index === 3) setRecordScoreDraft(studentId, { reason: inputEl.value });
+            else if (index === 2) setRecordScoreDraft(studentId, { starReason: inputEl.value });
+            else if (index === 3) setRecordScoreDraft(studentId, { vetos: inputEl.value });
+            else if (index === 4) setRecordScoreDraft(studentId, { vetoReason: inputEl.value });
         }
 
         function hasActiveRecordScoreEdit() {
@@ -13531,12 +13542,13 @@
                 const studentId = parseInt(row.getAttribute('data-student-id'), 10);
                 if (!studentId) return;
                 const inputs = row.querySelectorAll('input.score-input');
-                if (!inputs || inputs.length < 4) return;
+                if (!inputs || inputs.length < 5) return;
                 setRecordScoreDraft(studentId, {
                     points: inputs[0].value,
                     stars: inputs[1].value,
-                    vetos: inputs[2].value,
-                    reason: inputs[3].value
+                    starReason: inputs[2].value,
+                    vetos: inputs[3].value,
+                    vetoReason: inputs[4].value
                 });
             });
 
@@ -13786,11 +13798,13 @@
                 : 0;
             const pointsRaw = coalesce(safeProp(currentInputs[0], 'value'), '');
             const starsRaw = coalesce(safeProp(currentInputs[1], 'value'), '');
-            const vetosRaw = coalesce(safeProp(currentInputs[2], 'value'), '');
-            const vetoReasonRaw = coalesce(safeProp(currentInputs[3], 'value'), '');
+            const starReasonRaw = coalesce(safeProp(currentInputs[2], 'value'), '');
+            const vetosRaw = coalesce(safeProp(currentInputs[3], 'value'), '');
+            const vetoReasonRaw = coalesce(safeProp(currentInputs[4], 'value'), '');
             let points = pointsRaw === '' ? NaN : parseInt(pointsRaw, 10);
             const stars = parseTokenAdjustment(starsRaw, '*');
             const vetos = parseTokenAdjustment(vetosRaw, 'V');
+            const starReason = String(starReasonRaw || '').trim();
             const vetoReason = String(vetoReasonRaw || '').trim();
             const date = getElementValue('scoreDate');
             let month = getElementValue('scoreMonth') || (date ? date.substring(0, 7) : getCurrentMonthKey());
@@ -13826,9 +13840,14 @@
                 showAlert('Enter valid values. Stars: number or * pattern. VETOs: number or V pattern.', 'danger');
                 return;
             }
+            if (stars > 0 && !starReason) {
+                showAlert('Enter Star Reason when adding positive stars.', 'warning');
+                currentInputs[2].focus();
+                return;
+            }
             if (vetos < 0 && !vetoReason) {
                 showAlert('Enter VETO reason when using negative VETO.', 'warning');
-                currentInputs[3].focus();
+                currentInputs[4].focus();
                 return;
             }
 
@@ -13862,11 +13881,12 @@
 
             const existingNotes = String(coalesce(safeProp(existingScore, 'notes'), '')).trim();
             let notesToSave = existingNotes;
-            if (vetoReason) {
-                notesToSave = `VETO reason: ${vetoReason}`;
-            } else if (vetos < 0 && !notesToSave) {
-                notesToSave = 'VETO used';
-            }
+            const noteParts = [];
+            if (notesToSave) noteParts.push(notesToSave);
+            if (stars > 0 && starReason) noteParts.push(`Star reason: ${starReason}`);
+            if (vetoReason) noteParts.push(`VETO reason: ${vetoReason}`);
+            else if (vetos < 0 && !existingNotes) noteParts.push('VETO used');
+            notesToSave = noteParts.join(' | ').trim();
 
             const resolved = resolveScoreForRole(studentId, date, month, finalPoints, finalStars, finalVetos, notesToSave);
             db.addScore(resolved.score);
@@ -13888,6 +13908,7 @@
             currentInputs[1].value = '';
             currentInputs[2].value = '';
             currentInputs[3].value = '';
+            currentInputs[4].value = '';
             // Update stored-score badges in the row
             const pointsWrapper = currentInputs[0].closest('.score-input-wrapper');
             if (pointsWrapper) {
@@ -13914,7 +13935,8 @@
             // Update placeholders to show delta mode
             currentInputs[0].placeholder = '+/- to adjust';
             currentInputs[1].placeholder = '+/- stars';
-            currentInputs[2].placeholder = '+/- VETOs';
+            currentInputs[2].placeholder = 'Reason for +stars';
+            currentInputs[3].placeholder = '+/- VETOs';
             clearRecordScoreDraft(studentId);
             row.classList.add('score-recorded-row');
             currentInputs.forEach(input => input.classList.add('filled'));
