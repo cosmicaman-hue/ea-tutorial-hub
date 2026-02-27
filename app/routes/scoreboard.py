@@ -575,7 +575,10 @@ def _recover_stale_snapshot_if_needed(payload, min_students=25, min_newer_second
     # Prefer a newer peer snapshot first when peers are configured.
     peer_payload, peer_src = _best_peer_snapshot(min_students=min_students)
     peer_stamp = _payload_sync_stamp(peer_payload) if peer_payload else 0.0
-    if peer_payload and peer_stamp > best_stamp:
+    # Never adopt a peer snapshot that would shrink the local student roster —
+    # this prevents Render's FEB26_SEED (seeded with datetime.now() timestamp) from
+    # overwriting a healthy local master copy that has significantly more students.
+    if peer_payload and peer_stamp > best_stamp and not _is_suspicious_student_shrink(payload, peer_payload):
         best_payload = peer_payload
         best_src = peer_src
         best_stamp = peer_stamp
@@ -584,7 +587,7 @@ def _recover_stale_snapshot_if_needed(payload, min_students=25, min_newer_second
     if allow_local_scan:
         local_payload, local_src = _best_local_snapshot(min_students=min_students)
         local_best_stamp = _payload_sync_stamp(local_payload) if local_payload else 0.0
-        if local_payload and local_best_stamp > best_stamp:
+        if local_payload and local_best_stamp > best_stamp and not _is_suspicious_student_shrink(payload, local_payload):
             best_payload = local_payload
             best_src = local_src
             best_stamp = local_best_stamp
