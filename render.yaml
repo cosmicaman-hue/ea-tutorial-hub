@@ -16,7 +16,7 @@ services:
       - key: EA_INIT_ON_BOOT
         value: "1"
       - key: EA_MASTER_MODE
-        value: "1"
+        value: "0"
       - key: SESSION_COOKIE_SECURE
         value: "true"
       - key: SECRET_KEY
@@ -27,6 +27,6 @@ services:
       - key: TEACHER_PASSWORD
         sync: false
       - key: SYNC_SHARED_KEY
-        sync: false
+        value: "EA_SYNC_KEY_917511_2026"
       - key: EA_JOIN_CODE
         sync: false
