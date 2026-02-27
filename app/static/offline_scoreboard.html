@@ -29,8 +29,8 @@
             --ease-out:    cubic-bezier(0.25, 0.46, 0.45, 0.94);
             --ease-in-out: cubic-bezier(0.42, 0.00, 0.58, 1.00);
             --ease-in:     cubic-bezier(0.42, 0.00, 1.00, 1.00);
-            --spring:      cubic-bezier(0.34, 1.56, 0.64, 1.00);
-            --spring-soft: cubic-bezier(0.16, 1.00, 0.30, 1.00);
+            --spring:      cubic-bezier(0.2, 0.8, 0.2, 1);
+            --spring-soft: cubic-bezier(0.2, 0.8, 0.2, 1);
             --dur-xxs: 70ms;
             --dur-xs:  120ms;
             --dur-sm:  280ms;
@@ -240,22 +240,19 @@
             transition: border-color var(--dur-sm) var(--ease-out), box-shadow var(--dur-sm) var(--ease-out);
         }
 
-        /* ── iOS tap feedback: fast scale-down, spring recovery ─────────── */
+        /* ── Simple tap feedback ───────────────────────────────────────── */
         button:not(:disabled):not(.tab-button):not(.col-toggle):active {
-            transform: scale(0.955);
-            transition: transform 75ms var(--spring) !important;
+            opacity: 0.88;
         }
         .month-button:active {
-            transform: scale(0.95) !important;
-            transition: transform 75ms var(--spring) !important;
+            opacity: 0.88 !important;
         }
         .tab-button:active {
-            transform: scale(0.92);
+            opacity: 0.85;
         }
         /* Score-cell editable tap response */
         .score-cell.editable:active {
-            transform: scale(0.88);
-            transition: transform 60ms var(--spring);
+            opacity: 0.85;
         }
 
         button {
@@ -627,16 +624,16 @@
         #scoreboard-tab .scoreboard-scroll {
             overflow-x: scroll;
             overflow-y: auto;
-            max-height: calc(100vh - 300px);
-            min-height: 220px;
+            max-height: calc(100vh - 160px);
+            min-height: 340px;
             padding-bottom: 0;
             scroll-behavior: auto;
         }
 
         @media (max-width: 980px) {
             #scoreboard-tab .scoreboard-scroll {
-                max-height: calc(100vh - 220px);
-                min-height: 180px;
+                max-height: calc(100vh - 140px);
+                min-height: 280px;
             }
         }
 
@@ -926,6 +923,14 @@
             box-shadow: inset 0 0 0 1px rgba(251, 191, 36, 0.45);
             text-shadow: 0 0 6px rgba(251, 191, 36, 0.2);
         }
+        .score-cell.star-awarded-green {
+            box-shadow: inset 0 0 0 1px rgba(34, 197, 94, 0.55);
+            text-shadow: 0 0 6px rgba(34, 197, 94, 0.25);
+        }
+        .star-added {
+            color: #22c55e;
+            font-weight: 700;
+        }
 
         .record-star-undo-btn {
             width: 18px;
@@ -965,6 +970,7 @@
             background: linear-gradient(135deg, #f87171 0%, #b91c1c 100%);
             color: #7f1d1d;
             font-weight: 800;
+            font-size: 20px;
         }
 
         .score-cell.veto-used {
@@ -2128,7 +2134,7 @@
             display: flex;
             align-items: center;
             gap: 10px;
-            animation: iosSlideUp 280ms var(--spring-soft) both;
+            animation: fadeIn var(--dur-sm) var(--ease-out) both;
             will-change: auto;
             contain: layout style paint;
         }
@@ -2181,6 +2187,10 @@
             from { opacity: 0; }
             to   { opacity: 1; }
         }
+        @keyframes fadeOut {
+            from { opacity: 1; }
+            to   { opacity: 0; }
+        }
 
         .validation-modal-content {
             background: var(--bg-card);
@@ -2190,9 +2200,7 @@
             max-width: 500px;
             width: 90%;
             padding: 0;
-            animation: iosSlideUp var(--dur-sm) var(--spring-soft) both;
-            will-change: transform;
-            transform: translateZ(0);
+            animation: fadeIn var(--dur-sm) var(--ease-out) both;
         }
 
         @keyframes iosFadeIn {
@@ -2706,47 +2714,44 @@
             to   { opacity: 1; transform: translateY(0);   }
         }
 
-        /* ── Tab switch container entrance ──────────────────────────────── */
+        /* ── Tab switch container entrance (simple) ─────────────────────── */
         .tab-entering {
-            animation: iosSlideUp var(--dur-sm) var(--spring-soft) both;
-            will-change: transform, opacity;
-            backface-visibility: hidden;
-            transform: translateZ(0);
+            animation: fadeIn var(--dur-sm) var(--ease-out) both;
         }
 
         /* ── Tab-scoped card stagger (applied by .tab-entering parent) ──── */
-        .tab-entering .form-card:nth-child(1)  { animation: iosSlideUp var(--dur-sm) var(--spring-soft) 0ms  both; }
-        .tab-entering .form-card:nth-child(2)  { animation: iosSlideUp var(--dur-sm) var(--spring-soft) 22ms both; }
-        .tab-entering .form-card:nth-child(3)  { animation: iosSlideUp var(--dur-sm) var(--spring-soft) 44ms both; }
-        .tab-entering .form-card:nth-child(n+4){ animation: iosSlideUp var(--dur-sm) var(--spring-soft) 58ms both; }
+        .tab-entering .form-card:nth-child(1)  { animation: fadeIn var(--dur-sm) var(--ease-out) 0ms  both; }
+        .tab-entering .form-card:nth-child(2)  { animation: fadeIn var(--dur-sm) var(--ease-out) 20ms both; }
+        .tab-entering .form-card:nth-child(3)  { animation: fadeIn var(--dur-sm) var(--ease-out) 40ms both; }
+        .tab-entering .form-card:nth-child(n+4){ animation: fadeIn var(--dur-sm) var(--ease-out) 60ms both; }
 
         /* ── .ios-appear utility — add to any element for a one-shot pop-in */
         .ios-appear {
-            animation: iosSlideUp var(--dur-md) var(--spring-soft) both;
+            animation: fadeIn var(--dur-sm) var(--ease-out) both;
         }
         .ios-appear-fast {
-            animation: iosSlideUp var(--dur-sm) var(--spring-soft) both;
+            animation: fadeIn var(--dur-sm) var(--ease-out) both;
         }
         .ios-scale-in {
-            animation: iosScaleIn var(--dur-md) var(--spring-soft) both;
+            animation: fadeIn var(--dur-sm) var(--ease-out) both;
         }
 
         /* ── Table row stagger (add .ios-rows-animate to the <table>) ───── */
         .ios-rows-animate tbody tr { animation: none; }
-        .ios-rows-animate tbody tr:nth-child(-n+24) { animation: iosRowIn var(--dur-sm) var(--ease-out) both; will-change: transform, opacity; }
+        .ios-rows-animate tbody tr:nth-child(-n+24) { animation: fadeIn var(--dur-sm) var(--ease-out) both; will-change: opacity; }
         .ios-rows-animate tbody tr:nth-child(1)   { animation-delay:   0ms; }
-        .ios-rows-animate tbody tr:nth-child(2)   { animation-delay:  16ms; }
-        .ios-rows-animate tbody tr:nth-child(3)   { animation-delay:  28ms; }
-        .ios-rows-animate tbody tr:nth-child(4)   { animation-delay:  40ms; }
-        .ios-rows-animate tbody tr:nth-child(5)   { animation-delay:  52ms; }
-        .ios-rows-animate tbody tr:nth-child(6)   { animation-delay:  62ms; }
-        .ios-rows-animate tbody tr:nth-child(7)   { animation-delay:  72ms; }
-        .ios-rows-animate tbody tr:nth-child(8)   { animation-delay:  82ms; }
-        .ios-rows-animate tbody tr:nth-child(n+9) { animation-delay:  90ms; }
+        .ios-rows-animate tbody tr:nth-child(2)   { animation-delay:  14ms; }
+        .ios-rows-animate tbody tr:nth-child(3)   { animation-delay:  24ms; }
+        .ios-rows-animate tbody tr:nth-child(4)   { animation-delay:  34ms; }
+        .ios-rows-animate tbody tr:nth-child(5)   { animation-delay:  44ms; }
+        .ios-rows-animate tbody tr:nth-child(6)   { animation-delay:  54ms; }
+        .ios-rows-animate tbody tr:nth-child(7)   { animation-delay:  64ms; }
+        .ios-rows-animate tbody tr:nth-child(8)   { animation-delay:  74ms; }
+        .ios-rows-animate tbody tr:nth-child(n+9) { animation-delay:  84ms; }
 
         /* ── Modal entrance via .active class ───────────────────────────── */
         .modal.active .modal-content {
-            animation: iosScaleIn var(--dur-md) var(--spring-soft) both;
+            animation: fadeIn var(--dur-sm) var(--ease-out) both;
         }
         .modal.active {
             backdrop-filter: blur(2px);
@@ -2754,7 +2759,7 @@
             background: rgba(2, 6, 23, 0.58);
         }
         .modal.modal-exiting .modal-content {
-            animation: iosModalOut 140ms var(--ease-in) forwards !important;
+            animation: fadeOut 120ms var(--ease-in) forwards !important;
         }
 
         .group-a-row td {
@@ -3738,7 +3743,7 @@
                     </div>
                     <div class="control-group">
                         <label>Price/Unit</label>
-                        <input id="resourceItemPrice" type="number" min="0" step="1" placeholder="e.g., 50">
+                        <input id="resourceItemPrice" type="number" min="0" step="0.01" placeholder="e.g., 50 or 50.5">
                     </div>
                     <div class="control-group">
                         <label>Total Held</label>
@@ -3964,6 +3969,29 @@
                             <option value="completed">Completed</option>
                             <option value="not_completed">Not Completed</option>
                         </select>
+                    </div>
+                </div>
+                <div class="form-card" id="resourceSettlementCard" style="display:none;margin:8px 0 12px;padding:12px 14px;">
+                    <div style="font-weight:700;margin-bottom:6px;">Pending Settlement Summary</div>
+                    <div class="section-subtitle" style="margin-bottom:8px;">Consolidated per-student cash due/return for unsettled transactions.</div>
+                    <div class="scoreboard-wrapper">
+                        <div class="scoreboard-scroll">
+                            <table class="scoreboard" id="resourceSettlementTable">
+                                <thead>
+                                    <tr>
+                                        <th>Student</th>
+                                        <th style="width: 110px;">Roll</th>
+                                        <th style="width: 70px;">Txns</th>
+                                        <th style="width: 110px;">Due</th>
+                                        <th style="width: 110px;">Return</th>
+                                        <th style="width: 110px;">Net Due</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="resourceSettlementBody">
+                                    <tr><td colspan="6" class="text-center loading">Loading...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
                 <div class="scoreboard-wrapper">
@@ -7756,11 +7784,18 @@
         function renderStudentName(student, month = '') {
             const rawBase = getCanonicalStudentBaseName(student);
             const monthKey = String(month || '').trim();
-            let stars = Math.max(0, parseInt(safeProp(student, 'stars'), 10) || 0);
-            let vetos = Math.max(0, parseInt(safeProp(student, 'veto_count'), 10) || 0);
+            const globalStars = Math.max(0, parseInt(safeProp(student, 'stars'), 10) || 0);
+            const globalVetos = Math.max(0, parseInt(safeProp(student, 'veto_count'), 10) || 0);
+            let stars = globalStars;
+            let vetos = globalVetos;
             if (monthKey && safeProp(student, 'id')) {
-                stars = getStudentMonthStarAwardTotal(student.id, monthKey);
-                vetos = getStudentMonthVetoAwardTotal(student.id, monthKey);
+                const monthStars = getStudentMonthStarAwardTotal(student.id, monthKey);
+                const monthVetos = getStudentMonthVetoAwardTotal(student.id, monthKey);
+                const usedStars = getStudentMonthNegativeDeltaTotal(student.id, monthKey, 'stars');
+                const usedVetos = getStudentMonthNegativeDeltaTotal(student.id, monthKey, 'vetos');
+                // Show month awards when present; otherwise show global counters adjusted for usage.
+                stars = monthStars > 0 ? monthStars : Math.max(0, globalStars - usedStars);
+                vetos = monthVetos > 0 ? monthVetos : Math.max(0, globalVetos - usedVetos);
             }
             const designations = safeProp(student, 'id') ? getStudentDesignations(student.id, month) : [];
             const officeHolder = isOfficeHolderStudent(student, month);
@@ -9004,13 +9039,10 @@
                         const starDelta = starsByDate[date] || 0;
                         if (starDelta < 0) {
                             const uses = Math.abs(starDelta);
-                            const starText = uses <= 3 ? '*'.repeat(uses) : `*x${uses}`;
-                            if (points <= -51) {
-                                starOverrides[date] = starText;
-                                starClasses[date] = 'star-used-red';
-                            } else {
-                                starOverrides[date] = starText;
-                                starClasses[date] = 'star-used-green';
+                            const starText = '*';
+                            starOverrides[date] = starText;
+                            starClasses[date] = 'star-used-red';
+                            if (points >= -50) {
                                 const nextDate = addDays(date, 1);
                                 if (nextDate) {
                                     bonusByDate[nextDate] = (bonusByDate[nextDate] || 0) + (100 * uses);
@@ -9069,6 +9101,7 @@
                         if (delta > 0) monthlyVetos += delta;
                     });
 
+                    const isCurrentMonth = String(month || '').trim() === getCurrentMonthKey();
                     allDates.forEach(date => {
                         let points = row.pointsByDate[date] || 0;
                         const starOverride = starOverrides[date];
@@ -9117,15 +9150,15 @@
                             } else {
                                 scoreClass = 'score-cell bonus-neutral';
                             }
-                            const starText = starAwardCount > 0
-                                ? (starAwardCount <= 3 ? '★'.repeat(starAwardCount) : `★x${starAwardCount}`)
+                            const starText = (starAwardCount > 0 && isCurrentMonth)
+                                ? (starAwardCount <= 3 ? '*'.repeat(starAwardCount) : `*x${starAwardCount}`)
                                 : '';
-                            const displayWithStars = starText ? `${displayValue} ${starText}` : displayValue;
+                            const displayWithStars = starText ? `${displayValue} <span class="star-added">${starText}</span>` : displayValue;
                             const titleWithStars = starAwardCount > 0
                                 ? (noteText ? `${noteText} | Stars awarded: +${starAwardCount}` : `Stars awarded: +${starAwardCount}`)
                                 : (noteText || '');
-                            if (starAwardCount > 0) {
-                                scoreClass = `${scoreClass} star-awarded`.trim();
+                            if (starAwardCount > 0 && isCurrentMonth) {
+                                scoreClass = `${scoreClass} star-awarded star-awarded-green`.trim();
                             }
                             dailyDisplay.push(displayWithStars);
                             dailyClasses.push(scoreClass);
@@ -9261,11 +9294,21 @@
             if (newTabEl) {
                 newTabEl.classList.remove('hidden');
                 // Trigger iOS entrance animation without synchronous layout thrash.
-                newTabEl.classList.remove('tab-entering');
-                requestAnimationFrame(() => {
-                    newTabEl.classList.add('tab-entering');
-                });
-                newTabEl.addEventListener('animationend', () => newTabEl.classList.remove('tab-entering'), { once: true });
+                // Record Score needs faster response; skip the entrance animation there.
+                if (tabName !== 'add-score') {
+                    newTabEl.classList.remove('tab-entering');
+                    requestAnimationFrame(() => {
+                        newTabEl.classList.add('tab-entering');
+                    });
+                    newTabEl.addEventListener('animationend', () => newTabEl.classList.remove('tab-entering'), { once: true });
+                }
+                // Ensure Record Score opens aligned at the top (avoid retained scroll offset).
+                if (tabName === 'add-score') {
+                    requestAnimationFrame(() => {
+                        newTabEl.scrollTop = 0;
+                        window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+                    });
+                }
             }
 
             // Add active to clicked button
@@ -9390,48 +9433,71 @@
             return match ? match[1] : 'scoreboard';
         }
 
-        function refreshActiveTabFromSync() {
+        function refreshActiveTabFromSync(options = {}) {
+            const passive = options.passive === true;
             const tabName = getActiveTabName();
-            if (tabName === 'scoreboard') loadScoreboard();
-            else if (tabName === 'add-score') refreshRecordScoreTabFromSync();
-            else if (tabName === 'students') loadStudents();
-            else if (tabName === 'fees') loadFeesTab();
-            else if (tabName === 'resources') loadResourcesTab();
-            else if (tabName === 'syllabus') loadSyllabusTab();
-            else if (tabName === 'ranking') initRankingForm();
-            else if (tabName === 'group-scoreboard') loadGroupScoreboard();
-            else if (tabName === 'cr') loadCRTab();
-            else if (tabName === 'teachers') loadTeachersTab();
-            else if (tabName === 'teacher-voting') loadTeacherVotingTab();
-            else if (tabName === 'party') loadParties();
-            else if (tabName === 'office') loadOfficeHolders();
-            else if (tabName === 'voting') loadVotingTab();
-            else if (tabName === 'appeals') loadAppealsTab();
-            else if (tabName === 'notifications') loadNotificationsTab();
-            else if (tabName === 'attendance') refreshAttendanceTabFromSync();
-            else if (tabName === 'profile') loadProfileTab();
-            else if (tabName === 'homework') loadHomeworkTab();
-            else if (tabName === 'leadership') loadLeadership();
+            if (passive) {
+                window.__EA_SUPPRESS_TABLE_ANIM_UNTIL = Date.now() + 1800;
+            }
+            // Passive sync (auto/background) should not cause heavy full-tab re-renders
+            // on every snapshot. Keep always-fresh behavior for core live tabs only.
+            if (passive) {
+                if (tabName === 'scoreboard') loadScoreboard();
+                else if (tabName === 'add-score') refreshRecordScoreTabFromSync();
+                else if (tabName === 'attendance') refreshAttendanceTabFromSync();
+                else if (tabName === 'homework') loadHomeworkTab();
+            } else {
+                if (tabName === 'scoreboard') loadScoreboard();
+                else if (tabName === 'add-score') refreshRecordScoreTabFromSync();
+                else if (tabName === 'students') loadStudents();
+                else if (tabName === 'fees') loadFeesTab();
+                else if (tabName === 'resources') loadResourcesTab();
+                else if (tabName === 'syllabus') loadSyllabusTab();
+                else if (tabName === 'ranking') initRankingForm();
+                else if (tabName === 'group-scoreboard') loadGroupScoreboard();
+                else if (tabName === 'cr') loadCRTab();
+                else if (tabName === 'teachers') loadTeachersTab();
+                else if (tabName === 'teacher-voting') loadTeacherVotingTab();
+                else if (tabName === 'party') loadParties();
+                else if (tabName === 'office') loadOfficeHolders();
+                else if (tabName === 'voting') loadVotingTab();
+                else if (tabName === 'appeals') loadAppealsTab();
+                else if (tabName === 'notifications') loadNotificationsTab();
+                else if (tabName === 'attendance') refreshAttendanceTabFromSync();
+                else if (tabName === 'profile') loadProfileTab();
+                else if (tabName === 'homework') loadHomeworkTab();
+                else if (tabName === 'leadership') loadLeadership();
+            }
             // When not on scoreboard, silently refresh it in background so penalty
             // and score changes are reflected immediately when the user switches to it.
-            if (tabName !== 'scoreboard' && !document.hidden) {
+            if (!passive && tabName !== 'scoreboard' && !document.hidden) {
                 setTimeout(loadScoreboard, 400);
             }
             updateAppealsTabNotification();
             updateHomeworkTabNotification();
             updateNotificationsTabNotification();
-            autoAdjustTableFonts();
+            if (!passive) {
+                autoAdjustTableFonts();
+            }
         }
 
         let activeTabRefreshTimer = null;
-        function scheduleActiveTabRefreshFromSync(delayMs = 90) {
+        let lastPassiveSyncRefreshAt = 0;
+        function scheduleActiveTabRefreshFromSync(delayMs = 90, options = {}) {
+            const passive = options.passive === true;
+            if (passive) {
+                const now = Date.now();
+                // Guard against jitter when snapshots arrive in bursts (SSE + polling).
+                if (now - lastPassiveSyncRefreshAt < 1800) return;
+                lastPassiveSyncRefreshAt = now;
+            }
             if (activeTabRefreshTimer) {
                 clearTimeout(activeTabRefreshTimer);
             }
             const wait = Math.max(0, parseInt(delayMs, 10) || 0);
             activeTabRefreshTimer = setTimeout(() => {
                 activeTabRefreshTimer = null;
-                refreshActiveTabFromSync();
+                refreshActiveTabFromSync({ passive });
             }, wait);
         }
 
@@ -9646,6 +9712,19 @@
                 .reduce((sum, item) => {
                     const delta = parseInt(item[key], 10) || 0;
                     return sum + (delta > 0 ? delta : 0);
+                }, 0);
+        }
+
+        function getStudentMonthNegativeDeltaTotal(studentId, monthKey, field) {
+            const sid = parseInt(studentId, 10);
+            const month = String(monthKey || '').trim();
+            const key = String(field || '').trim().toLowerCase();
+            if (!sid || !month || (key !== 'stars' && key !== 'vetos')) return 0;
+            return db.getScoresForMonth(month)
+                .filter(item => parseInt(item.studentId, 10) === sid)
+                .reduce((sum, item) => {
+                    const delta = parseInt(item[key], 10) || 0;
+                    return sum + (delta < 0 ? Math.abs(delta) : 0);
                 }, 0);
         }
 
@@ -11065,7 +11144,7 @@
             if (showToast) {
                 showAlert('Synced latest data from LAN servers', 'success');
             }
-            scheduleActiveTabRefreshFromSync(90);
+            scheduleActiveTabRefreshFromSync(showToast ? 90 : 140, { passive: !showToast });
             return true;
         }
 
@@ -11212,7 +11291,10 @@
                 return pullInFlightPromise;
             }
             pullInFlightPromise = (async () => {
-            updateSyncStatus('syncing', 'Syncing');
+            const isBackgroundPull = !showToast && !forceFull;
+            if (!isBackgroundPull) {
+                updateSyncStatus('syncing', 'Syncing');
+            }
             const baseUrls = getSyncBaseUrls();
             // Same-origin only: avoids CORS failures when the UI is opened from a backup node.
             // Backup nodes should receive replicated updates from master and serve them locally.
@@ -11449,15 +11531,17 @@
                 try {
                     const payload = JSON.parse(event.data || '{}');
                     const stamp = parseSyncStamp(payload.updated_at);
-                    if (stamp && stamp <= lastKnownRemoteStamp) {
+                    // Ignore heartbeat/empty events. Pull only when server stamp advances.
+                    if (!stamp) {
                         return;
                     }
-                    if (stamp) {
-                        lastKnownRemoteStamp = stamp;
+                    if (stamp <= lastKnownRemoteStamp) {
+                        return;
                     }
-                    schedulePullFromServer(false, 120, true);
+                    lastKnownRemoteStamp = stamp;
+                    schedulePullFromServer(false, 120, false);
                 } catch (err) {
-                    schedulePullFromServer(false, 120, true);
+                    // Ignore malformed event payloads to avoid pull storms.
                 }
             });
             realtimeSyncSource.onerror = () => {
@@ -13092,7 +13176,8 @@
 
             const activeChip = strip.querySelector('.record-date-chip.active');
             if (activeChip && typeof activeChip.scrollIntoView === 'function') {
-                activeChip.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+                const behavior = getActiveTabName() === 'add-score' ? 'auto' : 'smooth';
+                activeChip.scrollIntoView({ behavior, inline: 'center', block: 'nearest' });
             }
         }
 
@@ -20774,6 +20859,14 @@
             return Array.isArray(data.resource_transactions) ? data.resource_transactions : [];
         }
 
+        function formatMoneyValue(value) {
+            const num = Number(value);
+            if (!Number.isFinite(num)) return '0';
+            let out = num.toFixed(2);
+            out = out.replace(/\.00$/, '').replace(/(\.\d)0$/, '$1');
+            return out;
+        }
+
         /**
          * Save resource changes to LOCAL data first, then push full data to server.
          * This prevents the bug where pushToServer(partial) + pullFromServer results in
@@ -21263,7 +21356,7 @@
                         <td>${parseInt(it.id, 10) || '-'}</td>
                         <td>${escapeHtml(String(it.name || '').trim())}</td>
                         <td>${escapeHtml(String(it.unit || '').trim() || '-')}</td>
-                        <td>${Math.round(Number(it.price_per_unit) || 0)}</td>
+                        <td>${formatMoneyValue(it.price_per_unit)}</td>
                         <td>${parseInt(it.total_held, 10) || 0}</td>
                         <td>${action}</td>
                     </tr>
@@ -21283,7 +21376,7 @@
             const heldEl = document.getElementById('resourceItemHeld');
             if (nameEl) nameEl.value = String(item.name || '').trim();
             if (unitEl) unitEl.value = String(item.unit || '').trim();
-            if (priceEl) priceEl.value = String(Math.round(Number(item.price_per_unit) || 0));
+            if (priceEl) priceEl.value = String(formatMoneyValue(item.price_per_unit));
             if (heldEl) heldEl.value = String(parseInt(item.total_held, 10) || 0);
         }
 
@@ -21478,6 +21571,7 @@
 
             if (!rows.length) {
                 tbody.innerHTML = `<tr><td colspan="12" class="text-center" style="padding: 22px;">No transactions</td></tr>`;
+                renderResourceSettlementSummary([]);
                 return;
             }
             tbody.innerHTML = rows.map(txn => {
@@ -22629,6 +22723,67 @@
                     </tr>
                 `;
             }).join('');
+            renderResourceSettlementSummary(rows, studentById);
+        }
+
+        function renderResourceSettlementSummary(rows, studentById = null) {
+            const target = document.getElementById('resourceSettlementBody');
+            const card = document.getElementById('resourceSettlementCard');
+            if (!target || !card) return;
+            const txns = Array.isArray(rows) ? rows : getResourceTransactions();
+            const byId = studentById || new Map((db.getStudents() || []).map(s => [parseInt(s.id, 10), s]));
+            const summary = new Map();
+
+            txns.forEach(txn => {
+                const mode = String(txn && txn.type || '').trim().toLowerCase();
+                if (mode !== 'cash_purchase') return;
+                const sid = parseInt(txn && txn.studentId, 10) || 0;
+                if (!sid) return;
+                const cashPaid = Math.max(0, parseFloat(txn && txn.cash_paid) || 0);
+                const cashCharged = Math.max(0, parseFloat(txn && txn.cash_charged) || 0);
+                const fallbackCharged = Math.max(0, parseFloat(txn && txn.total_cost) || 0);
+                const charged = cashCharged || fallbackCharged;
+                if (!charged) return;
+                const bal = computeResourceCashBalance(charged, cashPaid);
+                const cashDueRaw = parseFloat(txn && txn.cash_due);
+                const cashReturnRaw = parseFloat(txn && txn.cash_return_due);
+                const due = Math.max(0, Number.isFinite(cashDueRaw) ? cashDueRaw : bal.pending);
+                const ret = Math.max(0, Number.isFinite(cashReturnRaw) ? cashReturnRaw : bal.return_due);
+                if (due <= 0 && ret <= 0 && !txn.pending_settlement) return;
+
+                const entry = summary.get(sid) || { due: 0, ret: 0, count: 0 };
+                entry.due += due;
+                entry.ret += ret;
+                entry.count += 1;
+                summary.set(sid, entry);
+            });
+
+            if (!summary.size) {
+                card.style.display = 'none';
+                target.innerHTML = '';
+                return;
+            }
+            card.style.display = '';
+            const rowsHtml = Array.from(summary.entries())
+                .map(([sid, s]) => {
+                    const student = byId.get(parseInt(sid, 10));
+                    const roll = student ? formatRollDisplay(student.roll) : '';
+                    const name = student ? renderStudentName(student, getCurrentMonthKey()) : 'Unknown';
+                    const due = formatMoneyValue(s.due);
+                    const ret = formatMoneyValue(s.ret);
+                    const net = formatMoneyValue(Math.max(0, s.due - s.ret));
+                    return `
+                        <tr>
+                            <td>${name}</td>
+                            <td>${escapeHtml(roll || '-')}</td>
+                            <td>${s.count}</td>
+                            <td>₹${due}</td>
+                            <td>₹${ret}</td>
+                            <td>₹${net}</td>
+                        </tr>
+                    `;
+                }).join('');
+            target.innerHTML = rowsHtml;
         }
 
         function addSyllabusSubject() {
@@ -24041,6 +24196,10 @@
         function _animateTableRows(tableId) {
             const tbl = document.getElementById(tableId);
             if (!tbl) return;
+            if ((window.__EA_SUPPRESS_TABLE_ANIM_UNTIL || 0) > Date.now()) {
+                tbl.classList.remove('ios-rows-animate');
+                return;
+            }
             const rows = tbl.querySelectorAll('tbody tr');
             const totalRows = rows.length;
             if (!totalRows) {
