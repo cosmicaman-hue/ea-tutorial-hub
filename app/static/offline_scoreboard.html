@@ -624,16 +624,16 @@
         #scoreboard-tab .scoreboard-scroll {
             overflow-x: scroll;
             overflow-y: auto;
-            max-height: calc(100vh - 160px);
-            min-height: 340px;
+            max-height: calc(100vh - 90px);
+            min-height: 470px;
             padding-bottom: 0;
             scroll-behavior: auto;
         }
 
         @media (max-width: 980px) {
             #scoreboard-tab .scoreboard-scroll {
-                max-height: calc(100vh - 140px);
-                min-height: 280px;
+                max-height: calc(100vh - 85px);
+                min-height: 370px;
             }
         }
 
@@ -6606,7 +6606,16 @@
             const existingByCode = new Map();
             (data.parties || []).forEach(party => {
                 const code = normalizePartyCode(party.code);
-                if (code && !existingByCode.has(code)) {
+                if (!code) return;
+                if (!existingByCode.has(code)) {
+                    existingByCode.set(code, party);
+                    return;
+                }
+                // If duplicates exist, prefer the richer entry so members are not dropped.
+                const prev = existingByCode.get(code) || {};
+                const prevMembers = Array.isArray(prev.members) ? prev.members.length : 0;
+                const nextMembers = Array.isArray(party.members) ? party.members.length : 0;
+                if (nextMembers > prevMembers) {
                     existingByCode.set(code, party);
                 }
             });
@@ -8443,6 +8452,15 @@
 
             addParty(party) {
                 const data = this.getData();
+                const code = normalizePartyCode(party && party.code);
+                const existing = (data.parties || []).find(p => normalizePartyCode(p.code) === code);
+                if (existing) {
+                    // Upsert by code to avoid duplicate-party collapse during sync/schema normalization.
+                    if (!Array.isArray(existing.members)) existing.members = [];
+                    if (party && party.full_name) existing.full_name = party.full_name;
+                    this.saveData(data);
+                    return existing;
+                }
                 party.id = Date.now();
                 party.members = party.members || [];
                 data.parties.push(party);
@@ -15988,10 +16006,26 @@
                 return;
             }
 
+            const parties = db.getParties();
+            const conflicting = parties.find(p =>
+                normalizePartyCode(p.code) === code && (!editingPartyId || p.id !== editingPartyId)
+            );
+
             if (editingPartyId) {
+                if (conflicting) {
+                    showAlert('This party code already exists. Duplicate codes are not allowed.', 'warning');
+                    return;
+                }
                 db.updateParty(editingPartyId, { code });
                 showAlert('Party updated successfully!', 'success');
             } else {
+                if (conflicting) {
+                    showAlert('This party already exists. Opening existing party instead of creating duplicate.', 'info');
+                    setActiveParty(conflicting.id);
+                    clearPartyForm();
+                    loadParties();
+                    return;
+                }
                 db.addParty({ code, members: [] });
                 showAlert('Party added successfully!', 'success');
             }
