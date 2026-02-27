@@ -3183,8 +3183,8 @@
                 <div class="control-group">
                     <label>📅 Month View</label>
                     <div class="month-nav" id="monthSelectorWrap">
-                        <span class="month-nav-label">📅 Select Period →</span>
-                        <div id="monthSelector" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;"></div>
+                        <span class="month-nav-label">📅 Period</span>
+                        <select id="monthSelector" class="form-control" onchange="loadMonthScoreboard(this.value)" style="min-width:140px;padding:6px 10px;border-radius:6px;border:1px solid var(--border-color,#ccc);background:var(--input-bg,#fff);color:var(--text-primary,#222);font-size:14px;cursor:pointer;"></select>
                     </div>
                 </div>
                 <div class="control-group">
@@ -12361,6 +12361,65 @@
             return text;
         }
 
+        /**
+         * When the calendar rolls to a new month and no roster exists for it yet,
+         * silently copy the previous month's active roster (admin only).
+         * Stars and VETOs are snapshotted from each student's current global totals
+         * so historical views of this month will show correct carry-in balances.
+         * Returns true if a new roster was created, false otherwise.
+         */
+        function autoCreateNewMonthRosterIfNeeded() {
+            if (currentUserRole !== 'admin') return false;
+            const data = db.getData();
+            const todayMonth = getCurrentMonthKey();
+            // Already has a roster for today's month — nothing to do
+            const existing = data.month_students && data.month_students[todayMonth];
+            if (existing && existing.length > 0) return false;
+            // Find the most recent previous month that has a roster
+            const allMonths = db.getMonths(); // sorted descending
+            const prevMonth = allMonths.find(m => m < todayMonth);
+            if (!prevMonth) return false;
+            const prevRolls = (data.month_students && data.month_students[prevMonth]) || [];
+            if (!prevRolls.length) return false;
+            // Build new month profiles: copy names/classes from prev profiles,
+            // snapshot current star/veto totals from student records.
+            const prevProfiles = (data.month_roster_profiles && data.month_roster_profiles[prevMonth]) || [];
+            const studentsByRoll = new Map();
+            (data.students || []).forEach(s => {
+                const r = normalizeRosterValue(s.roll);
+                if (r) studentsByRoll.set(r, s);
+            });
+            const newProfiles = [];
+            prevRolls.forEach(rollRaw => {
+                const roll = normalizeRosterValue(rollRaw);
+                if (!roll || !isValidRollNo(roll)) return;
+                const student = studentsByRoll.get(roll);
+                const prev = prevProfiles.find(p => normalizeRosterValue(p.roll) === roll);
+                const name = (student && (student.name || student.base_name)) || (prev && prev.name) || roll;
+                const baseName = (student && (student.base_name || student.name)) || (prev && prev.base_name) || roll;
+                if (!isValidStudentName(baseName)) return;
+                const classRaw = (student && student.class) || (prev && prev.class);
+                const classNum = parseInt(classRaw, 10);
+                newProfiles.push({
+                    roll,
+                    name: name || baseName,
+                    base_name: baseName,
+                    class: Number.isNaN(classNum) ? null : classNum,
+                    month_star_count: student ? Math.max(0, parseInt(student.stars, 10) || 0) : 0,
+                    month_veto_count: student ? Math.max(0, parseInt(student.veto_count, 10) || 0) : 0,
+                    month_designations: []
+                });
+            });
+            if (!newProfiles.length) return false;
+            data.month_students = data.month_students || {};
+            data.month_roster_profiles = data.month_roster_profiles || {};
+            data.month_students[todayMonth] = newProfiles.map(p => p.roll);
+            data.month_roster_profiles[todayMonth] = newProfiles;
+            db.saveData(data);
+            console.log(`[AutoMonth] Created ${todayMonth} roster from ${prevMonth} (${newProfiles.length} students)`);
+            return true;
+        }
+
         function loadScoreboard() {
             if (localRosterNeedsRecovery()) {
                 rosterRecoveryQueuedTab = 'scoreboard';
@@ -12368,6 +12427,9 @@
                 attemptRosterRecovery();
                 return;
             }
+            // Auto-create new month roster when the calendar rolls over
+            autoCreateNewMonthRosterIfNeeded();
+
             const months = db.getMonths();
             const todayMonth = getCurrentMonthKey();
             const savedMonth = localStorage.getItem(ACTIVE_SCOREBOARD_MONTH_KEY) || '';
@@ -12377,14 +12439,14 @@
                 months[0] ||
                 todayMonth
             );
-            
-            // Populate month selector
+
+            // Populate month dropdown
             const monthSelector = document.getElementById('monthSelector');
             monthSelector.innerHTML = months.map(month => {
                 const [year, monthNum] = month.split('-');
                 const date = new Date(year, monthNum - 1);
                 const label = date.toLocaleDateString('en-US', { year: 'numeric', month: 'short' });
-                return `<button class="month-button ${month === currentMonth ? 'active' : ''}" data-month="${month}" onclick="loadMonthScoreboard('${month}')">${label}</button>`;
+                return `<option value="${month}"${month === currentMonth ? ' selected' : ''}>${label}</option>`;
             }).join('');
 
             loadMonthScoreboard(currentMonth);
@@ -12557,10 +12619,9 @@
             if (month) {
                 localStorage.setItem(ACTIVE_SCOREBOARD_MONTH_KEY, month);
             }
-            // Update active month button
-            document.querySelectorAll('.month-button').forEach(btn => {
-                btn.classList.toggle('active', btn.dataset.month === month);
-            });
+            // Sync month dropdown selection
+            const _sel = document.getElementById('monthSelector');
+            if (_sel && _sel.tagName === 'SELECT' && _sel.value !== month) _sel.value = month;
 
             let scoreboard = db.getMonthlyScoreboard(month);
             const allDates = (scoreboard.length && Array.isArray(scoreboard[0].dates))
@@ -12879,7 +12940,8 @@
         }
 
         function filterScoreboard() {
-            const activeMonth = safeProp(safeProp(document.querySelector('.month-button.active'), 'dataset'), 'month');
+            const sel = document.getElementById('monthSelector');
+            const activeMonth = sel && sel.value;
             if (activeMonth) {
                 loadMonthScoreboard(activeMonth, true);
             } else {
