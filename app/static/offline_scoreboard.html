@@ -11857,6 +11857,8 @@
             showAlert('Master update started. Syncing all configured servers for 3 seconds.', 'info');
 
             try {
+                let pushFailures = 0;
+                let pullFailures = 0;
                 for (const targetOffset of checkpointsMs) {
                     const waitMs = startedAt + targetOffset - Date.now();
                     if (waitMs > 0) {
@@ -11868,18 +11870,34 @@
                     setMasterUpdateButtonState(true, remaining);
 
                     if (canPush) {
-                        // 8 s timeout — server may need to contact Render peer on first request
-                        await withTimeout(pushToServer(db.getData(), { silent: true }), 8000);
+                        // Render cold-start/network jitter can exceed short timeouts.
+                        try {
+                            await withTimeout(pushToServer(db.getData(), { silent: true }), 15000);
+                        } catch (e) {
+                            pushFailures += 1;
+                        }
                     }
-                    await withTimeout(pullFromServer(false, true), 8000);
+                    try {
+                        await withTimeout(pullFromServer(false, true), 15000);
+                    } catch (e) {
+                        pullFailures += 1;
+                    }
                 }
 
                 const remainingFinal = Math.max(0, Math.ceil((totalWindowMs - (Date.now() - startedAt)) / 1000));
                 if (remainingFinal > 0) {
                     await delay(remainingFinal * 1000);
                 }
-                await withTimeout(pullFromServer(false, true), 8000); // forceFull on final pass
-                showAlert('Master update complete. Devices should converge within a few seconds.', 'success');
+                try {
+                    await withTimeout(pullFromServer(false, true), 15000); // forceFull on final pass
+                } catch (e) {
+                    pullFailures += 1;
+                }
+                if (pushFailures || pullFailures) {
+                    showAlert(`Master update finished with warnings (push fails: ${pushFailures}, pull fails: ${pullFailures}). Local data is safe; sync will continue in background.`, 'warning');
+                } else {
+                    showAlert('Master update complete. Devices should converge within a few seconds.', 'success');
+                }
             } catch (err) {
                 showAlert('Master update encountered an error. Local data is safe.', 'warning');
             } finally {

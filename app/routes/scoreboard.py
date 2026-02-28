@@ -171,7 +171,8 @@ def _forward_offline_data_to_peers(payload, extra_peers=None):
             }
         )
         try:
-            with urllib.request.urlopen(req, timeout=3):
+            # WAN peers (Render) can be slower on cold starts; keep a slightly higher timeout.
+            with urllib.request.urlopen(req, timeout=6):
                 pass
         except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError, OSError):
             continue
