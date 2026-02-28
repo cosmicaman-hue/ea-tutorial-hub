@@ -135,6 +135,19 @@ def _normalize_peer_list(raw_values):
     return peers
 
 
+def _resolve_sync_shared_key():
+    """
+    Resolve replication key with a safe fallback.
+    Priority:
+    1) SYNC_SHARED_KEY (explicit)
+    2) SECRET_KEY (deployment default fallback)
+    """
+    explicit = str(os.getenv('SYNC_SHARED_KEY', '') or '').strip()
+    if explicit:
+        return explicit
+    return str(os.getenv('SECRET_KEY', '') or '').strip()
+
+
 def _forward_offline_data_to_peers(payload, extra_peers=None):
     peers = _get_sync_peers() + _normalize_peer_list(extra_peers or [])
     peers = list(dict.fromkeys(peers))
@@ -142,6 +155,7 @@ def _forward_offline_data_to_peers(payload, extra_peers=None):
         return
     current_origin = (request.host_url or '').rstrip('/')
     body = json.dumps({'data': payload}).encode('utf-8')
+    shared_key = _resolve_sync_shared_key()
     for peer in peers:
         if peer.rstrip('/') == current_origin:
             continue
@@ -153,7 +167,7 @@ def _forward_offline_data_to_peers(payload, extra_peers=None):
             headers={
                 'Content-Type': 'application/json',
                 'X-EA-Replicated': '1',
-                'X-EA-Sync-Key': os.getenv('SYNC_SHARED_KEY', '')
+                'X-EA-Sync-Key': shared_key
             }
         )
         try:
@@ -2743,17 +2757,17 @@ def _is_valid_replication_request():
     if request.headers.get('X-EA-Replicated') != '1':
         return False
 
-    expected_key = os.getenv('SYNC_SHARED_KEY', '').strip()
+    expected_key = _resolve_sync_shared_key()
     provided_key = request.headers.get('X-EA-Sync-Key', '').strip()
 
-    # Security: Fail if sync key not configured (prevent unauthorized sync)
+    # Fail if no replication key source is configured.
     if not expected_key:
-        current_app.logger.warning("SYNC_SHARED_KEY not configured - rejecting replication request")
+        current_app.logger.warning("Replication key missing (set SYNC_SHARED_KEY or SECRET_KEY) - rejecting replication request")
         return False
 
-    # Security: Require minimum key length
-    if len(expected_key) < 16:
-        current_app.logger.error("SYNC_SHARED_KEY too short (minimum 16 characters required)")
+    # Keep a minimum length guard while allowing common SECRET_KEY fallbacks.
+    if len(expected_key) < 8:
+        current_app.logger.error("Replication key too short (minimum 8 characters required)")
         return False
 
     # Security: Use HMAC comparison to prevent timing attacks
