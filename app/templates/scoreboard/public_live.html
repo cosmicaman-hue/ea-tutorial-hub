@@ -71,6 +71,15 @@
         .pos { color: var(--good); }
         .neg { color: var(--bad); }
         .empty { padding: 24px; color: var(--muted); text-align: center; }
+        .anon td { color: var(--muted); font-size: 13px; }
+        .divider td {
+            border-top: 2px dashed rgba(148,163,184,.35);
+            padding: 4px 10px;
+            font-size: 11px;
+            color: #475569;
+            background: transparent;
+            letter-spacing: .05em;
+        }
     </style>
 </head>
 <body>
@@ -229,13 +238,28 @@
                 return;
             }
 
+            const TOP_FULL = 15;
             body.innerHTML = rows.map((r, i) => {
+                const rank = i + 1;
                 const cls = r.total > 0 ? 'pos' : (r.total < 0 ? 'neg' : '');
-                return `<tr>
-                    <td class="rank">${i + 1}</td>
+                if (rank <= TOP_FULL) {
+                    return `<tr>
+                        <td class="rank">${rank}</td>
+                        <td>${r.roll || '-'}</td>
+                        <td>${r.name}</td>
+                        <td>${r.classVal}</td>
+                        <td class="score ${cls}">${r.total}</td>
+                    </tr>`;
+                }
+                // Rank 16+: roll number only — name and class hidden to protect privacy
+                const divider = rank === TOP_FULL + 1
+                    ? `<tr class="divider"><td colspan="5">— remaining participants —</td></tr>`
+                    : '';
+                return `${divider}<tr class="anon">
+                    <td class="rank">${rank}</td>
                     <td>${r.roll || '-'}</td>
-                    <td>${r.name}</td>
-                    <td>${r.classVal}</td>
+                    <td>—</td>
+                    <td>—</td>
                     <td class="score ${cls}">${r.total}</td>
                 </tr>`;
             }).join('');
