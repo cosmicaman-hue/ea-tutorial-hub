@@ -231,19 +231,35 @@ def _do_peer_sync_cycle(app):
 
                 # ── Decide direction ─────────────────────────────────────────
                 # Margin of 30 s avoids flip-flopping on tiny clock skew.
-                # Master is the source of truth — it never adopts data from peers.
-                # Pulling from Render on the master caused admin changes (deactivations,
-                # deletions) to be silently reverted whenever Render's timestamp was
-                # >30 s ahead (a side-effect of Render's old code stamping with its clock).
                 is_master = str(os.getenv('EA_MASTER_MODE', '')).strip() == '1'
-                if not is_master and peer_stamp > local_stamp + 30 and peer_count >= _min_safe_student_roster():
-                    # Backup/slave node: adopt newer peer snapshot if not suspicious
+                if peer_stamp > local_stamp + 30 and peer_count >= _min_safe_student_roster():
                     if not _is_suspicious_student_shrink(local_data, peer_data):
-                        _save_offline_data(peer_data)
-                        _broadcast_sync_event(
-                            peer_data.get('server_updated_at', ''),
-                            source='bg-peer-pull'
-                        )
+                        if is_master:
+                            # Master pulls peer scores/attendance but NEVER lets a peer
+                            # re-activate a student that local has explicitly deactivated.
+                            # This allows teacher scores from Render to sync back to local
+                            # without reverting admin deactivations or deletions.
+                            local_inactive_rolls = {
+                                str(s.get('roll', '')).strip().upper()
+                                for s in local_data.get('students', [])
+                                if s.get('active') is False
+                            }
+                            merged_pull = dict(peer_data)
+                            for s in merged_pull.get('students', []):
+                                if str(s.get('roll', '')).strip().upper() in local_inactive_rolls:
+                                    s['active'] = False
+                            _save_offline_data(merged_pull)
+                            _broadcast_sync_event(
+                                merged_pull.get('server_updated_at', ''),
+                                source='bg-peer-pull'
+                            )
+                        else:
+                            # Backup/slave node: full adopt of newer peer snapshot
+                            _save_offline_data(peer_data)
+                            _broadcast_sync_event(
+                                peer_data.get('server_updated_at', ''),
+                                source='bg-peer-pull'
+                            )
                         app.logger.info(
                             "[BgSync] Pulled newer snapshot from %s (%s students, stamp=%s)",
                             peer, peer_count, peer_data.get('server_updated_at', '')
@@ -703,16 +719,29 @@ def _recover_stale_snapshot_if_needed(payload, min_students=25, min_newer_second
     best_src = ''
     best_stamp = local_stamp
 
-    # Master is the source of truth — never adopt a peer snapshot on master mode.
-    # On backup/slave nodes, prefer a newer peer snapshot when peers are configured.
+    # Prefer a newer peer snapshot when peers are configured.
+    # On master, still fetch peer data but protect local deactivation decisions.
     is_master = str(os.getenv('EA_MASTER_MODE', '')).strip() == '1'
-    if not is_master:
-        peer_payload, peer_src = _best_peer_snapshot(min_students=min_students)
-        peer_stamp = _payload_sync_stamp(peer_payload) if peer_payload else 0.0
-        if peer_payload and peer_stamp > best_stamp and not _is_suspicious_student_shrink(payload, peer_payload):
+    peer_payload, peer_src = _best_peer_snapshot(min_students=min_students)
+    peer_stamp = _payload_sync_stamp(peer_payload) if peer_payload else 0.0
+    if peer_payload and peer_stamp > best_stamp and not _is_suspicious_student_shrink(payload, peer_payload):
+        if is_master:
+            # Preserve local deactivation decisions — never let a peer re-activate
+            # a student that admin explicitly deactivated on the master.
+            local_inactive_rolls = {
+                str(s.get('roll', '')).strip().upper()
+                for s in payload.get('students', [])
+                if s.get('active') is False
+            }
+            guarded = dict(peer_payload)
+            for s in guarded.get('students', []):
+                if str(s.get('roll', '')).strip().upper() in local_inactive_rolls:
+                    s['active'] = False
+            best_payload = guarded
+        else:
             best_payload = peer_payload
-            best_src = peer_src
-            best_stamp = peer_stamp
+        best_src = peer_src
+        best_stamp = peer_stamp
 
     # Optional local backup scan (expensive): disabled on hot sync paths by default.
     if allow_local_scan:
