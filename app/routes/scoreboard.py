@@ -3138,10 +3138,20 @@ def offline_data():
         return jsonify({'success': True, 'updated_at': merged['server_updated_at']})
 
     if existing and incoming_stamp and existing_stamp and incoming_stamp < existing_stamp:
-        # If the server is in a known corrupt state (tiny roster), accept a healthy snapshot even if its stamp is older.
+        # Case 1: existing is a tiny/corrupt roster — accept any healthy incoming snapshot.
         if _is_tiny_roster(existing, min_students) and incoming_count >= min_students:
             current_app.logger.warning(
                 "Accepting healthy snapshot (%s students) over tiny-roster data (%s students) despite older stamp.",
+                incoming_count,
+                existing_count
+            )
+        # Case 2: trusted peer push arrives with significantly MORE students than existing.
+        # This heals the common Render-restart scenario where the dyno reseeds from FEB26_SEED
+        # (46 students, datetime.now() stamp) and then the local master tries to push the real
+        # 91-student snapshot whose stamp is genuinely older than the freshly-seeded timestamp.
+        elif replicated_auth and _is_suspicious_student_shrink(data, existing) and incoming_count >= min_students:
+            current_app.logger.warning(
+                "Accepting trusted peer push (%s students) over apparent seed/shrunk data (%s students) despite older stamp.",
                 incoming_count,
                 existing_count
             )
