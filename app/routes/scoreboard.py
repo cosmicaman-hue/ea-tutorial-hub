@@ -2714,6 +2714,12 @@ def offline_scoreboard():
     return send_file('static/offline_scoreboard.html')
 
 
+@points_bp.route('/public')
+def public_scoreboard():
+    """Public live scoreboard (read-only, no login required)."""
+    return render_template('scoreboard/public_live.html')
+
+
 @points_bp.route('/seed-data', methods=['GET'])
 def seed_data():
     """Provide seed data lazily so the main HTML stays lightweight."""

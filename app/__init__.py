@@ -1,5 +1,6 @@
 import os
 from flask import Flask, redirect, url_for, request, flash
+from datetime import timedelta
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, current_user
 from flask_wtf.csrf import CSRFProtect
@@ -41,10 +42,11 @@ def create_app():
     # Session security configuration
     app.config['SESSION_COOKIE_HTTPONLY'] = True
     app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
-    app.config['PERMANENT_SESSION_LIFETIME'] = 86400  # 24 hours
+    app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=7)
+    app.config['SESSION_REFRESH_EACH_REQUEST'] = True
     app.config['SESSION_COOKIE_SECURE'] = str(os.getenv('SESSION_COOKIE_SECURE', 'False')).lower() in ('true', '1', 'yes')
     app.config['REMEMBER_COOKIE_HTTPONLY'] = True
-    app.config['REMEMBER_COOKIE_DURATION'] = 86400  # 24 hours
+    app.config['REMEMBER_COOKIE_DURATION'] = timedelta(days=7)
     
     # Initialize extensions
     db.init_app(app)
@@ -70,11 +72,11 @@ def create_app():
 
     @app.route('/')
     def home():
-        return redirect(url_for('points.offline_scoreboard'))
+        return redirect(url_for('points.public_scoreboard'))
 
     @app.route('/ea')
     def ea_shortlink():
-        return redirect(url_for('points.offline_scoreboard'))
+        return redirect(url_for('points.public_scoreboard'))
 
     @app.route('/login')
     def login_shortlink():

@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>EA Live Scoreboard</title>
+    <style>
+        :root {
+            --bg: #0b1020;
+            --card: #111827;
+            --line: #26324d;
+            --text: #e5e7eb;
+            --muted: #9aa6bf;
+            --good: #34d399;
+            --bad: #f87171;
+            --accent: #60a5fa;
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            font-family: "Segoe UI", Tahoma, Arial, sans-serif;
+            background: linear-gradient(180deg, #0b1020 0%, #0f172a 100%);
+            color: var(--text);
+        }
+        .wrap { max-width: 1200px; margin: 0 auto; padding: 14px; }
+        .head {
+            display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+            margin-bottom: 12px;
+        }
+        h1 { margin: 0; font-size: 20px; }
+        .pill {
+            border: 1px solid var(--line);
+            background: rgba(96,165,250,.12);
+            color: #bfdbfe;
+            border-radius: 999px;
+            padding: 4px 10px;
+            font-size: 12px;
+        }
+        .meta { color: var(--muted); font-size: 12px; }
+        .controls {
+            display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+            margin-bottom: 10px;
+        }
+        select, button {
+            background: var(--card); color: var(--text);
+            border: 1px solid var(--line); border-radius: 8px;
+            padding: 8px 10px;
+        }
+        button { cursor: pointer; }
+        .table-wrap {
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            overflow: auto;
+            background: var(--card);
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 760px;
+        }
+        th, td {
+            padding: 9px 10px;
+            border-bottom: 1px solid rgba(148,163,184,.18);
+            text-align: left;
+            white-space: nowrap;
+            font-size: 14px;
+        }
+        th { color: #cbd5e1; background: #0f172a; position: sticky; top: 0; z-index: 1; }
+        .rank { width: 70px; text-align: center; }
+        .score { text-align: right; font-weight: 700; }
+        .pos { color: var(--good); }
+        .neg { color: var(--bad); }
+        .empty { padding: 24px; color: var(--muted); text-align: center; }
+    </style>
+</head>
+<body>
+    <div class="wrap">
+        <div class="head">
+            <h1>Excel Academy Live Scoreboard</h1>
+            <span class="pill">Public View</span>
+            <a href="/login" class="pill" style="text-decoration:none;">Login</a>
+        </div>
+        <div class="controls">
+            <label for="monthSel" class="meta">Month</label>
+            <select id="monthSel"></select>
+            <button id="refreshBtn" type="button">Refresh</button>
+            <span id="syncMeta" class="meta">Sync: -</span>
+        </div>
+        <div class="table-wrap">
+            <table id="tbl">
+                <thead>
+                    <tr>
+                        <th class="rank">Rank</th>
+                        <th>Roll</th>
+                        <th>Name</th>
+                        <th>Class</th>
+                        <th class="score">Total</th>
+                    </tr>
+                </thead>
+                <tbody id="body">
+                    <tr><td colspan="5" class="empty">Loading…</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <script>
+        const monthSel = document.getElementById('monthSel');
+        const body = document.getElementById('body');
+        const syncMeta = document.getElementById('syncMeta');
+        const refreshBtn = document.getElementById('refreshBtn');
+        let latest = null;
+
+        function parseStamp(v) {
+            const n = Date.parse(String(v || ''));
+            return Number.isFinite(n) ? n : 0;
+        }
+
+        function normStatus(v) {
+            const s = String(v || '').toLowerCase();
+            return ['present', 'absent', 'late', 'leave'].includes(s) ? s : 'present';
+        }
+
+        function penaltyOf(status) {
+            if (status === 'absent') return -20;
+            if (status === 'late') return -5;
+            return 0;
+        }
+
+        function monthKeys(data) {
+            const set = new Set();
+            (data.months || []).forEach(m => set.add(String(m || '').trim()));
+            (data.scores || []).forEach(s => set.add(String(s && s.month || '').trim()));
+            (data.attendance || []).forEach(a => {
+                const d = String(a && a.date || '').trim();
+                if (d.length >= 7) set.add(d.slice(0, 7));
+            });
+            const out = Array.from(set).filter(v => /^\d{4}-\d{2}$/.test(v));
+            out.sort((a, b) => b.localeCompare(a));
+            return out;
+        }
+
+        function rollKey(v) {
+            return String(v || '').trim().toUpperCase();
+        }
+
+        function render(data) {
+            latest = data || {};
+            const months = monthKeys(latest);
+            const old = String(monthSel.value || '');
+            monthSel.innerHTML = months.map(m => `<option value="${m}">${m}</option>`).join('');
+            const month = months.includes(old) ? old : (months[0] || '');
+            monthSel.value = month;
+
+            if (!month) {
+                body.innerHTML = '<tr><td colspan="5" class="empty">No month data</td></tr>';
+                return;
+            }
+
+            const students = (latest.students || []).filter(s => s && s.active !== false);
+            const byId = new Map(students.map(s => [parseInt(s.id, 10), s]));
+            const totals = new Map(students.map(s => [parseInt(s.id, 10), 0]));
+
+            (latest.scores || []).forEach(sc => {
+                const sid = parseInt(sc && sc.studentId, 10);
+                if (!sid || !totals.has(sid)) return;
+                const m = String(sc && sc.month || '').trim();
+                if (m !== month) return;
+                totals.set(sid, (totals.get(sid) || 0) + (parseInt(sc && sc.points, 10) || 0));
+            });
+
+            const attLatest = new Map();
+            (latest.attendance || []).forEach(a => {
+                const sid = parseInt(a && a.studentId, 10);
+                const d = String(a && a.date || '').trim();
+                if (!sid || !d.startsWith(month)) return;
+                const key = `${sid}|${d}`;
+                const prev = attLatest.get(key);
+                const prevTs = parseStamp(prev && (prev.updated_at || prev.created_at));
+                const nextTs = parseStamp((a && (a.updated_at || a.created_at)) || '');
+                if (!prev || nextTs >= prevTs) attLatest.set(key, a);
+            });
+            attLatest.forEach(a => {
+                const sid = parseInt(a && a.studentId, 10);
+                if (!sid || !totals.has(sid)) return;
+                totals.set(sid, (totals.get(sid) || 0) + penaltyOf(normStatus(a && a.status)));
+            });
+
+            const rows = Array.from(totals.entries()).map(([sid, total]) => {
+                const s = byId.get(sid) || {};
+                return {
+                    roll: rollKey(s.roll || ''),
+                    name: String(s.base_name || s.name || '').trim() || '-',
+                    classVal: s.class || '-',
+                    total: total || 0
+                };
+            }).sort((a, b) => {
+                if (b.total !== a.total) return b.total - a.total;
+                return a.roll.localeCompare(b.roll);
+            });
+
+            if (!rows.length) {
+                body.innerHTML = '<tr><td colspan="5" class="empty">No rows</td></tr>';
+                return;
+            }
+
+            body.innerHTML = rows.map((r, i) => {
+                const cls = r.total > 0 ? 'pos' : (r.total < 0 ? 'neg' : '');
+                return `<tr>
+                    <td class="rank">${i + 1}</td>
+                    <td>${r.roll || '-'}</td>
+                    <td>${r.name}</td>
+                    <td>${r.classVal}</td>
+                    <td class="score ${cls}">${r.total}</td>
+                </tr>`;
+            }).join('');
+        }
+
+        async function fetchAndRender() {
+            try {
+                const ts = Date.now();
+                const resp = await fetch(`/scoreboard/offline-data?_=${ts}`, { cache: 'no-store', credentials: 'same-origin' });
+                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                const payload = await resp.json();
+                const data = payload && payload.data ? payload.data : {};
+                render(data);
+                const stamp = payload && payload.updated_at ? payload.updated_at : '';
+                syncMeta.textContent = `Sync: ${stamp ? new Date(stamp).toLocaleString() : 'ok'}`;
+            } catch (e) {
+                syncMeta.textContent = 'Sync: failed';
+            }
+        }
+
+        monthSel.addEventListener('change', () => render(latest || {}));
+        refreshBtn.addEventListener('click', fetchAndRender);
+        fetchAndRender();
+        setInterval(fetchAndRender, 4000);
+    </script>
+</body>
+</html>

@@ -42,9 +42,7 @@
             margin: 0;
             padding: 0;
             box-sizing: border-box;
-            backface-visibility: hidden;
             -webkit-font-smoothing: antialiased;
-            -webkit-backface-visibility: hidden;
         }
 
         html {
@@ -832,6 +830,31 @@
         .scoreboard tbody tr:hover td.sticky-left,
         .scoreboard tbody tr:hover td.sticky-right {
             background-color: #1f2937 !important;
+        }
+
+        /* Record Score tab: reduce repaint/animation pressure while vertically scrolling large editable grids. */
+        #recordStudentsTable tbody tr td {
+            transition: none !important;
+        }
+        #recordStudentsTable .score-input,
+        #recordStudentsTable .score-save-btn {
+            will-change: auto !important;
+            transform: none !important;
+        }
+        #recordStudentsTable .score-save-btn:hover:not(:disabled),
+        #recordStudentsTable .score-save-btn:active:not(:disabled) {
+            transform: none !important;
+        }
+        #recordStudentsTable,
+        #recordStudentsTable tbody tr,
+        #recordStudentsTable tbody tr td {
+            contain: none !important;
+            backface-visibility: visible !important;
+            -webkit-backface-visibility: visible !important;
+        }
+        #scoreboardTable tbody tr,
+        #scoreboardTable tbody tr td {
+            contain: none !important;
         }
 
         /* MEDALS/BADGES */
@@ -3478,19 +3501,19 @@
                         <table class="scoreboard" id="recordStudentsTable">
                             <thead>
                                 <tr>
-                                    <th style="width: 140px;">Roll No.</th>
-                                    <th style="width: 260px;">Student Name</th>
+                                    <th style="width: 105px;">Roll No.</th>
+                                    <th style="width: 210px;">Student Name</th>
                                     <th style="width: 90px;">Class</th>
                                     <th style="width: 90px;" data-col="record-group">Group</th>
                                     <th style="width: 120px;" data-col="record-vote-power">Vote Power</th>
                                     <th style="width: 80px;" data-col="record-stars">Stars</th>
                                     <th style="width: 80px;" data-col="record-vetos">VETOs</th>
                                     <th style="width: 120px;" data-col="record-status">Status</th>
-                                    <th style="width: 180px;">Points (Enter to Save)</th>
-                                    <th style="width: 120px;">Stars +/-</th>
-                                    <th style="width: 230px;">Star Reason</th>
-                                    <th style="width: 120px;">VETOs +/-</th>
-                                    <th style="width: 230px;">VETO Reason</th>
+                                    <th style="width: 155px;">Points (Enter to Save)</th>
+                                    <th style="width: 105px;">Stars +/-</th>
+                                    <th style="width: 165px;">Star Reason</th>
+                                    <th style="width: 105px;">VETOs +/-</th>
+                                    <th style="width: 155px;">VETO Reason</th>
                                     <th style="width: 90px;">Save</th>
                                 </tr>
                             </thead>
@@ -3979,7 +4002,22 @@
                             <option value="not_completed">Not Completed</option>
                         </select>
                     </div>
+                    <div class="control-group">
+                        <label>Student</label>
+                        <select id="resourceTransactionsStudentFilter" onchange="renderResourceTransactions()">
+                            <option value="all" selected>All Students</option>
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <label>Date</label>
+                        <input id="resourceTransactionsDateFilter" type="date" onchange="renderResourceTransactions()">
+                    </div>
+                    <div class="control-group">
+                        <label>Month</label>
+                        <input id="resourceTransactionsMonthFilter" type="month" min="2025-08" onchange="renderResourceTransactions()">
+                    </div>
                 </div>
+                <div id="resourceTxnStudentPendingSummary" class="section-subtitle" style="display:none;margin:6px 0 10px;padding:8px 10px;border:1px solid rgba(148,163,184,0.25);border-radius:8px;background:rgba(15,23,42,0.6);"></div>
                 <div class="form-card" id="resourceSettlementCard" style="display:none;margin:8px 0 12px;padding:12px 14px;">
                     <div style="font-weight:700;margin-bottom:6px;">Pending Settlement Summary</div>
                     <div class="section-subtitle" style="margin-bottom:8px;">Consolidated per-student cash due/return for unsettled transactions.</div>
@@ -5824,7 +5862,8 @@
         const LOCAL_BACKUP_LIMIT = 1;
         const LOCAL_BACKUP_MAX_BYTES = 900000;
         const LOCAL_BACKUP_INTERVAL = 5 * 60 * 1000;
-        const AUTO_SYNC_INTERVAL_MS = 4 * 1000;
+        // Poll fallback for environments where SSE is flaky; keep modest to avoid mobile UI jitter.
+        const AUTO_SYNC_INTERVAL_MS = 12 * 1000;
 
         // ── Device fingerprinting ─────────────────────────────────────────────────────
         const DEVICE_UUID_KEY = 'ea_device_uuid';
@@ -5921,6 +5960,9 @@
         let pullDebouncedToast = false;
         let pullDebouncedForceFull = false;
         let lastKnownRemoteStamp = 0;
+        function isMobileViewport() {
+            return window.innerWidth <= 980 || /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent || '');
+        }
         let masterUpdateRunning = false;
         let forcePublishRunning = false;
         let adminAutoPublishAttempted = false;
@@ -8437,8 +8479,58 @@
                 const data = this.getData();
                 const student = data.students.find(s => s.id === studentId);
                 if (!student) return null;
+                const prevRoll = normalizeRoll(student.roll);
                 Object.assign(student, updates);
                 normalizeStudentMeta(student);
+                const nextRoll = normalizeRoll(student.roll);
+
+                if (prevRoll && nextRoll && prevRoll !== nextRoll) {
+                    const monthStudents = data.month_students || {};
+                    Object.keys(monthStudents).forEach(monthKey => {
+                        const list = Array.isArray(monthStudents[monthKey]) ? monthStudents[monthKey] : [];
+                        let touched = false;
+                        const mapped = list.map(value => {
+                            const roll = normalizeRosterValue(value);
+                            if (roll === prevRoll) {
+                                touched = true;
+                                return nextRoll;
+                            }
+                            return roll;
+                        });
+                        if (!touched) return;
+                        const deduped = [];
+                        const seen = new Set();
+                        mapped.forEach(value => {
+                            const roll = normalizeRosterValue(value);
+                            if (!roll || seen.has(roll)) return;
+                            seen.add(roll);
+                            deduped.push(roll);
+                        });
+                        monthStudents[monthKey] = deduped;
+                    });
+
+                    const monthProfilesMap = data.month_roster_profiles || {};
+                    Object.keys(monthProfilesMap).forEach(monthKey => {
+                        const profiles = Array.isArray(monthProfilesMap[monthKey]) ? monthProfilesMap[monthKey] : [];
+                        let touched = false;
+                        profiles.forEach(profile => {
+                            if (!profile || typeof profile !== 'object') return;
+                            if (normalizeRosterValue(profile.roll) !== prevRoll) return;
+                            profile.roll = nextRoll;
+                            touched = true;
+                        });
+                        if (!touched) return;
+                        const byRoll = new Map();
+                        profiles.forEach(profile => {
+                            if (!profile || typeof profile !== 'object') return;
+                            const roll = normalizeRosterValue(profile.roll);
+                            if (!roll) return;
+                            const prev = byRoll.get(roll) || {};
+                            byRoll.set(roll, { ...prev, ...profile, roll });
+                        });
+                        monthProfilesMap[monthKey] = Array.from(byRoll.values());
+                    });
+                }
                 this.saveData(data);
                 return student;
             }
@@ -9495,7 +9587,10 @@
             // on every snapshot. Keep always-fresh behavior for core live tabs only.
             if (passive) {
                 if (tabName === 'scoreboard') loadScoreboard();
-                else if (tabName === 'add-score') refreshRecordScoreTabFromSync();
+                else if (tabName === 'add-score') {
+                    // Mobile: avoid periodic DOM rebuild while user scrolls long student list.
+                    if (!isMobileViewport()) refreshRecordScoreTabFromSync();
+                }
                 else if (tabName === 'attendance') refreshAttendanceTabFromSync();
                 else if (tabName === 'homework') loadHomeworkTab();
             } else {
@@ -9540,7 +9635,8 @@
             if (passive) {
                 const now = Date.now();
                 // Guard against jitter when snapshots arrive in bursts (SSE + polling).
-                if (now - lastPassiveSyncRefreshAt < 1800) return;
+                const passiveMinGap = isMobileViewport() ? 4000 : 1800;
+                if (now - lastPassiveSyncRefreshAt < passiveMinGap) return;
                 lastPassiveSyncRefreshAt = now;
             }
             if (activeTabRefreshTimer) {
@@ -11238,7 +11334,7 @@
             let newestIso = '';
             for (const baseUrl of writeTargets) {
                 try {
-                    const resp = await fetchWithTimeout(buildSyncUrl(baseUrl, SERVER_SYNC.dataUrl), {
+                    let resp = await fetchWithTimeout(buildSyncUrl(baseUrl, SERVER_SYNC.dataUrl), {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         credentials: 'include',
@@ -11246,11 +11342,23 @@
                     }, 9000);
                     respondedCount += 1;
                     if (resp.status === 401 || resp.status === 403) {
-                        authFailureCount += 1;
-                        if (!options.silent) {
-                            showAlert('Sync failed: please re-login on this device.', 'warning');
+                        // Session might be stale after server restart; refresh session context once and retry.
+                        const refreshed = await loadSessionContext(1);
+                        if (refreshed) {
+                            resp = await fetchWithTimeout(buildSyncUrl(baseUrl, SERVER_SYNC.dataUrl), {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                credentials: 'include',
+                                body: JSON.stringify({ data, peers: baseUrls })
+                            }, 9000);
                         }
-                        continue;
+                        if (resp.status === 401 || resp.status === 403) {
+                            authFailureCount += 1;
+                            if (!options.silent) {
+                                showAlert('Sync failed: please re-login on this device.', 'warning');
+                            }
+                            continue;
+                        }
                     }
                     if (resp.status === 409) {
                         conflictCount += 1;
@@ -13360,6 +13468,8 @@
 
             tbody.innerHTML = filtered.map(student => {
                 const dayScore = date ? db.getScore(student.id, date) : null;
+                const attendanceRecord = date ? getAttendanceRecord(student.id, date) : null;
+                const attendancePenalty = getAttendancePenaltyPointsForStatus(safeProp(attendanceRecord, 'status'));
                 const draft = getRecordScoreDraft(student.id);
                 // Inputs show DRAFT values only (user's pending delta entry).
                 // Stored totals are shown as badges, NOT in inputs.
@@ -13374,7 +13484,20 @@
                 const storedPoints = hasExisting ? (parseInt(safeProp(dayScore, 'points'), 10) || 0) : null;
                 const storedStars = hasExisting ? (parseInt(safeProp(dayScore, 'stars'), 10) || 0) : null;
                 const storedVetos = hasExisting ? (parseInt(safeProp(dayScore, 'vetos'), 10) || 0) : null;
-                const storedBadge = storedPoints !== null ? `<span class="stored-score-badge" title="Stored: ${storedPoints} pts">${storedPoints}</span>` : '';
+                const recordedBy = hasExisting ? String(safeProp(dayScore, 'recordedBy') || '').trim() : '';
+                const storedTitleParts = [];
+                if (storedPoints !== null) storedTitleParts.push(`Stored: ${storedPoints} pts`);
+                if (recordedBy) storedTitleParts.push(`Recorded by: ${recordedBy}`);
+                if (date && attendancePenalty < 0) storedTitleParts.push(`Attendance penalty ${attendancePenalty} is auto-applied in scoreboard total`);
+                const storedBadge = storedPoints !== null
+                    ? `<span class="stored-score-badge" title="${escapeHtml(storedTitleParts.join(' | '))}">${storedPoints}</span>`
+                    : '';
+                const attendancePenaltyBadge = (date && attendancePenalty < 0)
+                    ? `<span class="stored-veto-badge" style="margin-left:6px;background:rgba(127,29,29,.35);border-color:rgba(248,113,113,.55);color:#fecaca;" title="Attendance penalty ${attendancePenalty} (${normalizeAttendanceStatus(safeProp(attendanceRecord, 'status'))}) is auto-applied to scoreboard total and is not an accidental score.">ATT ${attendancePenalty}</span>`
+                    : '';
+                const sourceBadge = (hasExisting && recordedBy)
+                    ? `<span class="stored-star-badge" style="margin-left:6px;background:rgba(30,41,59,.75);border-color:rgba(148,163,184,.45);color:#cbd5e1;" title="This score was recorded by ${escapeHtml(recordedBy)}.">By ${escapeHtml(recordedBy)}</span>`
+                    : '';
                 const storedStarBadge = storedStars ? `<span class="stored-star-badge" title="Stored: ${storedStars} star(s)">${storedStars}</span>` : '';
                 const starUndoBtn = (date && storedStars !== null && storedStars !== 0 && (currentUserRole === 'admin' || currentUserRole === 'teacher'))
                     ? `<button type="button" class="record-star-undo-btn" title="${storedStars > 0 ? 'Undo 1 awarded star' : 'Undo 1 star usage'}" onclick="undoStarAwardFromRecordRow(${student.id}, '${date}', event)">↺</button>`
@@ -13392,7 +13515,7 @@
                     <td data-col="record-vetos">${monthVetoAwardByStudent[student.id] || 0}</td>
                     <td data-col="record-status">${student.active === false ? 'Inactive' : 'Active'}</td>
                     <td>
-                        <div class="score-input-wrapper">${storedBadge}
+                        <div class="score-input-wrapper">${storedBadge}${attendancePenaltyBadge}${sourceBadge}
                         <input type="number" class="score-input" placeholder="${hasExisting ? '+/- to adjust' : 'e.g. 50 or -50'}"
                             value="${pointsValue}"
                             oninput="updateRecordScoreDraft(${student.id}, this, 0)"
@@ -13873,16 +13996,48 @@
             const existingPoints = existingScore ? (parseInt(safeProp(existingScore, 'points'), 10) || 0) : 0;
             const existingStars = existingScore ? (parseInt(safeProp(existingScore, 'stars'), 10) || 0) : 0;
             const existingVetos = existingScore ? (parseInt(safeProp(existingScore, 'vetos'), 10) || 0) : 0;
+            const attendanceRecord = getAttendanceRecord(studentId, date);
+            const attendancePenalty = getAttendancePenaltyPointsForStatus(safeProp(attendanceRecord, 'status'));
 
             // Accumulate: stored + delta
             const finalPoints = existingPoints + points;
             let finalStars = existingStars + (starsEmpty ? 0 : stars);
             let finalVetos = existingVetos + (vetosEmpty ? 0 : vetos);
 
+            if (attendancePenalty < 0 && existingPoints === 0 && points === Math.abs(attendancePenalty)) {
+                const proceedPenaltyComp = confirm(
+                    `Note: This date has an attendance penalty ${attendancePenalty} (auto-applied in scoreboard).\n` +
+                    `You are entering +${points}, which exactly cancels that penalty in total view.\n\nContinue?`
+                );
+                if (!proceedPenaltyComp) return;
+            }
+            if (existingScore && existingPoints !== 0 && finalPoints === 0) {
+                const prevBy = String(safeProp(existingScore, 'recordedBy') || '').trim();
+                const proceedZero = confirm(
+                    `You are about to zero-out an existing saved score (${existingPoints})${prevBy ? ` recorded by ${prevBy}` : ''}.\n` +
+                    `If this is not intentional, cancel and enter the actual delta directly.\n\nContinue?`
+                );
+                if (!proceedZero) return;
+            }
+
+            if (points < 0 && finalPoints < existingPoints) {
+                const recordedBy = String(safeProp(existingScore, 'recordedBy') || '').trim();
+                const student = db.getStudents().find(s => s.id === studentId);
+                const studentLabel = student ? `${student.base_name || student.name || 'Student'} (${formatRollDisplay(student.roll)})` : `ID ${studentId}`;
+                const ok = confirm(
+                    `This will REDUCE previously recorded score for ${studentLabel} on ${date}${recordedBy ? ` (recorded by: ${recordedBy})` : ''}.\n` +
+                    `Current: ${existingPoints}, Change: ${points}, New: ${finalPoints}.\n\nContinue?`
+                );
+                if (!ok) return;
+            }
+
             const existingNotes = String(coalesce(safeProp(existingScore, 'notes'), '')).trim();
             let notesToSave = existingNotes;
             const noteParts = [];
             if (notesToSave) noteParts.push(notesToSave);
+            if (points < 0 && finalPoints < existingPoints) {
+                noteParts.push(`Score adjusted by ${currentLoginId || currentUserRole}: ${existingPoints} -> ${finalPoints} (delta ${points})`);
+            }
             if (stars > 0 && starReason) noteParts.push(`Star reason: ${starReason}`);
             if (vetoReason) noteParts.push(`VETO reason: ${vetoReason}`);
             else if (vetos < 0 && !existingNotes) noteParts.push('VETO used');
@@ -14066,12 +14221,47 @@
             const existingPoints = existingScore ? (parseInt(safeProp(existingScore, 'points'), 10) || 0) : 0;
             const existingStars = existingScore ? (parseInt(safeProp(existingScore, 'stars'), 10) || 0) : 0;
             const existingVetos = existingScore ? (parseInt(safeProp(existingScore, 'vetos'), 10) || 0) : 0;
+            const attendanceRecord = getAttendanceRecord(studentId, date);
+            const attendancePenalty = getAttendancePenaltyPointsForStatus(safeProp(attendanceRecord, 'status'));
 
             const finalPoints = existingPoints + points;
             const finalStars = existingStars + (starsEmpty ? 0 : stars);
             const finalVetos = existingVetos + (vetosEmpty ? 0 : vetos);
 
-            const resolved = resolveScoreForRole(studentId, date, month, finalPoints, finalStars, finalVetos, notes);
+            if (attendancePenalty < 0 && existingPoints === 0 && points === Math.abs(attendancePenalty)) {
+                const proceedPenaltyComp = confirm(
+                    `Note: This date has an attendance penalty ${attendancePenalty} (auto-applied in scoreboard).\n` +
+                    `You are entering +${points}, which exactly cancels that penalty in total view.\n\nContinue?`
+                );
+                if (!proceedPenaltyComp) return;
+            }
+            if (existingScore && existingPoints !== 0 && finalPoints === 0) {
+                const prevBy = String(safeProp(existingScore, 'recordedBy') || '').trim();
+                const proceedZero = confirm(
+                    `You are about to zero-out an existing saved score (${existingPoints})${prevBy ? ` recorded by ${prevBy}` : ''}.\n` +
+                    `If this is not intentional, cancel and enter the actual delta directly.\n\nContinue?`
+                );
+                if (!proceedZero) return;
+            }
+
+            if (points < 0 && finalPoints < existingPoints) {
+                const recordedBy = String(safeProp(existingScore, 'recordedBy') || '').trim();
+                const student = db.getStudents().find(s => s.id === studentId);
+                const studentLabel = student ? `${student.base_name || student.name || 'Student'} (${formatRollDisplay(student.roll)})` : `ID ${studentId}`;
+                const ok = confirm(
+                    `This will REDUCE previously recorded score for ${studentLabel} on ${date}${recordedBy ? ` (recorded by: ${recordedBy})` : ''}.\n` +
+                    `Current: ${existingPoints}, Change: ${points}, New: ${finalPoints}.\n\nContinue?`
+                );
+                if (!ok) return;
+            }
+
+            let notesToSave = String(notes || '').trim();
+            if (points < 0 && finalPoints < existingPoints) {
+                const reductionNote = `Score adjusted by ${currentLoginId || currentUserRole}: ${existingPoints} -> ${finalPoints} (delta ${points})`;
+                notesToSave = notesToSave ? `${notesToSave} | ${reductionNote}` : reductionNote;
+            }
+
+            const resolved = resolveScoreForRole(studentId, date, month, finalPoints, finalStars, finalVetos, notesToSave);
             const result = db.addScore(resolved.score);
             reconcileVetoCountersFromScores(month, { persist: false });
             clearRecordScoreDraft(studentId);
@@ -15468,6 +15658,18 @@
             }
             if (!isValidStudentName(name)) {
                 showAlert('Student name is invalid. Remove + sign or non-student placeholder words.', 'danger');
+                return;
+            }
+
+            const normalizedRoll = normalizeRoll(roll);
+            const duplicateRollHolder = db.getStudents().find(s =>
+                s.id !== studentId &&
+                normalizeRoll(s.roll) === normalizedRoll &&
+                s.active !== false
+            );
+            if (duplicateRollHolder) {
+                const dupName = duplicateRollHolder.base_name || duplicateRollHolder.name || 'Unknown';
+                showAlert(`Roll ${formatRollDisplay(normalizedRoll)} is already assigned to ${dupName}. Use a unique roll to avoid roster shrink.`, 'danger');
                 return;
             }
 
@@ -19372,6 +19574,13 @@
             return 'present';
         }
 
+        function getAttendancePenaltyPointsForStatus(status) {
+            const key = normalizeAttendanceStatus(status);
+            if (key === 'absent') return -20;
+            if (key === 'late') return -5;
+            return 0;
+        }
+
         function resetAttendanceDraft(date = '', month = '') {
             attendanceDraftState.date = date || '';
             attendanceDraftState.month = month || '';
@@ -21692,11 +21901,48 @@
             }).join('');
         }
 
+        function populateResourceTransactionFilters() {
+            const select = document.getElementById('resourceTransactionsStudentFilter');
+            if (!select) return;
+            const prev = String(select.value || 'all');
+            const txns = getResourceTransactions() || [];
+            const studentById = new Map((db.getStudents() || []).map(s => [parseInt(s.id, 10), s]));
+            const seen = new Set();
+            const options = [{ value: 'all', label: 'All Students' }];
+
+            txns.forEach(txn => {
+                const sid = parseInt(txn && txn.studentId, 10) || 0;
+                const student = sid ? studentById.get(sid) : null;
+                const roll = String((txn && txn.student_roll) || (student && student.roll) || '').trim();
+                const name = String((txn && (txn.student_name || txn.studentName)) || (student && (student.base_name || student.name)) || '').trim();
+                let value = '';
+                if (sid > 0) value = `id:${sid}`;
+                else if (roll) value = `roll:${normalizeRoll(roll)}`;
+                if (!value || seen.has(value)) return;
+                seen.add(value);
+                const label = `${name || 'Unknown'}${roll ? ` (${formatRollDisplay(roll)})` : ''}`;
+                options.push({ value, label });
+            });
+
+            options.sort((a, b) => {
+                if (a.value === 'all') return -1;
+                if (b.value === 'all') return 1;
+                return String(a.label || '').localeCompare(String(b.label || ''));
+            });
+            select.innerHTML = options.map(opt => `<option value="${escapeHtml(opt.value)}">${escapeHtml(opt.label)}</option>`).join('');
+            select.value = options.some(opt => opt.value === prev) ? prev : 'all';
+        }
+
         function renderResourceTransactions() {
             const tbody = document.getElementById('resourceTransactionsBody');
             if (!tbody) return;
+            populateResourceTransactionFilters();
             _showTableSkeleton('resourceTransactionsBody', 12, 3);
             const filter = String(getElementValue('resourceTransactionsFilter') || 'all').trim().toLowerCase();
+            const studentFilterRaw = String(getElementValue('resourceTransactionsStudentFilter') || 'all').trim();
+            const studentFilter = studentFilterRaw.toLowerCase();
+            const dateFilter = String(getElementValue('resourceTransactionsDateFilter') || '').trim();
+            const monthFilter = String(getElementValue('resourceTransactionsMonthFilter') || '').trim();
             let rows = getResourceTransactions().slice().sort((a, b) => parseSyncStamp((b && (b.created_at || b.updated_at)) || '') - parseSyncStamp((a && (a.created_at || a.updated_at)) || ''));
 
             const isCompleted = (txn) => {
@@ -21721,6 +21967,36 @@
             }
 
             const studentById = new Map((db.getStudents() || []).map(s => [parseInt(s.id, 10), s]));
+            if (studentFilter && studentFilter !== 'all') {
+                rows = rows.filter(txn => {
+                    const sid = parseInt(txn && txn.studentId, 10) || 0;
+                    const student = sid ? studentById.get(sid) : null;
+                    const roll = normalizeRoll((txn && txn.student_roll) || (student && student.roll) || '');
+                    if (studentFilter.startsWith('id:')) {
+                        const targetId = parseInt(studentFilter.slice(3), 10) || 0;
+                        return targetId > 0 && sid === targetId;
+                    }
+                    if (studentFilter.startsWith('roll:')) {
+                        const targetRoll = normalizeRoll(studentFilter.slice(5));
+                        return !!targetRoll && roll === targetRoll;
+                    }
+                    return false;
+                });
+            }
+            if (dateFilter) {
+                rows = rows.filter(txn => {
+                    const raw = String((txn && (txn.created_at || txn.updated_at)) || '').trim();
+                    return raw && raw.slice(0, 10) === dateFilter;
+                });
+            }
+            if (monthFilter) {
+                rows = rows.filter(txn => {
+                    const explicitMonth = String(txn && txn.month || '').trim();
+                    if (explicitMonth) return explicitMonth === monthFilter;
+                    const raw = String((txn && (txn.created_at || txn.updated_at)) || '').trim();
+                    return raw && raw.slice(0, 7) === monthFilter;
+                });
+            }
             if (currentUserRole === 'student') {
                 const rollKey = normalizeRoll(currentLoginId || '');
                 rows = rows.filter(txn => {
@@ -21730,6 +22006,45 @@
                     return normalizeRoll(roll) === rollKey;
                 });
             }
+
+            const updateSelectedStudentPendingSummary = (filteredRows, studentMap) => {
+                const summaryEl = document.getElementById('resourceTxnStudentPendingSummary');
+                if (!summaryEl) return;
+                if (!studentFilter || studentFilter === 'all') {
+                    summaryEl.style.display = 'none';
+                    summaryEl.textContent = '';
+                    return;
+                }
+                let totalPending = 0;
+                let matchedTxns = 0;
+                let studentLabel = 'Selected Student';
+                filteredRows.forEach(txn => {
+                    const mode = String(txn && txn.type || '').trim().toLowerCase();
+                    if (mode !== 'cash_purchase') return;
+                    const sid = parseInt(txn && txn.studentId, 10) || 0;
+                    const student = sid ? studentMap.get(sid) : null;
+                    if (student && !studentLabel.includes('(')) {
+                        const roll = String(student.roll || '').trim();
+                        const name = String(student.base_name || student.name || '').trim();
+                        studentLabel = `${name || 'Selected Student'}${roll ? ` (${formatRollDisplay(roll)})` : ''}`;
+                    }
+                    const cashPaid = Math.max(0, parseFloat(txn && txn.cash_paid) || 0);
+                    const cashCharged = Math.max(0, parseFloat(txn && txn.cash_charged) || 0);
+                    const fallbackCharged = Math.max(0, parseFloat(txn && txn.total_cost) || 0);
+                    const charged = cashCharged || fallbackCharged;
+                    if (!charged) return;
+                    const bal = computeResourceCashBalance(charged, cashPaid);
+                    const cashDueRaw = parseFloat(txn && txn.cash_due);
+                    const due = Math.max(0, Number.isFinite(cashDueRaw) ? cashDueRaw : bal.pending);
+                    if (due > 0) {
+                        totalPending += due;
+                        matchedTxns += 1;
+                    }
+                });
+                summaryEl.style.display = '';
+                summaryEl.innerHTML = `<strong>${escapeHtml(studentLabel)}</strong> pending amount: <strong style="color:#fca5a5;">Rs ${escapeHtml(formatMoneyValue(totalPending))}</strong> <span style="color:var(--text-muted);">(from ${matchedTxns} pending transaction${matchedTxns === 1 ? '' : 's'})</span>`;
+            };
+            updateSelectedStudentPendingSummary(rows, studentById);
 
             if (!rows.length) {
                 tbody.innerHTML = `<tr><td colspan="12" class="text-center" style="padding: 22px;">No transactions</td></tr>`;
@@ -22705,6 +23020,7 @@
             populateResourceContextStudents();
             updateResourceContext();
             renderResourceRequests();
+            populateResourceTransactionFilters();
             renderResourceTransactions();
             autoAdjustTableFonts();
         }
@@ -24737,6 +25053,7 @@
                 }
                 setInterval(() => {
                     if (document.hidden) return;
+                    if (isMobileViewport() && getActiveTabName() === 'add-score') return;
                     if (hasActiveRecordScoreEdit() || hasActiveAttendanceEdit()) return;
                     // Pull-only background sync. Push uses explicit Master Update.
                     schedulePullFromServer(false, 0, currentUserRole === 'teacher' || currentUserRole === 'student');

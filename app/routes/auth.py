@@ -128,7 +128,9 @@ def login():
                 log_activity(0, f'Login blocked for {login_id} - account inactive', 'login_failed', 'Account inactive', request.remote_addr)
                 return redirect(url_for('auth.login'))
             
-            login_user(user)
+            # Keep auth stable across server restarts/browser reopen unless explicitly logged out.
+            login_user(user, remember=True)
+            session.permanent = True
             # Enforce student roll-based password policy on successful login.
             if str(getattr(user, 'role', '')).strip().lower() == 'student':
                 try:
