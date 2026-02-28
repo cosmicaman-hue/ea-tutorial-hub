@@ -143,6 +143,21 @@
             return String(v || '').trim().toUpperCase();
         }
 
+        function getMonthRosterRolls(data, month) {
+            const rolls = new Set();
+            const monthStudents = data && data.month_students && data.month_students[month];
+            const monthProfiles = data && data.month_roster_profiles && data.month_roster_profiles[month];
+            (Array.isArray(monthStudents) ? monthStudents : []).forEach(v => {
+                const r = rollKey(v);
+                if (r) rolls.add(r);
+            });
+            (Array.isArray(monthProfiles) ? monthProfiles : []).forEach(p => {
+                const r = rollKey(p && p.roll);
+                if (r) rolls.add(r);
+            });
+            return rolls;
+        }
+
         function render(data) {
             latest = data || {};
             const months = monthKeys(latest);
@@ -156,7 +171,18 @@
                 return;
             }
 
-            const students = (latest.students || []).filter(s => s && s.active !== false);
+            const rosterRolls = getMonthRosterRolls(latest, month);
+            const baseStudents = (latest.students || []).filter(s => s && s.active !== false);
+            const visibleStudents = rosterRolls.size
+                ? baseStudents.filter(s => rosterRolls.has(rollKey(s && s.roll)))
+                : baseStudents;
+            const dedupByRoll = new Map();
+            visibleStudents.forEach(s => {
+                const roll = rollKey(s && s.roll);
+                if (!roll) return;
+                if (!dedupByRoll.has(roll)) dedupByRoll.set(roll, s);
+            });
+            const students = Array.from(dedupByRoll.values());
             const byId = new Map(students.map(s => [parseInt(s.id, 10), s]));
             const totals = new Map(students.map(s => [parseInt(s.id, 10), 0]));
 
