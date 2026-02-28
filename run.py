@@ -230,6 +230,13 @@ def initialize_runtime(flask_app):
                 user.is_active = True
         db.session.commit()
     flask_app.config['_EA_RUNTIME_INIT_DONE'] = True
+    # Start background thread that keeps Render awake and syncs data every 30 s.
+    # Only activates when EA_MASTER_MODE=1 and SYNC_PEERS is configured (local server).
+    try:
+        from app.routes.scoreboard import start_peer_sync_background
+        start_peer_sync_background(flask_app)
+    except Exception:
+        pass
 
 if __name__ == '__main__':
     if not acquire_single_instance_lock(app):

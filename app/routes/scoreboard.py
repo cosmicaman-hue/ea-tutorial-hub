@@ -171,8 +171,9 @@ def _forward_offline_data_to_peers(payload, extra_peers=None):
             }
         )
         try:
-            # WAN peers (Render) can be slower on cold starts; keep a slightly higher timeout.
-            with urllib.request.urlopen(req, timeout=6):
+            # WAN peers (Render) cold-start can take 30-50 s on free tier.
+            # This function always runs in a background daemon thread so blocking is fine.
+            with urllib.request.urlopen(req, timeout=45):
                 pass
         except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError, OSError):
             continue
@@ -184,6 +185,116 @@ def _forward_offline_data_to_peers_async(payload, extra_peers=None):
         args=(payload, extra_peers),
         daemon=True
     ).start()
+
+
+# ── Background peer-sync thread ──────────────────────────────────────────────
+# Runs every 30 s on the local master server only (EA_MASTER_MODE=1).
+# Keeps Render awake (free-tier dynos sleep after 15 min of inactivity),
+# pushes local data when local is newer, and pulls Render data when Render is
+# newer — giving true bidirectional sync without any browser interaction.
+
+_peer_sync_thread_started = False
+
+
+def _do_peer_sync_cycle(app):
+    """One bidirectional sync cycle with all configured peers."""
+    peers = _get_sync_peers()
+    shared_key = _resolve_sync_shared_key()
+    if not peers or not shared_key:
+        return
+
+    with app.app_context():
+        local_data = _load_offline_data() or {}
+        local_stamp = _payload_sync_stamp(local_data) or 0.0
+        local_count = _student_count(local_data)
+
+        for peer in peers:
+            try:
+                # ── Pull: fetch peer's current snapshot ─────────────────────
+                get_req = urllib.request.Request(
+                    f'{peer}/scoreboard/offline-data',
+                    method='GET',
+                    headers={
+                        'Cache-Control': 'no-store',
+                        'X-EA-Sync-Key': shared_key,
+                    }
+                )
+                with urllib.request.urlopen(get_req, timeout=55) as resp:
+                    peer_body = resp.read()
+                peer_parsed = json.loads(peer_body.decode('utf-8', errors='replace'))
+                peer_data = peer_parsed.get('data') if isinstance(peer_parsed, dict) else None
+                if not isinstance(peer_data, dict):
+                    continue
+
+                peer_stamp = _payload_sync_stamp(peer_data) or 0.0
+                peer_count = _student_count(peer_data)
+
+                # ── Decide direction ─────────────────────────────────────────
+                # Margin of 30 s avoids flip-flopping on tiny clock skew.
+                if peer_stamp > local_stamp + 30 and peer_count >= _min_safe_student_roster():
+                    # Render has newer data → adopt locally if not suspicious
+                    if not _is_suspicious_student_shrink(local_data, peer_data):
+                        _save_offline_data(peer_data)
+                        _broadcast_sync_event(
+                            peer_data.get('server_updated_at', ''),
+                            source='bg-peer-pull'
+                        )
+                        app.logger.info(
+                            "[BgSync] Pulled newer snapshot from %s (%s students, stamp=%s)",
+                            peer, peer_count, peer_data.get('server_updated_at', '')
+                        )
+
+                elif local_stamp > peer_stamp + 30 and local_count >= _min_safe_student_roster():
+                    # Local is newer → push to peer
+                    body = json.dumps({'data': local_data}).encode('utf-8')
+                    post_req = urllib.request.Request(
+                        f'{peer}/scoreboard/offline-data',
+                        data=body,
+                        method='POST',
+                        headers={
+                            'Content-Type': 'application/json',
+                            'X-EA-Replicated': '1',
+                            'X-EA-Sync-Key': shared_key,
+                        }
+                    )
+                    with urllib.request.urlopen(post_req, timeout=55):
+                        pass
+                    app.logger.info(
+                        "[BgSync] Pushed local snapshot to %s (%s students, stamp=%s)",
+                        peer, local_count, local_data.get('server_updated_at', '')
+                    )
+
+            except Exception as exc:
+                app.logger.debug("[BgSync] Peer %s unreachable: %s", peer, exc)
+
+
+def start_peer_sync_background(app):
+    """Start a single persistent background thread that syncs with peers every 30 s.
+    Safe to call multiple times — only one thread is ever started.
+    Only active when EA_MASTER_MODE=1 and SYNC_PEERS is configured."""
+    global _peer_sync_thread_started
+    if _peer_sync_thread_started:
+        return
+    if str(os.getenv('EA_MASTER_MODE', '')).strip() != '1':
+        return
+    if not _get_sync_peers():
+        return
+    _peer_sync_thread_started = True
+
+    def _loop():
+        import time as _time
+        # Initial delay so the server finishes booting before the first sync.
+        _time.sleep(15)
+        while True:
+            try:
+                _do_peer_sync_cycle(app)
+            except Exception:
+                pass
+            _time.sleep(30)
+
+    t = threading.Thread(target=_loop, daemon=True, name='ea-peer-sync')
+    t.start()
+    app.logger.info("[BgSync] Background peer-sync thread started (interval=30s)")
 
 
 def _atomic_write_json(path, payload):
