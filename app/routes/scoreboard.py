@@ -385,13 +385,21 @@ def _load_db_snapshot():
     Returns the payload dict or None."""
     try:
         from app.models.offline_snapshot import OfflineSnapshot
-        snap = OfflineSnapshot.query.get(1)
+        from app import db as _db
+        snap = _db.session.get(OfflineSnapshot, 1)
         if snap and snap.data_json:
             data = json.loads(snap.data_json)
             if isinstance(data, dict) and _student_count(data) >= _min_safe_student_roster():
                 return data
     except Exception:
-        pass
+        # If the DB query failed (e.g. table not yet created on a fresh Supabase deploy),
+        # the PostgreSQL transaction is now aborted.  Roll back so the session is clean
+        # for any subsequent DB calls in this same request (e.g. User.query in load_user).
+        try:
+            from app import db as _db
+            _db.session.rollback()
+        except Exception:
+            pass
     return None
 
 
@@ -495,7 +503,7 @@ def _save_offline_data(payload):
         try:
             from app.models.offline_snapshot import OfflineSnapshot
             from app import db as _db
-            snap = OfflineSnapshot.query.get(1)
+            snap = _db.session.get(OfflineSnapshot, 1)
             if snap is None:
                 snap = OfflineSnapshot(id=1, data_json='', updated_at='', student_count=0)
                 _db.session.add(snap)
@@ -504,7 +512,13 @@ def _save_offline_data(payload):
             snap.student_count = _student_count(payload)
             _db.session.commit()
         except Exception:
-            pass  # DB write is supplemental; never block normal file-based flow
+            # Roll back so any DB error here doesn't leave the session in an aborted
+            # state for subsequent calls within the same request.
+            try:
+                from app import db as _db
+                _db.session.rollback()
+            except Exception:
+                pass
     return payload
 
 
