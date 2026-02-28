@@ -380,50 +380,22 @@ def _load_latest_offline_backup():
     return None
 
 
-def _load_db_snapshot():
-    """Try to load the last healthy snapshot stored in the database.
-    Returns the payload dict or None."""
-    try:
-        from app.models.offline_snapshot import OfflineSnapshot
-        from app import db as _db
-        snap = _db.session.get(OfflineSnapshot, 1)
-        if snap and snap.data_json:
-            data = json.loads(snap.data_json)
-            if isinstance(data, dict) and _student_count(data) >= _min_safe_student_roster():
-                return data
-    except Exception:
-        # If the DB query failed (e.g. table not yet created on a fresh Supabase deploy),
-        # the PostgreSQL transaction is now aborted.  Roll back so the session is clean
-        # for any subsequent DB calls in this same request (e.g. User.query in load_user).
-        try:
-            from app import db as _db
-            _db.session.rollback()
-        except Exception:
-            pass
-    return None
-
 
 def _load_offline_data():
     path = _offline_data_path()
+    # Fallback seed stamp: fixed old date so any real pushed data always wins the
+    # timestamp comparison.  Using datetime.now() here caused Render to reject local
+    # pushes with 409 because the seed appeared "newer" than real data.
+    _SEED_STAMP = "2026-02-26T00:00:00+00:00"
     if not os.path.exists(path):
         data = _load_latest_offline_backup()
         if data:
             return data
-        # Try the database snapshot before falling back to the hardcoded seed.
-        # This is what keeps Render showing correct data across ephemeral-FS restarts.
-        data = _load_db_snapshot()
-        if data:
-            try:
-                _atomic_write_json(path, data)
-            except Exception:
-                pass
-            return data
         # Last resort: hardcoded seed so the UI is never completely blank.
         try:
             payload = json.loads(json.dumps(FEB26_SEED))
-            stamp = datetime.now(timezone.utc).isoformat()
-            payload['server_updated_at'] = stamp
-            payload['updated_at'] = stamp
+            payload['server_updated_at'] = _SEED_STAMP
+            payload['updated_at'] = _SEED_STAMP
             try:
                 _atomic_write_json(path, payload)
             except Exception:
@@ -441,18 +413,10 @@ def _load_offline_data():
         data = _load_latest_offline_backup()
         if data:
             return data
-        data = _load_db_snapshot()
-        if data:
-            try:
-                _atomic_write_json(path, data)
-            except Exception:
-                pass
-            return data
         try:
             payload = json.loads(json.dumps(FEB26_SEED))
-            stamp = datetime.now(timezone.utc).isoformat()
-            payload['server_updated_at'] = stamp
-            payload['updated_at'] = stamp
+            payload['server_updated_at'] = _SEED_STAMP
+            payload['updated_at'] = _SEED_STAMP
             try:
                 _atomic_write_json(path, payload)
             except Exception:
@@ -497,28 +461,6 @@ def _save_offline_data(payload):
     _backup_offline_file(path)
     _atomic_write_json(path, payload)
     _backup_offline_hourly_immutable(payload)
-    # Also persist to the database so the snapshot survives ephemeral-filesystem
-    # restarts on Render.  Only store healthy snapshots (enough students).
-    if _student_count(payload) >= _min_safe_student_roster():
-        try:
-            from app.models.offline_snapshot import OfflineSnapshot
-            from app import db as _db
-            snap = _db.session.get(OfflineSnapshot, 1)
-            if snap is None:
-                snap = OfflineSnapshot(id=1, data_json='', updated_at='', student_count=0)
-                _db.session.add(snap)
-            snap.data_json = json.dumps(payload, ensure_ascii=False)
-            snap.updated_at = payload.get('server_updated_at') or payload.get('updated_at') or ''
-            snap.student_count = _student_count(payload)
-            _db.session.commit()
-        except Exception:
-            # Roll back so any DB error here doesn't leave the session in an aborted
-            # state for subsequent calls within the same request.
-            try:
-                from app import db as _db
-                _db.session.rollback()
-            except Exception:
-                pass
     return payload
 
 
