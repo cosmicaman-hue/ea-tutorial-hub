@@ -380,13 +380,37 @@ def _load_latest_offline_backup():
     return None
 
 
+def _load_db_snapshot():
+    """Try to load the last healthy snapshot stored in the database.
+    Returns the payload dict or None."""
+    try:
+        from app.models.offline_snapshot import OfflineSnapshot
+        snap = OfflineSnapshot.query.get(1)
+        if snap and snap.data_json:
+            data = json.loads(snap.data_json)
+            if isinstance(data, dict) and _student_count(data) >= _min_safe_student_roster():
+                return data
+    except Exception:
+        pass
+    return None
+
+
 def _load_offline_data():
     path = _offline_data_path()
     if not os.path.exists(path):
         data = _load_latest_offline_backup()
         if data:
             return data
-        # Fallback: seed snapshot so first-time Render deploys are not empty.
+        # Try the database snapshot before falling back to the hardcoded seed.
+        # This is what keeps Render showing correct data across ephemeral-FS restarts.
+        data = _load_db_snapshot()
+        if data:
+            try:
+                _atomic_write_json(path, data)
+            except Exception:
+                pass
+            return data
+        # Last resort: hardcoded seed so the UI is never completely blank.
         try:
             payload = json.loads(json.dumps(FEB26_SEED))
             stamp = datetime.now(timezone.utc).isoformat()
@@ -395,8 +419,6 @@ def _load_offline_data():
             try:
                 _atomic_write_json(path, payload)
             except Exception:
-                # Can't persist to disk (e.g. ephemeral FS, cross-device link on Render)
-                # but still return seed data so the client is not blank.
                 pass
             return payload
         except Exception:
@@ -405,12 +427,18 @@ def _load_offline_data():
         with open(path, 'r', encoding='utf-8') as f:
             data = json.load(f)
             if _student_count(data) == 0:
-                # Treat empty snapshots as missing; seed to avoid blank UI.
                 raise ValueError('Empty offline snapshot')
             return data
     except Exception:
         data = _load_latest_offline_backup()
         if data:
+            return data
+        data = _load_db_snapshot()
+        if data:
+            try:
+                _atomic_write_json(path, data)
+            except Exception:
+                pass
             return data
         try:
             payload = json.loads(json.dumps(FEB26_SEED))
@@ -461,6 +489,22 @@ def _save_offline_data(payload):
     _backup_offline_file(path)
     _atomic_write_json(path, payload)
     _backup_offline_hourly_immutable(payload)
+    # Also persist to the database so the snapshot survives ephemeral-filesystem
+    # restarts on Render.  Only store healthy snapshots (enough students).
+    if _student_count(payload) >= _min_safe_student_roster():
+        try:
+            from app.models.offline_snapshot import OfflineSnapshot
+            from app import db as _db
+            snap = OfflineSnapshot.query.get(1)
+            if snap is None:
+                snap = OfflineSnapshot(id=1, data_json='', updated_at='', student_count=0)
+                _db.session.add(snap)
+            snap.data_json = json.dumps(payload, ensure_ascii=False)
+            snap.updated_at = payload.get('server_updated_at') or payload.get('updated_at') or ''
+            snap.student_count = _student_count(payload)
+            _db.session.commit()
+        except Exception:
+            pass  # DB write is supplemental; never block normal file-based flow
     return payload
 
 
