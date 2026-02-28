@@ -3291,7 +3291,15 @@ def offline_data():
     _reconcile_role_veto_monthly(data)
     _reconcile_veto_counters_from_scores(data)
     _ensure_score_timestamps(data)
-    data['server_updated_at'] = _server_now_iso()
+    if is_replicated:
+        # Preserve the source timestamp so the receiver never appears artificially
+        # newer than the sender.  Generating a fresh _server_now_iso() here would
+        # make Render's stamp >30 s ahead of local's (due to cold-start latency),
+        # causing the next background-sync cycle to pull from Render and silently
+        # revert any local changes (deactivations, edits) made after the push.
+        data['server_updated_at'] = data.get('server_updated_at') or _server_now_iso()
+    else:
+        data['server_updated_at'] = _server_now_iso()
     _save_offline_data(data)
     _broadcast_sync_event(data['server_updated_at'], source='replica' if is_replicated else 'client')
     if not is_replicated:
