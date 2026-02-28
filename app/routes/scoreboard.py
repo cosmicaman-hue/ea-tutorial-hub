@@ -231,8 +231,13 @@ def _do_peer_sync_cycle(app):
 
                 # ── Decide direction ─────────────────────────────────────────
                 # Margin of 30 s avoids flip-flopping on tiny clock skew.
-                if peer_stamp > local_stamp + 30 and peer_count >= _min_safe_student_roster():
-                    # Render has newer data → adopt locally if not suspicious
+                # Master is the source of truth — it never adopts data from peers.
+                # Pulling from Render on the master caused admin changes (deactivations,
+                # deletions) to be silently reverted whenever Render's timestamp was
+                # >30 s ahead (a side-effect of Render's old code stamping with its clock).
+                is_master = str(os.getenv('EA_MASTER_MODE', '')).strip() == '1'
+                if not is_master and peer_stamp > local_stamp + 30 and peer_count >= _min_safe_student_roster():
+                    # Backup/slave node: adopt newer peer snapshot if not suspicious
                     if not _is_suspicious_student_shrink(local_data, peer_data):
                         _save_offline_data(peer_data)
                         _broadcast_sync_event(
@@ -698,16 +703,16 @@ def _recover_stale_snapshot_if_needed(payload, min_students=25, min_newer_second
     best_src = ''
     best_stamp = local_stamp
 
-    # Prefer a newer peer snapshot first when peers are configured.
-    peer_payload, peer_src = _best_peer_snapshot(min_students=min_students)
-    peer_stamp = _payload_sync_stamp(peer_payload) if peer_payload else 0.0
-    # Never adopt a peer snapshot that would shrink the local student roster —
-    # this prevents Render's FEB26_SEED (seeded with datetime.now() timestamp) from
-    # overwriting a healthy local master copy that has significantly more students.
-    if peer_payload and peer_stamp > best_stamp and not _is_suspicious_student_shrink(payload, peer_payload):
-        best_payload = peer_payload
-        best_src = peer_src
-        best_stamp = peer_stamp
+    # Master is the source of truth — never adopt a peer snapshot on master mode.
+    # On backup/slave nodes, prefer a newer peer snapshot when peers are configured.
+    is_master = str(os.getenv('EA_MASTER_MODE', '')).strip() == '1'
+    if not is_master:
+        peer_payload, peer_src = _best_peer_snapshot(min_students=min_students)
+        peer_stamp = _payload_sync_stamp(peer_payload) if peer_payload else 0.0
+        if peer_payload and peer_stamp > best_stamp and not _is_suspicious_student_shrink(payload, peer_payload):
+            best_payload = peer_payload
+            best_src = peer_src
+            best_stamp = peer_stamp
 
     # Optional local backup scan (expensive): disabled on hot sync paths by default.
     if allow_local_scan:
