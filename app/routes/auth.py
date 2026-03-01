@@ -6,6 +6,7 @@ from app.models.user import ActivityLog
 from datetime import datetime
 import json
 import os
+from sqlalchemy.exc import SQLAlchemyError
 
 auth_bp = Blueprint('auth', __name__, url_prefix='/auth')
 
@@ -91,7 +92,12 @@ def login():
             flash('Invalid login ID format. Admin: "Admin", Teacher: "Teacher", Student: "EA24A01"', 'error')
             return redirect(url_for('auth.login'))
         
-        user = User.query.filter_by(login_id=login_id).first()
+        try:
+            user = User.query.filter_by(login_id=login_id).first()
+        except SQLAlchemyError:
+            db.session.rollback()
+            flash('Login service is initializing. Please try again in 30 seconds.', 'error')
+            return redirect(url_for('auth.login'))
 
         login_ok = False
         if user:
@@ -140,7 +146,11 @@ def login():
                     pass
             user.last_login = datetime.utcnow()
             user.last_login_ip = request.remote_addr
-            db.session.commit()
+            try:
+                db.session.commit()
+            except SQLAlchemyError:
+                # Do not hard-fail user login because of audit/profile column mismatch on server.
+                db.session.rollback()
             
             # Log successful login
             log_activity(user.id, f'{user.role.capitalize()} login successful', 'login', f'IP: {request.remote_addr}', request.remote_addr)
