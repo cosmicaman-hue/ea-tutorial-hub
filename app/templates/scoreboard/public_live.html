@@ -197,12 +197,29 @@
             const students = Array.from(dedupByRoll.values());
             const byId = new Map(students.map(s => [parseInt(s.id, 10), s]));
             const totals = new Map(students.map(s => [parseInt(s.id, 10), 0]));
+            const isHistoricalMonth = month < '2026-02';
+            const historicalWorkbookTotals = new Map();
+            const historicalHasWorkbookTotal = new Set();
 
             (latest.scores || []).forEach(sc => {
                 const sid = parseInt(sc && sc.studentId, 10);
                 if (!sid || !totals.has(sid)) return;
                 const m = String(sc && sc.month || '').trim();
                 if (m !== month) return;
+                const note = String(sc && sc.notes || '').trim().toLowerCase();
+                if (isHistoricalMonth) {
+                    const isExcelTotal = note.startsWith('excel_total_score') || note.startsWith('excel_total_from_dates');
+                    const isExcelDaily = note.startsWith('excel_daily_score');
+                    const isExcelStar = note.startsWith('excel_star_usage');
+                    // Historical months must render strictly from Excel-imported rows only.
+                    if (!isExcelTotal && !isExcelDaily && !isExcelStar) return;
+                    if (isExcelTotal) {
+                        historicalWorkbookTotals.set(sid, (historicalWorkbookTotals.get(sid) || 0) + (parseInt(sc && sc.points, 10) || 0));
+                        historicalHasWorkbookTotal.add(sid);
+                        // Do not add workbook-total rows into daily accumulation.
+                        return;
+                    }
+                }
                 totals.set(sid, (totals.get(sid) || 0) + (parseInt(sc && sc.points, 10) || 0));
             });
 
@@ -222,6 +239,13 @@
                 if (!sid || !totals.has(sid)) return;
                 totals.set(sid, (totals.get(sid) || 0) + penaltyOf(normStatus(a && a.status)));
             });
+
+            // For historical months, workbook total is authoritative if present.
+            if (isHistoricalMonth) {
+                historicalHasWorkbookTotal.forEach(sid => {
+                    totals.set(sid, historicalWorkbookTotals.get(sid) || 0);
+                });
+            }
 
             const rows = Array.from(totals.entries()).map(([sid, total]) => {
                 const s = byId.get(sid) || {};
