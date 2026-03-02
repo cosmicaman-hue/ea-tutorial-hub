@@ -4328,6 +4328,7 @@ def offline_force_publish():
     payload = request.get_json(silent=True) or {}
     data = payload.get('data') if isinstance(payload, dict) else None
     request_peers = payload.get('peers', []) if isinstance(payload, dict) else []
+    wait_for_results = bool(payload.get('wait_for_results')) if isinstance(payload, dict) else False
     used_fallback_snapshot = False
     if not isinstance(data, dict):
         data = _load_offline_data() or {}
@@ -4338,6 +4339,21 @@ def offline_force_publish():
     data['server_updated_at'] = _server_now_iso()
     _save_offline_data(data)
     _broadcast_sync_event(data['server_updated_at'], source='force-publish')
+
+    # Default mode: queue remote replication in background and return fast.
+    # This avoids user-visible publish failures caused by WAN/Supabase timeouts.
+    if not wait_for_results:
+        _supabase_push_snapshot_async(data, reason='force_publish')
+        _forward_offline_data_to_peers_async(data, request_peers)
+        return jsonify({
+            'success': True,
+            'replication_ok': True,
+            'mode': 'queued',
+            'used_fallback_snapshot': used_fallback_snapshot,
+            'updated_at': data.get('server_updated_at'),
+            'supabase': {'status': 'queued'},
+            'peers': []
+        })
 
     supabase_result = {'status': 'skipped'}
 
