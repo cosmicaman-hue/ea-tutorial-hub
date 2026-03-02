@@ -1429,75 +1429,72 @@
             background-size: 100% 100%;
         }
 
-        /* FEES */
-        .fee-input {
-            width: 110px;
-            max-width: 100%;
-        }
-        #feesTable td:last-child button {
-            margin: 4px 6px 0 0;
-            padding: 8px 10px;
-            font-size: 12px;
-        }
+        /* FEES — revamped */
         .fee-name-cell {
-            max-width: 220px;
-            min-width: 170px;
+            max-width: 200px;
+            min-width: 140px;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
-        }
-        .fee-date-note {
-            display: block;
-            font-size: 11px;
-            color: #94a3b8;
-            margin-top: 4px;
-        }
-        .fee-date-cell {
-            display: grid;
-            grid-template-columns: minmax(120px, 1fr) 30px;
-            align-items: center;
-            gap: 4px 6px;
-            min-width: 170px;
-        }
-        .fee-date-input {
-            position: relative;
-            min-width: 120px;
-            width: 100%;
-        }
-        .fee-date-input::-webkit-calendar-picker-indicator {
-            opacity: 0;
-            pointer-events: none;
-            width: 0;
-            margin: 0;
-        }
-        .fee-date-picker-btn {
-            background: rgba(30, 41, 59, 0.85);
-            color: #93c5fd;
-            border: 1px solid rgba(147, 197, 253, 0.45);
-            border-radius: 6px;
-            padding: 4px 6px;
-            font-size: 12px;
-            line-height: 1;
-            cursor: pointer;
-            width: 30px;
-            height: 28px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
         }
         #feesTable th,
         #feesTable td {
             white-space: nowrap;
             vertical-align: middle;
         }
-        #feesTable th.fees-period-col {
-            white-space: normal;
-            line-height: 1.15;
-            text-align: center;
-        }
         #fees-tab .scoreboard-scroll {
             padding-right: 18px;
         }
+        /* Status badge + sub-label */
+        .fee-status-wrap { display: flex; flex-direction: column; gap: 2px; align-items: flex-start; }
+        .fee-status { font-weight: 700; border-radius: 4px; padding: 2px 7px; font-size: 12px; display: inline-block; }
+        .fee-overdue { color: #fecaca; background: rgba(239,68,68,0.22); }
+        .fee-paid    { color: #86efac; background: rgba(34,197,94,0.15); }
+        .fee-due     { color: #fde68a; background: rgba(234,179,8,0.18); }
+        .fee-status-sub { font-size: 11px; color: #94a3b8; padding-left: 2px; }
+        /* Action icon buttons */
+        .fee-actions { display: flex; gap: 5px; align-items: center; flex-wrap: nowrap; }
+        .fee-action-btn {
+            background: rgba(30,41,59,0.85);
+            border: 1px solid rgba(148,163,184,0.3);
+            border-radius: 6px;
+            color: #cbd5e1;
+            padding: 5px 8px;
+            font-size: 13px;
+            cursor: pointer;
+            line-height: 1;
+            transition: background 0.15s, color 0.15s;
+        }
+        .fee-action-btn:hover:not(:disabled) { background: rgba(51,65,85,0.9); color: #f1f5f9; }
+        .fee-action-btn:disabled { opacity: 0.38; cursor: default; }
+        .fee-action-btn.pay-btn { color: #86efac; border-color: rgba(134,239,172,0.35); }
+        .fee-action-btn.partial-btn { color: #fde68a; border-color: rgba(253,230,138,0.35); }
+        .fee-action-btn.edit-btn { color: #93c5fd; border-color: rgba(147,197,253,0.35); }
+        .fee-action-btn.hist-btn { color: #c4b5fd; border-color: rgba(196,181,253,0.35); }
+        /* Fee modals */
+        .fee-modal-row { display: flex; flex-direction: column; gap: 4px; margin-bottom: 14px; }
+        .fee-modal-row label { font-size: 12px; color: #94a3b8; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+        .fee-modal-row input[type="number"],
+        .fee-modal-row input[type="date"],
+        .fee-modal-row input[type="text"] {
+            background: rgba(15,23,42,0.7); border: 1px solid rgba(148,163,184,0.3);
+            border-radius: 6px; color: #e2e8f0; padding: 8px 10px; font-size: 14px; width: 100%;
+        }
+        .fee-modal-info { font-size: 13px; color: #cbd5e1; line-height: 1.6; margin-bottom: 14px; }
+        .fee-modal-info strong { color: #f1f5f9; }
+        .fee-modal-early { background: rgba(234,179,8,0.12); border: 1px solid rgba(234,179,8,0.3);
+            border-radius: 6px; padding: 8px 12px; font-size: 13px; color: #fde68a; margin-bottom: 14px; }
+        .fee-modal-preview { font-size: 12px; color: #7dd3fc; margin-top: 4px; }
+        .fee-modal-reset-warn { font-size: 12px; color: #fca5a5; margin-top: 4px; display: none; }
+        .fee-history-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        .fee-history-table th { color: #94a3b8; font-weight: 600; text-align: left; padding: 6px 10px; border-bottom: 1px solid rgba(148,163,184,0.2); font-size: 11px; text-transform: uppercase; }
+        .fee-history-table td { padding: 8px 10px; border-bottom: 1px solid rgba(148,163,184,0.1); color: #e2e8f0; }
+        .fee-history-table tr:last-child td { border-bottom: none; }
+        .fee-hist-early { color: #fde68a; }
+        .fee-hist-partial { color: #93c5fd; }
+        .fee-hist-regular { color: #86efac; }
+        .fee-modal-remaining { font-size: 15px; font-weight: 700; color: #f1f5f9; margin: 4px 0 10px; }
+        .fee-modal-remaining.cleared { color: #86efac; }
 
         .bulk-date-list {
             display: flex;
@@ -3093,6 +3090,106 @@
                 </div>
             </div>
         </div>
+
+        <!-- FEE EDIT MODAL -->
+        <div id="feeEditModal" class="validation-modal hidden">
+            <div class="validation-modal-content" style="max-width:420px;">
+                <div class="validation-modal-header">
+                    <h3><i class="fas fa-pencil-alt" style="color:#93c5fd;margin-right:8px;"></i>Edit Fee Record</h3>
+                </div>
+                <div class="validation-modal-body">
+                    <div style="font-size:13px;color:#94a3b8;margin-bottom:14px;" id="feeEditStudentLabel"></div>
+                    <div class="fee-modal-row">
+                        <label>Fee Amount (₹)</label>
+                        <input type="number" id="feeEditAmount" min="0" step="1" placeholder="e.g. 500">
+                    </div>
+                    <div class="fee-modal-row">
+                        <label>Cycle Start Date <span style="font-weight:400;color:#64748b;">(due = start + period)</span></label>
+                        <input type="date" id="feeEditStartDate" oninput="updateFeeEditPreview(); const chg=this.value!==(this.dataset.originalStart||''); document.getElementById('feeEditResetWarn').style.display=chg?'block':'none';">
+                        <span class="fee-modal-reset-warn" id="feeEditResetWarn">⚠ Changing start date will reset the paid cycle (last paid date cleared)</span>
+                    </div>
+                    <div class="fee-modal-row">
+                        <label>Period (months)</label>
+                        <input type="number" id="feeEditPeriod" min="1" step="1" placeholder="1" oninput="updateFeeEditPreview()">
+                        <span class="fee-modal-preview" id="feeEditDuePreview"></span>
+                    </div>
+                    <div class="fee-modal-row">
+                        <label>Remarks</label>
+                        <input type="text" id="feeEditRemarks" placeholder="Optional note">
+                    </div>
+                </div>
+                <div class="validation-modal-footer">
+                    <button class="secondary" onclick="closeFeeModal('feeEditModal')">Cancel</button>
+                    <button class="btn-primary" onclick="saveFeeEditModal()"><i class="fas fa-save"></i> Save</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- FEE PAY MODAL -->
+        <div id="feePayModal" class="validation-modal hidden">
+            <div class="validation-modal-content" style="max-width:420px;">
+                <div class="validation-modal-header">
+                    <h3><i class="fas fa-check-circle" style="color:#86efac;margin-right:8px;"></i>Confirm Payment</h3>
+                </div>
+                <div class="validation-modal-body">
+                    <div class="fee-modal-info" id="feePayInfo"></div>
+                    <div class="fee-modal-early hidden" id="feePayEarlyNote"></div>
+                    <div class="fee-modal-row">
+                        <label>Payment Note <span style="font-weight:400;color:#64748b;">(optional)</span></label>
+                        <input type="text" id="feePayNote" placeholder="e.g. Cash received, UPI #12345">
+                    </div>
+                </div>
+                <div class="validation-modal-footer">
+                    <button class="secondary" onclick="closeFeeModal('feePayModal')">Cancel</button>
+                    <button class="btn-primary" onclick="confirmFeePayModal()" style="background:rgba(34,197,94,0.25);border-color:rgba(134,239,172,0.5);color:#86efac;">
+                        <i class="fas fa-check"></i> Confirm Payment
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- FEE PARTIAL MODAL -->
+        <div id="feePartialModal" class="validation-modal hidden">
+            <div class="validation-modal-content" style="max-width:420px;">
+                <div class="validation-modal-header">
+                    <h3><i class="fas fa-coins" style="color:#fde68a;margin-right:8px;"></i>Partial Payment</h3>
+                </div>
+                <div class="validation-modal-body">
+                    <div class="fee-modal-info" id="feePartialInfo"></div>
+                    <div class="fee-modal-row">
+                        <label>Amount Paid (₹)</label>
+                        <input type="number" id="feePartialAmount" min="1" step="1" oninput="updatePartialRemaining()">
+                    </div>
+                    <div class="fee-modal-remaining" id="feePartialRemaining"></div>
+                    <div class="fee-modal-row">
+                        <label>Payment Note <span style="font-weight:400;color:#64748b;">(optional)</span></label>
+                        <input type="text" id="feePartialNote" placeholder="e.g. Partial — balance next week">
+                    </div>
+                </div>
+                <div class="validation-modal-footer">
+                    <button class="secondary" onclick="closeFeeModal('feePartialModal')">Cancel</button>
+                    <button class="btn-primary" onclick="confirmFeePartialModal()" style="background:rgba(234,179,8,0.2);border-color:rgba(253,230,138,0.4);color:#fde68a;">
+                        <i class="fas fa-coins"></i> Record Payment
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- FEE HISTORY MODAL -->
+        <div id="feeHistoryModal" class="validation-modal hidden">
+            <div class="validation-modal-content" style="max-width:500px;">
+                <div class="validation-modal-header">
+                    <h3><i class="fas fa-history" style="color:#c4b5fd;margin-right:8px;"></i>Payment History</h3>
+                </div>
+                <div class="validation-modal-body">
+                    <div style="font-size:13px;color:#94a3b8;margin-bottom:12px;" id="feeHistoryStudentLabel"></div>
+                    <div id="feeHistoryContent"></div>
+                </div>
+                <div class="validation-modal-footer">
+                    <button class="btn-primary" onclick="closeFeeModal('feeHistoryModal')">Close</button>
+                </div>
+            </div>
+        </div>
         
         <button
             id="masterUpdateBtn"
@@ -3353,6 +3450,12 @@
             <div class="form-card" id="myAppealsCard">
                 <h3><i class="fas fa-bullhorn"></i> My Appeals</h3>
                 <div id="myAppealsContent"><p style="color:var(--text-muted)">Loading…</p></div>
+            </div>
+
+            <!-- Student Transfers -->
+            <div class="form-card" id="myTransferCard">
+                <h3><i class="fas fa-right-left"></i> Transfer Points / Stars</h3>
+                <div id="myTransferContent"><p style="color:var(--text-muted)">Loading…</p></div>
             </div>
 
         </div>
@@ -3737,22 +3840,20 @@
                         <thead>
                             <tr>
                                 <th style="width: 110px;">Roll No.</th>
-                                <th style="min-width: 170px;">Student Name</th>
-                                <th style="width: 70px;">Class</th>
-                                <th style="width: 70px;">Group</th>
-                                <th style="width: 140px;">Fees</th>
-                                <th style="width: 150px;">Start Date</th>
-                                <th class="fees-period-col" style="width: 120px;">Period (Months)</th>
-                                <th style="width: 140px;">Due Date</th>
-                                <th style="width: 140px;">Last Paid</th>
-                                <th style="width: 120px;">Status</th>
-                                <th style="width: 190px;">Action</th>
-                                <th style="min-width: 160px;">Remarks</th>
+                                <th style="min-width: 150px;">Student Name</th>
+                                <th style="width: 65px;">Class</th>
+                                <th style="width: 65px;">Group</th>
+                                <th style="width: 100px;">Fee Amt</th>
+                                <th style="width: 120px;">Start Date</th>
+                                <th style="width: 120px;">Due Date</th>
+                                <th style="width: 120px;">Last Paid</th>
+                                <th style="width: 140px;">Status</th>
+                                <th style="width: 170px;">Actions</th>
                             </tr>
                         </thead>
                         <tbody id="feesBody">
                             <tr>
-                                <td colspan="11" class="text-center loading">Loading...</td>
+                                <td colspan="10" class="text-center loading">Loading...</td>
                             </tr>
                         </tbody>
                     </table>
@@ -5830,6 +5931,60 @@
                 </details>
             </div>
             <!-- ── End Device Monitoring Panel ──────────────────────────────── -->
+
+            <div class="form-card" id="adminControlCard" style="display:none">
+                <h3><i class="fas fa-user-shield"></i> Admin Control Panel</h3>
+                <p class="section-subtitle">Manage user accounts, join code, teacher month windows, and active device sessions.</p>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>New Join Code</label>
+                        <input id="adminJoinCodeInput" type="text" placeholder="Enter new join code">
+                    </div>
+                    <div class="form-group">
+                        <label>Join Code Expiry (optional)</label>
+                        <input id="adminJoinCodeExpiry" type="datetime-local">
+                    </div>
+                </div>
+                <div class="form-buttons">
+                    <button onclick="adminRotateJoinCode()"><i class="fas fa-key"></i> Rotate Join Code</button>
+                    <button class="secondary" onclick="loadAdminControlPanel()"><i class="fas fa-sync"></i> Refresh Control Data</button>
+                </div>
+                <div class="form-grid" style="margin-top:10px">
+                    <div class="form-group">
+                        <label>Teacher Login ID</label>
+                        <input id="adminAccessLoginId" type="text" placeholder="Teacher login id">
+                    </div>
+                    <div class="form-group">
+                        <label>Month From</label>
+                        <input id="adminAccessFrom" type="month">
+                    </div>
+                    <div class="form-group">
+                        <label>Month To</label>
+                        <input id="adminAccessTo" type="month">
+                    </div>
+                </div>
+                <div class="form-buttons">
+                    <button class="secondary" onclick="adminSetAccessWindow()"><i class="fas fa-calendar-check"></i> Save Teacher Window</button>
+                </div>
+                <div class="scoreboard-wrapper" style="margin-top:10px">
+                    <div class="scoreboard-scroll">
+                        <table class="scoreboard" id="adminUsersTable">
+                            <thead>
+                                <tr>
+                                    <th>Login</th>
+                                    <th>Role</th>
+                                    <th>Status</th>
+                                    <th>Last Login</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="adminUsersBody">
+                                <tr><td colspan="5" class="text-center">Refresh to load users.</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -6112,6 +6267,7 @@
         let forcePublishRunning = false;
         let adminAutoPublishAttempted = false;
         let pendingPushTimer = null;
+        let allowedMonthsFromServer = null;
         const AUTO_PUSH_DELAY_MS = 800;
         let rosterRecoveryInProgress = false;
         let rosterRecoveryQueuedTab = null;
@@ -9849,6 +10005,33 @@
             return formatDateKey(new Date()).substring(0, 7);
         }
 
+        async function refreshAllowedMonthsFromServer() {
+            if (!SERVER_SYNC.enabled || !currentLoginId) return;
+            try {
+                const resp = await fetch('/scoreboard/allowed-months', {
+                    method: 'GET',
+                    credentials: 'include',
+                    cache: 'no-store'
+                });
+                if (!resp.ok) return;
+                const payload = await resp.json();
+                const months = Array.isArray(payload && payload.months) ? payload.months : [];
+                allowedMonthsFromServer = new Set(months.map(m => String(m || '').trim()).filter(m => /^\d{4}-\d{2}$/.test(m)));
+            } catch (err) {
+                // non-blocking
+            }
+        }
+
+        function isMonthAllowedForCurrentUser(monthKey) {
+            const mk = String(monthKey || '').trim();
+            if (!/^\d{4}-\d{2}$/.test(mk)) return false;
+            if (currentUserRole === 'admin') return true;
+            if (!(allowedMonthsFromServer instanceof Set) || allowedMonthsFromServer.size === 0) {
+                return true;
+            }
+            return allowedMonthsFromServer.has(mk);
+        }
+
         function getMonthDateBounds(monthKey) {
             const value = String(monthKey || '').trim();
             if (!/^\d{4}-\d{2}$/.test(value)) {
@@ -10375,6 +10558,11 @@
             // Device monitor card — admin only
             const devCard = document.getElementById('deviceMonitorCard');
             if (devCard) devCard.style.display = isAdmin ? '' : 'none';
+            const adminControlCard = document.getElementById('adminControlCard');
+            if (adminControlCard) adminControlCard.style.display = isAdmin ? '' : 'none';
+            if (isAdmin) {
+                setTimeout(loadAdminControlPanel, 150);
+            }
 
             // Global Refresh button — visible to all logged-in users (admin/teacher/student)
             const refreshBtn = document.getElementById('globalRefreshBtn');
@@ -14507,6 +14695,10 @@
                 showAlert('Select a student, date, and month first.', 'danger');
                 return;
             }
+            if (!isMonthAllowedForCurrentUser(month)) {
+                showAlert(`You do not have access to modify month ${month}.`, 'warning');
+                return;
+            }
             if (!teacherValidateCurrentMonth(date, month, 'Score entry')) {
                 return;
             }
@@ -14956,6 +15148,7 @@
 
             // ── My appeals ─────────────────────────────────────────────────────────
             loadMyAppealsView();
+            loadMyTransferView();
         }
 
         function loadMyCRView(pos) {
@@ -15035,6 +15228,97 @@
                 <thead><tr><th>Type</th><th>Date</th><th>Status</th><th>Message</th></tr></thead>
                 <tbody>${rows}</tbody>
             </table></div></div>${_myAppealForm()}`;
+        }
+
+        function loadMyTransferView() {
+            const el = document.getElementById('myTransferContent');
+            if (!el) return;
+            if (currentUserRole !== 'student') {
+                el.innerHTML = '<p style="color:var(--text-muted)">Student transfer panel is available for student logins only.</p>';
+                return;
+            }
+            const me = (db.getStudents() || []).find(s => normalizeRoll(s && s.roll) === normalizeRoll(currentLoginId || ''));
+            const others = (db.getStudents() || [])
+                .filter(s => s && s.active !== false && normalizeRoll(s.roll) && normalizeRoll(s.roll) !== normalizeRoll(currentLoginId || ''))
+                .sort(compareRecordStudentsByRollSuffix);
+            const options = others.map(s => `<option value="${escapeHtml(String(s.roll || ''))}">${escapeHtml(formatRollDisplay(s.roll || ''))} — ${escapeHtml(String(s.base_name || s.name || ''))}</option>`).join('');
+            const myStars = me ? (parseInt(me.stars, 10) || 0) : 0;
+            const month = getCurrentMonthKey();
+            const myPoints = me ? db.getStudentMonthlyTotal(me.id, month) : 0;
+            el.innerHTML = `
+                <p style="color:var(--text-muted);font-size:13px;margin-bottom:10px">
+                    Rules: max 50 points/transfer, stars cap 3 per 24h, one transfer per pair in 24h, reverse lock in 24h.
+                </p>
+                <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+                    <span class="sync-pill">My Points (${month}): ${myPoints}</span>
+                    <span class="sync-pill">My Stars: ${myStars}</span>
+                </div>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>Recipient</label>
+                        <select id="myTransferTo">${options || '<option value="">No eligible student</option>'}</select>
+                    </div>
+                    <div class="form-group">
+                        <label>Type</label>
+                        <select id="myTransferType">
+                            <option value="points">Points</option>
+                            <option value="stars">Stars</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Amount</label>
+                        <input id="myTransferAmount" type="number" min="1" step="1" placeholder="e.g. 10">
+                    </div>
+                </div>
+                <div class="form-buttons">
+                    <button onclick="submitMyTransfer()"><i class="fas fa-paper-plane"></i> Transfer</button>
+                </div>
+            `;
+        }
+
+        async function submitMyTransfer() {
+            if (currentUserRole !== 'student') {
+                showAlert('Only students can transfer points/stars.', 'warning');
+                return;
+            }
+            const toLoginId = String(getElementValue('myTransferTo') || '').trim().toUpperCase();
+            const transferType = String(getElementValue('myTransferType') || '').trim().toLowerCase();
+            const amount = parseInt(getElementValue('myTransferAmount'), 10) || 0;
+            if (!toLoginId || !/^EA\d{2}[A-Z]\d{2}$/i.test(toLoginId)) {
+                showAlert('Select a valid recipient student.', 'warning');
+                return;
+            }
+            if (!(transferType === 'points' || transferType === 'stars')) {
+                showAlert('Select transfer type.', 'warning');
+                return;
+            }
+            if (!amount || amount <= 0) {
+                showAlert('Enter a valid amount.', 'warning');
+                return;
+            }
+            try {
+                const resp = await fetch('/scoreboard/student-transfers', {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        to_login_id: toLoginId,
+                        transfer_type: transferType,
+                        amount
+                    })
+                });
+                const payload = await resp.json().catch(() => ({}));
+                if (!resp.ok || payload.success === false) {
+                    showAlert(payload.error || 'Transfer failed', 'danger');
+                    return;
+                }
+                await pullFromServer(false, true);
+                loadScoreboard();
+                loadMyDashboard();
+                showAlert(payload.message || 'Transfer completed', 'success');
+            } catch (err) {
+                showAlert('Transfer failed due to network/server issue.', 'danger');
+            }
         }
 
         function _myAppealForm() {
@@ -20920,6 +21204,10 @@
             if (!teacherValidateCurrentMonth(date, month, 'Attendance marking')) {
                 return;
             }
+            if (!isMonthAllowedForCurrentUser(month)) {
+                showAlert(`You do not have access to modify month ${month}.`, 'warning');
+                return;
+            }
             const selects = document.querySelectorAll('[data-attendance-student]');
             let saved = 0;
             const changedRows = [];
@@ -21663,111 +21951,272 @@
             await pullFromServer(false);
         }
 
-        async function handleFeeInputChange(input) {
-            if (currentUserRole !== 'admin') return;
-            const studentId = parseInt(input.dataset.studentId, 10);
-            if (!studentId) return;
-            const field = input.dataset.field;
-            if (!field) return;
-            const updates = {};
-            if (field === 'amount') {
-                const value = parseFloat(input.value);
-                updates.amount = Number.isFinite(value) ? value : null;
-                updates.pending_amount = updates.amount;
-            } else if (field === 'start_date') {
-                updates.start_date = input.value || '';
-                // Manual cycle reset: start date is the new anchor.
-                updates.last_paid_date = '';
-            } else if (field === 'period_months') {
-                updates.period_months = Math.max(1, parseInt(input.value, 10) || 1);
-            } else if (field === 'remarks') {
-                updates.remarks = String(input.value || '').trim();
-            }
-            const saved = saveFeeRecord(studentId, updates);
-            if (!saved) {
-                showAlert('Unable to save fee update locally. Please run Master Update and retry.', 'warning');
-                return;
-            }
-            await syncFeeChangeNow();
-            loadFeesTab();
+        // ─── Fee modal helpers ───────────────────────────────────────────────────
+
+        let _feeModalStudentId = null;  // shared state for open modal
+
+        function closeFeeModal(id) {
+            const el = document.getElementById(id);
+            if (el) el.classList.add('hidden');
+            _feeModalStudentId = null;
         }
 
-        function openFeeDatePicker(studentId) {
-            const input = document.querySelector(`input[data-student-id="${studentId}"][data-field="start_date"]`);
-            if (!input) return;
-            if (typeof input.showPicker === 'function') {
-                input.showPicker();
-            } else {
-                input.focus();
-                input.click();
-            }
-        }
-
-        async function markFeePaid(studentId) {
+        // ── EDIT MODAL ────────────────────────────────────────────────────────────
+        function openFeeEditModal(studentId) {
             if (currentUserRole !== 'admin') return;
-            if (!confirm('Confirm Fees Paid for this student?')) return;
+            _feeModalStudentId = studentId;
             const studentKey = String(studentId);
             const record = normalizeFeeRecord(db.getFeeRecords().find(r => String(r.studentId) === studentKey));
-            const today = new Date().toISOString().split('T')[0];
             const student = db.getStudents().find(s => s.id === studentId);
-            const fallbackAmount = Number.isFinite(Number(student && student.fees)) ? Number(student.fees) : 0;
-            const amount = Number.isFinite(Number(record.amount)) ? Number(record.amount) : fallbackAmount;
+            const fallbackAmt = Number.isFinite(Number(student && student.fees)) ? Number(student.fees) : '';
+            const baseAmt = record.amount !== null ? record.amount : fallbackAmt;
+            const startVal = getEffectiveFeeStartDate(record);
+
+            document.getElementById('feeEditStudentLabel').textContent =
+                (student ? (student.base_name || student.name || '') + ' · ' + (student.roll || '') : '');
+            document.getElementById('feeEditAmount').value = baseAmt !== '' ? baseAmt : '';
+            document.getElementById('feeEditStartDate').value = startVal || '';
+            document.getElementById('feeEditPeriod').value = record.period_months || 1;
+            document.getElementById('feeEditRemarks').value = record.remarks || '';
+
+            // Store original start date so oninput can detect changes
+            document.getElementById('feeEditStartDate').dataset.originalStart = startVal || '';
+            document.getElementById('feeEditResetWarn').style.display = 'none';
+            updateFeeEditPreview();
+            document.getElementById('feeEditModal').classList.remove('hidden');
+        }
+
+        function updateFeeEditPreview() {
+            const start = (document.getElementById('feeEditStartDate') || {}).value || '';
+            const period = parseInt((document.getElementById('feeEditPeriod') || {}).value, 10) || 1;
+            const preview = document.getElementById('feeEditDuePreview');
+            if (!preview) return;
+            if (start) {
+                const due = computeFeeDueDate({ start_date: start, period_months: period });
+                preview.textContent = due ? `Due date: ${formatDateLabel(due)}` : '';
+            } else {
+                preview.textContent = 'Set a start date to compute due date';
+            }
+        }
+
+        async function saveFeeEditModal() {
+            if (currentUserRole !== 'admin' || _feeModalStudentId === null) return;
+            const studentId = _feeModalStudentId;
+            const amtRaw = parseFloat(document.getElementById('feeEditAmount').value);
+            const newStart = document.getElementById('feeEditStartDate').value || '';
+            const origStart = document.getElementById('feeEditStartDate').dataset.originalStart || '';
+            const period = Math.max(1, parseInt(document.getElementById('feeEditPeriod').value, 10) || 1);
+            const remarks = (document.getElementById('feeEditRemarks').value || '').trim();
+
+            const updates = {
+                amount: Number.isFinite(amtRaw) ? amtRaw : null,
+                pending_amount: Number.isFinite(amtRaw) ? amtRaw : null,
+                period_months: period,
+                remarks,
+            };
+            // Start date change resets last_paid_date (existing behaviour, now made explicit)
+            if (newStart !== origStart) {
+                updates.start_date = newStart;
+                updates.last_paid_date = '';
+            }
+
+            const saved = saveFeeRecord(studentId, updates);
+            if (!saved) { showAlert('Save failed locally. Run Master Update and retry.', 'warning'); return; }
+            closeFeeModal('feeEditModal');
+            await syncFeeChangeNow();
+            loadFeesTab();
+            showAlert('Fee record updated', 'success');
+        }
+
+        // ── PAY MODAL ─────────────────────────────────────────────────────────────
+        function openFeePayModal(studentId) {
+            if (currentUserRole !== 'admin') return;
+            _feeModalStudentId = studentId;
+            const studentKey = String(studentId);
+            const record = normalizeFeeRecord(db.getFeeRecords().find(r => String(r.studentId) === studentKey));
+            const student = db.getStudents().find(s => s.id === studentId);
+            const fallbackAmt = Number.isFinite(Number(student && student.fees)) ? Number(student.fees) : 0;
+            const amount = Number.isFinite(Number(record.amount)) ? Number(record.amount) : fallbackAmt;
             const effectiveStart = getEffectiveFeeStartDate(record);
             const dueDate = computeFeeDueDate({ ...record, start_date: effectiveStart });
-            const isEarlyPayment = !!dueDate && today < dueDate;
-            const history = Array.isArray(record.payment_history) ? record.payment_history : [];
-            history.push({
-                date: today,
-                amount,
-                note: isEarlyPayment ? `early_payment_before_due:${dueDate}` : 'regular_payment'
-            });
-            const saved = saveFeeRecord(studentId, buildFeeSettlementUpdate(record, today, amount, history));
-            if (!saved) {
-                showAlert('Unable to save fee update locally. Please run Master Update and retry.', 'warning');
-                return;
+            const today = new Date().toISOString().split('T')[0];
+            const isEarly = !!dueDate && today < dueDate;
+
+            const infoEl = document.getElementById('feePayInfo');
+            infoEl.innerHTML = `
+                <strong>Student:</strong> ${student ? (student.base_name || student.name || student.roll) : studentId}<br>
+                <strong>Amount:</strong> ₹${amount || 0}<br>
+                ${effectiveStart ? `<strong>Cycle:</strong> ${formatDateLabel(effectiveStart)} → ${dueDate ? formatDateLabel(dueDate) : '?'}<br>` : ''}
+                <strong>Today:</strong> ${formatDateLabel(today)}
+            `;
+
+            const earlyEl = document.getElementById('feePayEarlyNote');
+            if (!record.start_date) {
+                earlyEl.innerHTML = `⚠️ <strong>No start date set.</strong> Due date is computed from default Jan 1. Use the ✏️ Edit button to set a proper start date first.`;
+                earlyEl.style.color = '#fbbf24';
+                earlyEl.classList.remove('hidden');
+            } else if (isEarly && dueDate) {
+                earlyEl.innerHTML = `⚡ <strong>Early payment</strong> — before due date (${formatDateLabel(dueDate)}). Next cycle starts from ${formatDateLabel(dueDate)}.`;
+                earlyEl.style.color = '';
+                earlyEl.classList.remove('hidden');
+            } else {
+                earlyEl.style.color = '';
+                earlyEl.classList.add('hidden');
             }
-            await syncFeeChangeNow();
-            loadFeesTab();
-            showAlert(isEarlyPayment ? `Fees recorded as early payment (before due ${formatDateLabel(dueDate)})` : 'Fees marked as paid', 'success');
+
+            document.getElementById('feePayNote').value = '';
+            document.getElementById('feePayModal').classList.remove('hidden');
         }
 
-        async function markFeePartialPaid(studentId) {
-            if (currentUserRole !== 'admin') return;
+        async function confirmFeePayModal() {
+            if (currentUserRole !== 'admin' || _feeModalStudentId === null) return;
+            const studentId = _feeModalStudentId;
+            _feeModalStudentId = null; // prevent double-execution from rapid clicks
+            const note = (document.getElementById('feePayNote').value || '').trim();
             const studentKey = String(studentId);
             const record = normalizeFeeRecord(db.getFeeRecords().find(r => String(r.studentId) === studentKey));
             const student = db.getStudents().find(s => s.id === studentId);
-            const fallbackAmount = Number.isFinite(Number(student && student.fees)) ? Number(student.fees) : 0;
-            const baseAmount = Number.isFinite(Number(record.amount)) ? Number(record.amount) : fallbackAmount;
-            const dueAmount = Number.isFinite(Number(record.pending_amount)) ? Number(record.pending_amount) : baseAmount;
-            const input = prompt('Enter partial amount paid:', dueAmount ? String(dueAmount) : '');
-            if (input === null) return;
-            const paid = parseFloat(String(input).trim());
-            if (!Number.isFinite(paid) || paid <= 0) {
-                showAlert('Enter a valid amount', 'warning');
-                return;
-            }
-            const remaining = Math.max(0, dueAmount - paid);
-            const history = Array.isArray(record.payment_history) ? record.payment_history : [];
-            history.push({ date: new Date().toISOString().split('T')[0], amount: paid });
+            const fallbackAmt = Number.isFinite(Number(student && student.fees)) ? Number(student.fees) : 0;
+            const amount = Number.isFinite(Number(record.amount)) ? Number(record.amount) : fallbackAmt;
+            const effectiveStart = getEffectiveFeeStartDate(record);
+            const dueDate = computeFeeDueDate({ ...record, start_date: effectiveStart });
+            const today = new Date().toISOString().split('T')[0];
+            const isEarly = !!dueDate && today < dueDate;
+
+            const baseNote = isEarly ? `early_payment_before_due:${dueDate}` : 'regular_payment';
+            const fullNote = note ? `${baseNote} | ${note}` : baseNote;
+            const history = Array.isArray(record.payment_history) ? record.payment_history.slice() : [];
+            history.push({ date: today, amount, note: fullNote });
+
+            const saved = saveFeeRecord(studentId, buildFeeSettlementUpdate(record, today, amount, history));
+            if (!saved) { showAlert('Save failed locally. Run Master Update and retry.', 'warning'); return; }
+            closeFeeModal('feePayModal');
+            await syncFeeChangeNow();
+            loadFeesTab();
+            showAlert(isEarly ? `Early payment recorded (before due ${formatDateLabel(dueDate)})` : 'Fees marked as paid', 'success');
+        }
+
+        // ── PARTIAL MODAL ─────────────────────────────────────────────────────────
+        function openFeePartialModal(studentId) {
+            if (currentUserRole !== 'admin') return;
+            _feeModalStudentId = studentId;
+            const studentKey = String(studentId);
+            const record = normalizeFeeRecord(db.getFeeRecords().find(r => String(r.studentId) === studentKey));
+            const student = db.getStudents().find(s => s.id === studentId);
+            const fallbackAmt = Number.isFinite(Number(student && student.fees)) ? Number(student.fees) : 0;
+            const baseAmt = Number.isFinite(Number(record.amount)) ? Number(record.amount) : fallbackAmt;
+            const dueAmt = Number.isFinite(Number(record.pending_amount)) ? Number(record.pending_amount) : baseAmt;
+
+            const noStartWarn = !record.start_date
+                ? `<br><span style="color:#fbbf24;font-size:12px;">⚠️ No start date set — use ✏️ Edit to set one first.</span>`
+                : '';
+            document.getElementById('feePartialInfo').innerHTML =
+                `<strong>Student:</strong> ${student ? (student.base_name || student.name || student.roll) : studentId}<br>
+                 <strong>Total Due:</strong> ₹${dueAmt || 0}${noStartWarn}`;
+            document.getElementById('feePartialAmount').value = dueAmt || '';
+            document.getElementById('feePartialAmount').dataset.dueAmt = dueAmt || 0;
+            document.getElementById('feePartialNote').value = '';
+            updatePartialRemaining();
+            document.getElementById('feePartialModal').classList.remove('hidden');
+        }
+
+        function updatePartialRemaining() {
+            const input = document.getElementById('feePartialAmount');
+            const remEl = document.getElementById('feePartialRemaining');
+            if (!input || !remEl) return;
+            const dueAmt = parseFloat(input.dataset.dueAmt) || 0;
+            const paid = parseFloat(input.value) || 0;
+            const remaining = Math.max(0, dueAmt - paid);
+            remEl.textContent = remaining <= 0 ? 'Fully cleared ✓' : `Remaining: ₹${remaining}`;
+            remEl.className = 'fee-modal-remaining' + (remaining <= 0 ? ' cleared' : '');
+        }
+
+        async function confirmFeePartialModal() {
+            if (currentUserRole !== 'admin' || _feeModalStudentId === null) return;
+            const studentId = _feeModalStudentId;
+            _feeModalStudentId = null; // prevent double-execution from rapid clicks
+            const note = (document.getElementById('feePartialNote').value || '').trim();
+            const studentKey = String(studentId);
+            const record = normalizeFeeRecord(db.getFeeRecords().find(r => String(r.studentId) === studentKey));
+            const student = db.getStudents().find(s => s.id === studentId);
+            const fallbackAmt = Number.isFinite(Number(student && student.fees)) ? Number(student.fees) : 0;
+            const baseAmt = Number.isFinite(Number(record.amount)) ? Number(record.amount) : fallbackAmt;
+            const dueAmt = Number.isFinite(Number(record.pending_amount)) ? Number(record.pending_amount) : baseAmt;
+            const paid = parseFloat(document.getElementById('feePartialAmount').value);
+            if (!Number.isFinite(paid) || paid <= 0) { showAlert('Enter a valid amount', 'warning'); return; }
+
+            const remaining = Math.max(0, dueAmt - paid);
+            const history = Array.isArray(record.payment_history) ? record.payment_history.slice() : [];
+            const histNote = note ? `partial | ${note}` : 'partial';
+            history.push({ date: new Date().toISOString().split('T')[0], amount: paid, note: histNote });
+
             let saved = false;
             if (remaining <= 0) {
                 const paidDate = new Date().toISOString().split('T')[0];
-                saved = saveFeeRecord(studentId, buildFeeSettlementUpdate(record, paidDate, baseAmount, history));
-                if (saved) showAlert('Full payment recorded', 'success');
+                saved = saveFeeRecord(studentId, buildFeeSettlementUpdate(record, paidDate, baseAmt, history));
+                if (saved) showAlert('Full payment recorded — cycle advanced', 'success');
             } else {
-                saved = saveFeeRecord(studentId, {
-                    amount: baseAmount || null,
-                    payment_history: history,
-                    pending_amount: remaining
-                });
-                if (saved) showAlert(`Partial payment recorded. Pending: ${remaining}`, 'info');
+                saved = saveFeeRecord(studentId, { amount: baseAmt || null, payment_history: history, pending_amount: remaining });
+                if (saved) showAlert(`Partial payment recorded. Remaining: ₹${remaining}`, 'info');
             }
-            if (!saved) {
-                showAlert('Unable to save fee update locally. Please run Master Update and retry.', 'warning');
-                return;
-            }
+            if (!saved) { showAlert('Save failed locally. Run Master Update and retry.', 'warning'); return; }
+            closeFeeModal('feePartialModal');
             await syncFeeChangeNow();
             loadFeesTab();
+        }
+
+        // ── HISTORY MODAL ─────────────────────────────────────────────────────────
+        function openFeeHistoryModal(studentId) {
+            const studentKey = String(studentId);
+            const record = normalizeFeeRecord(db.getFeeRecords().find(r => String(r.studentId) === studentKey));
+            const student = db.getStudents().find(s => s.id === studentId);
+            const history = Array.isArray(record.payment_history) ? record.payment_history.slice() : [];
+            const baseAmt = record.amount !== null ? record.amount :
+                (Number.isFinite(Number(student && student.fees)) ? Number(student.fees) : null);
+
+            document.getElementById('feeHistoryStudentLabel').textContent =
+                (student ? (student.base_name || student.name || '') + ' · ' + (student.roll || '') : String(studentId)) +
+                (baseAmt !== null ? ` · ₹${baseAmt}/cycle` : '');
+
+            const contentEl = document.getElementById('feeHistoryContent');
+            if (!history.length) {
+                contentEl.innerHTML = '<p style="color:#94a3b8;text-align:center;padding:16px;">No payment history recorded yet.</p>';
+            } else {
+                // Sort newest first for display
+                const sorted = history.slice().sort((a, b) => {
+                    const da = String(a.date || a.paid_on || '');
+                    const db2 = String(b.date || b.paid_on || '');
+                    return db2.localeCompare(da);
+                });
+                const rows = sorted.map(entry => {
+                    const entryNote = String(entry.note || '').toLowerCase();
+                    let typeLabel, typeCls;
+                    if (entryNote.includes('early_payment_before_due')) {
+                        const dueMatch = entryNote.match(/early_payment_before_due:(\S+)/);
+                        typeLabel = dueMatch ? `Early (before ${formatDateLabel(dueMatch[1])})` : 'Early';
+                        typeCls = 'fee-hist-early';
+                    } else if (entryNote.includes('partial')) {
+                        typeLabel = 'Partial';
+                        typeCls = 'fee-hist-partial';
+                    } else {
+                        typeLabel = 'Regular';
+                        typeCls = 'fee-hist-regular';
+                    }
+                    const userNote = entryNote.replace(/^(early_payment_before_due:\S+|regular_payment|partial)\s*\|?\s*/i, '').trim();
+                    const noteSuffix = userNote ? `<br><span style="color:#64748b;font-size:11px;">${escapeHtml(userNote)}</span>` : '';
+                    return `<tr>
+                        <td>${formatDateLabel(entry.date || entry.paid_on || '-')}</td>
+                        <td style="font-weight:600;">₹${Number(entry.amount) || 0}</td>
+                        <td class="${typeCls}">${typeLabel}${noteSuffix}</td>
+                    </tr>`;
+                }).join('');
+                contentEl.innerHTML = `
+                    <table class="fee-history-table">
+                        <thead><tr><th>Date</th><th>Amount</th><th>Type / Note</th></tr></thead>
+                        <tbody>${rows}</tbody>
+                    </table>`;
+            }
+            document.getElementById('feeHistoryModal').classList.remove('hidden');
         }
 
         function loadFeesTab() {
@@ -21775,15 +22224,16 @@
             const dueFilter = getElementValue('feesDueFilter') || 'all';
             const search = (getElementValue('feesSearch') || '').trim().toLowerCase();
             const monthKey = getCurrentMonthKey();
+            const today = new Date().toISOString().split('T')[0];
             let students = filterStudentsByStatus(db.getStudents(), statusFilter, monthKey);
             const groupFilter = getElementValue('feesGroupFilter') || 'all';
             if (groupFilter !== 'all') {
-                students = students.filter(student => getStudentGroup(student) === groupFilter);
+                students = students.filter(s => getStudentGroup(s) === groupFilter);
             }
             if (search) {
-                students = students.filter(student => {
-                    const name = (student.base_name || student.name || '').toLowerCase();
-                    const roll = (student.roll || '').toLowerCase();
+                students = students.filter(s => {
+                    const name = (s.base_name || s.name || '').toLowerCase();
+                    const roll = (s.roll || '').toLowerCase();
                     return name.includes(search) || roll.includes(search);
                 });
             }
@@ -21794,87 +22244,93 @@
 
             const availableGroups = Array.from(new Set(
                 filterStudentsByStatus(db.getStudents(), statusFilter, monthKey)
-                    .map(student => getStudentGroup(student))
-                    .filter(Boolean)
+                    .map(s => getStudentGroup(s)).filter(Boolean)
             )).sort((a, b) => String(a).localeCompare(String(b)));
             const groupSelect = document.getElementById('feesGroupFilter');
             if (groupSelect) {
                 const selected = groupSelect.value || 'all';
                 groupSelect.innerHTML = '<option value="all">All Groups</option>' +
-                    availableGroups.map(group => `<option value="${group}">Group ${group}</option>`).join('');
+                    availableGroups.map(g => `<option value="${g}">Group ${g}</option>`).join('');
                 groupSelect.value = availableGroups.includes(selected) || selected === 'all' ? selected : 'all';
             }
 
             const tbody = document.getElementById('feesBody');
             if (!tbody) return;
 
+            const isAdmin = currentUserRole === 'admin';
+
+            // Helper: days between two YYYY-MM-DD strings (positive = b is later)
+            function daysBetween(a, b) {
+                if (!a || !b) return null;
+                return Math.round((new Date(b) - new Date(a)) / 86400000);
+            }
+
             const rowsHtml = students.map(student => {
                 const record = getFeeRecordForStudent(student.id, feeMap);
-                const baseAmount = record.amount !== null && record.amount !== undefined
+                const baseAmount = (record.amount !== null && record.amount !== undefined)
                     ? record.amount
-                    : (Number.isFinite(Number(student.fees)) ? Number(student.fees) : '');
-                const pendingAmount = Number.isFinite(Number(record.pending_amount))
-                    ? Number(record.pending_amount)
-                    : baseAmount;
+                    : (Number.isFinite(Number(student.fees)) ? Number(student.fees) : null);
+                const dispAmount = Number.isFinite(Number(baseAmount)) ? `₹${Number(baseAmount)}` : '-';
                 const startValue = getEffectiveFeeStartDate(record);
                 const periodValue = record.period_months || 1;
                 const dueDate = computeFeeDueDate({ ...record, start_date: startValue, period_months: periodValue });
                 const overdue = isFeeOverdue({ ...record, start_date: startValue, period_months: periodValue });
                 const lastPaid = record.last_paid_date ? formatDateLabel(record.last_paid_date) : '-';
+
+                // Status with days sub-label
                 const paymentState = overdue ? 'past_due' : (record.last_paid_date ? 'paid' : 'due');
-                if (dueFilter !== 'all' && dueFilter !== paymentState) {
-                    return '';
+                if (dueFilter !== 'all' && dueFilter !== paymentState) return '';
+
+                let statusHtml;
+                if (overdue) {
+                    const d = daysBetween(today, dueDate); // negative = days overdue
+                    const daysLabel = d !== null ? `· ${Math.abs(d)} day${Math.abs(d)===1?'':'s'} overdue` : '';
+                    statusHtml = `<div class="fee-status-wrap"><span class="fee-status fee-overdue">Past Due</span><span class="fee-status-sub">${daysLabel}</span></div>`;
+                } else if (record.last_paid_date) {
+                    // Compute next due date (the one after last payment)
+                    const nextDue = dueDate ? formatDateLabel(dueDate) : '-';
+                    statusHtml = `<div class="fee-status-wrap"><span class="fee-status fee-paid">Paid</span><span class="fee-status-sub">next ${nextDue}</span></div>`;
+                } else if (dueDate) {
+                    const d = daysBetween(today, dueDate);
+                    const daysLabel = d !== null ? (d === 0 ? '· due today' : d > 0 ? `· in ${d} day${d===1?'':'s'}` : `· ${Math.abs(d)} day${Math.abs(d)===1?'':'s'} overdue`) : '';
+                    statusHtml = `<div class="fee-status-wrap"><span class="fee-status fee-due">Due</span><span class="fee-status-sub">${daysLabel}</span></div>`;
+                } else {
+                    statusHtml = `<div class="fee-status-wrap"><span class="fee-status fee-due">Due</span></div>`;
                 }
-                const statusLabel = overdue
-                    ? `<span class="fee-status fee-overdue">Past Due</span>`
-                    : (record.last_paid_date ? `<span class="fee-status fee-paid">Paid</span>` : `<span class="fee-status fee-due">Due</span>`);
-                const remarksValue = record.remarks ? escapeHtml(record.remarks) : '';
 
                 if (overdue) overdueCount += 1;
                 if (Array.isArray(record.payment_history) && record.payment_history.length) {
-                    totalCollection += record.payment_history.reduce((sum, entry) => sum + (Number(entry.amount) || 0), 0);
+                    totalCollection += record.payment_history.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
                 } else if (record.last_paid_date && Number.isFinite(Number(record.amount))) {
                     totalCollection += Number(record.amount);
                 }
 
+                const disAttr = isAdmin ? '' : 'disabled';
                 return `
                     <tr class="${student.active === false ? 'inactive-row' : ''}">
                         <td>${formatRollDisplay(student.roll)}</td>
                         <td class="fee-name-cell">${renderStudentName(student)}</td>
                         <td>${student.class || '-'}</td>
                         <td>${getStudentGroup(student) || '-'}</td>
-                        <td>
-                            <input class="fee-input" type="number" min="0" step="1" data-student-id="${student.id}" data-field="amount" value="${pendingAmount}" ${currentUserRole === 'admin' ? '' : 'disabled'} onchange="handleFeeInputChange(this)">
-                        </td>
-                        <td>
-                            <div class="fee-date-cell">
-                            <input class="fee-input fee-date-input" type="date" data-student-id="${student.id}" data-field="start_date" value="${startValue}" ${currentUserRole === 'admin' ? '' : 'disabled'} onchange="handleFeeInputChange(this)">
-                            <button type="button" title="Pick date" class="fee-date-picker-btn" ${currentUserRole === 'admin' ? '' : 'disabled'} onclick="openFeeDatePicker(${student.id})"><i class="fas fa-calendar-alt"></i></button>
-                            <span class="fee-date-note" style="grid-column: 1 / span 2;">${startValue ? formatDateLabel(startValue) : '-'}</span>
-                            </div>
-                        </td>
-                        <td>
-                            <input class="fee-input" type="number" min="1" step="1" data-student-id="${student.id}" data-field="period_months" value="${periodValue}" ${currentUserRole === 'admin' ? '' : 'disabled'} onchange="handleFeeInputChange(this)">
-                        </td>
+                        <td style="font-weight:600;">${dispAmount}</td>
+                        <td>${record.start_date ? formatDateLabel(record.start_date) : '-'}</td>
                         <td>${dueDate ? formatDateLabel(dueDate) : '-'}</td>
                         <td>${lastPaid}</td>
-                        <td>${statusLabel}</td>
+                        <td>${statusHtml}</td>
                         <td>
-                            <button ${currentUserRole === 'admin' ? '' : 'disabled'} onclick="markFeePaid(${student.id})">Fees Paid</button>
-                            <button class="secondary" ${currentUserRole === 'admin' ? '' : 'disabled'} onclick="markFeePartialPaid(${student.id})">Fees Paid Partially</button>
-                        </td>
-                        <td>
-                            <input type="text" data-student-id="${student.id}" data-field="remarks" value="${remarksValue}" ${currentUserRole === 'admin' ? '' : 'disabled'} onchange="handleFeeInputChange(this)">
+                            <div class="fee-actions">
+                                <button class="fee-action-btn edit-btn" title="Edit fee details" ${disAttr} onclick="openFeeEditModal(${student.id})"><i class="fas fa-pencil-alt"></i></button>
+                                <button class="fee-action-btn pay-btn" title="Mark Paid" ${disAttr} onclick="openFeePayModal(${student.id})"><i class="fas fa-check"></i></button>
+                                <button class="fee-action-btn partial-btn" title="Partial Payment" ${disAttr} onclick="openFeePartialModal(${student.id})"><i class="fas fa-coins"></i></button>
+                                <button class="fee-action-btn hist-btn" title="Payment History" onclick="openFeeHistoryModal(${student.id})"><i class="fas fa-history"></i></button>
+                            </div>
                         </td>
                     </tr>
                 `;
             }).filter(Boolean).join('');
-            tbody.innerHTML = rowsHtml;
-            if (rowsHtml) _animateTableRows('feesTable');
 
-            if (!rowsHtml) {
-                tbody.innerHTML = `<tr><td colspan="12" class="text-center" style="padding: 30px;">No students for selected filters</td></tr>`;
-            }
+            tbody.innerHTML = rowsHtml || `<tr><td colspan="10" class="text-center" style="padding:30px;">No students for selected filters</td></tr>`;
+            if (rowsHtml) _animateTableRows('feesTable');
 
             const totalEl = document.getElementById('feesTotalStudents');
             if (totalEl) totalEl.textContent = students.length;
@@ -23151,6 +23607,10 @@
             }
 
             const monthKey = getResourceContextMonthKey();
+            if (!isMonthAllowedForCurrentUser(monthKey)) {
+                showAlert(`You do not have access to modify month ${monthKey}.`, 'warning');
+                return;
+            }
             const totalCashCost = Math.max(0, (Number(item.price_per_unit) || 0) * qty);
             const totalPointsCost = calculatePointsCostWithGst(totalCashCost);
 
@@ -24963,6 +25423,133 @@
                 showToast('Error: ' + e.message, 'danger');
             }
         }
+
+        async function loadAdminControlPanel() {
+            if (currentUserRole !== 'admin') return;
+            try {
+                const resp = await fetch('/scoreboard/admin/control-panel-data', {
+                    method: 'GET',
+                    credentials: 'include',
+                    cache: 'no-store'
+                });
+                const payload = await resp.json().catch(() => ({}));
+                if (!resp.ok || payload.success === false) {
+                    showAlert(payload.error || 'Failed to load control panel data', 'warning');
+                    return;
+                }
+                const users = Array.isArray(payload.users) ? payload.users : [];
+                const tbody = document.getElementById('adminUsersBody');
+                if (tbody) {
+                    tbody.innerHTML = users.map(user => {
+                        const loginId = String(user.login_id || '');
+                        const status = String(user.status || '').toLowerCase();
+                        const statusColor = status === 'active' || status === 'resume'
+                            ? '#86efac' : (status === 'hold' ? '#fde68a' : '#fca5a5');
+                        return `
+                            <tr>
+                                <td>${_esc(loginId)}</td>
+                                <td>${_esc(String(user.role || ''))}</td>
+                                <td style="color:${statusColor};font-weight:600">${_esc(status || 'active')}</td>
+                                <td>${_esc(_fmtTs(user.last_login || '') || '-')}</td>
+                                <td style="white-space:nowrap">
+                                    <button class="secondary" onclick="adminApplyAccountAction('${_esc(loginId)}','hold')">Hold</button>
+                                    <button class="secondary" onclick="adminApplyAccountAction('${_esc(loginId)}','resume')">Resume</button>
+                                    <button class="danger" onclick="adminApplyAccountAction('${_esc(loginId)}','delete')">Delete</button>
+                                </td>
+                            </tr>`;
+                    }).join('') || '<tr><td colspan="5" class="text-center">No users found</td></tr>';
+                }
+            } catch (err) {
+                showAlert('Failed to load control panel data', 'danger');
+            }
+        }
+
+        async function adminRotateJoinCode() {
+            if (currentUserRole !== 'admin') return;
+            const code = String(getElementValue('adminJoinCodeInput') || '').trim();
+            const expiryLocal = String(getElementValue('adminJoinCodeExpiry') || '').trim();
+            if (!code) {
+                showAlert('Enter a new join code first', 'warning');
+                return;
+            }
+            const body = { code };
+            if (expiryLocal) {
+                const dt = new Date(expiryLocal);
+                if (!Number.isNaN(dt.getTime())) body.expires_at = dt.toISOString();
+            }
+            try {
+                const resp = await fetch('/scoreboard/admin/join-code', {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+                const payload = await resp.json().catch(() => ({}));
+                if (!resp.ok || payload.success === false) {
+                    showAlert(payload.error || 'Join code rotation failed', 'danger');
+                    return;
+                }
+                showAlert(payload.message || 'Join code rotated', 'success');
+                setElementValue('adminJoinCodeInput', '');
+                await loadAdminControlPanel();
+            } catch (err) {
+                showAlert('Join code rotation failed', 'danger');
+            }
+        }
+
+        async function adminApplyAccountAction(loginId, action) {
+            if (currentUserRole !== 'admin') return;
+            const reason = prompt(`Reason for ${action} on ${loginId} (optional):`, '') || '';
+            try {
+                const resp = await fetch('/scoreboard/admin/account-action', {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ login_id: loginId, action, reason })
+                });
+                const payload = await resp.json().catch(() => ({}));
+                if (!resp.ok || payload.success === false) {
+                    showAlert(payload.error || `Failed to ${action} account`, 'danger');
+                    return;
+                }
+                showAlert(payload.message || `Account ${action} applied`, 'success');
+                await loadAdminControlPanel();
+            } catch (err) {
+                showAlert(`Failed to ${action} account`, 'danger');
+            }
+        }
+
+        async function adminSetAccessWindow() {
+            if (currentUserRole !== 'admin') return;
+            const loginId = String(getElementValue('adminAccessLoginId') || '').trim();
+            const monthFrom = String(getElementValue('adminAccessFrom') || '').trim();
+            const monthTo = String(getElementValue('adminAccessTo') || '').trim();
+            if (!loginId || !monthFrom || !monthTo) {
+                showAlert('Fill teacher login id, month from, and month to.', 'warning');
+                return;
+            }
+            try {
+                const resp = await fetch('/scoreboard/admin/access-window', {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        login_id: loginId,
+                        month_from: monthFrom,
+                        month_to: monthTo
+                    })
+                });
+                const payload = await resp.json().catch(() => ({}));
+                if (!resp.ok || payload.success === false) {
+                    showAlert(payload.error || 'Failed to save access window', 'danger');
+                    return;
+                }
+                showAlert(payload.message || 'Access window saved', 'success');
+                await loadAdminControlPanel();
+            } catch (err) {
+                showAlert('Failed to save access window', 'danger');
+            }
+        }
         // ══════════════════════════════════════════════════════════════════════
 
         function backupData() {
@@ -25678,6 +26265,7 @@
 
             if (SERVER_SYNC.enabled) {
                 await loadSessionContext(3);
+                await refreshAllowedMonthsFromServer();
                 checkinDevice('login'); // fire-and-forget: log this device/session
             }
             updateRoleBadge();
@@ -25702,6 +26290,7 @@
                 // forceFull=true on initial load: skip ?since so every page refresh always
                 // fetches a fresh full snapshot — prevents stale data after ?since 204 responses.
                 pullFromServer(false, true).catch(() => {});
+                setTimeout(() => refreshAllowedMonthsFromServer().catch(() => {}), 600);
                 if (ENABLE_REALTIME_SYNC) {
                     startRealtimeSync();
                 }

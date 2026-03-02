@@ -11,6 +11,7 @@ from app.models import (
     AccountAction,
     JoinCode,
     UserAccessWindow,
+    StudentTransfer,
 )
 from app.utils.syllabus_helpers import merge_syllabus_catalog_superset, merge_syllabus_tracking_superset
 from datetime import datetime, date, timedelta, timezone
@@ -26,6 +27,7 @@ import shutil
 import glob
 import urllib.request
 import urllib.error
+from werkzeug.security import generate_password_hash
 from zoneinfo import ZoneInfo
 from queue import Queue, Empty
 import threading
@@ -1673,6 +1675,245 @@ def _is_proposal_stakeholder(data, proposal, user):
     return _is_student_council_member(data, sid)
 
 
+def _month_key_from_date_like(value):
+    text = str(value or '').strip()
+    if re.match(r'^\d{4}-\d{2}$', text):
+        return text
+    if re.match(r'^\d{4}-\d{2}-\d{2}$', text):
+        return text[:7]
+    if len(text) >= 7 and re.match(r'^\d{4}-\d{2}', text[:7]):
+        return text[:7]
+    return ''
+
+
+def _iter_month_keys_between(start_key, end_key):
+    start = _month_key_from_date_like(start_key)
+    end = _month_key_from_date_like(end_key)
+    if not start or not end:
+        return []
+    try:
+        sy, sm = [int(x) for x in start.split('-')]
+        ey, em = [int(x) for x in end.split('-')]
+    except Exception:
+        return []
+    s = date(sy, sm, 1)
+    e = date(ey, em, 1)
+    if s > e:
+        s, e = e, s
+    out = []
+    cur = s
+    while cur <= e:
+        out.append(f"{cur.year:04d}-{cur.month:02d}")
+        year = cur.year + (1 if cur.month == 12 else 0)
+        month = 1 if cur.month == 12 else cur.month + 1
+        cur = date(year, month, 1)
+    return out
+
+
+def _student_allowed_months_from_roster(data, login_id):
+    roll = _normalize_roll_value(login_id)
+    if not roll.startswith('EA'):
+        return set()
+    allowed = set()
+    month_students = data.get('month_students', {}) if isinstance(data, dict) else {}
+    if isinstance(month_students, dict):
+        for month, rows in month_students.items():
+            mk = _month_key_from_date_like(month)
+            if not mk:
+                continue
+            for value in rows or []:
+                if _normalize_roll_value(value) == roll:
+                    allowed.add(mk)
+                    break
+    month_profiles = data.get('month_roster_profiles', {}) if isinstance(data, dict) else {}
+    if isinstance(month_profiles, dict):
+        for month, rows in month_profiles.items():
+            mk = _month_key_from_date_like(month)
+            if not mk:
+                continue
+            for profile in rows or []:
+                if not isinstance(profile, dict):
+                    continue
+                if _normalize_roll_value(profile.get('roll')) == roll:
+                    allowed.add(mk)
+                    break
+    return allowed
+
+
+def _teacher_allowed_months_from_windows(user_id):
+    allowed = set()
+    try:
+        rows = (
+            UserAccessWindow.query
+            .filter_by(user_id=_parse_int_safe(user_id, 0))
+            .order_by(UserAccessWindow.updated_at.desc(), UserAccessWindow.id.desc())
+            .all()
+        )
+    except Exception:
+        db.session.rollback()
+        rows = []
+    for row in rows:
+        for mk in _iter_month_keys_between(row.month_from, row.month_to):
+            allowed.add(mk)
+    return allowed
+
+
+def _allowed_months_for_user(data, user):
+    role = str(getattr(user, 'role', '') or '').strip().lower()
+    if role == 'admin':
+        return None  # unrestricted
+    if role == 'teacher':
+        months = _teacher_allowed_months_from_windows(getattr(user, 'id', 0))
+        # Backward compatibility: until admin configures windows, keep current behaviour.
+        return months if months else None
+    if role == 'student':
+        months = _student_allowed_months_from_roster(data, getattr(user, 'login_id', ''))
+        return months or {(_server_now_iso()[:7])}
+    return {(_server_now_iso()[:7])}
+
+
+def _is_month_allowed_for_user(data, user, month_key):
+    allowed = _allowed_months_for_user(data, user)
+    if allowed is None:
+        return True
+    mk = _month_key_from_date_like(month_key)
+    if not mk:
+        return False
+    return mk in allowed
+
+
+def _clip_payload_to_allowed_months(payload, allowed_months):
+    if allowed_months is None or not isinstance(payload, dict):
+        return payload
+
+    allowed = {m for m in (allowed_months or set()) if _month_key_from_date_like(m)}
+    data = dict(payload)
+
+    def _in_allowed(mk):
+        return bool(mk and mk in allowed)
+
+    data['scores'] = [
+        row for row in (payload.get('scores') or [])
+        if isinstance(row, dict) and _in_allowed(_month_key_from_date_like(row.get('month') or row.get('date')))
+    ]
+    data['attendance'] = [
+        row for row in (payload.get('attendance') or [])
+        if isinstance(row, dict) and _in_allowed(_month_key_from_date_like(row.get('month') or row.get('date')))
+    ]
+    data['appeals'] = [
+        row for row in (payload.get('appeals') or [])
+        if isinstance(row, dict) and _in_allowed(
+            _month_key_from_date_like(row.get('score_month') or row.get('score_date') or row.get('created_at'))
+        )
+    ]
+    data['resource_requests'] = [
+        row for row in (payload.get('resource_requests') or [])
+        if isinstance(row, dict) and _in_allowed(
+            _month_key_from_date_like(row.get('month') or row.get('request_date') or row.get('created_at'))
+        )
+    ]
+    data['resource_transactions'] = [
+        row for row in (payload.get('resource_transactions') or [])
+        if isinstance(row, dict) and _in_allowed(
+            _month_key_from_date_like(row.get('month') or row.get('date') or row.get('created_at'))
+        )
+    ]
+    data['fee_records'] = [
+        row for row in (payload.get('fee_records') or [])
+        if isinstance(row, dict) and _in_allowed(
+            _month_key_from_date_like(row.get('month') or row.get('start_date') or row.get('updated_at'))
+        )
+    ]
+
+    month_students = payload.get('month_students', {}) if isinstance(payload.get('month_students'), dict) else {}
+    month_profiles = payload.get('month_roster_profiles', {}) if isinstance(payload.get('month_roster_profiles'), dict) else {}
+    data['month_students'] = {
+        mk: rows for mk, rows in month_students.items()
+        if _month_key_from_date_like(mk) in allowed
+    }
+    data['month_roster_profiles'] = {
+        mk: rows for mk, rows in month_profiles.items()
+        if _month_key_from_date_like(mk) in allowed
+    }
+    data['allowed_months'] = sorted(list(allowed))
+    return data
+
+
+def _sum_points_for_student_month(snapshot, student_id, month_key):
+    sid = _parse_int_safe(student_id, 0)
+    if sid <= 0:
+        return 0
+    month = _month_key_from_date_like(month_key)
+    total = 0
+    for row in snapshot.get('scores', []) or []:
+        if not isinstance(row, dict):
+            continue
+        if _parse_int_safe(row.get('studentId'), 0) != sid:
+            continue
+        mk = _month_key_from_date_like(row.get('month') or row.get('date'))
+        if mk != month:
+            continue
+        total += _parse_int_safe(row.get('points'), 0)
+    return total
+
+
+def _upsert_score_delta(snapshot, student_id, date_key, month_key, delta_points=0, delta_stars=0, note=''):
+    sid = _parse_int_safe(student_id, 0)
+    if sid <= 0:
+        return None
+    date_text = str(date_key or '').strip()
+    month_text = _month_key_from_date_like(month_key) or _month_key_from_date_like(date_text)
+    if not date_text or not month_text:
+        return None
+
+    scores = snapshot.get('scores', [])
+    if not isinstance(scores, list):
+        scores = []
+        snapshot['scores'] = scores
+
+    target = None
+    best_stamp = 0.0
+    max_id = 0
+    for row in scores:
+        if not isinstance(row, dict):
+            continue
+        max_id = max(max_id, _parse_int_safe(row.get('id'), 0))
+        if _parse_int_safe(row.get('studentId'), 0) != sid:
+            continue
+        if str(row.get('date') or '').strip() != date_text:
+            continue
+        if _month_key_from_date_like(row.get('month') or row.get('date')) != month_text:
+            continue
+        stamp = max(_parse_sync_stamp(row.get('updated_at')), _parse_sync_stamp(row.get('created_at')))
+        if not target or stamp >= best_stamp:
+            target = row
+            best_stamp = stamp
+
+    now_iso = _server_now_iso()
+    if target is None:
+        target = {
+            'id': max_id + 1,
+            'studentId': sid,
+            'date': date_text,
+            'month': month_text,
+            'points': 0,
+            'stars': 0,
+            'vetos': 0,
+            'notes': '',
+            'recordedBy': 'transfer',
+            'created_at': now_iso,
+        }
+        scores.append(target)
+
+    target['points'] = _parse_int_safe(target.get('points'), 0) + _parse_int_safe(delta_points, 0)
+    target['stars'] = _parse_int_safe(target.get('stars'), 0) + _parse_int_safe(delta_stars, 0)
+    existing_note = str(target.get('notes') or '').strip()
+    if note:
+        target['notes'] = f"{existing_note} | {note}" if existing_note else note
+    target['updated_at'] = now_iso
+    return target
+
+
 def _merge_activity_log_superset(existing_logs, incoming_logs):
     merged = {}
 
@@ -3305,6 +3546,11 @@ def offline_data():
                 _save_offline_data(data)
             except Exception:
                 current_app.logger.exception("Failed to persist score timestamp normalization on GET")
+
+        if current_user.is_authenticated and str(current_user.role or '').strip().lower() != 'admin':
+            allowed_months = _allowed_months_for_user(data, current_user)
+            data = _clip_payload_to_allowed_months(data, allowed_months)
+
         updated_at = data.get('server_updated_at') or data.get('updated_at')
         since = request.args.get('since') if hasattr(request, 'args') else None
         if since and updated_at:
@@ -3399,6 +3645,11 @@ def offline_data():
     existing_stamp = _payload_sync_stamp(existing)
     if actor_role == 'teacher':
         data = _filter_teacher_payload_to_edit_window(data, actor_login_id or 'Teacher')
+        if current_user.is_authenticated:
+            data = _clip_payload_to_allowed_months(
+                data,
+                _allowed_months_for_user(existing, current_user)
+            )
         merged = existing if existing else {}
         merged.setdefault('students', existing.get('students', []))
         merged.setdefault('month_students', existing.get('month_students', {}))
@@ -3495,6 +3746,11 @@ def offline_data():
         return jsonify({'success': True, 'updated_at': merged['server_updated_at']})
 
     if actor_role == 'student':
+        if current_user.is_authenticated:
+            data = _clip_payload_to_allowed_months(
+                data,
+                _allowed_months_for_user(existing, current_user)
+            )
         # Students can only:
         # - create resource requests for themselves (append-only, server builds canonical row)
         # - submit profile-change requests to admin via appeals (append-only, sanitized)
@@ -4314,10 +4570,15 @@ def proposals_data():
     messages = list(data.get('proposal_messages') or [])
 
     if request.method == 'GET':
+        allowed_months = _allowed_months_for_user(data, current_user)
         visible = []
         for p in proposals:
             if not isinstance(p, dict):
                 continue
+            if allowed_months is not None:
+                pm = _month_key_from_date_like(p.get('month') or p.get('created_at') or p.get('open_at'))
+                if pm not in allowed_months:
+                    continue
             if _is_proposal_stakeholder(data, p, current_user):
                 pid = _parse_int_safe(p.get('id'), 0)
                 vote_counts = {'support': 0, 'oppose': 0, 'abstain': 0}
@@ -4339,6 +4600,8 @@ def proposals_data():
     role = str(current_user.role or '').strip().lower()
     if role not in ('admin', 'teacher'):
         return jsonify({'success': False, 'error': 'Only Admin/Teacher can create proposals'}), 403
+    if not _is_month_allowed_for_user(data, current_user, _server_now_iso()[:7]):
+        return jsonify({'success': False, 'error': 'No month access to create proposal'}), 403
     payload = request.get_json(silent=True) or {}
     title = str(payload.get('title') or '').strip()[:200]
     body = str(payload.get('body') or '').strip()[:4000]
@@ -4355,6 +4618,7 @@ def proposals_data():
         'title': title,
         'body': body,
         'scope': scope,
+        'month': _server_now_iso()[:7],
         'status': 'open',
         'created_by': str(current_user.login_id or ''),
         'created_by_role': role,
@@ -4390,6 +4654,8 @@ def proposal_vote(proposal_id):
         return jsonify({'success': False, 'error': 'Proposal is closed'}), 409
     if not _is_proposal_stakeholder(data, proposal, current_user):
         return jsonify({'success': False, 'error': 'Not a stakeholder for this proposal'}), 403
+    if not _is_month_allowed_for_user(data, current_user, proposal.get('month') or proposal.get('created_at')):
+        return jsonify({'success': False, 'error': 'No month access for this proposal'}), 403
 
     payload = request.get_json(silent=True) or {}
     choice = str(payload.get('choice') or '').strip().lower()
@@ -4439,6 +4705,8 @@ def proposal_messages(proposal_id):
         return jsonify({'success': False, 'error': 'Proposal not found'}), 404
     if not _is_proposal_stakeholder(data, proposal, current_user):
         return jsonify({'success': False, 'error': 'Not a stakeholder for this proposal'}), 403
+    if not _is_month_allowed_for_user(data, current_user, proposal.get('month') or proposal.get('created_at')):
+        return jsonify({'success': False, 'error': 'No month access for this proposal'}), 403
 
     messages = list(data.get('proposal_messages') or [])
     if request.method == 'GET':
@@ -4468,6 +4736,396 @@ def proposal_messages(proposal_id):
     _broadcast_sync_event(now_iso, source='proposal-chat')
     _forward_offline_data_to_peers_async(data, [])
     return jsonify({'success': True, 'message': msg_row, 'updated_at': now_iso})
+
+
+@points_bp.route('/allowed-months', methods=['GET'])
+@login_required
+def allowed_months():
+    data = _load_offline_data() or {}
+    allowed = _allowed_months_for_user(data, current_user)
+    if allowed is None:
+        # Unrestricted users receive known month keys for UI filters.
+        month_keys = set()
+        for key in (data.get('month_students') or {}).keys():
+            mk = _month_key_from_date_like(key)
+            if mk:
+                month_keys.add(mk)
+        for key in (data.get('month_roster_profiles') or {}).keys():
+            mk = _month_key_from_date_like(key)
+            if mk:
+                month_keys.add(mk)
+        if not month_keys:
+            month_keys.add(_server_now_iso()[:7])
+        allowed = month_keys
+    return jsonify({'success': True, 'months': sorted(list(allowed))})
+
+
+@points_bp.route('/admin/control-panel-data', methods=['GET'])
+@login_required
+def admin_control_panel_data():
+    if str(current_user.role or '').strip().lower() != 'admin':
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 403
+
+    users = User.query.order_by(User.role.asc(), User.login_id.asc()).all()
+    user_rows = []
+    for user in users:
+        last_action = (
+            AccountAction.query
+            .filter_by(target_user_id=user.id)
+            .order_by(AccountAction.created_at.desc(), AccountAction.id.desc())
+            .first()
+        )
+        status = 'active' if bool(user.is_active) else 'inactive'
+        if last_action and str(last_action.action or '').strip().lower() in ('hold', 'delete'):
+            status = str(last_action.action or '').strip().lower()
+        user_rows.append({
+            'id': user.id,
+            'login_id': user.login_id,
+            'role': user.role,
+            'status': status,
+            'is_active': bool(user.is_active),
+            'created_at': user.created_at.isoformat() if user.created_at else '',
+            'last_login': user.last_login.isoformat() if user.last_login else '',
+            'last_login_ip': str(user.last_login_ip or ''),
+        })
+
+    sessions = (
+        DeviceSession.query
+        .order_by(DeviceSession.last_seen.desc(), DeviceSession.id.desc())
+        .limit(1000)
+        .all()
+    )
+    session_rows = [{
+        'id': s.id,
+        'user_id': s.user_id,
+        'login_id': s.login_id,
+        'role': s.role,
+        'device_id': s.device_id,
+        'device_name': s.device_name,
+        'os': s.os,
+        'browser': s.browser,
+        'ip': s.ip,
+        'last_seen': s.last_seen.isoformat() if s.last_seen else '',
+        'status': s.status,
+    } for s in sessions]
+
+    windows = (
+        UserAccessWindow.query
+        .order_by(UserAccessWindow.updated_at.desc(), UserAccessWindow.id.desc())
+        .all()
+    )
+    window_rows = [{
+        'id': w.id,
+        'user_id': w.user_id,
+        'month_from': str(w.month_from or ''),
+        'month_to': str(w.month_to or ''),
+        'set_by': w.set_by,
+        'updated_at': w.updated_at.isoformat() if w.updated_at else '',
+    } for w in windows]
+
+    join_codes = (
+        JoinCode.query
+        .order_by(JoinCode.created_at.desc(), JoinCode.id.desc())
+        .limit(20)
+        .all()
+    )
+    code_rows = [{
+        'id': c.id,
+        'active': bool(c.active),
+        'expires_at': c.expires_at.isoformat() if c.expires_at else '',
+        'created_by': c.created_by,
+        'created_at': c.created_at.isoformat() if c.created_at else '',
+    } for c in join_codes]
+
+    return jsonify({
+        'success': True,
+        'users': user_rows,
+        'device_sessions': session_rows,
+        'access_windows': window_rows,
+        'join_codes': code_rows,
+    })
+
+
+@points_bp.route('/admin/join-code', methods=['POST'])
+@login_required
+def admin_rotate_join_code():
+    if str(current_user.role or '').strip().lower() != 'admin':
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 403
+
+    payload = request.get_json(silent=True) or {}
+    code = str(payload.get('code') or '').strip()
+    if len(code) < 4:
+        return jsonify({'success': False, 'error': 'Join code must be at least 4 characters'}), 400
+    expires_at = None
+    expires_raw = str(payload.get('expires_at') or '').strip()
+    if expires_raw:
+        try:
+            expires_at = datetime.fromisoformat(expires_raw.replace('Z', '+00:00'))
+        except Exception:
+            return jsonify({'success': False, 'error': 'Invalid expires_at format'}), 400
+
+    try:
+        JoinCode.query.update({'active': False})
+        row = JoinCode(
+            code_hash=generate_password_hash(code),
+            active=True,
+            expires_at=expires_at,
+            created_by=_parse_int_safe(current_user.id, 0) or None,
+            created_at=datetime.utcnow()
+        )
+        db.session.add(row)
+        db.session.commit()
+    except Exception as exc:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(exc)}), 500
+    return jsonify({'success': True, 'message': 'Join code rotated'})
+
+
+@points_bp.route('/admin/account-action', methods=['POST'])
+@login_required
+def admin_account_action():
+    if str(current_user.role or '').strip().lower() != 'admin':
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 403
+
+    payload = request.get_json(silent=True) or {}
+    login_id = str(payload.get('login_id') or '').strip()
+    action = str(payload.get('action') or '').strip().lower()
+    reason = str(payload.get('reason') or '').strip()[:500]
+    if action not in ('hold', 'resume', 'delete'):
+        return jsonify({'success': False, 'error': 'Invalid action'}), 400
+    if not login_id:
+        return jsonify({'success': False, 'error': 'login_id required'}), 400
+
+    user = User.query.filter_by(login_id=login_id).first()
+    if not user:
+        return jsonify({'success': False, 'error': 'User not found'}), 404
+    if user.login_id == 'Admin' and action in ('hold', 'delete'):
+        return jsonify({'success': False, 'error': 'Cannot disable Admin account'}), 400
+
+    try:
+        if action == 'resume':
+            user.is_active = True
+        else:
+            user.is_active = False
+        db.session.add(AccountAction(
+            target_user_id=user.id,
+            action=action,
+            reason=reason,
+            by_user_id=_parse_int_safe(current_user.id, 0),
+            created_at=datetime.utcnow()
+        ))
+        db.session.commit()
+    except Exception as exc:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(exc)}), 500
+
+    return jsonify({'success': True, 'message': f'Action {action} applied for {login_id}'})
+
+
+@points_bp.route('/admin/access-window', methods=['POST'])
+@login_required
+def admin_set_access_window():
+    if str(current_user.role or '').strip().lower() != 'admin':
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 403
+
+    payload = request.get_json(silent=True) or {}
+    login_id = str(payload.get('login_id') or '').strip()
+    month_from = _month_key_from_date_like(payload.get('month_from'))
+    month_to = _month_key_from_date_like(payload.get('month_to'))
+    if not login_id or not month_from or not month_to:
+        return jsonify({'success': False, 'error': 'login_id, month_from, month_to are required'}), 400
+
+    user = User.query.filter_by(login_id=login_id).first()
+    if not user:
+        return jsonify({'success': False, 'error': 'User not found'}), 404
+    if str(user.role or '').strip().lower() != 'teacher':
+        return jsonify({'success': False, 'error': 'Access windows can be configured for teachers only'}), 400
+
+    try:
+        UserAccessWindow.query.filter_by(user_id=user.id).delete()
+        db.session.add(UserAccessWindow(
+            user_id=user.id,
+            month_from=month_from,
+            month_to=month_to,
+            set_by=_parse_int_safe(current_user.id, 0),
+            updated_at=datetime.utcnow()
+        ))
+        db.session.commit()
+    except Exception as exc:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(exc)}), 500
+    return jsonify({'success': True, 'message': f'Window saved for {login_id}'})
+
+
+@points_bp.route('/student-transfers', methods=['GET', 'POST'])
+@login_required
+def student_transfers():
+    if str(current_user.role or '').strip().lower() != 'student':
+        return jsonify({'success': False, 'error': 'Student role required'}), 403
+
+    now = datetime.utcnow()
+    now_iso = _server_now_iso()
+    now_date = _parse_date_key(now_iso) or date.today()
+    month_key = now_date.strftime('%Y-%m')
+    data = _load_offline_data() or {}
+
+    sender_id = _student_id_by_login(data, current_user.login_id)
+    if sender_id <= 0:
+        return jsonify({'success': False, 'error': 'Student roster mapping not found'}), 404
+    if not _is_month_allowed_for_user(data, current_user, month_key):
+        return jsonify({'success': False, 'error': 'No month access for transfer operation'}), 403
+
+    if request.method == 'GET':
+        rows = (
+            StudentTransfer.query
+            .filter(
+                (StudentTransfer.from_student_id == sender_id) |
+                (StudentTransfer.to_student_id == sender_id)
+            )
+            .order_by(StudentTransfer.created_at.desc(), StudentTransfer.id.desc())
+            .limit(200)
+            .all()
+        )
+        out = [{
+            'id': r.id,
+            'from_student_id': r.from_student_id,
+            'to_student_id': r.to_student_id,
+            'transfer_type': r.transfer_type,
+            'amount': r.amount,
+            'created_at': r.created_at.isoformat() if r.created_at else '',
+            'lock_until': r.lock_until.isoformat() if r.lock_until else '',
+        } for r in rows]
+        return jsonify({'success': True, 'transfers': out})
+
+    payload = request.get_json(silent=True) or {}
+    transfer_type = str(payload.get('transfer_type') or '').strip().lower()
+    amount = _parse_int_safe(payload.get('amount'), 0)
+    to_login_id = str(payload.get('to_login_id') or '').strip().upper()
+    if transfer_type not in ('points', 'stars'):
+        return jsonify({'success': False, 'error': 'transfer_type must be points or stars'}), 400
+    if amount <= 0:
+        return jsonify({'success': False, 'error': 'amount must be > 0'}), 400
+    if transfer_type == 'points' and amount > 50:
+        return jsonify({'success': False, 'error': 'Maximum point transfer is 50 per transaction'}), 400
+    if transfer_type == 'stars' and amount > 3:
+        return jsonify({'success': False, 'error': 'Maximum star transfer is 3 in a transfer'}), 400
+    if not to_login_id or not to_login_id.startswith('EA'):
+        return jsonify({'success': False, 'error': 'to_login_id must be a valid student roll'}), 400
+
+    receiver_id = _student_id_by_login(data, to_login_id)
+    if receiver_id <= 0:
+        return jsonify({'success': False, 'error': 'Recipient not found'}), 404
+    if receiver_id == sender_id:
+        return jsonify({'success': False, 'error': 'Cannot transfer to self'}), 400
+
+    lock_window = now - timedelta(hours=24)
+    existing_pair = (
+        StudentTransfer.query
+        .filter_by(from_student_id=sender_id, to_student_id=receiver_id)
+        .filter(StudentTransfer.created_at >= lock_window)
+        .order_by(StudentTransfer.created_at.desc())
+        .first()
+    )
+    if existing_pair:
+        return jsonify({'success': False, 'error': 'You can transfer to this student only once in 24 hours'}), 409
+    reverse_pair = (
+        StudentTransfer.query
+        .filter_by(from_student_id=receiver_id, to_student_id=sender_id)
+        .filter(StudentTransfer.created_at >= lock_window)
+        .order_by(StudentTransfer.created_at.desc())
+        .first()
+    )
+    if reverse_pair:
+        return jsonify({'success': False, 'error': 'Reverse transfer lock active for this pair (24h)'}), 409
+
+    sender = next((s for s in (data.get('students') or []) if _parse_int_safe(s.get('id'), 0) == sender_id), None)
+    receiver = next((s for s in (data.get('students') or []) if _parse_int_safe(s.get('id'), 0) == receiver_id), None)
+    if not sender or not receiver:
+        return jsonify({'success': False, 'error': 'Sender/receiver records unavailable'}), 409
+
+    if transfer_type == 'points':
+        sender_points = _sum_points_for_student_month(data, sender_id, month_key)
+        if sender_points <= 0:
+            return jsonify({'success': False, 'error': 'Sender has no transferable points'}), 409
+        if amount > sender_points:
+            return jsonify({'success': False, 'error': 'Transfer exceeds sender available points'}), 409
+        _upsert_score_delta(
+            data, sender_id, now_date.isoformat(), month_key,
+            delta_points=-amount, delta_stars=0,
+            note=f'[TRANSFER OUT points:{amount} to {to_login_id}]'
+        )
+        _upsert_score_delta(
+            data, receiver_id, now_date.isoformat(), month_key,
+            delta_points=amount, delta_stars=0,
+            note=f'[TRANSFER IN points:{amount} from {current_user.login_id}]'
+        )
+    else:
+        stars_24h = (
+            db.session.query(db.func.coalesce(db.func.sum(StudentTransfer.amount), 0))
+            .filter_by(from_student_id=sender_id, transfer_type='stars')
+            .filter(StudentTransfer.created_at >= lock_window)
+            .scalar() or 0
+        )
+        if _parse_int_safe(stars_24h, 0) + amount > 3:
+            return jsonify({'success': False, 'error': 'Star transfer exceeds 24h cap (3)'}), 409
+        sender_stars = _parse_int_safe(sender.get('stars'), 0)
+        if sender_stars <= 0 or amount > sender_stars:
+            return jsonify({'success': False, 'error': 'Sender has insufficient stars'}), 409
+        sender['stars'] = max(0, sender_stars - amount)
+        receiver['stars'] = max(0, _parse_int_safe(receiver.get('stars'), 0) + amount)
+        _upsert_score_delta(
+            data, sender_id, now_date.isoformat(), month_key,
+            delta_points=0, delta_stars=-amount,
+            note=f'[TRANSFER OUT stars:{amount} to {to_login_id}]'
+        )
+        _upsert_score_delta(
+            data, receiver_id, now_date.isoformat(), month_key,
+            delta_points=0, delta_stars=amount,
+            note=f'[TRANSFER IN stars:{amount} from {current_user.login_id}]'
+        )
+
+    transfer_row = StudentTransfer(
+        from_student_id=sender_id,
+        to_student_id=receiver_id,
+        transfer_type=transfer_type,
+        amount=amount,
+        created_at=now,
+        lock_until=now + timedelta(hours=24)
+    )
+    try:
+        db.session.add(transfer_row)
+        db.session.commit()
+    except Exception as exc:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(exc)}), 500
+
+    _append_activity_log_entries(
+        data,
+        str(current_user.login_id or ''),
+        'student',
+        {
+            'scores': [],
+            'activity_log': [{
+                'entity': 'student_transfer',
+                'action': 'create',
+                'detail': f'{transfer_type}:{amount} to {to_login_id}',
+                'month': month_key,
+                'date': now_date.isoformat(),
+            }]
+        },
+        source='student-transfer'
+    )
+    _ensure_score_timestamps(data)
+    data['server_updated_at'] = now_iso
+    _save_offline_data(data)
+    _broadcast_sync_event(now_iso, source='student-transfer')
+    _forward_offline_data_to_peers_async(data, [])
+
+    return jsonify({
+        'success': True,
+        'message': f'{transfer_type.capitalize()} transfer completed',
+        'updated_at': now_iso
+    })
 
 
 @points_bp.route('/add-points', methods=['POST'])
