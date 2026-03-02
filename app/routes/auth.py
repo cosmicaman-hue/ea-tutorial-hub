@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session, current_app
 from flask_login import login_user, logout_user, current_user, login_required
-from app import db, limiter
+from app import db, limiter, make_ephemeral_user
 from app.models import User
 from app.models.user import ActivityLog
 from datetime import datetime
@@ -11,6 +11,36 @@ from sqlalchemy import inspect, text
 from werkzeug.security import generate_password_hash
 
 auth_bp = Blueprint('auth', __name__, url_prefix='/auth')
+
+
+def _env_password_for_role(login_id):
+    lid = str(login_id or '').strip()
+    if lid == 'Admin':
+        return str(os.getenv('ADMIN_PASSWORD', '') or '').strip()
+    if lid == 'Teacher':
+        return str(os.getenv('TEACHER_PASSWORD', '') or '').strip()
+    return ''
+
+
+def _try_env_fallback_login(login_id, password):
+    """
+    Emergency login path for Admin/Teacher when DB auth is unavailable.
+    """
+    if str(os.getenv('EA_AUTH_ENV_FALLBACK', '1')).strip().lower() not in ('1', 'true', 'yes', 'on'):
+        return False
+    expected = _env_password_for_role(login_id)
+    if not expected:
+        return False
+    provided = str(password or '').strip()
+    if not provided or provided.lower() != expected.lower():
+        return False
+    role = 'admin' if login_id == 'Admin' else ('teacher' if login_id == 'Teacher' else '')
+    user = make_ephemeral_user(role)
+    if not user:
+        return False
+    login_user(user, remember=True)
+    session.permanent = True
+    return True
 
 
 def _ensure_auth_schema_and_defaults():
@@ -242,6 +272,9 @@ def login():
                 user = User.query.filter_by(login_id=login_id).first()
             except Exception:
                 db.session.rollback()
+                if _try_env_fallback_login(login_id, password):
+                    flash('Logged in using fallback mode. Database recovery is still in progress.', 'warning')
+                    return redirect(url_for('points.offline_scoreboard'))
                 flash('Login service temporarily unavailable. Please retry in 30 seconds.', 'error')
                 return redirect(url_for('auth.login'))
 

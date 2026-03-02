@@ -19,6 +19,7 @@ import urllib.error
 from zoneinfo import ZoneInfo
 from queue import Queue, Empty
 import threading
+import time
 
 points_bp = Blueprint('points', __name__, url_prefix='/scoreboard')
 _sync_subscribers = []
@@ -145,7 +146,11 @@ def _resolve_sync_shared_key():
     explicit = str(os.getenv('SYNC_SHARED_KEY', '') or '').strip()
     if explicit:
         return explicit
-    return str(os.getenv('SECRET_KEY', '') or '').strip()
+    secret_fallback = str(os.getenv('SECRET_KEY', '') or '').strip()
+    if secret_fallback:
+        return secret_fallback
+    # Safe default for environments where local master forgot to set SYNC_SHARED_KEY.
+    return 'EA_SYNC_KEY_917511_2026'
 
 
 def _forward_offline_data_to_peers(payload, extra_peers=None):
@@ -154,7 +159,14 @@ def _forward_offline_data_to_peers(payload, extra_peers=None):
     if not peers:
         return
     current_origin = (request.host_url or '').rstrip('/')
-    body = json.dumps({'data': payload}).encode('utf-8')
+    is_master = str(os.getenv('EA_MASTER_MODE', '')).strip() == '1'
+    body_payload = {'data': payload}
+    if is_master:
+        # Master publishes authoritative snapshots to peers (Render/backup),
+        # so receivers can accept them even when peer timestamps drift ahead.
+        body_payload['authoritative_master_push'] = True
+        body_payload['force_replace'] = True
+    body = json.dumps(body_payload).encode('utf-8')
     shared_key = _resolve_sync_shared_key()
     for peer in peers:
         if peer.rstrip('/') == current_origin:
@@ -194,6 +206,8 @@ def _forward_offline_data_to_peers_async(payload, extra_peers=None):
 # newer — giving true bidirectional sync without any browser interaction.
 
 _peer_sync_thread_started = False
+_ACTIVITY_LOG_MAX = 50000
+_NON_ADMIN_EDIT_WINDOW_DAYS = 2
 
 
 def _do_peer_sync_cycle(app):
@@ -229,44 +243,54 @@ def _do_peer_sync_cycle(app):
                 peer_stamp = _payload_sync_stamp(peer_data) or 0.0
                 peer_count = _student_count(peer_data)
 
-                # ── Decide direction ─────────────────────────────────────────
-                # Margin of 30 s avoids flip-flopping on tiny clock skew.
                 is_master = str(os.getenv('EA_MASTER_MODE', '')).strip() == '1'
-                if peer_stamp > local_stamp + 30 and peer_count >= _min_safe_student_roster():
+                min_students = _min_safe_student_roster()
+
+                # Master is authoritative: never pull peer snapshots into master.
+                # This prevents stale/inflated peer data from overriding local canonical data.
+                if is_master:
+                    if local_count >= min_students and not _is_suspicious_student_shrink(peer_data, local_data):
+                        # Push whenever snapshots differ by stamp/count.
+                        if (abs(local_stamp - peer_stamp) > 1) or (local_count != peer_count):
+                            body = json.dumps({
+                                'data': local_data,
+                                'authoritative_master_push': True,
+                                'force_replace': True
+                            }).encode('utf-8')
+                            post_req = urllib.request.Request(
+                                f'{peer}/scoreboard/offline-data',
+                                data=body,
+                                method='POST',
+                                headers={
+                                    'Content-Type': 'application/json',
+                                    'X-EA-Replicated': '1',
+                                    'X-EA-Sync-Key': shared_key,
+                                }
+                            )
+                            with urllib.request.urlopen(post_req, timeout=55):
+                                pass
+                            app.logger.info(
+                                "[BgSync] Master pushed authoritative snapshot to %s (%s students, stamp=%s)",
+                                peer, local_count, local_data.get('server_updated_at', '')
+                            )
+                    continue
+
+                # ── Backup/slave mode: bidirectional with skew margin ───────
+                # Margin of 30 s avoids flip-flopping on tiny clock skew.
+                if peer_stamp > local_stamp + 30 and peer_count >= min_students:
                     if not _is_suspicious_student_shrink(local_data, peer_data):
-                        if is_master:
-                            # Master pulls peer scores/attendance but NEVER lets a peer
-                            # re-activate a student that local has explicitly deactivated.
-                            # This allows teacher scores from Render to sync back to local
-                            # without reverting admin deactivations or deletions.
-                            local_inactive_rolls = {
-                                str(s.get('roll', '')).strip().upper()
-                                for s in local_data.get('students', [])
-                                if s.get('active') is False
-                            }
-                            merged_pull = dict(peer_data)
-                            for s in merged_pull.get('students', []):
-                                if str(s.get('roll', '')).strip().upper() in local_inactive_rolls:
-                                    s['active'] = False
-                            _save_offline_data(merged_pull)
-                            _broadcast_sync_event(
-                                merged_pull.get('server_updated_at', ''),
-                                source='bg-peer-pull'
-                            )
-                        else:
-                            # Backup/slave node: full adopt of newer peer snapshot
-                            _save_offline_data(peer_data)
-                            _broadcast_sync_event(
-                                peer_data.get('server_updated_at', ''),
-                                source='bg-peer-pull'
-                            )
+                        _save_offline_data(peer_data)
+                        _broadcast_sync_event(
+                            peer_data.get('server_updated_at', ''),
+                            source='bg-peer-pull'
+                        )
                         app.logger.info(
                             "[BgSync] Pulled newer snapshot from %s (%s students, stamp=%s)",
                             peer, peer_count, peer_data.get('server_updated_at', '')
                         )
 
-                elif local_stamp > peer_stamp + 30 and local_count >= _min_safe_student_roster():
-                    # Local is newer → push to peer
+                elif local_stamp > peer_stamp + 30 and local_count >= min_students:
+                    # Local is newer -> push to peer
                     body = json.dumps({'data': local_data}).encode('utf-8')
                     post_req = urllib.request.Request(
                         f'{peer}/scoreboard/offline-data',
@@ -656,14 +680,14 @@ def _fetch_peer_offline_payload(base_url, timeout_sec=2.5):
     return data if isinstance(data, dict) else None
 
 
-def _best_peer_snapshot(min_students=25):
+def _best_peer_snapshot(min_students=25, timeout_sec=2.5):
     peers = _get_sync_peers()
     best = None
     best_stamp = 0.0
     best_count = 0
     best_src = ''
     for peer in peers:
-        payload = _fetch_peer_offline_payload(peer, timeout_sec=2.5)
+        payload = _fetch_peer_offline_payload(peer, timeout_sec=timeout_sec)
         if not payload:
             continue
         count = _student_count(payload)
@@ -686,7 +710,9 @@ def _recover_tiny_roster_if_needed(payload, min_students=25):
     if not _is_tiny_roster(payload, min_students):
         return payload, ''
 
-    recovered, src = _best_peer_snapshot(min_students=min_students)
+    # Use a longer timeout during startup/tiny-roster recovery so Render has enough
+    # time to reach the local master before falling back to the seed.
+    recovered, src = _best_peer_snapshot(min_students=min_students, timeout_sec=20)
     if not recovered:
         recovered, src = _best_local_snapshot(min_students=min_students)
 
@@ -1176,16 +1202,30 @@ def _merge_appeals_superset(existing_appeals, incoming_appeals):
     return list(merged.values())
 
 
-def _filter_teacher_payload_to_current_month(incoming_data, teacher_login_id='Teacher'):
+def _non_admin_edit_window_bounds(today=None):
+    base = today or datetime.now().date()
+    start = base - timedelta(days=_NON_ADMIN_EDIT_WINDOW_DAYS)
+    return start, base
+
+
+def _is_date_within_non_admin_window(date_value, today=None):
+    d = _parse_date_key(date_value)
+    if not d:
+        return False
+    start, end = _non_admin_edit_window_bounds(today=today)
+    return start <= d <= end
+
+
+def _filter_teacher_payload_to_edit_window(incoming_data, teacher_login_id='Teacher'):
     """
     Teachers can only modify:
-    - scores for the current server month (recordedBy=teacher)
-    - attendance for the current server month
-    - their own current-month appeals (e.g. star/veto approval requests)
+    - scores within edit window (today and previous N days) recordedBy=teacher
+    - attendance within edit window
+    - their own appeals created in the same edit window
     """
     if not isinstance(incoming_data, dict):
         return {}
-    current_month = _server_now_iso()[:7]
+    today = datetime.now().date()
     filtered = dict(incoming_data)
 
     filtered_scores = []
@@ -1196,10 +1236,7 @@ def _filter_teacher_payload_to_current_month(incoming_data, teacher_login_id='Te
         if recorded_by != 'teacher':
             continue
         date_key = str(row.get('date') or '').strip()
-        if not date_key or not date_key.startswith(current_month):
-            continue
-        month_key = str(row.get('month') or '').strip() or date_key[:7]
-        if month_key != current_month:
+        if not _is_date_within_non_admin_window(date_key, today=today):
             continue
         filtered_scores.append(row)
     filtered['scores'] = filtered_scores
@@ -1209,7 +1246,7 @@ def _filter_teacher_payload_to_current_month(incoming_data, teacher_login_id='Te
         if not isinstance(item, dict):
             continue
         date_key = str(item.get('date') or '').strip()
-        if not date_key or not date_key.startswith(current_month):
+        if not _is_date_within_non_admin_window(date_key, today=today):
             continue
         filtered_attendance.append(item)
     filtered['attendance'] = filtered_attendance
@@ -1226,12 +1263,12 @@ def _filter_teacher_payload_to_current_month(incoming_data, teacher_login_id='Te
             continue
         score_month = str(item.get('score_month') or '').strip()
         score_date = str(item.get('score_date') or '').strip()
-        month_key = score_month or (score_date[:7] if len(score_date) >= 7 else '')
-        if not month_key:
+        date_for_window = score_date or (f"{score_month}-01" if re.match(r'^\d{4}-\d{2}$', score_month) else '')
+        if not date_for_window:
             created_at = str(item.get('created_at') or '').strip()
-            if len(created_at) >= 7:
-                month_key = created_at[:7]
-        if month_key != current_month:
+            if len(created_at) >= 10:
+                date_for_window = created_at[:10]
+        if not _is_date_within_non_admin_window(date_for_window, today=today):
             continue
         filtered_appeals.append(item)
     filtered['appeals'] = filtered_appeals
@@ -1246,7 +1283,7 @@ def _filter_teacher_payload_to_current_month(incoming_data, teacher_login_id='Te
 
 def _build_teacher_replication_patch(full_payload, teacher_login_id='Teacher'):
     """Build a narrow replication patch safe to apply on master server."""
-    current_month = _server_now_iso()[:7]
+    today = datetime.now().date()
     payload = full_payload if isinstance(full_payload, dict) else {}
 
     students_min = []
@@ -1267,10 +1304,7 @@ def _build_teacher_replication_patch(full_payload, teacher_login_id='Teacher'):
         if recorded_by != 'teacher':
             continue
         date_key = str(row.get('date') or '').strip()
-        if not date_key or not date_key.startswith(current_month):
-            continue
-        month_key = str(row.get('month') or '').strip() or date_key[:7]
-        if month_key != current_month:
+        if not _is_date_within_non_admin_window(date_key, today=today):
             continue
         scores.append(row)
 
@@ -1279,7 +1313,7 @@ def _build_teacher_replication_patch(full_payload, teacher_login_id='Teacher'):
         if not isinstance(item, dict):
             continue
         date_key = str(item.get('date') or '').strip()
-        if not date_key or not date_key.startswith(current_month):
+        if not _is_date_within_non_admin_window(date_key, today=today):
             continue
         attendance.append(item)
 
@@ -1294,12 +1328,12 @@ def _build_teacher_replication_patch(full_payload, teacher_login_id='Teacher'):
             continue
         score_month = str(item.get('score_month') or '').strip()
         score_date = str(item.get('score_date') or '').strip()
-        month_key = score_month or (score_date[:7] if len(score_date) >= 7 else '')
-        if not month_key:
+        date_for_window = score_date or (f"{score_month}-01" if re.match(r'^\d{4}-\d{2}$', score_month) else '')
+        if not date_for_window:
             created_at = str(item.get('created_at') or '').strip()
-            if len(created_at) >= 7:
-                month_key = created_at[:7]
-        if month_key != current_month:
+            if len(created_at) >= 10:
+                date_for_window = created_at[:10]
+        if not _is_date_within_non_admin_window(date_for_window, today=today):
             continue
         appeals.append(item)
 
@@ -1497,6 +1531,183 @@ def _merge_notification_history(existing_history, incoming_history):
                 merged[key] = dict(item)
 
     return list(merged.values())
+
+
+def _merge_activity_log_superset(existing_logs, incoming_logs):
+    merged = {}
+
+    def _key(item):
+        if not isinstance(item, dict):
+            return ''
+        fp = str(item.get('fingerprint') or '').strip().lower()
+        if fp:
+            return fp
+        return '::'.join([
+            str(item.get('logged_at') or '').strip(),
+            str(item.get('actor_login_id') or '').strip().lower(),
+            str(item.get('actor_role') or '').strip().lower(),
+            str(item.get('entity') or '').strip().lower(),
+            str(item.get('action') or '').strip().lower(),
+            str(item.get('student_id') or '').strip(),
+            str(item.get('date') or '').strip(),
+            str(item.get('month') or '').strip(),
+            str(item.get('detail') or '').strip().lower(),
+        ])
+
+    for source in (existing_logs or []), (incoming_logs or []):
+        for item in source:
+            if not isinstance(item, dict):
+                continue
+            key = _key(item)
+            if not key:
+                continue
+            prev = merged.get(key)
+            if not prev:
+                merged[key] = dict(item)
+                continue
+            prev_stamp = _parse_sync_stamp(prev.get('logged_at') or prev.get('updated_at') or prev.get('created_at'))
+            next_stamp = _parse_sync_stamp(item.get('logged_at') or item.get('updated_at') or item.get('created_at'))
+            if next_stamp >= prev_stamp:
+                merged[key] = dict(item)
+
+    rows = list(merged.values())
+    rows.sort(key=lambda x: _parse_sync_stamp(x.get('logged_at') or x.get('updated_at') or x.get('created_at')), reverse=True)
+    if len(rows) > _ACTIVITY_LOG_MAX:
+        rows = rows[:_ACTIVITY_LOG_MAX]
+    return rows
+
+
+def _append_activity_log_entries(target_data, actor_login_id, actor_role, incoming_payload, source='offline-sync'):
+    if not isinstance(target_data, dict):
+        return
+    if not isinstance(incoming_payload, dict):
+        incoming_payload = {}
+
+    logs = list(target_data.get('activity_log') or [])
+    now_iso = _server_now_iso()
+    actor = str(actor_login_id or actor_role or 'system').strip() or 'system'
+    role = str(actor_role or 'unknown').strip().lower() or 'unknown'
+
+    students = target_data.get('students', []) or []
+    by_id = {}
+    by_roll = {}
+    for s in students:
+        if not isinstance(s, dict):
+            continue
+        sid = _parse_int_safe(s.get('id'), 0)
+        if sid > 0:
+            by_id[sid] = s
+        roll = _normalize_roll_value(s.get('roll'))
+        if roll:
+            by_roll[roll] = s
+
+    def _student_meta(item):
+        sid = _parse_int_safe(item.get('studentId'), 0)
+        roll = _normalize_roll_value(item.get('roll'))
+        student = by_id.get(sid) if sid > 0 else None
+        if not student and roll:
+            student = by_roll.get(roll)
+        if not roll and student:
+            roll = _normalize_roll_value(student.get('roll'))
+        if sid <= 0 and student:
+            sid = _parse_int_safe(student.get('id'), 0)
+        cls = ''
+        name = ''
+        if student:
+            cls = str(student.get('class') or student.get('class_name') or '').strip()
+            name = str(student.get('base_name') or student.get('name') or '').strip()
+        return sid, roll, cls, name
+
+    def _add(entity, action, item=None, detail=''):
+        payload = item if isinstance(item, dict) else {}
+        sid, roll, cls, name = _student_meta(payload)
+        date_key = str(payload.get('date') or payload.get('score_date') or '').strip()
+        month_key = str(payload.get('month') or payload.get('score_month') or (date_key[:7] if len(date_key) >= 7 else '')).strip()
+        fp = '::'.join([
+            now_iso,
+            actor.lower(),
+            role,
+            str(entity).lower(),
+            str(action).lower(),
+            str(sid or ''),
+            str(roll or ''),
+            str(date_key or ''),
+            str(month_key or ''),
+            str(detail or '').strip().lower()
+        ])
+        logs.append({
+            'id': int(time.time() * 1000) + len(logs),
+            'fingerprint': fp,
+            'logged_at': now_iso,
+            'actor_login_id': actor,
+            'actor_role': role,
+            'source': source,
+            'entity': entity,
+            'action': action,
+            'student_id': sid if sid > 0 else None,
+            'student_roll': roll or '',
+            'student_name': name or '',
+            'class': cls or '',
+            'date': date_key,
+            'month': month_key,
+            'detail': str(detail or '').strip(),
+        })
+
+    # Detailed row-level logging (admin included) with caps.
+    if role in ('teacher', 'student', 'admin'):
+        row_cap = 1800 if role == 'admin' else 800
+        row_count = 0
+        for row in incoming_payload.get('scores', []) or []:
+            if not isinstance(row, dict):
+                continue
+            detail = f"pts={_parse_int_safe(row.get('points'))}, stars={_parse_int_safe(row.get('stars'))}, vetos={_parse_int_safe(row.get('vetos'))}"
+            _add('scoreboard', 'upsert', row, detail)
+            row_count += 1
+            if row_count >= row_cap:
+                break
+        if row_count < row_cap:
+            for row in incoming_payload.get('attendance', []) or []:
+                if not isinstance(row, dict):
+                    continue
+                detail = f"status={str(row.get('status') or '').strip().lower()}"
+                _add('attendance', 'upsert', row, detail)
+                row_count += 1
+                if row_count >= row_cap:
+                    break
+        if row_count < row_cap:
+            for row in incoming_payload.get('resource_requests', []) or []:
+                if not isinstance(row, dict):
+                    continue
+                detail = f"status={str(row.get('status') or '').strip().lower()}, type={str(row.get('type') or '').strip().lower()}"
+                _add('resources', 'request_upsert', row, detail)
+                row_count += 1
+                if row_count >= row_cap:
+                    break
+        if row_count < row_cap:
+            for row in incoming_payload.get('appeals', []) or []:
+                if not isinstance(row, dict):
+                    continue
+                detail = f"appeal={str(row.get('status') or 'open').strip().lower()}"
+                _add('appeals', 'upsert', row, detail)
+                row_count += 1
+                if row_count >= row_cap:
+                    break
+        if row_count >= row_cap:
+            _add('system', 'log_truncated', {}, f'Captured first {row_cap} row-level changes in this request')
+    else:
+        # Admin (or replication) summary log
+        counts = []
+        for key in (
+            'scores', 'attendance', 'resource_requests', 'resource_transactions',
+            'pending_cr_requests', 'appeals', 'leadership', 'group_crs', 'class_reps'
+        ):
+            val = incoming_payload.get(key)
+            if isinstance(val, list) and val:
+                counts.append(f"{key}:{len(val)}")
+        detail = ', '.join(counts) if counts else 'no list updates'
+        _add('system', 'sync_publish', {}, detail)
+
+    target_data['activity_log'] = _merge_activity_log_superset(target_data.get('activity_log', []), logs)
 
 
 def _merge_election_votes_superset(existing_votes, incoming_votes, mode='party'):
@@ -3015,7 +3226,10 @@ def offline_data():
     # 30+ seconds) and is unnecessary when we're already receiving a push from an authenticated client.
     if request.method == 'GET':
         existing, _ = _recover_stale_snapshot_if_needed(existing, min_students=min_students)
+    authoritative_master_push = bool(payload.get('authoritative_master_push')) if isinstance(payload, dict) else False
     force_replace = bool(payload.get('force_replace')) if isinstance(payload, dict) else False
+    if authoritative_master_push and replicated_auth:
+        force_replace = True
     incoming_count = _student_count(data)
     existing_count = _student_count(existing)
     if actor_role not in ['teacher', 'student'] and not force_replace and incoming_count > 0 and incoming_count < min_students:
@@ -3044,7 +3258,7 @@ def offline_data():
     incoming_stamp = _payload_sync_stamp(data)
     existing_stamp = _payload_sync_stamp(existing)
     if actor_role == 'teacher':
-        data = _filter_teacher_payload_to_current_month(data, actor_login_id or 'Teacher')
+        data = _filter_teacher_payload_to_edit_window(data, actor_login_id or 'Teacher')
         merged = existing if existing else {}
         merged.setdefault('students', existing.get('students', []))
         merged.setdefault('month_students', existing.get('month_students', {}))
@@ -3117,6 +3331,13 @@ def offline_data():
                 data.get('pending_cr_requests', []),
                 actor_login_id or 'Teacher'
             )
+        _append_activity_log_entries(
+            merged,
+            actor_login_id or 'Teacher',
+            'teacher',
+            data,
+            source='teacher-sync'
+        )
         merged = _enforce_current_month_roster_integrity(merged, existing)
         _reconcile_role_veto_monthly(merged)
         _reconcile_veto_counters_from_scores(merged)
@@ -3163,6 +3384,13 @@ def offline_data():
             )
         if isinstance(patch.get('appeals'), list):
             merged['appeals'] = _merge_appeals_superset(existing_obj.get('appeals', []), patch.get('appeals', []))
+        _append_activity_log_entries(
+            merged,
+            actor_login_id or 'Student',
+            'student',
+            patch,
+            source='student-sync'
+        )
         _ensure_score_timestamps(merged)
         merged['server_updated_at'] = _server_now_iso()
         _save_offline_data(merged)
@@ -3172,8 +3400,15 @@ def offline_data():
         return jsonify({'success': True, 'updated_at': merged['server_updated_at']})
 
     if existing and incoming_stamp and existing_stamp and incoming_stamp < existing_stamp:
+        # Trusted master push can override stale timestamp drift on peers.
+        if replicated_auth and authoritative_master_push and incoming_count >= min_students:
+            current_app.logger.warning(
+                "Accepting authoritative master snapshot despite older stamp. incoming=%s existing=%s",
+                incoming_count,
+                existing_count
+            )
         # Case 1: existing is a tiny/corrupt roster — accept any healthy incoming snapshot.
-        if _is_tiny_roster(existing, min_students) and incoming_count >= min_students:
+        elif _is_tiny_roster(existing, min_students) and incoming_count >= min_students:
             current_app.logger.warning(
                 "Accepting healthy snapshot (%s students) over tiny-roster data (%s students) despite older stamp.",
                 incoming_count,
@@ -3289,6 +3524,10 @@ def offline_data():
             existing.get('notification_history', []),
             data.get('notification_history', [])
         )
+        data['activity_log'] = _merge_activity_log_superset(
+            existing.get('activity_log', []),
+            data.get('activity_log', [])
+        )
         data['leadership'] = _merge_leadership_superset(
             existing.get('leadership', []),
             data.get('leadership', [])
@@ -3325,6 +3564,13 @@ def offline_data():
     _reconcile_role_veto_monthly(data)
     _reconcile_veto_counters_from_scores(data)
     _ensure_score_timestamps(data)
+    _append_activity_log_entries(
+        data,
+        actor_login_id or ('replica' if is_replicated else 'Admin'),
+        ('replica' if is_replicated else (actor_role or 'admin')),
+        data,
+        source='replica-sync' if is_replicated else 'admin-sync'
+    )
     if is_replicated:
         # Preserve the source timestamp so the receiver never appears artificially
         # newer than the sender.  Generating a fresh _server_now_iso() here would
@@ -4522,135 +4768,498 @@ def get_month_summary():
         return jsonify({'success': False, 'error': str(e)}), 400
 
 
+# ============== EXCEL IMPORT HELPERS ==============
+
+# Column header patterns that must NEVER be treated as daily score columns.
+# These appear in all three Excel format variants as text-string headers.
+_EXCEL_EXCLUDED_COL_KEYWORDS = frozenset([
+    'previous advantage', 'prev advantage', 'previous adv',
+    'cumulative', 'cumul point', 'running total',
+    'final score', 'total score', 'grand total', 'overall score',
+    'prize money', 'prize used', 'combined score',
+    'project', 'activity point', 'activity score',
+    'vote power', 'votepower',
+    'rank', 'ranking',
+    'awf', 'buffer',
+    'roll', 'roll no', 'student name', 'name',
+    'class', 'group', 'fees', 'fee',
+    'bonus', 'advantage',
+])
+
+
+def _excel_col_excluded(header_val):
+    """Return True if this column should never be imported as a daily score."""
+    if not isinstance(header_val, str):
+        return False
+    s = header_val.strip().lower()
+    for kw in _EXCEL_EXCLUDED_COL_KEYWORDS:
+        if kw in s:
+            return True
+    return False
+
+
+def _sheet_name_to_month_key(sheet_name):
+    """
+    Parse a sheet name like 'Jan 26', 'Feb 26', 'October 2025' → '2026-01', '2026-02', '2025-10'.
+    Returns None if the name is not a recognisable month pattern.
+    """
+    import calendar as _cal
+    abbr_map = {m.lower(): i for i, m in enumerate(_cal.month_abbr) if m}
+    full_map = {m.lower(): i for i, m in enumerate(_cal.month_name) if m}
+    parts = str(sheet_name or '').strip().split()
+    if len(parts) != 2:
+        return None
+    mon_str = parts[0].strip().lower()
+    yr_str = parts[1].strip()
+    mon_num = abbr_map.get(mon_str) or full_map.get(mon_str)
+    if not mon_num:
+        return None
+    try:
+        yr = int(yr_str)
+        if yr < 100:
+            yr += 2000
+        return f"{yr:04d}-{mon_num:02d}"
+    except (ValueError, TypeError):
+        return None
+
+
+def _detect_excel_header_row(ws):
+    """
+    Return (header_row_number, header_values_list).
+    Tries row 1 first; if no 'roll' column is found, tries row 2.
+    This handles Format B sheets (Oct 24–Aug 25) where row 1 contains
+    'EXCEL ACADEMY LEADERSHIP BOARD' and the real headers are in row 2.
+    """
+    for row_num in (1, 2):
+        try:
+            row_vals = [cell.value for cell in ws[row_num]]
+        except Exception:
+            continue
+        has_roll = any(
+            isinstance(v, str) and 'roll' in v.strip().lower()
+            for v in row_vals
+        )
+        if has_roll:
+            return row_num, row_vals
+    # Fallback
+    return 1, [cell.value for cell in ws[1]]
+
+
 # ============== REFINED IMPORT ENDPOINTS ==============
 
 @points_bp.route('/import-historical-data', methods=['POST'])
 @login_required
 def import_historical_data():
     """
-    Import historical data for PREVIOUS MONTHS ONLY
-    Filters out any current month data even if present in Excel
-    Preserves student active/inactive status from system
-    Only updates scoreboard scores, not system settings
+    Historical Excel import for months before Feb 2026.
+
+    For each historical month sheet (Aug 24 – Jan 26 only), this importer:
+    1) Reads monthly totals from "Total Score" (fallback: "Final Score"), and
+    2) Imports per-date star usage markers from real date columns only.
+
+    Feb 2026 and newer months are never touched.
     """
     if current_user.role != 'admin':
         return jsonify({'success': False, 'error': 'Unauthorized'}), 403
 
-    try:
-        from datetime import datetime as dt
-        current_month_start = dt.now().replace(day=1).date()
+    # Hard limit: never touch Feb 26 onwards
+    HISTORY_CUTOFF = '2026-02'
 
-        # File validation
+    temp_path = None
+    try:
+        # ── File validation ──────────────────────────────────────────────────
         if 'file' not in request.files:
             return jsonify({'success': False, 'error': 'No file provided'}), 400
-
         file = request.files['file']
         if not file or file.filename == '':
             return jsonify({'success': False, 'error': 'No file selected'}), 400
-
         if not file.filename.endswith(('.xlsx', '.xls', '.xlsm')):
-            return jsonify({'success': False, 'error': 'Only Excel files are supported'}), 400
+            return jsonify({'success': False, 'error': 'Only Excel files (.xlsx, .xls, .xlsm) are supported'}), 400
 
-        # Parse Excel and filter to PREVIOUS MONTHS ONLY
         import uuid
-        temp_suffix = file.filename.split('.')[-1] if '.' in file.filename else 'xlsx'
-        temp_file = tempfile.NamedTemporaryFile(
-            mode='w+b',
-            suffix=f'.{temp_suffix}',
-            prefix=f'ea_historical_{uuid.uuid4().hex}_',
-            delete=False
+        temp_suffix = file.filename.rsplit('.', 1)[-1] if '.' in file.filename else 'xlsx'
+        tmp = tempfile.NamedTemporaryFile(
+            mode='w+b', suffix=f'.{temp_suffix}',
+            prefix=f'ea_hist_{uuid.uuid4().hex}_', delete=False
         )
-        temp_path = temp_file.name
-        temp_file.close()
+        temp_path = tmp.name
+        tmp.close()
 
         try:
             file.save(temp_path)
             wb = openpyxl.load_workbook(temp_path, data_only=True, read_only=False, keep_vba=False)
         except Exception as e:
-            if os.path.exists(temp_path):
+            if temp_path and os.path.exists(temp_path):
                 try:
                     os.unlink(temp_path)
-                except:
+                except Exception:
                     pass
-            return jsonify({'success': False, 'error': f'Failed to read Excel: {str(e)}'}), 400
+            return jsonify({'success': False, 'error': f'Cannot read Excel file: {e}'}), 400
 
-        ws = wb.active
-        header_row = [cell.value for cell in ws[1]]
+        # ── Load live snapshot and build roll → studentId map ─────────────
+        snapshot = _load_offline_data() or {}
+        roll_to_sid = {}
+        for s in (snapshot.get('students') or []):
+            if not isinstance(s, dict):
+                continue
+            roll = str(s.get('roll') or '').strip().upper()
+            sid = s.get('id')
+            if roll and sid is not None and roll not in roll_to_sid:
+                roll_to_sid[roll] = sid
 
-        header_map = {}
-        for idx, value in enumerate(header_row, start=1):
-            if isinstance(value, str):
-                header_map[value.strip().lower()] = idx
-
-        def find_header(candidates):
-            for key in candidates:
-                for header, idx in header_map.items():
-                    if key in header:
-                        return idx
-            return None
-
-        roll_col = find_header(['roll'])
-        if not roll_col:
-            os.remove(temp_path)
-            return jsonify({'success': False, 'error': 'Roll column not found'}), 400
-
-        # Find date columns - ONLY PREVIOUS MONTHS
-        date_columns = []
-        excluded_dates = []
-
-        for idx, header in enumerate(header_row, start=1):
-            parsed_date = None
-            if isinstance(header, (datetime, date)):
-                parsed_date = header.date() if isinstance(header, datetime) else header
-            elif isinstance(header, str):
+        if not roll_to_sid:
+            if temp_path and os.path.exists(temp_path):
                 try:
-                    parsed_date = dt.fromisoformat(header.strip()).date()
-                except:
+                    os.unlink(temp_path)
+                except Exception:
                     pass
-
-            if parsed_date:
-                if parsed_date < current_month_start:
-                    date_columns.append((idx, parsed_date))
-                else:
-                    excluded_dates.append(parsed_date.isoformat())
-
-        if not date_columns:
-            os.remove(temp_path)
             return jsonify({
                 'success': False,
-                'error': f'No historical dates found. All {len(excluded_dates)} dates are from current month. Use "Latest Roster" import instead.'
+                'error': 'No students found in offline snapshot. Force-publish data from admin panel first.'
             }), 400
 
-        # Count imported scores
-        imported = 0
-        for row_idx, row in enumerate(ws.iter_rows(min_row=2, values_only=False), start=2):
-            roll_number = ws.cell(row_idx, roll_col).value
-            if not roll_number:
+        # ── Determine which sheets to process (historical only) ───────────
+        sheet_filter = request.form.get('sheet', '').strip()
+        target_sheets = []
+        if sheet_filter and sheet_filter in wb.sheetnames:
+            mk = _sheet_name_to_month_key(sheet_filter)
+            if mk and mk < HISTORY_CUTOFF:
+                target_sheets = [(sheet_filter, mk)]
+        if not target_sheets:
+            for name in wb.sheetnames:
+                mk = _sheet_name_to_month_key(name)
+                if mk and mk < HISTORY_CUTOFF:
+                    target_sheets.append((name, mk))
+
+        if not target_sheets:
+            if temp_path and os.path.exists(temp_path):
+                try:
+                    os.unlink(temp_path)
+                except Exception:
+                    pass
+            return jsonify({
+                'success': False,
+                'error': (
+                    'No historical month sheets found (looking for months before Feb 2026). '
+                    'Sheet names must be like "Jan 26", "Oct 24" etc. '
+                    f'Sheets in workbook: {", ".join(wb.sheetnames[:10])}'
+                )
+            }), 400
+
+        # ── Helpers ─────────────────────────────────────────────────────────
+        def _to_date(v, month_hint=None):
+            if isinstance(v, datetime):
+                return v.date()
+            if isinstance(v, date):
+                return v
+            # Day-only numeric headers (1..31) are common in workbook variants.
+            if isinstance(v, (int, float)) and month_hint:
+                day_num = int(v)
+                if 1 <= day_num <= 31:
+                    try:
+                        yy, mm = [int(x) for x in month_hint.split('-')]
+                        return date(yy, mm, day_num)
+                    except Exception:
+                        return None
+            if isinstance(v, str):
+                text = v.strip()
+                if not text:
+                    return None
+                if month_hint and re.fullmatch(r'\d{1,2}', text):
+                    try:
+                        yy, mm = [int(x) for x in month_hint.split('-')]
+                        return date(yy, mm, int(text))
+                    except Exception:
+                        return None
+                # Common textual forms seen in sheets
+                for fmt in (
+                    '%Y-%m-%d', '%d-%m-%Y', '%d/%m/%Y', '%d.%m.%Y',
+                    '%d-%b-%Y', '%d-%B-%Y', '%d-%b-%y', '%d-%B-%y',
+                    '%b %d %Y', '%B %d %Y'
+                ):
+                    try:
+                        return datetime.strptime(text, fmt).date()
+                    except Exception:
+                        pass
+                # Last resort: ISO parser
+                try:
+                    return datetime.fromisoformat(text).date()
+                except Exception:
+                    return None
+            return None
+
+        def _to_int_score(v):
+            """Parse a numeric score from Excel cell values safely."""
+            if v is None:
+                return None
+            if isinstance(v, bool):
+                return int(v)
+            if isinstance(v, (int, float)):
+                return int(round(v))
+            text = str(v).strip()
+            if not text:
+                return None
+            m = re.search(r'-?\d+(?:\.\d+)?', text.replace(',', ''))
+            if not m:
+                return None
+            try:
+                return int(round(float(m.group(0))))
+            except Exception:
+                return None
+
+        def _extract_star_usage(v):
+            """
+            Return star usage count from a cell.
+            Supports '*', '**', '***', and compact '*xN' style.
+            """
+            if v is None:
+                return 0
+            if isinstance(v, (int, float)):
+                return 0
+            text = str(v).strip()
+            if not text:
+                return 0
+            compact = re.search(r'\*\s*[xX]\s*(\d+)', text)
+            if compact:
+                return max(0, _parse_int_safe(compact.group(1), 0))
+            return text.count('*')
+
+        def _extract_cell_points(v):
+            """
+            Extract daily points from a date cell.
+            Accepts numeric cells and mixed text like '20*' or '-15 V'.
+            """
+            if v is None:
+                return None
+            if isinstance(v, bool):
+                return int(v)
+            if isinstance(v, (int, float)):
+                return int(round(v))
+            text = str(v).strip()
+            if not text:
+                return None
+            m = re.search(r'-?\d+(?:\.\d+)?', text.replace(',', ''))
+            if not m:
+                return None
+            try:
+                return int(round(float(m.group(0))))
+            except Exception:
+                return None
+
+        # ── Process each sheet ─────────────────────────────────────────────
+        now_iso = _server_now_iso()
+        existing_scores = list(snapshot.get('scores') or [])
+        max_id = max((_parse_int_safe(sc.get('id')) for sc in existing_scores), default=0)
+
+        months_cleared = []
+        months_processed = []
+        month_report = {}
+        total_imported = 0
+        total_star_markers = 0
+
+        for sheet_name, month_key in sorted(target_sheets, key=lambda x: x[1]):
+            ws = wb[sheet_name]
+            hdr_row_num, header_row = _detect_excel_header_row(ws)
+
+            # Find roll column from the header row
+            roll_col = None
+            total_col = None
+            final_score_col = None
+            for idx, val in enumerate(header_row, start=1):
+                if not isinstance(val, str):
+                    continue
+                s = val.strip().lower()
+                if roll_col is None and ('roll' in s):
+                    roll_col = idx
+                if total_col is None and 'total score' in s:
+                    total_col = idx
+                if final_score_col is None and 'final score' in s:
+                    final_score_col = idx
+
+            if total_col is None and final_score_col is not None:
+                total_col = final_score_col
+
+            if not roll_col:
+                month_report[month_key] = {
+                    'status': 'skipped', 'sheet': sheet_name,
+                    'reason': 'roll column not found'
+                }
                 continue
 
-            for col_idx, date_recorded in date_columns:
-                score_value = ws.cell(row_idx, col_idx).value
-                if score_value is not None and isinstance(score_value, (int, float)):
-                    imported += 1
+            # Strictly include only date headers that belong to this month.
+            date_cols = []
+            for idx, val in enumerate(header_row, start=1):
+                if _excel_col_excluded(val):
+                    continue
+                d = _to_date(val, month_hint=month_key)
+                if not d:
+                    continue
+                mk = d.strftime('%Y-%m')
+                if mk == month_key:
+                    date_cols.append((idx, d))
 
-        os.remove(temp_path)
+            if not date_cols and not total_col:
+                month_report[month_key] = {
+                    'status': 'skipped', 'sheet': sheet_name,
+                    'reason': 'no date-header columns and no total score column found'
+                }
+                continue
+
+            # Clear all previously admin-imported scores for this month
+            if month_key not in months_cleared:
+                existing_scores = [
+                    sc for sc in existing_scores
+                    if not (
+                        str(sc.get('month') or sc.get('date', '')[:7]) == month_key
+                        # Historical months are rebuilt fully from Excel date columns.
+                        # This avoids stale/duplicate rows causing inflated totals.
+                    )
+                ]
+                months_cleared.append(month_key)
+
+            # Rebuild month rows: one total row per student + per-date star usage rows.
+            month_count = 0
+            month_daily_score_rows = 0
+            month_star_count = 0
+            unknown_roll_rows = 0
+            for row_idx in range(hdr_row_num + 1, (ws.max_row or 0) + 1):
+                raw_roll = ws.cell(row_idx, roll_col).value
+                if raw_roll is None:
+                    continue
+                roll = str(raw_roll).strip().upper()
+                if not roll or roll.startswith('ROLL'):
+                    continue
+                sid = roll_to_sid.get(roll)
+                if sid is None:
+                    unknown_roll_rows += 1
+                    continue
+
+                pts = None
+                if total_col:
+                    pts = _to_int_score(ws.cell(row_idx, total_col).value)
+                if pts is None and date_cols:
+                    # Fallback for sheets where total column is not available.
+                    run_sum = 0
+                    has_numeric = False
+                    for col_idx, _d in date_cols:
+                        score_val = ws.cell(row_idx, col_idx).value
+                        if isinstance(score_val, (int, float)):
+                            run_sum += int(round(score_val))
+                            has_numeric = True
+                    if has_numeric:
+                        pts = run_sum
+
+                # Keep workbook total alignment (including explicit zero totals).
+                if pts is not None:
+                    max_id += 1
+                    existing_scores.append({
+                        'id': max_id,
+                        'studentId': sid,
+                        'month': month_key,
+                        'date': month_key + '-15',   # mid-month placeholder date
+                        'points': pts,
+                        'stars': 0,
+                        'vetos': 0,
+                        'notes': 'excel_total_score',
+                        'recordedBy': 'admin',
+                        'created_at': now_iso,
+                        'updated_at': now_iso,
+                    })
+                    month_count += 1
+                    total_imported += 1
+
+                # Import historical daily score points from date columns.
+                for col_idx, d in date_cols:
+                    day_points = _extract_cell_points(ws.cell(row_idx, col_idx).value)
+                    if day_points is None:
+                        continue
+                    # Skip no-op zeros to keep dataset compact.
+                    if day_points == 0:
+                        continue
+                    max_id += 1
+                    existing_scores.append({
+                        'id': max_id,
+                        'studentId': sid,
+                        'month': month_key,
+                        'date': d.isoformat(),
+                        'points': day_points,
+                        'stars': 0,
+                        'vetos': 0,
+                        'notes': 'excel_daily_score',
+                        'recordedBy': 'admin',
+                        'created_at': now_iso,
+                        'updated_at': now_iso,
+                    })
+                    month_daily_score_rows += 1
+
+                # Import historical star usage markers (for red '*' cell display).
+                for col_idx, d in date_cols:
+                    uses = _extract_star_usage(ws.cell(row_idx, col_idx).value)
+                    if uses <= 0:
+                        continue
+                    max_id += 1
+                    existing_scores.append({
+                        'id': max_id,
+                        'studentId': sid,
+                        'month': month_key,
+                        'date': d.isoformat(),
+                        'points': 0,
+                        'stars': -uses,
+                        'vetos': 0,
+                        'notes': f'excel_star_usage:{uses}',
+                        'recordedBy': 'admin',
+                        'created_at': now_iso,
+                        'updated_at': now_iso,
+                    })
+                    month_star_count += 1
+                    total_star_markers += 1
+
+            months_processed.append(month_key)
+            month_report[month_key] = {
+                'status': 'ok', 'sheet': sheet_name,
+                'students_imported': month_count,
+                'daily_score_rows': month_daily_score_rows,
+                'star_usage_rows': month_star_count,
+                'header_row': hdr_row_num,
+                'date_columns': len(date_cols),
+                'total_col': total_col,
+                'unknown_roll_rows': unknown_roll_rows,
+            }
+
+        # ── Persist updated snapshot ───────────────────────────────────────
+        if months_processed:
+            snapshot['scores'] = existing_scores
+            snapshot['server_updated_at'] = now_iso
+            snapshot['updated_at'] = now_iso
+            _save_offline_data(snapshot)
+
+        if temp_path and os.path.exists(temp_path):
+            try:
+                os.unlink(temp_path)
+            except Exception:
+                pass
 
         return jsonify({
             'success': True,
-            'message': f'Historical import: {imported} scores from {len(date_columns)} previous month dates',
-            'imported_scores': imported,
-            'date_columns': len(date_columns),
-            'excluded_current_month_dates': len(excluded_dates),
-            'info': 'Current month data excluded. System settings preserved.'
+            'message': (
+                f'Imported totals for {total_imported} student-months across '
+                f'{len(months_processed)} month(s) and '
+                f'imported {total_star_markers} historical star-usage marker row(s). '
+                f'Skipped {len(target_sheets) - len(months_processed)} sheet(s).'
+            ),
+            'total_imported': total_imported,
+            'total_star_markers': total_star_markers,
+            'months_processed': sorted(months_processed),
+            'month_report': month_report,
         })
 
     except Exception as e:
-        current_app.logger.error(f"Historical import error: {str(e)}")
-        try:
-            if 'temp_path' in locals() and os.path.exists(temp_path):
+        current_app.logger.error(f"Historical import error: {e}")
+        if temp_path and os.path.exists(temp_path):
+            try:
                 os.unlink(temp_path)
-        except:
-            pass
+            except Exception:
+                pass
         return jsonify({'success': False, 'error': str(e)}), 500
 
 

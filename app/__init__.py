@@ -1,9 +1,10 @@
 import os
 from flask import Flask, redirect, url_for, request, flash
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy import text
 from datetime import timedelta
 from flask_sqlalchemy import SQLAlchemy
-from flask_login import LoginManager, current_user
+from flask_login import LoginManager, current_user, UserMixin
 from flask_wtf.csrf import CSRFProtect
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
@@ -19,6 +20,29 @@ limiter = Limiter(
     default_limits=["200 per day", "50 per hour"],
     storage_uri="memory://"
 )
+
+
+class EphemeralUser(UserMixin):
+    """Fallback session user used when DB ORM user loading is unavailable."""
+
+    def __init__(self, user_id, login_id, role, active=True):
+        self.id = int(user_id)
+        self.login_id = str(login_id or '')
+        self.role = str(role or 'student')
+        self._active = bool(active)
+
+    @property
+    def is_active(self):
+        return self._active
+
+
+def make_ephemeral_user(role):
+    role_key = str(role or '').strip().lower()
+    if role_key == 'admin':
+        return EphemeralUser(-1, 'Admin', 'admin', True)
+    if role_key == 'teacher':
+        return EphemeralUser(-2, 'Teacher', 'teacher', True)
+    return None
 
 
 def _bootstrap_auth_defaults(app):
@@ -122,7 +146,36 @@ def create_app():
     
     @login_manager.user_loader
     def load_user(user_id):
-        return User.query.get(int(user_id))
+        try:
+            uid = int(str(user_id))
+        except Exception:
+            return None
+
+        if uid == -1:
+            return make_ephemeral_user('admin')
+        if uid == -2:
+            return make_ephemeral_user('teacher')
+
+        try:
+            return User.query.get(uid)
+        except Exception:
+            db.session.rollback()
+            # ORM can fail on partially migrated schemas; use raw fallback to keep sessions usable.
+            try:
+                with db.engine.connect() as conn:
+                    row = conn.execute(
+                        text("SELECT * FROM users WHERE id = :id LIMIT 1"),
+                        {'id': uid}
+                    ).mappings().first()
+                if not row:
+                    return None
+                login_id = str(row.get('login_id') or '')
+                role = str(row.get('role') or 'student')
+                active_val = row.get('is_active')
+                is_active = True if active_val is None else bool(active_val)
+                return EphemeralUser(uid, login_id, role, is_active)
+            except Exception:
+                return None
 
     # Defensive bootstrap for production entrypoints (Render/Gunicorn).
     if str(os.getenv('EA_DB_AUTO_INIT', '1')).strip().lower() in ('1', 'true', 'yes', 'on'):
