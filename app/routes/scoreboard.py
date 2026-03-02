@@ -4186,6 +4186,7 @@ def offline_events():
 
 
 @points_bp.route('/offline-server-health', methods=['POST'])
+@csrf.exempt
 @login_required
 def offline_server_health():
     if current_user.role not in ['admin', 'teacher']:
@@ -4314,6 +4315,7 @@ def supabase_health():
 
 
 @points_bp.route('/offline-force-publish', methods=['POST'])
+@csrf.exempt
 @login_required
 def offline_force_publish():
     if current_user.role != 'admin':
