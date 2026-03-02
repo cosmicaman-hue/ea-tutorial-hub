@@ -170,7 +170,10 @@
         function render(data) {
             latest = data || {};
             const months = monthKeys(latest);
-            const old = String(monthSel.value || '');
+            // Prefer localStorage over in-memory value so user's month selection
+            // survives the 4-second polling cycle and data refreshes.
+            const saved = localStorage.getItem('ea_pub_month') || '';
+            const old = saved || String(monthSel.value || '');
             monthSel.innerHTML = months.map(m => `<option value="${m}">${m}</option>`).join('');
             const month = months.includes(old) ? old : (months[0] || '');
             monthSel.value = month;
@@ -280,7 +283,10 @@
             }
         }
 
-        monthSel.addEventListener('change', () => render(latest || {}));
+        monthSel.addEventListener('change', () => {
+            localStorage.setItem('ea_pub_month', monthSel.value);
+            render(latest || {});
+        });
         refreshBtn.addEventListener('click', fetchAndRender);
         fetchAndRender();
         setInterval(fetchAndRender, 4000);
