@@ -11963,14 +11963,20 @@
             }
             try {
                 const pushed = await withTimeout(pushToServer(db.getData(), { silent: false }), 90000);
-                await withTimeout(pullFromServer(true, true), 30000);
                 if (!pushed) {
                     showAlert('Force Publish could not reach server. Local data remains safe.', 'warning');
                 } else {
-                    showAlert('Force Publish complete. Server snapshot updated and reloaded.', 'success');
+                    // Publish already succeeded; refresh is best-effort and must not turn success into failure.
+                    try {
+                        await withTimeout(pullFromServer(true, true), 30000);
+                        showAlert('Force Publish complete. Server snapshot updated and reloaded.', 'success');
+                    } catch (pullErr) {
+                        showAlert('Force Publish succeeded, but refresh timed out. Use Refresh once.', 'warning');
+                    }
                 }
             } catch (err) {
-                showAlert('Force Publish failed. Local data remains safe.', 'warning');
+                const msg = (err && err.message) ? String(err.message) : 'unexpected error';
+                showAlert(`Force Publish failed (${msg}). Local data remains safe.`, 'warning');
             } finally {
                 if (btn) {
                     btn.disabled = false;
