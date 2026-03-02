@@ -235,12 +235,12 @@ def login():
         
         try:
             user = User.query.filter_by(login_id=login_id).first()
-        except SQLAlchemyError:
+        except Exception:
             db.session.rollback()
             try:
                 _ensure_auth_schema_and_defaults()
                 user = User.query.filter_by(login_id=login_id).first()
-            except SQLAlchemyError:
+            except Exception:
                 db.session.rollback()
                 flash('Login service temporarily unavailable. Please retry in 30 seconds.', 'error')
                 return redirect(url_for('auth.login'))
