@@ -6276,6 +6276,7 @@
         let currentUserRole = 'student';
         let currentLoginId = '';
         let currentStudentRoll = '';
+        let feesModuleEnabled = true;
         let currentStudentPositions = {};  // populated after session loads for students
         let isSelfProfileEditMode = false;
         let serverTimezone = 'Asia/Kolkata';
@@ -10504,7 +10505,7 @@
             if (tabName === 'good-conduct') return true;
             if (tabName === 'profile') return true;
             if (tabName === 'homework') return isAdmin || isTeacher;
-            if (tabName === 'fees') return isAdmin;
+            if (tabName === 'fees') return feesModuleEnabled && isAdmin;
             if (tabName === 'resources') return true;
             if (tabName === 'add-score') return isAdmin || isTeacher;
             if (tabName === 'students') return isAdmin;
@@ -10537,7 +10538,7 @@
             setTabVisibility('teacher-voting', isAdmin || isTeacher);
             setTabVisibility('add-score', isAdmin || isTeacher);
             setTabVisibility('students', isAdmin);
-            setTabVisibility('fees', isAdmin);
+            setTabVisibility('fees', feesModuleEnabled && isAdmin);
             setTabVisibility('resources', true);
             setTabVisibility('syllabus', true);
             setTabVisibility('party', isAdmin);
@@ -10707,6 +10708,7 @@
                     currentLoginId = session.login_id || currentLoginId || '';
                     currentStudentRoll = session.student_roll || '';
                     serverTimezone = session.server_timezone || serverTimezone;
+                    feesModuleEnabled = session.fees_enabled !== false;
                     // Remember this profile for future visits from this browser
                     saveProfileToLocal(currentUserRole, currentLoginId, currentStudentRoll);
                     return true;

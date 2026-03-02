@@ -27,7 +27,7 @@ import shutil
 import glob
 import urllib.request
 import urllib.error
-import requests
+import urllib.parse
 from werkzeug.security import generate_password_hash
 from zoneinfo import ZoneInfo
 from queue import Queue, Empty
@@ -225,29 +225,37 @@ _supabase_push_lock = threading.Lock()
 _supabase_last_pushed_stamp = ''
 
 
+def _fees_module_enabled():
+    raw = str(os.getenv('EA_ENABLE_FEES_MODULE', '1') or '1').strip().lower()
+    return raw in ('1', 'true', 'yes', 'on')
+
+
 def _supabase_snapshot_config():
     url = str(os.getenv('SUPABASE_URL', '') or '').strip().rstrip('/')
-    key = str(
-        os.getenv('SUPABASE_SERVICE_ROLE_KEY', '')
-        or os.getenv('SUPABASE_ANON_KEY', '')
-        or ''
-    ).strip()
+    service_key = str(os.getenv('SUPABASE_SERVICE_ROLE_KEY', '') or '').strip()
+    anon_key = str(os.getenv('SUPABASE_ANON_KEY', '') or '').strip()
+    read_key = service_key or anon_key
+    write_key = service_key
     table = str(os.getenv('SUPABASE_SNAPSHOT_TABLE', 'offline_snapshots') or 'offline_snapshots').strip()
     row_id = str(os.getenv('SUPABASE_SNAPSHOT_ROW_ID', 'main') or 'main').strip()
-    enabled = bool(url and key and table and row_id)
+    enabled_read = bool(url and read_key and table and row_id)
+    enabled_write = bool(url and write_key and table and row_id)
     return {
-        'enabled': enabled,
+        'enabled_read': enabled_read,
+        'enabled_write': enabled_write,
         'url': url,
-        'key': key,
+        'read_key': read_key,
+        'write_key': write_key,
         'table': table,
         'row_id': row_id,
     }
 
 
-def _supabase_headers(cfg, for_write=False):
+def _supabase_headers(cfg, key_name='read_key', for_write=False):
+    key = cfg.get(key_name, '')
     headers = {
-        'apikey': cfg.get('key', ''),
-        'Authorization': f"Bearer {cfg.get('key', '')}",
+        'apikey': key,
+        'Authorization': f"Bearer {key}",
     }
     if for_write:
         headers['Content-Type'] = 'application/json'
@@ -257,29 +265,29 @@ def _supabase_headers(cfg, for_write=False):
 
 def _supabase_fetch_snapshot(timeout_sec=12):
     cfg = _supabase_snapshot_config()
-    if not cfg.get('enabled'):
+    if not cfg.get('enabled_read'):
         return None, 'not-configured'
     endpoint = f"{cfg['url']}/rest/v1/{cfg['table']}"
     try:
-        resp = requests.get(
-            endpoint,
-            headers=_supabase_headers(cfg, for_write=False),
-            params={
-                'select': 'data,updated_at,source',
-                'id': f"eq.{cfg['row_id']}",
-                'limit': 1
-            },
-            timeout=timeout_sec
+        params = urllib.parse.urlencode({
+            'select': 'data,updated_at,source',
+            'id': f"eq.{cfg['row_id']}",
+            'limit': 1
+        })
+        req = urllib.request.Request(
+            f"{endpoint}?{params}",
+            headers=_supabase_headers(cfg, key_name='read_key', for_write=False),
+            method='GET'
         )
-        if resp.status_code >= 400:
-            current_app.logger.warning('Supabase fetch snapshot failed: %s %s', resp.status_code, resp.text[:240])
-            return None, 'error'
-        rows = resp.json() if resp.content else []
+        with urllib.request.urlopen(req, timeout=timeout_sec) as resp:
+            raw = resp.read()
+        rows = json.loads(raw.decode('utf-8', errors='replace')) if raw else []
         if not isinstance(rows, list) or not rows:
             return None, 'empty'
         row = rows[0] if isinstance(rows[0], dict) else {}
         data = row.get('data')
         if isinstance(data, dict):
+            data.pop('fee_records', None)
             return data, 'supabase'
     except Exception as exc:
         current_app.logger.warning('Supabase fetch snapshot exception: %s', exc)
@@ -288,12 +296,16 @@ def _supabase_fetch_snapshot(timeout_sec=12):
 
 def _supabase_push_snapshot(payload, reason='snapshot_save', timeout_sec=15):
     cfg = _supabase_snapshot_config()
-    if not cfg.get('enabled'):
+    if not cfg.get('enabled_write'):
         return False
     if not isinstance(payload, dict):
         return False
 
-    stamp = str(payload.get('server_updated_at') or payload.get('updated_at') or '').strip()
+    # Exclude fees module data from Supabase mirror by requirement.
+    mirror_payload = dict(payload)
+    mirror_payload.pop('fee_records', None)
+
+    stamp = str(mirror_payload.get('server_updated_at') or mirror_payload.get('updated_at') or '').strip()
     global _supabase_last_pushed_stamp
     with _supabase_push_lock:
         if stamp and stamp == _supabase_last_pushed_stamp:
@@ -302,21 +314,20 @@ def _supabase_push_snapshot(payload, reason='snapshot_save', timeout_sec=15):
     endpoint = f"{cfg['url']}/rest/v1/{cfg['table']}"
     body = [{
         'id': cfg['row_id'],
-        'data': payload,
+        'data': mirror_payload,
         'source': str(reason or 'snapshot_save')[:80],
         'updated_at': _server_now_iso(),
     }]
     try:
-        resp = requests.post(
-            endpoint,
-            headers=_supabase_headers(cfg, for_write=True),
-            params={'on_conflict': 'id'},
-            json=body,
-            timeout=timeout_sec
+        params = urllib.parse.urlencode({'on_conflict': 'id'})
+        req = urllib.request.Request(
+            f"{endpoint}?{params}",
+            data=json.dumps(body).encode('utf-8'),
+            headers=_supabase_headers(cfg, key_name='write_key', for_write=True),
+            method='POST'
         )
-        if resp.status_code >= 400:
-            current_app.logger.warning('Supabase push snapshot failed: %s %s', resp.status_code, resp.text[:240])
-            return False
+        with urllib.request.urlopen(req, timeout=timeout_sec):
+            pass
         if stamp:
             with _supabase_push_lock:
                 _supabase_last_pushed_stamp = stamp
@@ -328,7 +339,7 @@ def _supabase_push_snapshot(payload, reason='snapshot_save', timeout_sec=15):
 
 def _supabase_push_snapshot_async(payload, reason='snapshot_save'):
     cfg = _supabase_snapshot_config()
-    if not cfg.get('enabled'):
+    if not cfg.get('enabled_write'):
         return
     threading.Thread(
         target=_supabase_push_snapshot,
@@ -4409,7 +4420,8 @@ def scoreboard_session():
         'login_id': current_user.login_id,
         'role': role,
         'server_timezone': _get_server_timezone(),
-        'server_time': _server_now_iso()
+        'server_time': _server_now_iso(),
+        'fees_enabled': _fees_module_enabled(),
     }
 
     # For students, add their roll number to enable personalized filtering
