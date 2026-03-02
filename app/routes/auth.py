@@ -50,6 +50,8 @@ def _ensure_auth_schema_and_defaults():
                 )
             """))
             for stmt in (
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS login_id VARCHAR(50)",
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash VARCHAR(255)",
                 "ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(20) NOT NULL DEFAULT 'student'",
                 "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE",
                 "ALTER TABLE users ADD COLUMN IF NOT EXISTS first_login BOOLEAN DEFAULT TRUE",
@@ -65,15 +67,27 @@ def _ensure_auth_schema_and_defaults():
                 ('Teacher', 'teacher', os.getenv('TEACHER_PASSWORD', 'ChangeTeacherPass123!')),
             ):
                 pw_hash = generate_password_hash(password)
-                conn.execute(
-                    text("""
-                        INSERT INTO users (login_id, password_hash, role, is_active, first_login, created_at, password_changed_at)
-                        VALUES (:login_id, :password_hash, :role, TRUE, FALSE, NOW(), NOW())
-                        ON CONFLICT (login_id)
-                        DO UPDATE SET role = EXCLUDED.role, is_active = TRUE
-                    """),
-                    {'login_id': login_id, 'password_hash': pw_hash, 'role': role}
-                )
+                row = conn.execute(
+                    text("SELECT id FROM users WHERE login_id = :login_id LIMIT 1"),
+                    {'login_id': login_id}
+                ).fetchone()
+                if row:
+                    conn.execute(
+                        text("""
+                            UPDATE users
+                            SET role = :role, is_active = TRUE
+                            WHERE login_id = :login_id
+                        """),
+                        {'login_id': login_id, 'role': role}
+                    )
+                else:
+                    conn.execute(
+                        text("""
+                            INSERT INTO users (login_id, password_hash, role, is_active, first_login, created_at, password_changed_at)
+                            VALUES (:login_id, :password_hash, :role, TRUE, FALSE, NOW(), NOW())
+                        """),
+                        {'login_id': login_id, 'password_hash': pw_hash, 'role': role}
+                    )
         else:
             conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS users (
