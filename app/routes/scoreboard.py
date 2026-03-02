@@ -17,7 +17,6 @@ from app.utils.syllabus_helpers import merge_syllabus_catalog_superset, merge_sy
 from datetime import datetime, date, timedelta, timezone
 from dateutil.relativedelta import relativedelta
 import calendar
-import openpyxl
 from werkzeug.utils import secure_filename
 import os
 import json
@@ -5940,7 +5939,8 @@ def import_excel():
             file.save(temp_path)
 
             # Load workbook with security settings (read_only to prevent formula execution)
-            wb = openpyxl.load_workbook(temp_path, data_only=True, read_only=False, keep_vba=False)
+            import openpyxl
+            wb = openpyxl.load_workbook(temp_path, data_only=True, read_only=True, keep_vba=False)
         except Exception as e:
             # Security: Always cleanup temp file on error
             if os.path.exists(temp_path):
@@ -6390,7 +6390,8 @@ def import_historical_data():
 
         try:
             file.save(temp_path)
-            wb = openpyxl.load_workbook(temp_path, data_only=True, read_only=False, keep_vba=False)
+            import openpyxl
+            wb = openpyxl.load_workbook(temp_path, data_only=True, read_only=True, keep_vba=False)
         except Exception as e:
             if temp_path and os.path.exists(temp_path):
                 try:
@@ -6810,7 +6811,8 @@ def import_latest_roster():
 
         try:
             file.save(temp_path)
-            wb = openpyxl.load_workbook(temp_path, data_only=True, read_only=False, keep_vba=False)
+            import openpyxl
+            wb = openpyxl.load_workbook(temp_path, data_only=True, read_only=True, keep_vba=False)
         except Exception as e:
             if os.path.exists(temp_path):
                 try:
