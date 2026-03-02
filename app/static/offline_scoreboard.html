@@ -21616,6 +21616,20 @@
             return addMonths(record.start_date, months) || '';
         }
 
+        function buildFeeSettlementUpdate(record, paidDate, amount, paymentHistory) {
+            const effectiveStart = getEffectiveFeeStartDate(record);
+            const dueDate = computeFeeDueDate({ ...record, start_date: effectiveStart });
+            // Cycle anchor must advance to due date, never to paid date.
+            const nextStart = dueDate || effectiveStart;
+            return {
+                amount: amount || null,
+                last_paid_date: paidDate || '',
+                payment_history: Array.isArray(paymentHistory) ? paymentHistory : [],
+                pending_amount: amount || null,
+                start_date: nextStart
+            };
+        }
+
         function isFeeOverdue(record) {
             const due = computeFeeDueDate(record);
             if (!due) return false;
@@ -21700,22 +21714,21 @@
             const amount = Number.isFinite(Number(record.amount)) ? Number(record.amount) : fallbackAmount;
             const effectiveStart = getEffectiveFeeStartDate(record);
             const dueDate = computeFeeDueDate({ ...record, start_date: effectiveStart });
+            const isEarlyPayment = !!dueDate && today < dueDate;
             const history = Array.isArray(record.payment_history) ? record.payment_history : [];
-            history.push({ date: today, amount });
-            const saved = saveFeeRecord(studentId, {
-                amount: amount || null,
-                last_paid_date: today,
-                payment_history: history,
-                pending_amount: amount || null,
-                start_date: dueDate || effectiveStart
+            history.push({
+                date: today,
+                amount,
+                note: isEarlyPayment ? `early_payment_before_due:${dueDate}` : 'regular_payment'
             });
+            const saved = saveFeeRecord(studentId, buildFeeSettlementUpdate(record, today, amount, history));
             if (!saved) {
                 showAlert('Unable to save fee update locally. Please run Master Update and retry.', 'warning');
                 return;
             }
             await syncFeeChangeNow();
             loadFeesTab();
-            showAlert('Fees marked as paid', 'success');
+            showAlert(isEarlyPayment ? `Fees recorded as early payment (before due ${formatDateLabel(dueDate)})` : 'Fees marked as paid', 'success');
         }
 
         async function markFeePartialPaid(studentId) {
@@ -21738,14 +21751,8 @@
             history.push({ date: new Date().toISOString().split('T')[0], amount: paid });
             let saved = false;
             if (remaining <= 0) {
-                const effectiveStart = getEffectiveFeeStartDate(record);
-                saved = saveFeeRecord(studentId, {
-                    amount: baseAmount || null,
-                    last_paid_date: new Date().toISOString().split('T')[0],
-                    payment_history: history,
-                    pending_amount: baseAmount || null,
-                    start_date: computeFeeDueDate({ ...record, start_date: effectiveStart }) || effectiveStart
-                });
+                const paidDate = new Date().toISOString().split('T')[0];
+                saved = saveFeeRecord(studentId, buildFeeSettlementUpdate(record, paidDate, baseAmount, history));
                 if (saved) showAlert('Full payment recorded', 'success');
             } else {
                 saved = saveFeeRecord(studentId, {
