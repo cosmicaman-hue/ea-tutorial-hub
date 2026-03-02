@@ -4847,6 +4847,7 @@ def admin_control_panel_data():
 
 
 @points_bp.route('/admin/join-code', methods=['POST'])
+@csrf.exempt  # JSON API endpoint secured by @login_required + admin role check
 @login_required
 def admin_rotate_join_code():
     if str(current_user.role or '').strip().lower() != 'admin':
@@ -4882,6 +4883,7 @@ def admin_rotate_join_code():
 
 
 @points_bp.route('/admin/account-action', methods=['POST'])
+@csrf.exempt  # JSON API endpoint secured by @login_required + admin role check
 @login_required
 def admin_account_action():
     if str(current_user.role or '').strip().lower() != 'admin':
@@ -4923,6 +4925,7 @@ def admin_account_action():
 
 
 @points_bp.route('/admin/access-window', methods=['POST'])
+@csrf.exempt  # JSON API endpoint secured by @login_required + admin role check
 @login_required
 def admin_set_access_window():
     if str(current_user.role or '').strip().lower() != 'admin':
@@ -4958,6 +4961,7 @@ def admin_set_access_window():
 
 
 @points_bp.route('/student-transfers', methods=['GET', 'POST'])
+@csrf.exempt  # JSON API endpoint secured by @login_required + student role check
 @login_required
 def student_transfers():
     if str(current_user.role or '').strip().lower() != 'student':
