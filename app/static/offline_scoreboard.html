@@ -3209,6 +3209,24 @@
             <span id="syncStatus" class="sync-pill offline">Offline</span>
             <span id="roleBadge" class="sync-pill">Role: -</span>
             <span id="lastSyncTime" class="sync-meta" style="flex:1;min-width:120px">Last sync: -</span>
+            <a id="globalPublicBtn" class="secondary" data-allow="true"
+                href="/scoreboard/public"
+                style="padding:5px 12px;font-size:12px;text-decoration:none;display:inline-flex;align-items:center;gap:6px;"
+                title="Open public scoreboard page">
+                <i class="fas fa-globe"></i> Public
+            </a>
+            <a id="globalLoginBtn" class="secondary" data-allow="true"
+                href="/auth/login"
+                style="padding:5px 12px;font-size:12px;text-decoration:none;display:none;align-items:center;gap:6px;"
+                title="Go to login page">
+                <i class="fas fa-sign-in-alt"></i> Login
+            </a>
+            <button id="globalLogoutBtn" class="secondary" data-allow="true"
+                onclick="performLogout()"
+                style="padding:5px 12px;font-size:12px;display:none"
+                title="Logout from this device">
+                <i class="fas fa-sign-out-alt"></i> Logout
+            </button>
             <button id="globalPublishBtn" class="secondary" data-allow="true"
                 onclick="forcePublishNow()"
                 style="padding:5px 12px;font-size:12px;display:none"
@@ -6286,6 +6304,7 @@
         let currentUserRole = 'student';
         let currentLoginId = '';
         let currentStudentRoll = '';
+        let hasServerSession = false;
         let feesModuleEnabled = true;
         let currentStudentPositions = {};  // populated after session loads for students
         let isSelfProfileEditMode = false;
@@ -10614,6 +10633,7 @@
             // Force Publish button — admin only
             const publishBtn = document.getElementById('globalPublishBtn');
             if (publishBtn) publishBtn.style.display = (SERVER_SYNC.enabled && isAdmin) ? '' : 'none';
+            updateAuthButtons();
 
             const isStudent = !isAdmin && !isTeacher;
             setTabVisibility('my-dashboard', isStudent);
@@ -10736,6 +10756,8 @@
             if (!SERVER_SYNC.enabled) {
                 // Offline: try to restore last known profile from this browser
                 restoreProfileFromLocal();
+                hasServerSession = false;
+                updateAuthButtons();
                 return false;
             }
             const attempts = Math.max(1, parseInt(maxAttempts, 10) || 1);
@@ -10752,6 +10774,8 @@
                     currentStudentRoll = session.student_roll || '';
                     serverTimezone = session.server_timezone || serverTimezone;
                     feesModuleEnabled = session.fees_enabled !== false;
+                    hasServerSession = true;
+                    updateAuthButtons();
                     // Remember this profile for future visits from this browser
                     saveProfileToLocal(currentUserRole, currentLoginId, currentStudentRoll);
                     return true;
@@ -10767,7 +10791,21 @@
             if (restored) {
                 console.log(`Session unavailable. Restored profile: ${currentUserRole} (${currentLoginId})`);
             }
+            hasServerSession = false;
+            updateAuthButtons();
             return false;
+        }
+
+        function updateAuthButtons() {
+            const loginBtn = document.getElementById('globalLoginBtn');
+            const logoutBtn = document.getElementById('globalLogoutBtn');
+            if (loginBtn) loginBtn.style.display = hasServerSession ? 'none' : 'inline-flex';
+            if (logoutBtn) logoutBtn.style.display = hasServerSession ? '' : 'none';
+        }
+
+        function performLogout() {
+            clearUserDataOnLogout();
+            window.location.href = '/auth/logout?next=login';
         }
 
         function updateSyncStatus(state, message) {
@@ -12294,7 +12332,21 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ data: db.getData(), peers: baseUrls })
                 }), 120000);
-                const payload = await resp.json();
+                const contentType = String(resp.headers.get('content-type') || '').toLowerCase();
+                if (resp.status === 401 || resp.status === 403 || contentType.includes('text/html')) {
+                    hasServerSession = false;
+                    updateAuthButtons();
+                    showAlert('You have been logged out. Please log-in again to use features or view Public page.', 'warning');
+                    setTimeout(() => { window.location.href = '/auth/login'; }, 500);
+                    return;
+                }
+                let payload = {};
+                try {
+                    payload = await resp.json();
+                } catch (jsonErr) {
+                    const shortBody = await resp.text().catch(() => '');
+                    throw new Error(`non-JSON server response (${resp.status}) ${shortBody.slice(0, 120)}`);
+                }
                 if (!resp.ok || !payload.success) {
                     throw new Error(payload.error || 'publish failed');
                 }
@@ -26319,6 +26371,7 @@
             populateServerEndpointInputs();
             refreshServerHealth();
             refreshSupabaseHealth();
+            updateAuthButtons();
             setInterval(() => {
                 if (document.hidden) return;
                 if (getActiveTabName() !== 'tools') return;

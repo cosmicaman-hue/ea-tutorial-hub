@@ -637,5 +637,8 @@ def logout():
     logout_user()
     # Clear server-side session data
     session.clear()
-    flash('You have been logged out', 'success')
+    next_target = str(request.args.get('next', 'login') or 'login').strip().lower()
+    flash('You have been logged out. Please log-in again to use features.', 'success')
+    if next_target == 'public':
+        return redirect(url_for('points.public_scoreboard'))
     return redirect(url_for('auth.login'))

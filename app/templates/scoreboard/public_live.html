@@ -87,7 +87,7 @@
         <div class="head">
             <h1>Excel Academy Live Scoreboard</h1>
             <span class="pill">Public View</span>
-            <a href="/login" class="pill" style="text-decoration:none;">Login</a>
+            <a href="/auth/login" class="pill" style="text-decoration:none;">Login</a>
         </div>
         <div class="controls">
             <label for="monthSel" class="meta">Month</label>
@@ -144,8 +144,14 @@
                 if (d.length >= 7) set.add(d.slice(0, 7));
             });
             const out = Array.from(set).filter(v => /^\d{4}-\d{2}$/.test(v));
-            out.sort((a, b) => b.localeCompare(a));
-            return out;
+            const now = new Date();
+            const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+            const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+            const prevMonth = `${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, '0')}`;
+            const allowed = new Set([currentMonth, prevMonth]);
+            const filtered = out.filter(v => allowed.has(v));
+            filtered.sort((a, b) => b.localeCompare(a));
+            return filtered;
         }
 
         function rollKey(v) {
