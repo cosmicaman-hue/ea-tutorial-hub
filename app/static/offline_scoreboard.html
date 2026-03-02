@@ -3176,6 +3176,9 @@
             <button class="tab-button" id="notificationsTabButton" onclick="switchTab('notifications')" style="--tab-icon: #f43f5e;">
                 <i class="fas fa-bell"></i> Notifications
             </button>
+            <button class="tab-button" id="proposalsTabButton" onclick="switchTab('proposals')" style="--tab-icon: #14b8a6;">
+                <i class="fas fa-comments"></i> Proposals
+            </button>
             <button class="tab-button" id="activityLogTabButton" onclick="switchTab('activity-log')" style="--tab-icon: #f59e0b;">
                 <i class="fas fa-clipboard-list"></i> Activity Log
             </button>
@@ -3425,6 +3428,7 @@
                     <button class="secondary" onclick="clearScoreForm()">Clear</button>
                     <button class="danger" onclick="deleteScore()">Delete Score</button>
                     <button onclick="saveScore()">Save Score</button>
+                    <button class="secondary" onclick="applyLeaderAdjustment()"><i class="fas fa-shield-alt"></i> Leader/CoL Relief</button>
                 </div>
                 <div id="starTransferModule" style="margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--border);">
                     <h4 style="margin-bottom: 8px;"><i class="fas fa-exchange-alt"></i> Star Transfer</h4>
@@ -5051,6 +5055,80 @@
             </div>
         </div>
 
+        <!-- TAB: PROPOSALS -->
+        <div id="proposals-tab" class="tab-content hidden">
+            <div class="form-card">
+                <h3><i class="fas fa-comments"></i> Proposals & Mandate</h3>
+                <p class="section-subtitle">Admin/Teacher can publish proposals. Stakeholders can vote and discuss in proposal-specific chat.</p>
+                <div id="proposalCreatePanel" style="display:none;margin-bottom:12px;border:1px solid var(--border-color);border-radius:10px;padding:10px;">
+                    <div class="form-grid">
+                        <div class="form-group" style="grid-column: span 2;">
+                            <label>Title</label>
+                            <input id="proposalTitle" type="text" maxlength="200" placeholder="Proposal title">
+                        </div>
+                        <div class="form-group" style="grid-column: span 2;">
+                            <label>Body</label>
+                            <textarea id="proposalBody" rows="3" maxlength="4000" placeholder="Proposal details"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Scope</label>
+                            <select id="proposalScope">
+                                <option value="student_council">Student Council</option>
+                                <option value="all_students">All Students</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-buttons">
+                        <button onclick="createProposal()" data-allow="true"><i class="fas fa-plus-circle"></i> Publish Proposal</button>
+                    </div>
+                </div>
+
+                <div class="scoreboard-wrapper">
+                    <div class="scoreboard-scroll">
+                        <table class="scoreboard">
+                            <thead>
+                                <tr>
+                                    <th style="width: 220px;">Title</th>
+                                    <th style="width: 110px;">Scope</th>
+                                    <th style="width: 140px;">By</th>
+                                    <th style="width: 150px;">Votes</th>
+                                    <th style="width: 130px;">Status</th>
+                                    <th style="width: 140px;">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="proposalBodyRows">
+                                <tr><td colspan="6" class="text-center loading">Loading...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div id="proposalDetailCard" class="form-card" style="margin-top:12px;display:none;">
+                    <h4 id="proposalDetailTitle">Proposal</h4>
+                    <p id="proposalDetailMeta" class="section-subtitle">-</p>
+                    <p id="proposalDetailBody">-</p>
+                    <div class="form-buttons" id="proposalVoteButtons" style="margin-bottom:8px;">
+                        <button class="secondary" onclick="voteProposal('support')" data-allow="true"><i class="fas fa-thumbs-up"></i> Support</button>
+                        <button class="secondary" onclick="voteProposal('oppose')" data-allow="true"><i class="fas fa-thumbs-down"></i> Oppose</button>
+                        <button class="secondary" onclick="voteProposal('abstain')" data-allow="true"><i class="fas fa-minus-circle"></i> Abstain</button>
+                    </div>
+                    <div style="border:1px solid var(--border-color);border-radius:10px;padding:8px;">
+                        <h5 style="margin:0 0 8px 0;"><i class="fas fa-comments"></i> Stakeholder Chat</h5>
+                        <div id="proposalChatMessages" style="max-height:220px;overflow-y:auto;display:grid;gap:6px;"></div>
+                        <div class="form-grid" style="margin-top:8px;">
+                            <div class="form-group" style="grid-column: span 2;">
+                                <input id="proposalChatInput" type="text" maxlength="2000" placeholder="Type a message...">
+                            </div>
+                        </div>
+                        <div class="form-buttons">
+                            <button class="secondary" onclick="sendProposalMessage()" data-allow="true"><i class="fas fa-paper-plane"></i> Send</button>
+                            <button class="secondary" onclick="loadProposalMessages()" data-allow="true"><i class="fas fa-sync-alt"></i> Refresh Chat</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- TAB: ACTIVITY LOG -->
         <div id="activity-log-tab" class="tab-content hidden">
             <div class="form-card">
@@ -6067,6 +6145,8 @@
         let lastNotificationArchiveDigest = '';
         let _notifFilter = 'all';
         let _notifSelectedIdx = -1;
+        let _proposalCache = [];
+        let _activeProposalId = 0;
         const SYLLABUS_SEED_VERSION = '2026-02-20.v1';
         const SYLLABUS_BOARDS = ['CBSE', 'ICSE', 'WBBSE'];
         const SYLLABUS_CLASSES = ['3', '4', '5', '6', '7', '8', '9', '10', '11', '12'];
@@ -8045,6 +8125,10 @@
                     post_holder_history: [],
                     notification_history: [],
                     activity_log: [],
+                    proposals: [],
+                    proposal_votes: [],
+                    proposal_messages: [],
+                    score_adjustment_actions: [],
                     updated_at: null
                 };
             }
@@ -8100,6 +8184,10 @@
                 if (!data.post_holder_history) data.post_holder_history = [];
                 if (!data.notification_history) data.notification_history = [];
                 if (!data.activity_log) data.activity_log = [];
+                if (!data.proposals) data.proposals = [];
+                if (!data.proposal_votes) data.proposal_votes = [];
+                if (!data.proposal_messages) data.proposal_messages = [];
+                if (!data.score_adjustment_actions) data.score_adjustment_actions = [];
                 data.students = (data.students || [])
                     .map(student => normalizeStudentMeta(student))
                     .filter(student => isValidRollNo(student.roll) && isValidStudentName(student.base_name || student.name));
@@ -9586,6 +9674,7 @@
             else if (tabName === 'teacher-voting')   _safeRender(loadTeacherVotingTab, 'teacher-voting');
             else if (tabName === 'appeals')          _safeRender(loadAppealsTab, 'appeals');
             else if (tabName === 'notifications')    _safeRender(loadNotificationsTab, 'notifications');
+            else if (tabName === 'proposals')        _safeRender(loadProposalsTab, 'proposals');
             else if (tabName === 'activity-log')     _safeRender(loadActivityLogTab, 'activity-log');
             else if (tabName === 'profile')          _safeRender(loadProfileTab, 'profile');
             else if (tabName === 'homework')         _safeRender(loadHomeworkTab, 'homework');
@@ -9715,6 +9804,7 @@
                 else if (tabName === 'voting') loadVotingTab();
                 else if (tabName === 'appeals') loadAppealsTab();
                 else if (tabName === 'notifications') loadNotificationsTab();
+                else if (tabName === 'proposals') loadProposalsTab();
                 else if (tabName === 'activity-log') loadActivityLogTab();
                 else if (tabName === 'attendance') refreshAttendanceTabFromSync();
                 else if (tabName === 'profile') loadProfileTab();
@@ -10224,6 +10314,7 @@
             if (tabName === 'cr') return isAdmin || isTeacher;
             if (tabName === 'appeals') return true;
             if (tabName === 'notifications') return isAdmin || isTeacher;
+            if (tabName === 'proposals') return true;
             if (tabName === 'activity-log') return isAdmin;
             if (tabName === 'attendance') return true;
             if (tabName === 'syllabus') return true;
@@ -10271,6 +10362,7 @@
             setTabVisibility('voting', isAdmin);
             setTabVisibility('appeals', true);
             setTabVisibility('notifications', isAdmin || isTeacher);
+            setTabVisibility('proposals', true);
             setTabVisibility('activity-log', isAdmin);
             setTabVisibility('attendance', isAdmin || isTeacher);
             setTabVisibility('good-conduct', isAdmin || isTeacher);
@@ -14531,6 +14623,38 @@
             }
         }
 
+        async function applyLeaderAdjustment() {
+            if (currentUserRole !== 'student') {
+                showAlert('Only student post-holders can use this action.', 'warning');
+                return;
+            }
+            const studentId = parseInt(document.getElementById('scoreStudent').value, 10) || 0;
+            const date = String(document.getElementById('scoreDate').value || '').trim();
+            if (!studentId || !date) {
+                showAlert('Select student and date first.', 'warning');
+                return;
+            }
+            const reason = String(document.getElementById('scoreNotes').value || '').trim();
+            try {
+                const resp = await fetch('/scoreboard/leader-adjust-score', {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ student_id: studentId, date, reason })
+                });
+                const payload = await resp.json();
+                if (!resp.ok || !payload.success) {
+                    throw new Error(payload.error || 'Adjustment failed');
+                }
+                await pullFromServer(false, true);
+                loadScoreboard();
+                loadRecordStudentTable();
+                showAlert(`Applied ${payload.mode === 'leader_zero' ? 'Leader neutralization' : 'Co-Leader relief'} successfully.`, 'success');
+            } catch (e) {
+                showAlert(`Relief failed: ${String(e.message || e)}`, 'danger');
+            }
+        }
+
         function loadExistingScore() {
             const studentId = parseInt(document.getElementById('scoreStudent').value);
             const date = document.getElementById('scoreDate').value;
@@ -17938,6 +18062,203 @@
                 loadNotificationsTab();
             }
             showAlert('Notifications refreshed.', 'success');
+        }
+
+        function _normalizeProposalScope(scope) {
+            const s = String(scope || '').trim().toLowerCase();
+            return s === 'all_students' ? 'all_students' : 'student_council';
+        }
+
+        function _currentStudentIdFromLogin() {
+            if (!currentLoginId || !String(currentLoginId).toUpperCase().startsWith('EA')) return 0;
+            const roll = normalizeRoll(currentLoginId);
+            const student = (db.getData().students || []).find(s => normalizeRoll(s.roll) === roll);
+            return student ? (parseInt(student.id, 10) || 0) : 0;
+        }
+
+        function _isCouncilMemberStudent(studentId) {
+            const sid = parseInt(studentId, 10) || 0;
+            if (sid <= 0) return false;
+            const data = db.getData() || {};
+            const isActive = s => normalizePostHolderStatus(s || 'active') === 'active';
+            if ((data.leadership || []).some(p => (parseInt(p.studentId, 10) || 0) === sid && isActive(p.status))) return true;
+            if ((data.class_reps || []).some(p => (parseInt(p.studentId, 10) || 0) === sid && isActive(p.status))) return true;
+            if ((data.group_crs || []).some(p => (parseInt(p.studentId, 10) || 0) === sid && isActive(p.status))) return true;
+            for (const party of (data.parties || [])) {
+                for (const member of (party.members || [])) {
+                    if ((parseInt(member.studentId, 10) || 0) === sid && isActive(member.status)) return true;
+                }
+            }
+            return false;
+        }
+
+        function _canCurrentUserAccessProposal(proposal) {
+            if (!proposal || typeof proposal !== 'object') return false;
+            if (currentUserRole === 'admin' || currentUserRole === 'teacher') return true;
+            if (currentUserRole !== 'student') return false;
+            const scope = _normalizeProposalScope(proposal.scope);
+            if (scope === 'all_students') return true;
+            return _isCouncilMemberStudent(_currentStudentIdFromLogin());
+        }
+
+        function loadProposalsTab() {
+            const data = db.getData() || {};
+            _proposalCache = (data.proposals || []).slice().sort((a, b) => parseSyncStamp(b.created_at) - parseSyncStamp(a.created_at));
+            const createPanel = document.getElementById('proposalCreatePanel');
+            if (createPanel) createPanel.style.display = (currentUserRole === 'admin' || currentUserRole === 'teacher') ? '' : 'none';
+            const tbody = document.getElementById('proposalBodyRows');
+            if (!tbody) return;
+            const visible = _proposalCache.filter(_canCurrentUserAccessProposal);
+            if (!visible.length) {
+                tbody.innerHTML = '<tr><td colspan="6" class="text-center">No proposals for your role.</td></tr>';
+                const detail = document.getElementById('proposalDetailCard');
+                if (detail) detail.style.display = 'none';
+                return;
+            }
+            tbody.innerHTML = visible.map(p => {
+                const scopeLabel = _normalizeProposalScope(p.scope) === 'all_students' ? 'All Students' : 'Student Council';
+                const vc = p.vote_counts || {};
+                const votes = `${parseInt(vc.support, 10) || 0} / ${parseInt(vc.oppose, 10) || 0} / ${parseInt(vc.abstain, 10) || 0}`;
+                const status = String(p.status || 'open').toLowerCase();
+                return `<tr>
+                    <td>${_esc(p.title || '-')}</td>
+                    <td>${_esc(scopeLabel)}</td>
+                    <td>${_esc(p.created_by || '-')}</td>
+                    <td>${votes}</td>
+                    <td>${_esc(status)}</td>
+                    <td><button class="secondary" onclick="openProposalDetail(${parseInt(p.id, 10) || 0})" data-allow="true">Open</button></td>
+                </tr>`;
+            }).join('');
+        }
+
+        async function refreshProposalsFromServer() {
+            try {
+                const resp = await fetch('/scoreboard/proposals', { credentials: 'include', cache: 'no-store' });
+                const payload = await resp.json();
+                if (!resp.ok || !payload.success) return false;
+                const data = db.getData();
+                data.proposals = payload.proposals || [];
+                db.saveData(data, { system: true, skipSync: true, preserveTimestamp: true, skipBackup: true });
+                return true;
+            } catch (e) {
+                return false;
+            }
+        }
+
+        async function createProposal() {
+            if (!(currentUserRole === 'admin' || currentUserRole === 'teacher')) return;
+            const title = String(document.getElementById('proposalTitle')?.value || '').trim();
+            const body = String(document.getElementById('proposalBody')?.value || '').trim();
+            const scope = _normalizeProposalScope(document.getElementById('proposalScope')?.value || 'student_council');
+            if (!title || !body) {
+                showAlert('Proposal title and body are required.', 'warning');
+                return;
+            }
+            try {
+                const resp = await fetch('/scoreboard/proposals', {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ title, body, scope })
+                });
+                const payload = await resp.json();
+                if (!resp.ok || !payload.success) throw new Error(payload.error || 'Create failed');
+                await pullFromServer(false, true);
+                await refreshProposalsFromServer();
+                showAlert('Proposal published.', 'success');
+                const t = document.getElementById('proposalTitle'); if (t) t.value = '';
+                const b = document.getElementById('proposalBody'); if (b) b.value = '';
+                loadProposalsTab();
+            } catch (e) {
+                showAlert(`Proposal create failed: ${String(e.message || e)}`, 'danger');
+            }
+        }
+
+        function openProposalDetail(id) {
+            _activeProposalId = parseInt(id, 10) || 0;
+            const proposal = (_proposalCache || []).find(p => (parseInt(p.id, 10) || 0) === _activeProposalId);
+            if (!proposal) return;
+            const detail = document.getElementById('proposalDetailCard');
+            if (!detail) return;
+            detail.style.display = '';
+            document.getElementById('proposalDetailTitle').textContent = proposal.title || 'Proposal';
+            document.getElementById('proposalDetailMeta').textContent = `${proposal.created_by || '-'} • ${proposal.scope || '-'} • ${proposal.status || 'open'}`;
+            document.getElementById('proposalDetailBody').textContent = proposal.body || '';
+            const voteButtons = document.getElementById('proposalVoteButtons');
+            if (voteButtons) voteButtons.style.display = _canCurrentUserAccessProposal(proposal) ? '' : 'none';
+            loadProposalMessages();
+        }
+
+        async function voteProposal(choice) {
+            const pid = parseInt(_activeProposalId, 10) || 0;
+            if (!pid) return;
+            const c = String(choice || '').trim().toLowerCase();
+            if (!['support', 'oppose', 'abstain'].includes(c)) return;
+            try {
+                const resp = await fetch(`/scoreboard/proposals/${pid}/vote`, {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ choice: c })
+                });
+                const payload = await resp.json();
+                if (!resp.ok || !payload.success) throw new Error(payload.error || 'Vote failed');
+                await pullFromServer(false, true);
+                await refreshProposalsFromServer();
+                loadProposalsTab();
+                openProposalDetail(pid);
+                showAlert('Vote recorded.', 'success');
+            } catch (e) {
+                showAlert(`Vote failed: ${String(e.message || e)}`, 'danger');
+            }
+        }
+
+        async function loadProposalMessages() {
+            const pid = parseInt(_activeProposalId, 10) || 0;
+            const box = document.getElementById('proposalChatMessages');
+            if (!box) return;
+            if (!pid) {
+                box.innerHTML = '<div class="text-center">Select a proposal.</div>';
+                return;
+            }
+            try {
+                const resp = await fetch(`/scoreboard/proposals/${pid}/messages`, { credentials: 'include', cache: 'no-store' });
+                const payload = await resp.json();
+                if (!resp.ok || !payload.success) throw new Error(payload.error || 'Load failed');
+                const rows = payload.messages || [];
+                box.innerHTML = rows.length
+                    ? rows.map(m => `<div style="padding:6px 8px;border:1px solid var(--border-color);border-radius:8px;">
+                        <div style="font-size:12px;color:var(--text-muted);">${_esc(m.login_id || '-')}${m.role ? ` (${_esc(m.role)})` : ''} • ${_fmtTs(m.created_at || '')}</div>
+                        <div>${_esc(m.message || '')}</div>
+                    </div>`).join('')
+                    : '<div class="text-center">No chat messages yet.</div>';
+                box.scrollTop = box.scrollHeight;
+            } catch (e) {
+                box.innerHTML = `<div class="text-center">${_esc(String(e.message || e))}</div>`;
+            }
+        }
+
+        async function sendProposalMessage() {
+            const pid = parseInt(_activeProposalId, 10) || 0;
+            if (!pid) return;
+            const input = document.getElementById('proposalChatInput');
+            const message = String(input?.value || '').trim();
+            if (!message) return;
+            try {
+                const resp = await fetch(`/scoreboard/proposals/${pid}/messages`, {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message })
+                });
+                const payload = await resp.json();
+                if (!resp.ok || !payload.success) throw new Error(payload.error || 'Send failed');
+                if (input) input.value = '';
+                await pullFromServer(false, true);
+                await loadProposalMessages();
+            } catch (e) {
+                showAlert(`Chat send failed: ${String(e.message || e)}`, 'danger');
+            }
         }
 
         function getActivityLogRows() {

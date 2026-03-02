@@ -1,7 +1,17 @@
 from flask import Blueprint, render_template, request, jsonify, current_app, send_file, after_this_request, Response, stream_with_context
 from flask_login import login_required, current_user
 from app import db, csrf, limiter
-from app.models import User
+from app.models import (
+    User,
+    Proposal,
+    ProposalVote,
+    ProposalMessage,
+    ScoreAdjustmentAction,
+    DeviceSession,
+    AccountAction,
+    JoinCode,
+    UserAccessWindow,
+)
 from app.utils.syllabus_helpers import merge_syllabus_catalog_superset, merge_syllabus_tracking_superset
 from datetime import datetime, date, timedelta, timezone
 from dateutil.relativedelta import relativedelta
@@ -1531,6 +1541,136 @@ def _merge_notification_history(existing_history, incoming_history):
                 merged[key] = dict(item)
 
     return list(merged.values())
+
+
+def _merge_records_superset(existing_rows, incoming_rows, key_fields, ts_fields=('updated_at', 'created_at')):
+    merged = {}
+
+    def _key(item):
+        if not isinstance(item, dict):
+            return ''
+        parts = []
+        for field in key_fields:
+            parts.append(str(item.get(field) or '').strip().lower())
+        return '::'.join(parts)
+
+    def _ts(item):
+        if not isinstance(item, dict):
+            return 0.0
+        stamps = [_parse_sync_stamp(item.get(field)) for field in ts_fields]
+        return max(stamps) if stamps else 0.0
+
+    for source in (existing_rows or []), (incoming_rows or []):
+        for row in source:
+            if not isinstance(row, dict):
+                continue
+            key = _key(row)
+            if not key:
+                continue
+            prev = merged.get(key)
+            if not prev or _ts(row) >= _ts(prev):
+                merged[key] = dict(row)
+
+    return list(merged.values())
+
+
+def _active_leadership_role_for_login(data, login_id):
+    roll = _normalize_roll_value(login_id)
+    if not roll.startswith('EA'):
+        return ''
+    check_date = _parse_date_key(_server_now_iso()) or date.today()
+    for post in data.get('leadership', []) or []:
+        if _normalize_holder_status(post.get('status') or 'active') != 'active':
+            continue
+        tenure_months = _tenure_months_for_assignment('leadership', post.get('post'))
+        extension_months = _parse_int_safe(post.get('tenure_extension_months'), 0)
+        if not _is_assignment_active_by_tenure(post.get('elected_on'), tenure_months, extension_months, check_date):
+            continue
+        post_roll = _normalize_roll_value(post.get('roll'))
+        if post_roll and post_roll == roll:
+            role_type = _leadership_role_type(post.get('post'))
+            if role_type in ('leader', 'co_leader'):
+                return role_type
+    return ''
+
+
+def _get_score_row_for_student_date(data, student_id, date_key):
+    best = None
+    best_stamp = 0.0
+    for row in data.get('scores', []) or []:
+        if not isinstance(row, dict):
+            continue
+        sid = _parse_int_safe(row.get('studentId'), 0)
+        d = str(row.get('date') or '').strip()
+        if sid != student_id or d != date_key:
+            continue
+        stamp = max(
+            _parse_sync_stamp(row.get('updated_at')),
+            _parse_sync_stamp(row.get('created_at')),
+        )
+        if not best or stamp >= best_stamp:
+            best = row
+            best_stamp = stamp
+    return best
+
+
+def _student_id_by_login(data, login_id):
+    roll = _normalize_roll_value(login_id)
+    if not roll.startswith('EA'):
+        return 0
+    for student in data.get('students', []) or []:
+        if _normalize_roll_value(student.get('roll')) == roll:
+            return _parse_int_safe(student.get('id'), 0)
+    return 0
+
+
+def _is_active_assignment(item, source='leadership', check_date=None):
+    if not isinstance(item, dict):
+        return False
+    if _normalize_holder_status(item.get('status') or 'active') != 'active':
+        return False
+    post_name = item.get('post') or ''
+    tenure_months = _tenure_months_for_assignment(source, post_name)
+    extension_months = _parse_int_safe(item.get('tenure_extension_months'), 0)
+    return _is_assignment_active_by_tenure(item.get('elected_on'), tenure_months, extension_months, check_date or date.today())
+
+
+def _is_student_council_member(data, student_id):
+    sid = _parse_int_safe(student_id, 0)
+    if sid <= 0:
+        return False
+    check_date = _parse_date_key(_server_now_iso()) or date.today()
+    for post in data.get('leadership', []) or []:
+        if _parse_int_safe(post.get('studentId'), 0) == sid and _is_active_assignment(post, 'leadership', check_date):
+            return True
+    for post in data.get('class_reps', []) or []:
+        if _parse_int_safe(post.get('studentId'), 0) == sid and _is_active_assignment(post, 'class_rep', check_date):
+            return True
+    for post in data.get('group_crs', []) or []:
+        if _parse_int_safe(post.get('studentId'), 0) == sid and _is_active_assignment(post, 'group_cr', check_date):
+            return True
+    for party in data.get('parties', []) or []:
+        for member in party.get('members', []) or []:
+            if _parse_int_safe(member.get('studentId'), 0) != sid:
+                continue
+            status = str(member.get('status') or 'active').strip().lower()
+            if status not in ('active', ''):
+                continue
+            return True
+    return False
+
+
+def _is_proposal_stakeholder(data, proposal, user):
+    role = str(getattr(user, 'role', '') or '').strip().lower()
+    if role in ('admin', 'teacher'):
+        return True
+    if role != 'student':
+        return False
+    scope = str((proposal or {}).get('scope') or 'student_council').strip().lower()
+    if scope == 'all_students':
+        return True
+    sid = _student_id_by_login(data, getattr(user, 'login_id', ''))
+    return _is_student_council_member(data, sid)
 
 
 def _merge_activity_log_superset(existing_logs, incoming_logs):
@@ -3524,6 +3664,30 @@ def offline_data():
             existing.get('notification_history', []),
             data.get('notification_history', [])
         )
+        data['proposals'] = _merge_records_superset(
+            existing.get('proposals', []),
+            data.get('proposals', []),
+            key_fields=('id',),
+            ts_fields=('updated_at', 'created_at', 'open_at')
+        )
+        data['proposal_votes'] = _merge_records_superset(
+            existing.get('proposal_votes', []),
+            data.get('proposal_votes', []),
+            key_fields=('proposal_id', 'voter_login_id'),
+            ts_fields=('updated_at', 'created_at')
+        )
+        data['proposal_messages'] = _merge_records_superset(
+            existing.get('proposal_messages', []),
+            data.get('proposal_messages', []),
+            key_fields=('id',),
+            ts_fields=('created_at',)
+        )
+        data['score_adjustment_actions'] = _merge_records_superset(
+            existing.get('score_adjustment_actions', []),
+            data.get('score_adjustment_actions', []),
+            key_fields=('id',),
+            ts_fields=('created_at',)
+        )
         data['activity_log'] = _merge_activity_log_superset(
             existing.get('activity_log', []),
             data.get('activity_log', [])
@@ -4141,6 +4305,171 @@ def get_scoreboard_data():
         return jsonify({'success': False, 'error': str(e)}), 400
 
 
+@points_bp.route('/proposals', methods=['GET', 'POST'])
+@login_required
+def proposals_data():
+    data = _load_offline_data() or {}
+    proposals = list(data.get('proposals') or [])
+    votes = list(data.get('proposal_votes') or [])
+    messages = list(data.get('proposal_messages') or [])
+
+    if request.method == 'GET':
+        visible = []
+        for p in proposals:
+            if not isinstance(p, dict):
+                continue
+            if _is_proposal_stakeholder(data, p, current_user):
+                pid = _parse_int_safe(p.get('id'), 0)
+                vote_counts = {'support': 0, 'oppose': 0, 'abstain': 0}
+                for v in votes:
+                    if _parse_int_safe(v.get('proposal_id'), 0) != pid:
+                        continue
+                    ch = str(v.get('choice') or '').strip().lower()
+                    if ch in vote_counts:
+                        vote_counts[ch] += 1
+                msg_count = sum(1 for m in messages if _parse_int_safe(m.get('proposal_id'), 0) == pid)
+                row = dict(p)
+                row['vote_counts'] = vote_counts
+                row['message_count'] = msg_count
+                visible.append(row)
+        visible.sort(key=lambda x: _parse_sync_stamp(x.get('created_at')), reverse=True)
+        return jsonify({'success': True, 'proposals': visible})
+
+    # POST: create proposal (admin/teacher)
+    role = str(current_user.role or '').strip().lower()
+    if role not in ('admin', 'teacher'):
+        return jsonify({'success': False, 'error': 'Only Admin/Teacher can create proposals'}), 403
+    payload = request.get_json(silent=True) or {}
+    title = str(payload.get('title') or '').strip()[:200]
+    body = str(payload.get('body') or '').strip()[:4000]
+    scope = str(payload.get('scope') or 'student_council').strip().lower()
+    if scope not in ('student_council', 'all_students'):
+        scope = 'student_council'
+    if not title or not body:
+        return jsonify({'success': False, 'error': 'title and body are required'}), 400
+
+    now_iso = _server_now_iso()
+    next_id = max([_parse_int_safe(p.get('id'), 0) for p in proposals if isinstance(p, dict)] + [0]) + 1
+    proposal = {
+        'id': next_id,
+        'title': title,
+        'body': body,
+        'scope': scope,
+        'status': 'open',
+        'created_by': str(current_user.login_id or ''),
+        'created_by_role': role,
+        'open_at': now_iso,
+        'created_at': now_iso,
+        'updated_at': now_iso,
+    }
+    proposals.append(proposal)
+    data['proposals'] = proposals
+    _append_activity_log_entries(
+        data,
+        str(current_user.login_id or ''),
+        role,
+        {'proposals': [proposal]},
+        source='proposal-create'
+    )
+    data['server_updated_at'] = now_iso
+    _save_offline_data(data)
+    _broadcast_sync_event(now_iso, source='proposal')
+    _forward_offline_data_to_peers_async(data, [])
+    return jsonify({'success': True, 'proposal': proposal, 'updated_at': now_iso})
+
+
+@points_bp.route('/proposals/<int:proposal_id>/vote', methods=['POST'])
+@login_required
+def proposal_vote(proposal_id):
+    data = _load_offline_data() or {}
+    proposals = list(data.get('proposals') or [])
+    proposal = next((p for p in proposals if _parse_int_safe(p.get('id'), 0) == proposal_id), None)
+    if not proposal:
+        return jsonify({'success': False, 'error': 'Proposal not found'}), 404
+    if str(proposal.get('status') or 'open').strip().lower() != 'open':
+        return jsonify({'success': False, 'error': 'Proposal is closed'}), 409
+    if not _is_proposal_stakeholder(data, proposal, current_user):
+        return jsonify({'success': False, 'error': 'Not a stakeholder for this proposal'}), 403
+
+    payload = request.get_json(silent=True) or {}
+    choice = str(payload.get('choice') or '').strip().lower()
+    if choice not in ('support', 'oppose', 'abstain'):
+        return jsonify({'success': False, 'error': 'Invalid vote choice'}), 400
+
+    votes = list(data.get('proposal_votes') or [])
+    now_iso = _server_now_iso()
+    voter_login = str(current_user.login_id or '').strip()
+    replaced = False
+    for row in votes:
+        if not isinstance(row, dict):
+            continue
+        if _parse_int_safe(row.get('proposal_id'), 0) != proposal_id:
+            continue
+        if str(row.get('voter_login_id') or '').strip() != voter_login:
+            continue
+        row['choice'] = choice
+        row['updated_at'] = now_iso
+        replaced = True
+        break
+    if not replaced:
+        votes.append({
+            'id': int(time.time() * 1000),
+            'proposal_id': proposal_id,
+            'voter_login_id': voter_login,
+            'voter_role': str(current_user.role or ''),
+            'choice': choice,
+            'created_at': now_iso,
+            'updated_at': now_iso,
+        })
+    data['proposal_votes'] = votes
+    data['server_updated_at'] = now_iso
+    _save_offline_data(data)
+    _broadcast_sync_event(now_iso, source='proposal-vote')
+    _forward_offline_data_to_peers_async(data, [])
+    return jsonify({'success': True, 'updated_at': now_iso})
+
+
+@points_bp.route('/proposals/<int:proposal_id>/messages', methods=['GET', 'POST'])
+@login_required
+def proposal_messages(proposal_id):
+    data = _load_offline_data() or {}
+    proposals = list(data.get('proposals') or [])
+    proposal = next((p for p in proposals if _parse_int_safe(p.get('id'), 0) == proposal_id), None)
+    if not proposal:
+        return jsonify({'success': False, 'error': 'Proposal not found'}), 404
+    if not _is_proposal_stakeholder(data, proposal, current_user):
+        return jsonify({'success': False, 'error': 'Not a stakeholder for this proposal'}), 403
+
+    messages = list(data.get('proposal_messages') or [])
+    if request.method == 'GET':
+        rows = [m for m in messages if _parse_int_safe(m.get('proposal_id'), 0) == proposal_id]
+        rows.sort(key=lambda x: _parse_sync_stamp(x.get('created_at')))
+        return jsonify({'success': True, 'messages': rows[-500:]})
+
+    payload = request.get_json(silent=True) or {}
+    text = str(payload.get('message') or '').strip()
+    if not text:
+        return jsonify({'success': False, 'error': 'Message is required'}), 400
+    if len(text) > 2000:
+        return jsonify({'success': False, 'error': 'Message too long'}), 400
+    now_iso = _server_now_iso()
+    msg_row = {
+        'id': int(time.time() * 1000),
+        'proposal_id': proposal_id,
+        'login_id': str(current_user.login_id or ''),
+        'role': str(current_user.role or ''),
+        'message': text,
+        'created_at': now_iso,
+    }
+    messages.append(msg_row)
+    data['proposal_messages'] = messages[-20000:]
+    data['server_updated_at'] = now_iso
+    _save_offline_data(data)
+    _broadcast_sync_event(now_iso, source='proposal-chat')
+    _forward_offline_data_to_peers_async(data, [])
+    return jsonify({'success': True, 'message': msg_row, 'updated_at': now_iso})
+
+
 @points_bp.route('/add-points', methods=['POST'])
 @login_required
 def add_points():
@@ -4243,6 +4572,138 @@ def add_points():
         db.session.rollback()
         current_app.logger.error(f"Error in add_points: {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 400
+
+
+@points_bp.route('/leader-adjust-score', methods=['POST'])
+@login_required
+def leader_adjust_score():
+    """
+    Leader rule:
+    - can neutralize negative score to zero for only 1 student per day (today only).
+    Co-Leader rule:
+    - can reduce a negative score by at most 30 points (today only).
+    """
+    if str(current_user.role or '').strip().lower() != 'student':
+        return jsonify({'success': False, 'error': 'Only student post-holders can use this action'}), 403
+
+    payload = request.get_json(silent=True) or {}
+    student_id = _parse_int_safe(payload.get('student_id'), 0)
+    date_key = str(payload.get('date') or '').strip()
+    reason = str(payload.get('reason') or '').strip()[:300]
+    if student_id <= 0 or not date_key:
+        return jsonify({'success': False, 'error': 'student_id and date are required'}), 400
+
+    today = _parse_date_key(_server_now_iso()) or date.today()
+    target_date = _parse_date_key(date_key)
+    if not target_date or target_date != today:
+        return jsonify({'success': False, 'error': 'Action allowed only for current server date'}), 400
+
+    data = _load_offline_data() or {}
+    role_type = _active_leadership_role_for_login(data, current_user.login_id)
+    if role_type not in ('leader', 'co_leader'):
+        return jsonify({'success': False, 'error': 'Active Leader/Co-Leader role required'}), 403
+
+    score_row = _get_score_row_for_student_date(data, student_id, date_key)
+    if not score_row:
+        return jsonify({'success': False, 'error': 'Score row not found for target student/date'}), 404
+
+    current_points = _parse_int_safe(score_row.get('points'), 0)
+    if current_points >= 0:
+        return jsonify({'success': False, 'error': 'Only negative score can be adjusted'}), 400
+
+    actions = list(data.get('score_adjustment_actions') or [])
+    actor_login = str(current_user.login_id or '').strip()
+    today_str = today.isoformat()
+
+    if role_type == 'leader':
+        # Leader can affect only 1 student/day.
+        prior = [
+            a for a in actions
+            if isinstance(a, dict)
+            and str(a.get('actor_login_id') or '').strip() == actor_login
+            and str(a.get('action_date') or '').strip() == today_str
+            and str(a.get('mode') or '').strip() == 'leader_zero'
+        ]
+        if prior:
+            first_sid = _parse_int_safe(prior[0].get('target_student_id'), 0)
+            if first_sid != student_id:
+                return jsonify({'success': False, 'error': 'Leader can neutralize only one student per day'}), 409
+        delta = abs(current_points)
+        new_points = 0
+        mode = 'leader_zero'
+    else:
+        # Co-Leader can reduce penalty up to 30 points.
+        relief = min(30, abs(current_points))
+        if relief <= 0:
+            return jsonify({'success': False, 'error': 'No reducible penalty found'}), 400
+        delta = relief
+        new_points = current_points + relief
+        if new_points > 0:
+            new_points = 0
+            delta = abs(current_points)
+        mode = 'co_leader_reduce'
+
+    now_iso = _server_now_iso()
+    score_row['points'] = new_points
+    score_row['updated_at'] = now_iso
+    note = str(score_row.get('notes') or '').strip()
+    suffix = (
+        f"[{mode}] {actor_login} adjusted {current_points} -> {new_points}"
+        + (f" | reason: {reason}" if reason else '')
+    )
+    score_row['notes'] = f"{note} | {suffix}" if note else suffix
+
+    action_row = {
+        'id': int(time.time() * 1000),
+        'actor_login_id': actor_login,
+        'actor_user_id': _parse_int_safe(current_user.id, 0),
+        'actor_role': role_type,
+        'target_student_id': student_id,
+        'target_date': date_key,
+        'action_date': today_str,
+        'delta_points': delta,
+        'mode': mode,
+        'reason': reason,
+        'created_at': now_iso,
+    }
+    actions.append(action_row)
+    data['score_adjustment_actions'] = actions[-5000:]
+    _append_activity_log_entries(
+        data,
+        actor_login,
+        role_type,
+        {'scores': [score_row], 'score_adjustment_actions': [action_row]},
+        source='leader-adjust'
+    )
+
+    try:
+        db_action = ScoreAdjustmentAction(
+            actor_user_id=_parse_int_safe(current_user.id, 0),
+            actor_login_id=actor_login,
+            actor_role=role_type,
+            target_student_id=student_id,
+            target_date=target_date,
+            delta_points=delta,
+            mode=mode,
+            reason=reason
+        )
+        db.session.add(db_action)
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+
+    _ensure_score_timestamps(data)
+    data['server_updated_at'] = now_iso
+    _save_offline_data(data)
+    _broadcast_sync_event(data['server_updated_at'], source='leader-adjust')
+    _forward_offline_data_to_peers_async(data, [])
+    return jsonify({
+        'success': True,
+        'mode': mode,
+        'old_points': current_points,
+        'new_points': new_points,
+        'updated_at': data['server_updated_at']
+    })
 
 
 @points_bp.route('/add-student', methods=['POST'])

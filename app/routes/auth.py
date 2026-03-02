@@ -1,14 +1,14 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session, current_app
 from flask_login import login_user, logout_user, current_user, login_required
 from app import db, limiter, make_ephemeral_user
-from app.models import User
+from app.models import User, JoinCode, DeviceSession, AccountAction
 from app.models.user import ActivityLog
 from datetime import datetime
 import json
 import os
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy import inspect, text
-from werkzeug.security import generate_password_hash
+from werkzeug.security import generate_password_hash, check_password_hash
 
 auth_bp = Blueprint('auth', __name__, url_prefix='/auth')
 
@@ -79,6 +79,41 @@ def _ensure_auth_schema_and_defaults():
                     CONSTRAINT fk_activity_logs_user_id FOREIGN KEY (user_id) REFERENCES users(id)
                 )
             """))
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS join_codes (
+                    id SERIAL PRIMARY KEY,
+                    code_hash VARCHAR(255) NOT NULL,
+                    active BOOLEAN NOT NULL DEFAULT TRUE,
+                    expires_at TIMESTAMP NULL,
+                    created_by INTEGER NULL,
+                    created_at TIMESTAMP NOT NULL DEFAULT NOW()
+                )
+            """))
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS device_sessions (
+                    id SERIAL PRIMARY KEY,
+                    user_id INTEGER NULL,
+                    login_id VARCHAR(50) NOT NULL,
+                    role VARCHAR(20) NOT NULL DEFAULT 'student',
+                    device_id VARCHAR(128) NULL,
+                    device_name VARCHAR(120) NULL,
+                    os VARCHAR(80) NULL,
+                    browser VARCHAR(80) NULL,
+                    ip VARCHAR(64) NULL,
+                    last_seen TIMESTAMP NOT NULL DEFAULT NOW(),
+                    status VARCHAR(20) NOT NULL DEFAULT 'online'
+                )
+            """))
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS account_actions (
+                    id SERIAL PRIMARY KEY,
+                    target_user_id INTEGER NOT NULL,
+                    action VARCHAR(20) NOT NULL,
+                    reason TEXT NULL,
+                    by_user_id INTEGER NOT NULL,
+                    created_at TIMESTAMP NOT NULL DEFAULT NOW()
+                )
+            """))
             for stmt in (
                 "ALTER TABLE users ADD COLUMN IF NOT EXISTS login_id VARCHAR(50)",
                 "ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash VARCHAR(255)",
@@ -144,6 +179,41 @@ def _ensure_auth_schema_and_defaults():
                     timestamp DATETIME
                 )
             """))
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS join_codes (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    code_hash TEXT NOT NULL,
+                    active INTEGER NOT NULL DEFAULT 1,
+                    expires_at DATETIME,
+                    created_by INTEGER,
+                    created_at DATETIME
+                )
+            """))
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS device_sessions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER,
+                    login_id TEXT NOT NULL,
+                    role TEXT NOT NULL DEFAULT 'student',
+                    device_id TEXT,
+                    device_name TEXT,
+                    os TEXT,
+                    browser TEXT,
+                    ip TEXT,
+                    last_seen DATETIME,
+                    status TEXT NOT NULL DEFAULT 'online'
+                )
+            """))
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS account_actions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    target_user_id INTEGER NOT NULL,
+                    action TEXT NOT NULL,
+                    reason TEXT,
+                    by_user_id INTEGER NOT NULL,
+                    created_at DATETIME
+                )
+            """))
             inspector = inspect(engine)
             cols = {c.get('name') for c in inspector.get_columns('users')}
             for col, ddl in (
@@ -177,9 +247,127 @@ def _ensure_auth_schema_and_defaults():
     except Exception:
         trans.rollback()
         current_app.logger.exception('Auth schema self-heal failed')
-        raise
     finally:
         conn.close()
+
+
+def _validate_join_code_or_fallback(provided_code):
+    """Validate student join code against DB-backed active codes, with env fallback."""
+    token = str(provided_code or '').strip()
+    now = datetime.utcnow()
+    try:
+        rows = (
+            JoinCode.query
+            .filter(JoinCode.active.is_(True))
+            .order_by(JoinCode.created_at.desc(), JoinCode.id.desc())
+            .all()
+        )
+        active_codes = []
+        for row in rows:
+            if row.expires_at and row.expires_at < now:
+                continue
+            active_codes.append(row)
+        if active_codes:
+            if not token:
+                return False
+            for row in active_codes:
+                try:
+                    if check_password_hash(row.code_hash, token):
+                        return True
+                except Exception:
+                    continue
+            return False
+    except Exception:
+        db.session.rollback()
+
+    expected_code = str(os.getenv('EA_JOIN_CODE', '') or '').strip()
+    if expected_code:
+        return bool(token) and token.lower() == expected_code.lower()
+    return True
+
+
+def _latest_account_action(user_id):
+    try:
+        return (
+            AccountAction.query
+            .filter_by(target_user_id=user_id)
+            .order_by(AccountAction.created_at.desc(), AccountAction.id.desc())
+            .first()
+        )
+    except Exception:
+        db.session.rollback()
+        return None
+
+
+def _is_user_blocked(user):
+    if not user:
+        return False
+    if getattr(user, 'is_active', True) is False:
+        return True
+    last_action = _latest_account_action(getattr(user, 'id', None))
+    if not last_action:
+        return False
+    return str(last_action.action or '').strip().lower() in ('hold', 'delete')
+
+
+def _touch_device_session(user):
+    """Best-effort device session upsert; auth flow must never fail because of this."""
+    if not user:
+        return
+    device_id = (request.headers.get('X-EA-Device-ID') or '').strip()[:128]
+    device_name = (request.headers.get('X-EA-Device-Name') or '').strip()[:120]
+    os_name = (request.headers.get('X-EA-Device-OS') or '').strip()[:80]
+    browser = (request.headers.get('X-EA-Device-Browser') or request.user_agent.browser or '').strip()[:80]
+    ip_addr = ((request.headers.get('X-Forwarded-For') or request.remote_addr or '').split(',')[0].strip())[:64]
+    ua_platform = (request.user_agent.platform or '').strip()
+    if not os_name and ua_platform:
+        os_name = ua_platform[:80]
+    if not device_name:
+        device_name = f"{os_name or 'Device'} / {browser or 'Browser'}"
+    try:
+        q = DeviceSession.query.filter_by(user_id=user.id, login_id=user.login_id)
+        if device_id:
+            q = q.filter_by(device_id=device_id)
+        row = q.order_by(DeviceSession.last_seen.desc(), DeviceSession.id.desc()).first()
+        if row is None:
+            row = DeviceSession(
+                user_id=user.id,
+                login_id=user.login_id,
+                role=user.role,
+                device_id=device_id or None,
+            )
+            db.session.add(row)
+        row.role = user.role
+        row.device_id = device_id or row.device_id
+        row.device_name = device_name
+        row.os = os_name
+        row.browser = browser
+        row.ip = ip_addr
+        row.last_seen = datetime.utcnow()
+        row.status = 'online'
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        current_app.logger.exception('Device session upsert failed')
+
+
+def _mark_user_sessions_offline(user):
+    if not user:
+        return
+    try:
+        rows = DeviceSession.query.filter_by(user_id=user.id, login_id=user.login_id).all()
+        now = datetime.utcnow()
+        changed = False
+        for row in rows:
+            if str(row.status or '').lower() != 'offline':
+                row.status = 'offline'
+                row.last_seen = now
+                changed = True
+        if changed:
+            db.session.commit()
+    except Exception:
+        db.session.rollback()
+        current_app.logger.exception('Device session offline mark failed')
 
 
 def _check_password_for_login(user, password):
@@ -308,7 +496,7 @@ def login():
                     db.session.rollback()
 
         if user and login_ok:
-            if getattr(user, 'is_active', True) is False:
+            if _is_user_blocked(user):
                 flash('Your account is disabled. Contact admin.', 'error')
                 log_activity(0, f'Login blocked for {login_id} - account inactive', 'login_failed', 'Account inactive', request.remote_addr)
                 return redirect(url_for('auth.login'))
@@ -330,6 +518,7 @@ def login():
             except SQLAlchemyError:
                 # Do not hard-fail user login because of audit/profile column mismatch on server.
                 db.session.rollback()
+            _touch_device_session(user)
             
             # Log successful login
             log_activity(user.id, f'{user.role.capitalize()} login successful', 'login', f'IP: {request.remote_addr}', request.remote_addr)
@@ -359,10 +548,9 @@ def register():
         return redirect(url_for('points.offline_scoreboard'))
     
     if request.method == 'POST':
-        # Join-code gate — optional but enforced when EA_JOIN_CODE is set
+        # Join-code gate — DB-backed active code check with env fallback.
         join_code = request.form.get('join_code', '').strip()
-        expected_code = os.getenv('EA_JOIN_CODE', '').strip()
-        if expected_code and join_code.lower() != expected_code.lower():
+        if not _validate_join_code_or_fallback(join_code):
             flash('Invalid join code. Please get the correct code from your Admin.', 'danger')
             return render_template('auth/register.html')
 
@@ -445,6 +633,7 @@ def change_password():
 @login_required
 def logout():
     log_activity(current_user.id, f'{current_user.role.capitalize()} logout', 'logout', f'IP: {request.remote_addr}', request.remote_addr)
+    _mark_user_sessions_offline(current_user)
     logout_user()
     # Clear server-side session data
     session.clear()
