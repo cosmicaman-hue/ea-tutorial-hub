@@ -4329,7 +4329,7 @@ def offline_force_publish():
     _save_offline_data(data)
     _broadcast_sync_event(data['server_updated_at'], source='force-publish')
 
-    supabase_ok = _supabase_push_snapshot(data, reason='force_publish', timeout_sec=18)
+    supabase_result = {'status': 'skipped'}
 
     peers = _get_sync_peers() + _normalize_peer_list(request_peers)
     peers = list(dict.fromkeys(peers))
@@ -4342,12 +4342,39 @@ def offline_force_publish():
         peer_body_payload['force_replace'] = True
     peer_body = json.dumps(peer_body_payload).encode('utf-8')
 
-    peer_results = []
+    peer_targets = []
     for peer in peers:
         base = str(peer or '').rstrip('/')
         if not base or (current_origin and base == current_origin):
             continue
+        peer_targets.append(base)
+
+    peer_results = []
+    result_lock = threading.Lock()
+    threads = []
+
+    def _push_supabase_worker():
+        nonlocal supabase_result
+        started = time.time()
+        try:
+            ok = _supabase_push_snapshot(data, reason='force_publish', timeout_sec=10)
+            elapsed_ms = int((time.time() - started) * 1000)
+            supabase_result = {
+                'status': 'ok' if ok else 'failed',
+                'latency_ms': elapsed_ms,
+            }
+        except Exception as exc:
+            elapsed_ms = int((time.time() - started) * 1000)
+            supabase_result = {
+                'status': 'failed',
+                'latency_ms': elapsed_ms,
+                'error': str(exc),
+            }
+
+    def _push_peer_worker(base):
         target_url = f'{base}/scoreboard/offline-data'
+        started = time.time()
+        result = {'base_url': base, 'status': 'failed'}
         try:
             req = urllib.request.Request(
                 target_url,
@@ -4359,7 +4386,7 @@ def offline_force_publish():
                     'X-EA-Sync-Key': shared_key
                 }
             )
-            with urllib.request.urlopen(req, timeout=45) as resp:
+            with urllib.request.urlopen(req, timeout=12) as resp:
                 raw = resp.read()
             updated_at = ''
             try:
@@ -4368,15 +4395,49 @@ def offline_force_publish():
                     updated_at = parsed.get('updated_at') or ''
             except Exception:
                 updated_at = ''
-            peer_results.append({'base_url': base, 'status': 'ok', 'updated_at': updated_at})
+            result['status'] = 'ok'
+            result['updated_at'] = updated_at
         except Exception as exc:
-            peer_results.append({'base_url': base, 'status': 'failed', 'error': str(exc)})
+            result['error'] = str(exc)
+        result['latency_ms'] = int((time.time() - started) * 1000)
+        with result_lock:
+            peer_results.append(result)
 
-    peer_ok = any(item.get('status') == 'ok' for item in peer_results) if peer_results else True
+    supa_thread = threading.Thread(target=_push_supabase_worker, daemon=True)
+    supa_thread.start()
+    threads.append(supa_thread)
+    for base in peer_targets:
+        t = threading.Thread(target=_push_peer_worker, args=(base,), daemon=True)
+        t.start()
+        threads.append(t)
+
+    deadline = time.time() + 16.0
+    for t in threads:
+        remaining = deadline - time.time()
+        if remaining <= 0:
+            break
+        t.join(timeout=remaining)
+
+    for t in threads:
+        if t.is_alive():
+            if t is supa_thread:
+                supabase_result = {'status': 'timeout', 'error': 'Timed out'}
+            else:
+                # Best-effort: workers append own results; on timeout add synthetic entry.
+                pass
+
+    seen_bases = {str(item.get('base_url') or '').rstrip('/') for item in peer_results}
+    for base in peer_targets:
+        if base not in seen_bases:
+            peer_results.append({'base_url': base, 'status': 'timeout', 'error': 'Timed out', 'latency_ms': 16000})
+
+    peer_ok = any(item.get('status') == 'ok' for item in peer_results) if peer_targets else False
+    replication_ok = bool(peer_ok or supabase_result.get('status') == 'ok')
     return jsonify({
-        'success': bool(supabase_ok or peer_ok),
+        'success': True,
+        'replication_ok': replication_ok,
         'updated_at': data.get('server_updated_at'),
-        'supabase': {'status': 'ok' if supabase_ok else 'failed'},
+        'supabase': supabase_result,
         'peers': peer_results
     })
 

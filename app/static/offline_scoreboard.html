@@ -7221,8 +7221,9 @@
                 const stamp = payload.snapshot_updated_at || '-';
                 const src = payload.snapshot_source || '-';
                 const probe = payload.probe_note ? ` | Probe: ${payload.probe_note}` : '';
+                const err = payload.error ? ` | Error: ${String(payload.error)}` : '';
                 textEl.style.color = color;
-                textEl.textContent = `Status: ${status.toUpperCase()} | Latency: ${latency} | Last snapshot: ${stamp} | Source: ${src}${probe}`;
+                textEl.textContent = `Status: ${status.toUpperCase()} | Latency: ${latency} | Last snapshot: ${stamp} | Source: ${src}${probe}${err}`;
             } catch (err) {
                 textEl.style.color = '#f87171';
                 textEl.textContent = `Status: OFFLINE | ${err.message || 'Unknown error'}`;
@@ -12301,12 +12302,17 @@
                 const peerOk = peerItems.filter(item => String(item.status || '').toLowerCase() === 'ok').length;
                 const peerFail = peerItems.length - peerOk;
                 const supabaseStatus = payload.supabase && payload.supabase.status ? String(payload.supabase.status).toUpperCase() : 'UNKNOWN';
+                const replicated = payload.replication_ok === true;
                 try {
                     await withTimeout(pullFromServer(true, true), 30000);
                 } catch (pullErr) {
                     // Best effort pull only.
                 }
-                showAlert(`Force Publish complete. Supabase: ${supabaseStatus}. Peers OK: ${peerOk}, Failed: ${peerFail}.`, 'success');
+                if (replicated) {
+                    showAlert(`Force Publish complete. Supabase: ${supabaseStatus}. Peers OK: ${peerOk}, Failed: ${peerFail}.`, 'success');
+                } else {
+                    showAlert(`Force Publish saved locally, but remote replication did not confirm. Supabase: ${supabaseStatus}. Peers OK: ${peerOk}, Failed: ${peerFail}.`, 'warning');
+                }
                 refreshServerHealth();
                 refreshSupabaseHealth();
             } catch (err) {
