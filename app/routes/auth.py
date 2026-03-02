@@ -8,6 +8,7 @@ import json
 import os
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy import inspect, text
+from werkzeug.security import generate_password_hash
 
 auth_bp = Blueprint('auth', __name__, url_prefix='/auth')
 
@@ -17,44 +18,124 @@ def _ensure_auth_schema_and_defaults():
     Best-effort auth schema repair for production DBs that were created from older models.
     """
     engine = db.engine
-    inspector = inspect(engine)
-    table_names = set(inspector.get_table_names())
-
-    if 'users' not in table_names or 'activity_logs' not in table_names:
-        db.create_all()
-        return
-
-    users_cols = {c.get('name') for c in inspector.get_columns('users')}
     dialect = engine.dialect.name
-    users_add = {
-        'role': "ALTER TABLE users ADD COLUMN role VARCHAR(20) NOT NULL DEFAULT 'student'" if dialect == 'postgresql' else "ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'student'",
-        'is_active': "ALTER TABLE users ADD COLUMN is_active BOOLEAN DEFAULT TRUE" if dialect == 'postgresql' else "ALTER TABLE users ADD COLUMN is_active INTEGER DEFAULT 1",
-        'first_login': "ALTER TABLE users ADD COLUMN first_login BOOLEAN DEFAULT TRUE" if dialect == 'postgresql' else "ALTER TABLE users ADD COLUMN first_login INTEGER DEFAULT 1",
-        'created_at': "ALTER TABLE users ADD COLUMN created_at TIMESTAMP" if dialect == 'postgresql' else "ALTER TABLE users ADD COLUMN created_at DATETIME",
-        'last_login': "ALTER TABLE users ADD COLUMN last_login TIMESTAMP" if dialect == 'postgresql' else "ALTER TABLE users ADD COLUMN last_login DATETIME",
-        'last_login_ip': "ALTER TABLE users ADD COLUMN last_login_ip VARCHAR(50)" if dialect == 'postgresql' else "ALTER TABLE users ADD COLUMN last_login_ip TEXT",
-        'password_changed_at': "ALTER TABLE users ADD COLUMN password_changed_at TIMESTAMP" if dialect == 'postgresql' else "ALTER TABLE users ADD COLUMN password_changed_at DATETIME",
-    }
-    for col, ddl in users_add.items():
-        if col not in users_cols:
-            db.session.execute(text(ddl))
-    db.session.commit()
+    conn = engine.connect()
+    trans = conn.begin()
+    try:
+        if dialect == 'postgresql':
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS users (
+                    id SERIAL PRIMARY KEY,
+                    login_id VARCHAR(50) UNIQUE NOT NULL,
+                    password_hash VARCHAR(255) NOT NULL,
+                    role VARCHAR(20) NOT NULL DEFAULT 'student',
+                    is_active BOOLEAN DEFAULT TRUE,
+                    first_login BOOLEAN DEFAULT TRUE,
+                    created_at TIMESTAMP,
+                    last_login TIMESTAMP,
+                    last_login_ip VARCHAR(50),
+                    password_changed_at TIMESTAMP
+                )
+            """))
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS activity_logs (
+                    id SERIAL PRIMARY KEY,
+                    user_id INTEGER NOT NULL,
+                    action VARCHAR(200) NOT NULL,
+                    action_type VARCHAR(50),
+                    details TEXT,
+                    ip_address VARCHAR(50),
+                    timestamp TIMESTAMP,
+                    CONSTRAINT fk_activity_logs_user_id FOREIGN KEY (user_id) REFERENCES users(id)
+                )
+            """))
+            for stmt in (
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(20) NOT NULL DEFAULT 'student'",
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE",
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS first_login BOOLEAN DEFAULT TRUE",
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS created_at TIMESTAMP",
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login TIMESTAMP",
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login_ip VARCHAR(50)",
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS password_changed_at TIMESTAMP",
+            ):
+                conn.execute(text(stmt))
 
-    admin_password = os.getenv('ADMIN_PASSWORD', 'ChangeAdminPass123!')
-    teacher_password = os.getenv('TEACHER_PASSWORD', 'ChangeTeacherPass123!')
-    for login_id, role, password in (
-        ('Admin', 'admin', admin_password),
-        ('Teacher', 'teacher', teacher_password),
-    ):
-        user = User.query.filter_by(login_id=login_id).first()
-        if not user:
-            user = User(login_id=login_id, role=role, first_login=False, is_active=True)
-            user.set_password(password)
-            db.session.add(user)
+            for login_id, role, password in (
+                ('Admin', 'admin', os.getenv('ADMIN_PASSWORD', 'ChangeAdminPass123!')),
+                ('Teacher', 'teacher', os.getenv('TEACHER_PASSWORD', 'ChangeTeacherPass123!')),
+            ):
+                pw_hash = generate_password_hash(password)
+                conn.execute(
+                    text("""
+                        INSERT INTO users (login_id, password_hash, role, is_active, first_login, created_at, password_changed_at)
+                        VALUES (:login_id, :password_hash, :role, TRUE, FALSE, NOW(), NOW())
+                        ON CONFLICT (login_id)
+                        DO UPDATE SET role = EXCLUDED.role, is_active = TRUE
+                    """),
+                    {'login_id': login_id, 'password_hash': pw_hash, 'role': role}
+                )
         else:
-            user.role = role
-            user.is_active = True
-    db.session.commit()
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS users (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    login_id TEXT UNIQUE NOT NULL,
+                    password_hash TEXT NOT NULL,
+                    role TEXT DEFAULT 'student',
+                    is_active INTEGER DEFAULT 1,
+                    first_login INTEGER DEFAULT 1,
+                    created_at DATETIME,
+                    last_login DATETIME,
+                    last_login_ip TEXT,
+                    password_changed_at DATETIME
+                )
+            """))
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS activity_logs (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL,
+                    action TEXT NOT NULL,
+                    action_type TEXT,
+                    details TEXT,
+                    ip_address TEXT,
+                    timestamp DATETIME
+                )
+            """))
+            inspector = inspect(engine)
+            cols = {c.get('name') for c in inspector.get_columns('users')}
+            for col, ddl in (
+                ('role', "ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'student'"),
+                ('is_active', "ALTER TABLE users ADD COLUMN is_active INTEGER DEFAULT 1"),
+                ('first_login', "ALTER TABLE users ADD COLUMN first_login INTEGER DEFAULT 1"),
+                ('created_at', "ALTER TABLE users ADD COLUMN created_at DATETIME"),
+                ('last_login', "ALTER TABLE users ADD COLUMN last_login DATETIME"),
+                ('last_login_ip', "ALTER TABLE users ADD COLUMN last_login_ip TEXT"),
+                ('password_changed_at', "ALTER TABLE users ADD COLUMN password_changed_at DATETIME"),
+            ):
+                if col not in cols:
+                    conn.execute(text(ddl))
+            for login_id, role, password in (
+                ('Admin', 'admin', os.getenv('ADMIN_PASSWORD', 'ChangeAdminPass123!')),
+                ('Teacher', 'teacher', os.getenv('TEACHER_PASSWORD', 'ChangeTeacherPass123!')),
+            ):
+                pw_hash = generate_password_hash(password)
+                conn.execute(
+                    text("""
+                        INSERT OR IGNORE INTO users (login_id, password_hash, role, is_active, first_login, created_at, password_changed_at)
+                        VALUES (:login_id, :password_hash, :role, 1, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                    """),
+                    {'login_id': login_id, 'password_hash': pw_hash, 'role': role}
+                )
+                conn.execute(
+                    text("UPDATE users SET role = :role, is_active = 1 WHERE login_id = :login_id"),
+                    {'login_id': login_id, 'role': role}
+                )
+        trans.commit()
+    except Exception:
+        trans.rollback()
+        current_app.logger.exception('Auth schema self-heal failed')
+        raise
+    finally:
+        conn.close()
 
 
 def _check_password_for_login(user, password):
@@ -180,7 +261,7 @@ def login():
                     db.session.rollback()
 
         if user and login_ok:
-            if not user.is_active:
+            if getattr(user, 'is_active', True) is False:
                 flash('Your account is disabled. Contact admin.', 'error')
                 log_activity(0, f'Login blocked for {login_id} - account inactive', 'login_failed', 'Account inactive', request.remote_addr)
                 return redirect(url_for('auth.login'))
