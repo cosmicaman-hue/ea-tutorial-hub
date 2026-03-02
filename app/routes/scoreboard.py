@@ -27,6 +27,7 @@ import shutil
 import glob
 import urllib.request
 import urllib.error
+import requests
 from werkzeug.security import generate_password_hash
 from zoneinfo import ZoneInfo
 from queue import Queue, Empty
@@ -220,6 +221,120 @@ def _forward_offline_data_to_peers_async(payload, extra_peers=None):
 _peer_sync_thread_started = False
 _ACTIVITY_LOG_MAX = 50000
 _NON_ADMIN_EDIT_WINDOW_DAYS = 2
+_supabase_push_lock = threading.Lock()
+_supabase_last_pushed_stamp = ''
+
+
+def _supabase_snapshot_config():
+    url = str(os.getenv('SUPABASE_URL', '') or '').strip().rstrip('/')
+    key = str(
+        os.getenv('SUPABASE_SERVICE_ROLE_KEY', '')
+        or os.getenv('SUPABASE_ANON_KEY', '')
+        or ''
+    ).strip()
+    table = str(os.getenv('SUPABASE_SNAPSHOT_TABLE', 'offline_snapshots') or 'offline_snapshots').strip()
+    row_id = str(os.getenv('SUPABASE_SNAPSHOT_ROW_ID', 'main') or 'main').strip()
+    enabled = bool(url and key and table and row_id)
+    return {
+        'enabled': enabled,
+        'url': url,
+        'key': key,
+        'table': table,
+        'row_id': row_id,
+    }
+
+
+def _supabase_headers(cfg, for_write=False):
+    headers = {
+        'apikey': cfg.get('key', ''),
+        'Authorization': f"Bearer {cfg.get('key', '')}",
+    }
+    if for_write:
+        headers['Content-Type'] = 'application/json'
+        headers['Prefer'] = 'resolution=merge-duplicates,return=minimal'
+    return headers
+
+
+def _supabase_fetch_snapshot(timeout_sec=12):
+    cfg = _supabase_snapshot_config()
+    if not cfg.get('enabled'):
+        return None, 'not-configured'
+    endpoint = f"{cfg['url']}/rest/v1/{cfg['table']}"
+    try:
+        resp = requests.get(
+            endpoint,
+            headers=_supabase_headers(cfg, for_write=False),
+            params={
+                'select': 'data,updated_at,source',
+                'id': f"eq.{cfg['row_id']}",
+                'limit': 1
+            },
+            timeout=timeout_sec
+        )
+        if resp.status_code >= 400:
+            current_app.logger.warning('Supabase fetch snapshot failed: %s %s', resp.status_code, resp.text[:240])
+            return None, 'error'
+        rows = resp.json() if resp.content else []
+        if not isinstance(rows, list) or not rows:
+            return None, 'empty'
+        row = rows[0] if isinstance(rows[0], dict) else {}
+        data = row.get('data')
+        if isinstance(data, dict):
+            return data, 'supabase'
+    except Exception as exc:
+        current_app.logger.warning('Supabase fetch snapshot exception: %s', exc)
+    return None, 'error'
+
+
+def _supabase_push_snapshot(payload, reason='snapshot_save', timeout_sec=15):
+    cfg = _supabase_snapshot_config()
+    if not cfg.get('enabled'):
+        return False
+    if not isinstance(payload, dict):
+        return False
+
+    stamp = str(payload.get('server_updated_at') or payload.get('updated_at') or '').strip()
+    global _supabase_last_pushed_stamp
+    with _supabase_push_lock:
+        if stamp and stamp == _supabase_last_pushed_stamp:
+            return True
+
+    endpoint = f"{cfg['url']}/rest/v1/{cfg['table']}"
+    body = [{
+        'id': cfg['row_id'],
+        'data': payload,
+        'source': str(reason or 'snapshot_save')[:80],
+        'updated_at': _server_now_iso(),
+    }]
+    try:
+        resp = requests.post(
+            endpoint,
+            headers=_supabase_headers(cfg, for_write=True),
+            params={'on_conflict': 'id'},
+            json=body,
+            timeout=timeout_sec
+        )
+        if resp.status_code >= 400:
+            current_app.logger.warning('Supabase push snapshot failed: %s %s', resp.status_code, resp.text[:240])
+            return False
+        if stamp:
+            with _supabase_push_lock:
+                _supabase_last_pushed_stamp = stamp
+        return True
+    except Exception as exc:
+        current_app.logger.warning('Supabase push snapshot exception: %s', exc)
+        return False
+
+
+def _supabase_push_snapshot_async(payload, reason='snapshot_save'):
+    cfg = _supabase_snapshot_config()
+    if not cfg.get('enabled'):
+        return
+    threading.Thread(
+        target=_supabase_push_snapshot,
+        args=(payload, reason),
+        daemon=True
+    ).start()
 
 
 def _do_peer_sync_cycle(app):
@@ -446,7 +561,15 @@ def _load_offline_data():
     _SEED_STAMP = "2026-02-26T00:00:00+00:00"
     if not os.path.exists(path):
         data = _load_latest_offline_backup()
+        if not data:
+            supa_data, _ = _supabase_fetch_snapshot()
+            if isinstance(supa_data, dict):
+                data = supa_data
         if data:
+            try:
+                _atomic_write_json(path, data)
+            except Exception:
+                pass
             return data
         # Last resort: hardcoded seed so the UI is never completely blank.
         try:
@@ -468,7 +591,15 @@ def _load_offline_data():
             return data
     except Exception:
         data = _load_latest_offline_backup()
+        if not data:
+            supa_data, _ = _supabase_fetch_snapshot()
+            if isinstance(supa_data, dict):
+                data = supa_data
         if data:
+            try:
+                _atomic_write_json(path, data)
+            except Exception:
+                pass
             return data
         try:
             payload = json.loads(json.dumps(FEB26_SEED))
@@ -518,6 +649,7 @@ def _save_offline_data(payload):
     _backup_offline_file(path)
     _atomic_write_json(path, payload)
     _backup_offline_hourly_immutable(payload)
+    _supabase_push_snapshot_async(payload, reason='save_offline_data')
     return payload
 
 
