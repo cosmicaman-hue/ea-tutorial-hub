@@ -12348,7 +12348,7 @@
                     throw new Error(`non-JSON server response (${resp.status}) ${shortBody.slice(0, 120)}`);
                 }
                 if (!resp.ok || !payload.success) {
-                    throw new Error(payload.error || 'publish failed');
+                    throw new Error(payload.error || `publish failed (HTTP ${resp.status})`);
                 }
                 const peerItems = Array.isArray(payload.peers) ? payload.peers : [];
                 const peerOk = peerItems.filter(item => String(item.status || '').toLowerCase() === 'ok').length;

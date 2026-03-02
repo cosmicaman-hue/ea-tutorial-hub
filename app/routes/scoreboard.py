@@ -3614,7 +3614,11 @@ FEB26_SEED = json.loads(r'''
 @points_bp.route('/offline')
 def offline_scoreboard():
     """Serve offline scoreboard HTML"""
-    return send_file('static/offline_scoreboard.html')
+    response = send_file('static/offline_scoreboard.html')
+    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
 
 
 @points_bp.route('/public')
