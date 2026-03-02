@@ -7214,12 +7214,15 @@
                     throw new Error(payload.error || 'Supabase health check failed');
                 }
                 const status = String(payload.status || 'unknown').toLowerCase();
-                const color = status === 'online' ? '#34d399' : (status === 'disabled' ? '#fbbf24' : '#f87171');
+                const color = status === 'online'
+                    ? '#34d399'
+                    : ((status === 'disabled' || status === 'degraded') ? '#fbbf24' : '#f87171');
                 const latency = Number.isFinite(Number(payload.latency_ms)) ? `${payload.latency_ms} ms` : '-';
                 const stamp = payload.snapshot_updated_at || '-';
                 const src = payload.snapshot_source || '-';
+                const probe = payload.probe_note ? ` | Probe: ${payload.probe_note}` : '';
                 textEl.style.color = color;
-                textEl.textContent = `Status: ${status.toUpperCase()} | Latency: ${latency} | Last snapshot: ${stamp} | Source: ${src}`;
+                textEl.textContent = `Status: ${status.toUpperCase()} | Latency: ${latency} | Last snapshot: ${stamp} | Source: ${src}${probe}`;
             } catch (err) {
                 textEl.style.color = '#f87171';
                 textEl.textContent = `Status: OFFLINE | ${err.message || 'Unknown error'}`;

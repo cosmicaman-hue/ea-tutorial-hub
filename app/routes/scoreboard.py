@@ -4288,9 +4288,26 @@ def supabase_health():
         })
     except Exception as exc:
         elapsed_ms = int((time.time() - started) * 1000)
+        degraded_hint = ''
+        degraded_latency = None
+        try:
+            root_started = time.time()
+            root_req = urllib.request.Request(
+                f"{cfg.get('url', '').rstrip('/')}/rest/v1/",
+                headers=_supabase_headers(cfg, key_name='read_key', for_write=False),
+                method='GET'
+            )
+            with urllib.request.urlopen(root_req, timeout=8) as root_resp:
+                _ = root_resp.read()
+            degraded_latency = int((time.time() - root_started) * 1000)
+            degraded_hint = 'Project reachable; table read endpoint is blocked/slow'
+        except Exception:
+            degraded_hint = ''
         response.update({
-            'status': 'offline',
+            'status': 'degraded' if degraded_hint else 'offline',
             'latency_ms': elapsed_ms,
+            'probe_latency_ms': degraded_latency,
+            'probe_note': degraded_hint,
             'error': str(exc),
         })
     return jsonify(response)
