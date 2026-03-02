@@ -166,6 +166,15 @@ def _resolve_sync_shared_key():
     return 'EA_SYNC_KEY_917511_2026'
 
 
+def _payload_for_external_replication(payload):
+    """Strip local-only modules before mirroring to WAN/peer systems."""
+    if not isinstance(payload, dict):
+        return {}
+    external = dict(payload)
+    external.pop('fee_records', None)
+    return external
+
+
 def _forward_offline_data_to_peers(payload, extra_peers=None):
     peers = _get_sync_peers() + _normalize_peer_list(extra_peers or [])
     peers = list(dict.fromkeys(peers))
@@ -173,7 +182,7 @@ def _forward_offline_data_to_peers(payload, extra_peers=None):
         return
     current_origin = (request.host_url or '').rstrip('/')
     is_master = str(os.getenv('EA_MASTER_MODE', '')).strip() == '1'
-    body_payload = {'data': payload}
+    body_payload = {'data': _payload_for_external_replication(payload)}
     if is_master:
         # Master publishes authoritative snapshots to peers (Render/backup),
         # so receivers can accept them even when peer timestamps drift ahead.
@@ -302,8 +311,7 @@ def _supabase_push_snapshot(payload, reason='snapshot_save', timeout_sec=15):
         return False
 
     # Exclude fees module data from Supabase mirror by requirement.
-    mirror_payload = dict(payload)
-    mirror_payload.pop('fee_records', None)
+    mirror_payload = _payload_for_external_replication(payload)
 
     stamp = str(mirror_payload.get('server_updated_at') or mirror_payload.get('updated_at') or '').strip()
     global _supabase_last_pushed_stamp
@@ -391,7 +399,7 @@ def _do_peer_sync_cycle(app):
                         # Push whenever snapshots differ by stamp/count.
                         if (abs(local_stamp - peer_stamp) > 1) or (local_count != peer_count):
                             body = json.dumps({
-                                'data': local_data,
+                                'data': _payload_for_external_replication(local_data),
                                 'authoritative_master_push': True,
                                 'force_replace': True
                             }).encode('utf-8')
@@ -429,7 +437,7 @@ def _do_peer_sync_cycle(app):
 
                 elif local_stamp > peer_stamp + 30 and local_count >= min_students:
                     # Local is newer -> push to peer
-                    body = json.dumps({'data': local_data}).encode('utf-8')
+                    body = json.dumps({'data': _payload_for_external_replication(local_data)}).encode('utf-8')
                     post_req = urllib.request.Request(
                         f'{peer}/scoreboard/offline-data',
                         data=body,
@@ -4231,6 +4239,129 @@ def offline_server_health():
         })
 
     return jsonify({'success': True, 'items': items, 'checked_at': _server_now_iso()})
+
+
+@points_bp.route('/supabase-health', methods=['GET'])
+@login_required
+def supabase_health():
+    if current_user.role not in ['admin', 'teacher']:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 403
+
+    cfg = _supabase_snapshot_config()
+    enabled = bool(cfg.get('enabled_read') or cfg.get('enabled_write'))
+    response = {
+        'success': True,
+        'enabled': enabled,
+        'read_enabled': bool(cfg.get('enabled_read')),
+        'write_enabled': bool(cfg.get('enabled_write')),
+        'table': cfg.get('table'),
+        'row_id': cfg.get('row_id'),
+        'checked_at': _server_now_iso(),
+    }
+    if not enabled:
+        response.update({'status': 'disabled', 'error': 'Supabase env not configured'})
+        return jsonify(response)
+
+    endpoint = f"{cfg.get('url', '').rstrip('/')}/rest/v1/{cfg.get('table', 'offline_snapshots')}"
+    params = urllib.parse.urlencode({
+        'select': 'id,updated_at,source',
+        'id': f"eq.{cfg.get('row_id', 'main')}",
+        'limit': 1
+    })
+    started = time.time()
+    try:
+        req = urllib.request.Request(
+            f"{endpoint}?{params}",
+            headers=_supabase_headers(cfg, key_name='read_key', for_write=False),
+            method='GET'
+        )
+        with urllib.request.urlopen(req, timeout=12) as resp:
+            body = resp.read()
+        elapsed_ms = int((time.time() - started) * 1000)
+        rows = json.loads(body.decode('utf-8', errors='replace')) if body else []
+        row = rows[0] if isinstance(rows, list) and rows and isinstance(rows[0], dict) else {}
+        response.update({
+            'status': 'online',
+            'latency_ms': elapsed_ms,
+            'snapshot_updated_at': row.get('updated_at') or '',
+            'snapshot_source': row.get('source') or '',
+        })
+    except Exception as exc:
+        elapsed_ms = int((time.time() - started) * 1000)
+        response.update({
+            'status': 'offline',
+            'latency_ms': elapsed_ms,
+            'error': str(exc),
+        })
+    return jsonify(response)
+
+
+@points_bp.route('/offline-force-publish', methods=['POST'])
+@login_required
+def offline_force_publish():
+    if current_user.role != 'admin':
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 403
+
+    payload = request.get_json(silent=True) or {}
+    data = payload.get('data') if isinstance(payload, dict) else None
+    request_peers = payload.get('peers', []) if isinstance(payload, dict) else []
+    if not isinstance(data, dict):
+        return jsonify({'success': False, 'error': 'Invalid payload'}), 400
+
+    data['server_updated_at'] = _server_now_iso()
+    _save_offline_data(data)
+    _broadcast_sync_event(data['server_updated_at'], source='force-publish')
+
+    supabase_ok = _supabase_push_snapshot(data, reason='force_publish', timeout_sec=18)
+
+    peers = _get_sync_peers() + _normalize_peer_list(request_peers)
+    peers = list(dict.fromkeys(peers))
+    current_origin = (request.host_url or '').rstrip('/')
+    shared_key = _resolve_sync_shared_key()
+    is_master = str(os.getenv('EA_MASTER_MODE', '')).strip() == '1'
+    peer_body_payload = {'data': _payload_for_external_replication(data)}
+    if is_master:
+        peer_body_payload['authoritative_master_push'] = True
+        peer_body_payload['force_replace'] = True
+    peer_body = json.dumps(peer_body_payload).encode('utf-8')
+
+    peer_results = []
+    for peer in peers:
+        base = str(peer or '').rstrip('/')
+        if not base or (current_origin and base == current_origin):
+            continue
+        target_url = f'{base}/scoreboard/offline-data'
+        try:
+            req = urllib.request.Request(
+                target_url,
+                data=peer_body,
+                method='POST',
+                headers={
+                    'Content-Type': 'application/json',
+                    'X-EA-Replicated': '1',
+                    'X-EA-Sync-Key': shared_key
+                }
+            )
+            with urllib.request.urlopen(req, timeout=45) as resp:
+                raw = resp.read()
+            updated_at = ''
+            try:
+                parsed = json.loads(raw.decode('utf-8', errors='replace')) if raw else {}
+                if isinstance(parsed, dict):
+                    updated_at = parsed.get('updated_at') or ''
+            except Exception:
+                updated_at = ''
+            peer_results.append({'base_url': base, 'status': 'ok', 'updated_at': updated_at})
+        except Exception as exc:
+            peer_results.append({'base_url': base, 'status': 'failed', 'error': str(exc)})
+
+    peer_ok = any(item.get('status') == 'ok' for item in peer_results) if peer_results else True
+    return jsonify({
+        'success': bool(supabase_ok or peer_ok),
+        'updated_at': data.get('server_updated_at'),
+        'supabase': {'status': 'ok' if supabase_ok else 'failed'},
+        'peers': peer_results
+    })
 
 
 @points_bp.route('/offline-backup', methods=['GET'])

@@ -5806,6 +5806,15 @@
                         </table>
                     </div>
                 </div>
+                <div style="margin-top: 10px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:6px;">
+                        <strong>Supabase Health</strong>
+                        <button class="secondary" data-allow="true" onclick="refreshSupabaseHealth()"><i class="fas fa-cloud"></i> Refresh Supabase</button>
+                    </div>
+                    <div id="supabaseHealthPanel" style="border:1px solid rgba(148,163,184,0.25); border-radius:8px; padding:10px;">
+                        <div id="supabaseHealthText" style="font-size:13px; color:var(--text-muted);">Health check pending...</div>
+                    </div>
+                </div>
                 <p class="section-subtitle" style="margin-top: 8px;">
                     If server is down, installed app keeps working locally and auto-syncs queued changes when any configured server comes back online.
                 </p>
@@ -6147,7 +6156,8 @@
         const SERVER_SYNC = {
             enabled: window.location.protocol.startsWith('http'),
             dataUrl: '/scoreboard/offline-data',
-            backupUrl: '/scoreboard/offline-backup'
+            backupUrl: '/scoreboard/offline-backup',
+            forcePublishUrl: '/scoreboard/offline-force-publish'
         };
         const SERVER_URLS_KEY = 'ea_server_sync_urls';
         const DEFAULT_PRIMARY_SERVER_URL = 'http://192.168.0.183:5000';
@@ -7188,12 +7198,41 @@
             }).join('');
         }
 
+        async function refreshSupabaseHealth() {
+            const textEl = document.getElementById('supabaseHealthText');
+            if (!textEl) return;
+            textEl.style.color = 'var(--text-muted)';
+            textEl.textContent = 'Checking Supabase...';
+            try {
+                const resp = await fetch('/scoreboard/supabase-health', {
+                    method: 'GET',
+                    credentials: 'same-origin',
+                    cache: 'no-store'
+                });
+                const payload = await resp.json();
+                if (!resp.ok || !payload.success) {
+                    throw new Error(payload.error || 'Supabase health check failed');
+                }
+                const status = String(payload.status || 'unknown').toLowerCase();
+                const color = status === 'online' ? '#34d399' : (status === 'disabled' ? '#fbbf24' : '#f87171');
+                const latency = Number.isFinite(Number(payload.latency_ms)) ? `${payload.latency_ms} ms` : '-';
+                const stamp = payload.snapshot_updated_at || '-';
+                const src = payload.snapshot_source || '-';
+                textEl.style.color = color;
+                textEl.textContent = `Status: ${status.toUpperCase()} | Latency: ${latency} | Last snapshot: ${stamp} | Source: ${src}`;
+            } catch (err) {
+                textEl.style.color = '#f87171';
+                textEl.textContent = `Status: OFFLINE | ${err.message || 'Unknown error'}`;
+            }
+        }
+
         function saveServerEndpoints() {
             const primary = normalizeServerBaseUrl(getElementValue('primaryServerUrl') || '');
             const backup = normalizeServerBaseUrl(getElementValue('backupServerUrl') || '');
             const urls = setConfiguredServerUrls([primary, backup]);
             showAlert(urls.length ? 'Server endpoints saved' : 'Server endpoints cleared', 'success');
             refreshServerHealth();
+            refreshSupabaseHealth();
         }
 
         function populateServerEndpointInputs() {
@@ -12244,18 +12283,29 @@
                 btn.innerHTML = '<i class="fas fa-sync fa-spin"></i> Publishing';
             }
             try {
-                const pushed = await withTimeout(pushToServer(db.getData(), { silent: false }), 90000);
-                if (!pushed) {
-                    showAlert('Force Publish could not reach server. Local data remains safe.', 'warning');
-                } else {
-                    // Publish already succeeded; refresh is best-effort and must not turn success into failure.
-                    try {
-                        await withTimeout(pullFromServer(true, true), 30000);
-                        showAlert('Force Publish complete. Server snapshot updated and reloaded.', 'success');
-                    } catch (pullErr) {
-                        showAlert('Force Publish succeeded, but refresh timed out. Use Refresh once.', 'warning');
-                    }
+                const baseUrls = getSyncBaseUrls();
+                const resp = await withTimeout(fetch(SERVER_SYNC.forcePublishUrl || '/scoreboard/offline-force-publish', {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ data: db.getData(), peers: baseUrls })
+                }), 120000);
+                const payload = await resp.json();
+                if (!resp.ok || !payload.success) {
+                    throw new Error(payload.error || 'publish failed');
                 }
+                const peerItems = Array.isArray(payload.peers) ? payload.peers : [];
+                const peerOk = peerItems.filter(item => String(item.status || '').toLowerCase() === 'ok').length;
+                const peerFail = peerItems.length - peerOk;
+                const supabaseStatus = payload.supabase && payload.supabase.status ? String(payload.supabase.status).toUpperCase() : 'UNKNOWN';
+                try {
+                    await withTimeout(pullFromServer(true, true), 30000);
+                } catch (pullErr) {
+                    // Best effort pull only.
+                }
+                showAlert(`Force Publish complete. Supabase: ${supabaseStatus}. Peers OK: ${peerOk}, Failed: ${peerFail}.`, 'success');
+                refreshServerHealth();
+                refreshSupabaseHealth();
             } catch (err) {
                 const msg = (err && err.message) ? String(err.message) : 'unexpected error';
                 showAlert(`Force Publish failed (${msg}). Local data remains safe.`, 'warning');
@@ -26259,10 +26309,12 @@
             applyColumnVisibility();
             populateServerEndpointInputs();
             refreshServerHealth();
+            refreshSupabaseHealth();
             setInterval(() => {
                 if (document.hidden) return;
                 if (getActiveTabName() !== 'tools') return;
                 refreshServerHealth();
+                refreshSupabaseHealth();
             }, 30000);
 
             if (SERVER_SYNC.enabled) {
