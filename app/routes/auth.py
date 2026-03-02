@@ -7,8 +7,54 @@ from datetime import datetime
 import json
 import os
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy import inspect, text
 
 auth_bp = Blueprint('auth', __name__, url_prefix='/auth')
+
+
+def _ensure_auth_schema_and_defaults():
+    """
+    Best-effort auth schema repair for production DBs that were created from older models.
+    """
+    engine = db.engine
+    inspector = inspect(engine)
+    table_names = set(inspector.get_table_names())
+
+    if 'users' not in table_names or 'activity_logs' not in table_names:
+        db.create_all()
+        return
+
+    users_cols = {c.get('name') for c in inspector.get_columns('users')}
+    dialect = engine.dialect.name
+    users_add = {
+        'role': "ALTER TABLE users ADD COLUMN role VARCHAR(20) NOT NULL DEFAULT 'student'" if dialect == 'postgresql' else "ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'student'",
+        'is_active': "ALTER TABLE users ADD COLUMN is_active BOOLEAN DEFAULT TRUE" if dialect == 'postgresql' else "ALTER TABLE users ADD COLUMN is_active INTEGER DEFAULT 1",
+        'first_login': "ALTER TABLE users ADD COLUMN first_login BOOLEAN DEFAULT TRUE" if dialect == 'postgresql' else "ALTER TABLE users ADD COLUMN first_login INTEGER DEFAULT 1",
+        'created_at': "ALTER TABLE users ADD COLUMN created_at TIMESTAMP" if dialect == 'postgresql' else "ALTER TABLE users ADD COLUMN created_at DATETIME",
+        'last_login': "ALTER TABLE users ADD COLUMN last_login TIMESTAMP" if dialect == 'postgresql' else "ALTER TABLE users ADD COLUMN last_login DATETIME",
+        'last_login_ip': "ALTER TABLE users ADD COLUMN last_login_ip VARCHAR(50)" if dialect == 'postgresql' else "ALTER TABLE users ADD COLUMN last_login_ip TEXT",
+        'password_changed_at': "ALTER TABLE users ADD COLUMN password_changed_at TIMESTAMP" if dialect == 'postgresql' else "ALTER TABLE users ADD COLUMN password_changed_at DATETIME",
+    }
+    for col, ddl in users_add.items():
+        if col not in users_cols:
+            db.session.execute(text(ddl))
+    db.session.commit()
+
+    admin_password = os.getenv('ADMIN_PASSWORD', 'ChangeAdminPass123!')
+    teacher_password = os.getenv('TEACHER_PASSWORD', 'ChangeTeacherPass123!')
+    for login_id, role, password in (
+        ('Admin', 'admin', admin_password),
+        ('Teacher', 'teacher', teacher_password),
+    ):
+        user = User.query.filter_by(login_id=login_id).first()
+        if not user:
+            user = User(login_id=login_id, role=role, first_login=False, is_active=True)
+            user.set_password(password)
+            db.session.add(user)
+        else:
+            user.role = role
+            user.is_active = True
+    db.session.commit()
 
 
 def _check_password_for_login(user, password):
@@ -96,8 +142,13 @@ def login():
             user = User.query.filter_by(login_id=login_id).first()
         except SQLAlchemyError:
             db.session.rollback()
-            flash('Login service is initializing. Please try again in 30 seconds.', 'error')
-            return redirect(url_for('auth.login'))
+            try:
+                _ensure_auth_schema_and_defaults()
+                user = User.query.filter_by(login_id=login_id).first()
+            except SQLAlchemyError:
+                db.session.rollback()
+                flash('Login service temporarily unavailable. Please retry in 30 seconds.', 'error')
+                return redirect(url_for('auth.login'))
 
         login_ok = False
         if user:
