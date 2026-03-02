@@ -3176,6 +3176,9 @@
             <button class="tab-button" id="notificationsTabButton" onclick="switchTab('notifications')" style="--tab-icon: #f43f5e;">
                 <i class="fas fa-bell"></i> Notifications
             </button>
+            <button class="tab-button" id="activityLogTabButton" onclick="switchTab('activity-log')" style="--tab-icon: #f59e0b;">
+                <i class="fas fa-clipboard-list"></i> Activity Log
+            </button>
             <button class="tab-button" onclick="switchTab('attendance')" style="--tab-icon: #10b981;">
                 <i class="fas fa-user-check"></i> Attendance
             </button>
@@ -5044,6 +5047,70 @@
                 </div>
                 <div id="notifHistoryList" style="display:grid;gap:3px">
                     <div class="notif-empty"><i class="fas fa-inbox"></i><p>No log entries yet.</p></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB: ACTIVITY LOG -->
+        <div id="activity-log-tab" class="tab-content hidden">
+            <div class="form-card">
+                <h3><i class="fas fa-clipboard-list"></i> Activity Log</h3>
+                <p class="section-subtitle">Auditable user activity stream. Filter by user, class, student, month, or date range.</p>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>User</label>
+                        <select id="activityLogUserFilter" onchange="loadActivityLogTab()">
+                            <option value="">All Users</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Class</label>
+                        <select id="activityLogClassFilter" onchange="loadActivityLogTab()">
+                            <option value="">All Classes</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Student</label>
+                        <input type="text" id="activityLogStudentFilter" placeholder="Roll or name" oninput="loadActivityLogTab()">
+                    </div>
+                    <div class="form-group">
+                        <label>Month</label>
+                        <input type="month" id="activityLogMonthFilter" onchange="loadActivityLogTab()">
+                    </div>
+                    <div class="form-group">
+                        <label>Date From</label>
+                        <input type="date" id="activityLogFromDate" onchange="loadActivityLogTab()">
+                    </div>
+                    <div class="form-group">
+                        <label>Date To</label>
+                        <input type="date" id="activityLogToDate" onchange="loadActivityLogTab()">
+                    </div>
+                </div>
+                <div class="form-buttons" style="margin-top:8px;">
+                    <button class="secondary" onclick="resetActivityLogFilters()" data-allow="true"><i class="fas fa-eraser"></i> Reset Filters</button>
+                    <button class="secondary" onclick="loadActivityLogTab()" data-allow="true"><i class="fas fa-sync-alt"></i> Refresh</button>
+                </div>
+                <div class="scoreboard-wrapper" style="margin-top:12px;">
+                    <div class="scoreboard-scroll">
+                        <table class="scoreboard">
+                            <thead>
+                                <tr>
+                                    <th style="width: 170px;">Timestamp</th>
+                                    <th style="width: 130px;">User</th>
+                                    <th style="width: 80px;">Role</th>
+                                    <th style="width: 70px;">Class</th>
+                                    <th style="width: 190px;">Student</th>
+                                    <th style="width: 130px;">Entity</th>
+                                    <th style="width: 110px;">Action</th>
+                                    <th style="width: 120px;">Date</th>
+                                    <th>Detail</th>
+                                </tr>
+                            </thead>
+                            <tbody id="activityLogBody">
+                                <tr><td colspan="9" class="text-center loading">Loading...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>
@@ -7977,6 +8044,7 @@
                     homework: [],
                     post_holder_history: [],
                     notification_history: [],
+                    activity_log: [],
                     updated_at: null
                 };
             }
@@ -8031,6 +8099,7 @@
                 if (!data.homework) data.homework = [];
                 if (!data.post_holder_history) data.post_holder_history = [];
                 if (!data.notification_history) data.notification_history = [];
+                if (!data.activity_log) data.activity_log = [];
                 data.students = (data.students || [])
                     .map(student => normalizeStudentMeta(student))
                     .filter(student => isValidRollNo(student.roll) && isValidStudentName(student.base_name || student.name));
@@ -9145,7 +9214,32 @@
                     const vetosByDate = {};
                     const notesByDate = {};
                     const hasEntryByDate = {};
+                    let monthlyImportedTotal = 0;
+                    let hasHistoricalMonthlyTotal = false;
+                    const isHistoricalMonth = String(month || '').trim() < '2026-02';
                     studentScores.forEach(s => {
+                        const noteText = String(coalesce(safeProp(s, 'notes'), '')).trim();
+                        if (isHistoricalMonth) {
+                            const noteLow = noteText.toLowerCase();
+                            const isExcelTotal = noteLow.startsWith('excel_total_score') || noteLow.startsWith('excel_total_from_dates');
+                            const isExcelDaily = noteLow.startsWith('excel_daily_score');
+                            const isExcelStar = noteLow.startsWith('excel_star_usage');
+                            // Historical months should render strictly from Excel-imported rows only.
+                            // This prevents old legacy rows from inflating totals.
+                            if (!isExcelTotal && !isExcelDaily && !isExcelStar) {
+                                return;
+                            }
+                        }
+                        // Historical import stores workbook monthly totals as synthetic rows.
+                        // Keep them in total/rank, but never render as a daily day-15 cell.
+                        if (isHistoricalMonth && (
+                            noteText.toLowerCase().startsWith('excel_total_score') ||
+                            noteText.toLowerCase().startsWith('excel_total_from_dates')
+                        )) {
+                            monthlyImportedTotal += (parseInt(s.points, 10) || 0);
+                            hasHistoricalMonthlyTotal = true;
+                            return;
+                        }
                         const date = normalizeDateKey(s.date);
                         if (!date) return;
                         hasEntryByDate[date] = true;
@@ -9156,7 +9250,6 @@
                             starUsageByDate[date] = (starUsageByDate[date] || 0) + Math.abs(starDelta);
                         }
                         vetosByDate[date] = (vetosByDate[date] || 0) + (parseInt(s.vetos, 10) || 0);
-                        const noteText = String(coalesce(safeProp(s, 'notes'), '')).trim();
                         if (noteText) {
                             notesByDate[date] = noteText;
                         }
@@ -9178,15 +9271,19 @@
                     const bonusByDate = {};
                     const starDates = new Set([...Object.keys(pointsByDate), ...Object.keys(starsByDate), ...Object.keys(starUsageByDate)]);
                     const isCurrentMonth = String(month || '').trim() === getCurrentMonthKey();
+                    // Star +100 bonus on next day only applies from Feb 2026 onwards.
+                    // Historical months (Aug 24 – Jan 26) already have the bonus baked
+                    // into their Excel values, so applying it again would double-count.
+                    const applyStarBonus = String(month || '').trim() >= '2026-02';
                     starDates.forEach(date => {
                         const points = pointsByDate[date] || 0;
                         const usageCount = starUsageByDate[date] || 0;
                         if (usageCount > 0) {
                             const uses = usageCount;
-                            const starText = uses <= 3 ? '*'.repeat(uses) : `*x${uses}`; // show count for multi-use
+                            const starText = '*'.repeat(uses);
                             starOverrides[date] = starText;
                             starClasses[date] = 'star-used-red';
-                            if (points >= -50) {
+                            if (points >= -50 && applyStarBonus) {
                                 const nextDate = addDays(date, 1);
                                 if (nextDate) {
                                     bonusByDate[nextDate] = (bonusByDate[nextDate] || 0) + (100 * uses);
@@ -9215,6 +9312,8 @@
                         starOverrides,
                         starClasses,
                         bonusByDate,
+                        monthlyImportedTotal,
+                        hasHistoricalMonthlyTotal,
                         group: getStudentGroup(student),
                         leadershipRole: resolveLeadershipRole(student),
                         isCR: crByStudent.has(student.id),
@@ -9310,7 +9409,12 @@
                         }
                     });
 
-                    const total = dailyScores.reduce((sum, p) => sum + p, 0);
+                    const dailySum = dailyScores.reduce((sum, p) => sum + p, 0);
+                    let total = dailySum + (parseInt(row.monthlyImportedTotal, 10) || 0);
+                    // For historical months, workbook total is authoritative for ranking/total.
+                    if (String(month || '').trim() < '2026-02' && row.hasHistoricalMonthlyTotal) {
+                        total = parseInt(row.monthlyImportedTotal, 10) || 0;
+                    }
                     row.rawStudent.computed_total_score = total;
                     return {
                         student: row.student,
@@ -9482,6 +9586,7 @@
             else if (tabName === 'teacher-voting')   _safeRender(loadTeacherVotingTab, 'teacher-voting');
             else if (tabName === 'appeals')          _safeRender(loadAppealsTab, 'appeals');
             else if (tabName === 'notifications')    _safeRender(loadNotificationsTab, 'notifications');
+            else if (tabName === 'activity-log')     _safeRender(loadActivityLogTab, 'activity-log');
             else if (tabName === 'profile')          _safeRender(loadProfileTab, 'profile');
             else if (tabName === 'homework')         _safeRender(loadHomeworkTab, 'homework');
             else if (tabName === 'good-conduct')     _safeRender(renderGoodConductBadge, 'good-conduct');
@@ -9610,6 +9715,7 @@
                 else if (tabName === 'voting') loadVotingTab();
                 else if (tabName === 'appeals') loadAppealsTab();
                 else if (tabName === 'notifications') loadNotificationsTab();
+                else if (tabName === 'activity-log') loadActivityLogTab();
                 else if (tabName === 'attendance') refreshAttendanceTabFromSync();
                 else if (tabName === 'profile') loadProfileTab();
                 else if (tabName === 'homework') loadHomeworkTab();
@@ -9720,11 +9826,28 @@
 
         function teacherValidateCurrentMonth(dateValue, monthValue, label = 'This action') {
             if (currentUserRole !== 'teacher') return true;
-            const currentMonth = getCurrentMonthKey();
             const dateKey = String(dateValue || '').trim();
             const monthKey = String(monthValue || '').trim() || (dateKey ? dateKey.substring(0, 7) : '');
-            if (!dateKey || dateKey.substring(0, 7) !== currentMonth || monthKey !== currentMonth) {
-                showAlert(`${label} is allowed only for the current month (${currentMonth}).`, 'warning');
+            if (!dateKey) {
+                showAlert(`${label} requires a valid date.`, 'warning');
+                return false;
+            }
+            if (monthKey && monthKey !== dateKey.substring(0, 7)) {
+                showAlert(`${label} date/month mismatch. Please align the selected month and date.`, 'warning');
+                return false;
+            }
+            const target = new Date(`${dateKey}T00:00:00`);
+            if (Number.isNaN(target.getTime())) {
+                showAlert(`${label} requires a valid date.`, 'warning');
+                return false;
+            }
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const minDate = new Date(today);
+            minDate.setDate(today.getDate() - 2);
+            if (target < minDate || target > today) {
+                const fmt = d => d.toISOString().slice(0, 10);
+                showAlert(`${label} is allowed only for dates from ${fmt(minDate)} to ${fmt(today)}.`, 'warning');
                 return false;
             }
             return true;
@@ -10101,6 +10224,7 @@
             if (tabName === 'cr') return isAdmin || isTeacher;
             if (tabName === 'appeals') return true;
             if (tabName === 'notifications') return isAdmin || isTeacher;
+            if (tabName === 'activity-log') return isAdmin;
             if (tabName === 'attendance') return true;
             if (tabName === 'syllabus') return true;
             if (tabName === 'good-conduct') return true;
@@ -10147,6 +10271,7 @@
             setTabVisibility('voting', isAdmin);
             setTabVisibility('appeals', true);
             setTabVisibility('notifications', isAdmin || isTeacher);
+            setTabVisibility('activity-log', isAdmin);
             setTabVisibility('attendance', isAdmin || isTeacher);
             setTabVisibility('good-conduct', isAdmin || isTeacher);
             setTabVisibility('profile', isAdmin || isTeacher);
@@ -10570,6 +10695,81 @@
                 usedIds.add(idNum);
                 return { ...row, id: idNum };
             });
+        }
+
+        function getScoreMonthKey(row) {
+            if (!row || typeof row !== 'object') return '';
+            const month = String(coalesce(row.month, '')).trim();
+            if (/^\d{4}-\d{2}$/.test(month)) return month;
+            const dateKey = normalizeDateKey(row.date);
+            return dateKey ? String(dateKey).slice(0, 7) : '';
+        }
+
+        function isTrustedHistoricalExcelRow(row) {
+            const note = String(coalesce(row && row.notes, '')).trim().toLowerCase();
+            return (
+                note.startsWith('excel_total_score') ||
+                note.startsWith('excel_total_from_dates') ||
+                note.startsWith('excel_daily_score') ||
+                note.startsWith('excel_star_usage')
+            );
+        }
+
+        function ensureUniqueScoreIds(rows) {
+            const used = new Set();
+            let maxId = 0;
+            const normalized = (Array.isArray(rows) ? rows : []).map(row => ({ ...row }));
+            normalized.forEach(row => {
+                const idNum = parseInt(row.id, 10) || 0;
+                if (idNum > maxId) maxId = idNum;
+            });
+            normalized.forEach(row => {
+                let idNum = parseInt(row.id, 10) || 0;
+                if (!idNum || used.has(idNum)) {
+                    maxId += 1;
+                    idNum = maxId;
+                }
+                used.add(idNum);
+                row.id = idNum;
+            });
+            return normalized;
+        }
+
+        function mergeScoreRowsWithHistoricalLocalGuard(existingScores, incomingScores, options = {}) {
+            const preferIncomingOnTie = options.preferIncomingOnTie === true;
+            const historicalCutoff = String(options.historicalCutoff || '2026-02').trim();
+            const allowHistoricalOverride = options.allowHistoricalOverride === true;
+            const localRows = Array.isArray(existingScores) ? existingScores : [];
+            const incomingRows = Array.isArray(incomingScores) ? incomingScores : [];
+
+            const localHasTrustedHistorical = localRows.some(row => {
+                const mk = getScoreMonthKey(row);
+                return !!mk && mk < historicalCutoff && isTrustedHistoricalExcelRow(row);
+            });
+
+            const localHistorical = localRows.filter(row => {
+                const mk = getScoreMonthKey(row);
+                return !!mk && mk < historicalCutoff;
+            });
+            const incomingHistorical = incomingRows.filter(row => {
+                const mk = getScoreMonthKey(row);
+                return !!mk && mk < historicalCutoff;
+            });
+            const localActive = localRows.filter(row => {
+                const mk = getScoreMonthKey(row);
+                return !!mk && mk >= historicalCutoff;
+            });
+            const incomingActive = incomingRows.filter(row => {
+                const mk = getScoreMonthKey(row);
+                return !!mk && mk >= historicalCutoff;
+            });
+
+            const mergedActive = mergeScoreRowsSuperset(localActive, incomingActive, { preferIncomingOnTie });
+            const mergedHistorical = (allowHistoricalOverride || !localHasTrustedHistorical)
+                ? mergeScoreRowsSuperset(localHistorical, incomingHistorical, { preferIncomingOnTie })
+                : mergeScoreRowsSuperset(localHistorical, [], { preferIncomingOnTie: false });
+
+            return ensureUniqueScoreIds([...mergedHistorical, ...mergedActive]);
         }
 
         function mergeNotificationHistorySuperset(existingHistory, incomingHistory) {
@@ -11246,6 +11446,11 @@
                     server_updated_at: serverData.server_updated_at || serverUpdatedAt || baseline.server_updated_at || '',
                     updated_at: serverData.updated_at || serverUpdatedAt || baseline.updated_at || ''
                 };
+                mergedData.scores = mergeScoreRowsWithHistoricalLocalGuard(
+                    localData.scores || [],
+                    serverData.scores || [],
+                    { preferIncomingOnTie: preferServerConflicts }
+                );
             } else {
                 mergedData = {
                     ...localData,
@@ -11254,7 +11459,7 @@
                     students: mergeStudentsSuperset(localData.students || [], serverData.students || []),
                     month_students: mergeMonthStudentsSuperset(localData.month_students || {}, serverData.month_students || {}),
                     month_roster_profiles: mergeMonthRosterProfilesSuperset(localData.month_roster_profiles || {}, serverData.month_roster_profiles || {}),
-                    scores: mergeScoreRowsSuperset(localData.scores || [], serverData.scores || [], { preferIncomingOnTie: preferServerConflicts }),
+                    scores: mergeScoreRowsWithHistoricalLocalGuard(localData.scores || [], serverData.scores || [], { preferIncomingOnTie: preferServerConflicts }),
                     attendance: mergeAttendanceSuperset(
                         localData.attendance || [],
                         serverData.attendance || [],
@@ -11321,7 +11526,11 @@
             const baseUrls = getSyncBaseUrls();
             // Browser fetches must be same-origin (cross-origin peer fetches are blocked by CORS on LAN).
             // Server will forward replication to peers using SYNC_PEERS.
-            const writeTargets = [getCurrentSyncBaseUrl() || getPrimarySyncBaseUrl()].filter(Boolean);
+            // Try same-origin first, then configured primary as fallback.
+            const writeTargets = Array.from(new Set([
+                getCurrentSyncBaseUrl(),
+                getPrimarySyncBaseUrl()
+            ].filter(Boolean)));
             if (!writeTargets.length) {
                 updateSyncStatus('offline', 'Offline');
                 return false;
@@ -11330,6 +11539,7 @@
             let conflictCount = 0;
             let authFailureCount = 0;
             let respondedCount = 0;
+            let timeoutCount = 0;
             let newestStamp = 0;
             let newestIso = '';
             for (const baseUrl of writeTargets) {
@@ -11339,7 +11549,7 @@
                         headers: { 'Content-Type': 'application/json' },
                         credentials: 'include',
                         body: JSON.stringify({ data, peers: baseUrls })
-                    }, 9000);
+                    }, 45000);
                     respondedCount += 1;
                     if (resp.status === 401 || resp.status === 403) {
                         // Session might be stale after server restart; refresh session context once and retry.
@@ -11350,7 +11560,7 @@
                                 headers: { 'Content-Type': 'application/json' },
                                 credentials: 'include',
                                 body: JSON.stringify({ data, peers: baseUrls })
-                            }, 9000);
+                            }, 45000);
                         }
                         if (resp.status === 401 || resp.status === 403) {
                             authFailureCount += 1;
@@ -11373,6 +11583,9 @@
                         newestIso = payload.updated_at || newestIso;
                     }
                 } catch (err) {
+                    if (err && err.name === 'AbortError') {
+                        timeoutCount += 1;
+                    }
                     continue;
                 }
             }
@@ -11410,6 +11623,13 @@
                     showAlert('Server reachable, but sync payload was rejected. Pulling latest snapshot now.', 'warning');
                 }
                 await pullFromServer(false, true);
+                return false;
+            }
+            if (timeoutCount > 0) {
+                updateSyncStatus('online', 'Online (sync timeout)');
+                if (!options.silent) {
+                    showAlert('Sync timed out while processing a large snapshot. Please retry once.', 'warning');
+                }
                 return false;
             }
             // ── Write-ahead log ──────────────────────────────────────────────────────
@@ -11742,8 +11962,8 @@
                 btn.innerHTML = '<i class="fas fa-sync fa-spin"></i> Publishing';
             }
             try {
-                const pushed = await withTimeout(pushToServer(db.getData(), { silent: false }), 4000);
-                await withTimeout(pullFromServer(true, true), 4000);
+                const pushed = await withTimeout(pushToServer(db.getData(), { silent: false }), 90000);
+                await withTimeout(pullFromServer(true, true), 30000);
                 if (!pushed) {
                     showAlert('Force Publish could not reach server. Local data remains safe.', 'warning');
                 } else {
@@ -12581,8 +12801,8 @@
             const todayMonth = getCurrentMonthKey();
             const savedMonth = localStorage.getItem(ACTIVE_SCOREBOARD_MONTH_KEY) || '';
             const currentMonth = (
-                (months.includes(todayMonth) ? todayMonth : '') ||
                 (savedMonth && months.includes(savedMonth) && savedMonth) ||
+                (months.includes(todayMonth) ? todayMonth : '') ||
                 months[0] ||
                 todayMonth
             );
@@ -17712,6 +17932,109 @@
                 loadNotificationsTab();
             }
             showAlert('Notifications refreshed.', 'success');
+        }
+
+        function getActivityLogRows() {
+            const data = db.getData();
+            const rows = Array.isArray(data.activity_log) ? data.activity_log : [];
+            return rows.slice().sort((a, b) => {
+                const aa = Date.parse(String(a && a.logged_at || '')) || 0;
+                const bb = Date.parse(String(b && b.logged_at || '')) || 0;
+                return bb - aa;
+            });
+        }
+
+        function populateActivityLogUserFilter(rows) {
+            const select = document.getElementById('activityLogUserFilter');
+            if (!select) return;
+            const current = select.value || '';
+            const users = Array.from(new Set((rows || [])
+                .map(r => String(r && r.actor_login_id || '').trim())
+                .filter(Boolean))).sort((a, b) => a.localeCompare(b));
+            select.innerHTML = '<option value="">All Users</option>' + users.map(u => `<option value="${escapeHtml(u)}">${escapeHtml(u)}</option>`).join('');
+            if (users.includes(current)) select.value = current;
+        }
+
+        function populateActivityLogClassFilter(rows) {
+            const select = document.getElementById('activityLogClassFilter');
+            if (!select) return;
+            const current = select.value || '';
+            const classes = Array.from(new Set((rows || [])
+                .map(r => String(r && r.class || '').trim())
+                .filter(Boolean))).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+            select.innerHTML = '<option value="">All Classes</option>' + classes.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+            if (classes.includes(current)) select.value = current;
+        }
+
+        function resetActivityLogFilters() {
+            const ids = [
+                'activityLogUserFilter',
+                'activityLogClassFilter',
+                'activityLogStudentFilter',
+                'activityLogMonthFilter',
+                'activityLogFromDate',
+                'activityLogToDate'
+            ];
+            ids.forEach(id => {
+                const el = document.getElementById(id);
+                if (!el) return;
+                if (el.tagName === 'SELECT') el.value = '';
+                else el.value = '';
+            });
+            loadActivityLogTab();
+        }
+
+        function loadActivityLogTab() {
+            const tbody = document.getElementById('activityLogBody');
+            if (!tbody) return;
+            const rows = getActivityLogRows();
+            populateActivityLogUserFilter(rows);
+            populateActivityLogClassFilter(rows);
+
+            const userFilter = String(getElementValue('activityLogUserFilter') || '').trim().toLowerCase();
+            const classFilter = String(getElementValue('activityLogClassFilter') || '').trim();
+            const studentFilter = String(getElementValue('activityLogStudentFilter') || '').trim().toLowerCase();
+            const monthFilter = String(getElementValue('activityLogMonthFilter') || '').trim();
+            const fromDate = String(getElementValue('activityLogFromDate') || '').trim();
+            const toDate = String(getElementValue('activityLogToDate') || '').trim();
+
+            const filtered = rows.filter(item => {
+                if (!item || typeof item !== 'object') return false;
+                const actor = String(item.actor_login_id || '').trim().toLowerCase();
+                const cls = String(item.class || '').trim();
+                const roll = String(item.student_roll || '').trim().toLowerCase();
+                const name = String(item.student_name || '').trim().toLowerCase();
+                const month = String(item.month || '').trim();
+                const date = String(item.date || '').trim();
+                if (userFilter && actor !== userFilter) return false;
+                if (classFilter && cls !== classFilter) return false;
+                if (studentFilter && !roll.includes(studentFilter) && !name.includes(studentFilter)) return false;
+                if (monthFilter && month !== monthFilter) return false;
+                if (fromDate && date && date < fromDate) return false;
+                if (toDate && date && date > toDate) return false;
+                return true;
+            }).slice(0, 3000);
+
+            if (!filtered.length) {
+                tbody.innerHTML = '<tr><td colspan="9" class="text-center" style="padding: 24px;">No activity log entries for selected filters.</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = filtered.map(item => {
+                const ts = item.logged_at ? formatDateLabel(item.logged_at) : '-';
+                const studentLabel = [String(item.student_roll || '').trim(), String(item.student_name || '').trim()].filter(Boolean).join(' - ');
+                return `<tr>
+                    <td>${escapeHtml(ts)}</td>
+                    <td>${escapeHtml(String(item.actor_login_id || '-'))}</td>
+                    <td>${escapeHtml(String(item.actor_role || '-'))}</td>
+                    <td>${escapeHtml(String(item.class || '-'))}</td>
+                    <td>${escapeHtml(studentLabel || '-')}</td>
+                    <td>${escapeHtml(String(item.entity || '-'))}</td>
+                    <td>${escapeHtml(String(item.action || '-'))}</td>
+                    <td>${escapeHtml(String(item.date || '-'))}</td>
+                    <td>${escapeHtml(String(item.detail || '-'))}</td>
+                </tr>`;
+            }).join('');
         }
 
         function getPostHistoryStatus(record) {
@@ -23998,83 +24321,62 @@
         }
 
         async function importExcel() {
+            // Server-side historical import:
+            // - monthly totals from Total Score / Final Score
+            // - per-date star usage markers from real date columns
+            // Feb 26 and newer months are never touched.
             const file = document.getElementById('excelFile').files[0];
             if (!file) {
                 showAlert('Please select an Excel file', 'danger');
                 return;
             }
-            if (!confirm('This will replace offline data with the Excel workbook. Continue?')) {
-                return;
-            }
-            await ensureXlsxLoaded();
+            if (!confirm(
+                'Import Historical Scores from Excel workbook?\n\n' +
+                '• Reads historical monthly totals from "Total Score" (fallback: "Final Score")\n' +
+                '• Imports historical star usage from date columns only (for red * cells)\n' +
+                '• Old admin-imported scores for those months will be replaced\n' +
+                '• Feb 2026, Mar 2026 and current teacher data are NOT changed\n\n' +
+                'Continue?'
+            )) return;
 
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                try {
-                    const data = new Uint8Array(e.target.result);
-                    const workbook = XLSX.read(data, { type: 'array' });
-                    const imported = parseWorkbook(workbook);
-                    if (imported.students.length === 0) {
-                        showAlert('No student data found in workbook', 'danger');
-                        return;
-                    }
-                    const existing = db.getData();
-                    const existingByRoll = new Map((existing.students || []).map(s => [String(s.roll || '').toUpperCase(), s]));
-                    const importedStudents = imported.students.map(student => {
-                        const prev = existingByRoll.get(String(student.roll || '').toUpperCase());
-                        return ({
-                        ...student,
-                        group: student.group || deriveGroupFromRoll(student.roll),
-                        active: prev ? prev.active !== false : (student.active !== false),
-                        raw_name: prev ? (prev.raw_name || prev.name || student.name) : (student.raw_name || student.name),
-                        stars: prev ? (parseInt(prev.stars, 10) || 0) : (parseInt(student.stars, 10) || 0),
-                        veto_count: prev ? (parseInt(prev.veto_count, 10) || 0) : (parseInt(student.veto_count, 10) || 0),
-                        profile_data: prev ? (prev.profile_data || {}) : (student.profile_data || {})
-                    });
-                    }).map(student => normalizeStudentMeta(student));
-                    db.saveData({
-                        students: importedStudents,
-                        scores: imported.scores,
-                        months: [],
-                        month_students: imported.month_students || {},
-                        month_extra_columns: imported.month_extra_columns || {},
-                        month_student_extras: imported.month_student_extras || {},
-                        month_roster_profiles: imported.month_roster_profiles || existing.month_roster_profiles || {},
-                        parties: imported.parties.length ? imported.parties.map((party, idx) => ({ id: idx + 1, ...party, members: party.members || [] })) : existing.parties,
-                        leadership: imported.leadership.length ? imported.leadership.map((post, idx) => ({ id: idx + 1, ...post })) : existing.leadership,
-                        class_reps: existing.class_reps || [],
-                        group_crs: existing.group_crs || [],
-                        election_candidates: existing.election_candidates || [],
-                        election_votes: existing.election_votes || [],
-                        election_individual_votes: existing.election_individual_votes || [],
-                        role_veto_grants: existing.role_veto_grants || [],
-                        post_holder_history: existing.post_holder_history || [],
-                        notification_history: existing.notification_history || [],
-                        appeals: existing.appeals || [],
-                        attendance: existing.attendance || [],
-                        fee_records: existing.fee_records || [],
-                        homework: existing.homework || []
-                    });
-                    db.ensureSchema();
-                    const febKey = findFeb26MonthKey(imported.month_students || {});
-                    if (febKey && imported.month_roster_profiles && imported.month_roster_profiles[febKey]) {
-                        applyRosterProfilesForMonth(febKey, imported.month_roster_profiles[febKey], { silent: true });
-                    } else {
-                        applyActiveStatusFromMonth(febKey, { silent: true });
-                    }
-                    const monthCount = new Set(imported.scores.map(s => s.month)).size;
-                    const extraColCount = Object.values(imported.month_extra_columns || {}).reduce((sum, cols) => sum + ((cols || []).length), 0);
-                    const scannedSheets = (imported.scanned_sheets || []).length;
-                    showAlert(`Excel imported: ${imported.students.length} students, ${imported.scores.length} scores, ${extraColCount} extra columns across ${monthCount} months from ${scannedSheets} visible sheets`, 'success');
-                    loadScoreboard();
-                    loadStudents();
-                    loadParties();
-                    loadLeadership();
-                } catch (err) {
-                    showAlert('Error reading Excel file: ' + err.message, 'danger');
+            const btn = event && event.target;
+            if (btn) { btn.disabled = true; btn.textContent = 'Importing…'; }
+
+            const formData = new FormData();
+            formData.append('file', file);
+            try {
+                const resp = await fetch('/scoreboard/import-historical-data', {
+                    method: 'POST',
+                    body: formData,
+                    credentials: 'same-origin'
+                });
+                if (!resp.ok) {
+                    const errText = await resp.text();
+                    showAlert('Import failed (HTTP ' + resp.status + '): ' + errText, 'danger');
+                    return;
                 }
-            };
-            reader.readAsArrayBuffer(file);
+                const result = await resp.json();
+                if (result.success) {
+                    const lines = [`✓ ${result.message}`];
+                    Object.entries(result.month_report || {}).forEach(([mk, r]) => {
+                        if (r.status === 'ok') {
+                            lines.push(`  ${mk} (${r.sheet}): ${r.students_imported} totals + ${r.star_usage_rows || 0} star markers [total col ${r.total_col || '-'}, date cols ${r.date_columns || 0}, header row ${r.header_row}]`);
+                        } else {
+                            lines.push(`  ${mk}: SKIPPED — ${r.reason}`);
+                        }
+                    });
+                    showAlert(lines.join('\n'), 'success');
+                    // Pull fresh data from server so the scoreboard reflects the import
+                    await pullFromServer(false, true);
+                    loadScoreboard();
+                } else {
+                    showAlert('Import failed: ' + (result.error || 'Unknown error'), 'danger');
+                }
+            } catch (e) {
+                showAlert('Import error: ' + e.message, 'danger');
+            } finally {
+                if (btn) { btn.disabled = false; btn.textContent = 'Import Historical Data'; }
+            }
         }
 
         async function exportToExcel() {
