@@ -4328,8 +4328,12 @@ def offline_force_publish():
     payload = request.get_json(silent=True) or {}
     data = payload.get('data') if isinstance(payload, dict) else None
     request_peers = payload.get('peers', []) if isinstance(payload, dict) else []
+    used_fallback_snapshot = False
     if not isinstance(data, dict):
-        return jsonify({'success': False, 'error': 'Invalid payload'}), 400
+        data = _load_offline_data() or {}
+        used_fallback_snapshot = True
+    if not isinstance(data, dict):
+        data = {}
 
     data['server_updated_at'] = _server_now_iso()
     _save_offline_data(data)
@@ -4442,6 +4446,7 @@ def offline_force_publish():
     return jsonify({
         'success': True,
         'replication_ok': replication_ok,
+        'used_fallback_snapshot': used_fallback_snapshot,
         'updated_at': data.get('server_updated_at'),
         'supabase': supabase_result,
         'peers': peer_results
