@@ -9310,7 +9310,7 @@
                 return this.getData().fee_records || [];
             }
 
-            upsertFeeRecord(record) {
+            upsertFeeRecord(record, options = {}) {
                 const data = this.getData();
                 data.fee_records = data.fee_records || [];
                 const parsedStudentId = parseInt(record && record.studentId, 10);
@@ -9330,7 +9330,7 @@
                 } else {
                     data.fee_records.push(normalizedRecord);
                 }
-                return this.saveData(data);
+                return this.saveData(data, options);
             }
 
             getHomework() {
@@ -22140,7 +22140,7 @@
         }
 
         function saveFeeRecord(studentId, updates) {
-            if (currentUserRole !== 'admin') return;
+            if (currentUserRole !== 'admin') return false;
             const studentKey = String(studentId);
             const existing = normalizeFeeRecord(db.getFeeRecords().find(r => String(r.studentId) === studentKey));
             const parsedStudentId = parseInt(studentId, 10);
@@ -22153,7 +22153,7 @@
                 next.pending_amount = null;
             }
             next.period_months = Math.max(1, parseInt(next.period_months, 10) || 1);
-            return db.upsertFeeRecord(next);
+            return db.upsertFeeRecord(next, { allowTeacher: true, skipSync: true });
         }
 
         async function syncFeeChangeNow() {
@@ -22171,6 +22171,7 @@
             const modal = document.getElementById(modalId);
             if (!modal) return;
             modal.classList.remove('hidden');
+            modal.style.display = '';
             const content = modal.querySelector('.validation-modal-content');
             if (!content) return;
             content.style.position = '';
@@ -22213,7 +22214,10 @@
 
         function closeFeeModal(id) {
             const el = document.getElementById(id);
-            if (el) el.classList.add('hidden');
+            if (el) {
+                el.classList.add('hidden');
+                el.style.display = 'none';
+            }
             const content = el ? el.querySelector('.validation-modal-content') : null;
             if (content) {
                 content.style.position = '';
@@ -22250,6 +22254,8 @@
             document.getElementById('feeEditResetWarn').style.display = 'none';
             updateFeeEditPreview();
             openFeeModalNearAnchor('feeEditModal', anchorEl);
+            const modalEl = document.getElementById('feeEditModal');
+            if (modalEl) modalEl.style.display = '';
         }
 
         function updateFeeEditPreview() {
@@ -22290,16 +22296,25 @@
                 updates.payment_history = [];
             }
 
-            const saved = saveFeeRecord(studentId, updates);
-            if (!saved) { showAlert('Save failed locally. Run Master Update and retry.', 'warning'); return; }
             closeFeeModal('feeEditModal');
-            loadFeesTab();
-            showAlert('✅ Fee record updated instantly', 'success');
+            let saved = false;
             try {
-                await syncFeeChangeNow();
+                saved = !!saveFeeRecord(studentId, updates);
             } catch (e) {
-                showAlert('Saved locally. Server sync will retry in background.', 'warning');
+                saved = false;
             }
+            if (!saved) {
+                loadFeesTab();
+                showAlert('Save failed locally. Run Master Update and retry.', 'warning');
+                return;
+            }
+            setTimeout(() => {
+                loadFeesTab();
+                showAlert('✅ Fee record updated instantly', 'success');
+            }, 0);
+            syncFeeChangeNow().catch(() => {
+                showAlert('Saved locally. Server sync will retry in background.', 'warning');
+            });
         }
 
         // ── PAY MODAL ─────────────────────────────────────────────────────────────
