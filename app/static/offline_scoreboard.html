@@ -22160,7 +22160,6 @@
             if (!SERVER_SYNC.enabled) return;
             if (!(currentUserRole === 'admin' || currentUserRole === 'teacher')) return;
             await pushToServer(db.getData(), { silent: true });
-            await pullFromServer(false);
         }
 
         // ─── Fee modal helpers ───────────────────────────────────────────────────
@@ -22360,7 +22359,6 @@
         async function confirmFeePayModal() {
             if (currentUserRole !== 'admin' || _feeModalStudentId === null) return;
             const studentId = _feeModalStudentId;
-            _feeModalStudentId = null; // prevent double-execution from rapid clicks
             const note = (document.getElementById('feePayNote').value || '').trim();
             const studentKey = String(studentId);
             const record = normalizeFeeRecord(db.getFeeRecords().find(r => String(r.studentId) === studentKey));
@@ -22377,12 +22375,28 @@
             const history = Array.isArray(record.payment_history) ? record.payment_history.slice() : [];
             history.push({ date: today, amount, note: fullNote });
 
-            const saved = saveFeeRecord(studentId, buildFeeSettlementUpdate(record, today, amount, history));
-            if (!saved) { showAlert('Save failed locally. Run Master Update and retry.', 'warning'); return; }
             closeFeeModal('feePayModal');
-            await syncFeeChangeNow();
-            loadFeesTab();
-            showAlert(isEarly ? `Early payment recorded (before due ${formatDateLabel(dueDate)})` : 'Fees marked as paid', 'success');
+            const updatePayload = buildFeeSettlementUpdate(record, today, amount, history);
+            // Explicitly stamp today's paid date in local record.
+            updatePayload.last_paid_date = today;
+            let saved = false;
+            try {
+                saved = !!saveFeeRecord(studentId, updatePayload);
+            } catch (e) {
+                saved = false;
+            }
+            if (!saved) {
+                loadFeesTab();
+                showAlert('Save failed locally. Run Master Update and retry.', 'warning');
+                return;
+            }
+            setTimeout(() => {
+                loadFeesTab();
+                showAlert(isEarly ? `⚡ Early payment recorded (before due ${formatDateLabel(dueDate)})` : '✅ Fees marked as paid', 'success');
+            }, 0);
+            syncFeeChangeNow().catch(() => {
+                showAlert('Saved locally. Server sync will retry in background.', 'warning');
+            });
         }
 
         // ── PARTIAL MODAL ─────────────────────────────────────────────────────────
