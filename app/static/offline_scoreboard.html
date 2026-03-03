@@ -1493,6 +1493,17 @@
         .fee-hist-early { color: #fde68a; }
         .fee-hist-partial { color: #93c5fd; }
         .fee-hist-regular { color: #86efac; }
+        .fee-hist-delete { text-align: right; }
+        .fee-delete-entry {
+            background: rgba(239,68,68,0.14);
+            border: 1px solid rgba(248,113,113,0.4);
+            color: #fecaca;
+            border-radius: 6px;
+            padding: 3px 7px;
+            font-size: 11px;
+            cursor: pointer;
+        }
+        .fee-delete-entry:hover { background: rgba(239,68,68,0.22); }
         .fee-modal-remaining { font-size: 15px; font-weight: 700; color: #f1f5f9; margin: 4px 0 10px; }
         .fee-modal-remaining.cleared { color: #86efac; }
 
@@ -2227,6 +2238,8 @@
             box-shadow: 0 25px 80px rgba(0, 0, 0, 0.6);
             max-width: 500px;
             width: 90%;
+            max-height: 86vh;
+            overflow: auto;
             padding: 0;
             animation: fadeIn var(--dur-sm) var(--ease-out) both;
         }
@@ -3093,7 +3106,7 @@
 
         <!-- FEE EDIT MODAL -->
         <div id="feeEditModal" class="validation-modal hidden">
-            <div class="validation-modal-content" style="max-width:420px;">
+            <div class="validation-modal-content" style="max-width:560px;">
                 <div class="validation-modal-header">
                     <h3><i class="fas fa-pencil-alt" style="color:#93c5fd;margin-right:8px;"></i>Edit Fee Record</h3>
                 </div>
@@ -3106,7 +3119,7 @@
                     <div class="fee-modal-row">
                         <label>Cycle Start Date <span style="font-weight:400;color:#64748b;">(due = start + period)</span></label>
                         <input type="date" id="feeEditStartDate" oninput="updateFeeEditPreview(); const chg=this.value!==(this.dataset.originalStart||''); document.getElementById('feeEditResetWarn').style.display=chg?'block':'none';">
-                        <span class="fee-modal-reset-warn" id="feeEditResetWarn">⚠ Changing start date will reset the paid cycle (last paid date cleared)</span>
+                        <span class="fee-modal-reset-warn" id="feeEditResetWarn">⚠ Changing start date will clear saved payment history for prior cycle tracking.</span>
                     </div>
                     <div class="fee-modal-row">
                         <label>Period (months)</label>
@@ -3120,14 +3133,14 @@
                 </div>
                 <div class="validation-modal-footer">
                     <button class="secondary" onclick="closeFeeModal('feeEditModal')">Cancel</button>
-                    <button class="btn-primary" onclick="saveFeeEditModal()"><i class="fas fa-save"></i> Save</button>
+                    <button class="btn-primary" onclick="saveFeeEditModal()"><i class="fas fa-save"></i> Save ✅</button>
                 </div>
             </div>
         </div>
 
         <!-- FEE PAY MODAL -->
         <div id="feePayModal" class="validation-modal hidden">
-            <div class="validation-modal-content" style="max-width:420px;">
+            <div class="validation-modal-content" style="max-width:560px;">
                 <div class="validation-modal-header">
                     <h3><i class="fas fa-check-circle" style="color:#86efac;margin-right:8px;"></i>Confirm Payment</h3>
                 </div>
@@ -3150,7 +3163,7 @@
 
         <!-- FEE PARTIAL MODAL -->
         <div id="feePartialModal" class="validation-modal hidden">
-            <div class="validation-modal-content" style="max-width:420px;">
+            <div class="validation-modal-content" style="max-width:560px;">
                 <div class="validation-modal-header">
                     <h3><i class="fas fa-coins" style="color:#fde68a;margin-right:8px;"></i>Partial Payment</h3>
                 </div>
@@ -3177,7 +3190,7 @@
 
         <!-- FEE HISTORY MODAL -->
         <div id="feeHistoryModal" class="validation-modal hidden">
-            <div class="validation-modal-content" style="max-width:500px;">
+            <div class="validation-modal-content" style="max-width:640px;">
                 <div class="validation-modal-header">
                     <h3><i class="fas fa-history" style="color:#c4b5fd;margin-right:8px;"></i>Payment History</h3>
                 </div>
@@ -3186,6 +3199,7 @@
                     <div id="feeHistoryContent"></div>
                 </div>
                 <div class="validation-modal-footer">
+                    <button class="danger" onclick="clearFeePaymentHistory()"><i class="fas fa-trash"></i> Clear History</button>
                     <button class="btn-primary" onclick="closeFeeModal('feeHistoryModal')">Close</button>
                 </div>
             </div>
@@ -3586,6 +3600,12 @@
             <div class="form-card">
                 <h3><i class="fas fa-users"></i> Student List (Record Score)</h3>
                 <div class="form-grid" style="margin-bottom: 10px;">
+                    <div class="form-group" id="recordScoreMonthPickerWrap">
+                        <label>Month</label>
+                        <select id="recordScoreMonthPicker" onchange="applyRecordScoreMonthPicker()">
+                            <option value="">Select month...</option>
+                        </select>
+                    </div>
                     <div class="form-group">
                         <label>Group Filter</label>
                         <select id="scoreGroupFilterList" onchange="syncRecordScoreGroupFilter()">
@@ -3828,6 +3848,12 @@
                         <option value="due">Due</option>
                         <option value="past_due">Past Due</option>
                         <option value="paid">Paid</option>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <label>Month</label>
+                    <select id="feesMonthFilter" onchange="loadFeesTab()">
+                        <option value="all" selected>All Months</option>
                     </select>
                 </div>
             </div>
@@ -9652,6 +9678,9 @@
                     });
 
                     const isCurrentMonth = String(month || '').trim() === getCurrentMonthKey();
+                    // Star '*' symbols in cells apply from Feb 2026 onwards only.
+                    // Historical months (before Feb 26) keep their original appearance untouched.
+                    const showStarSymbols = String(month || '').trim() >= '2026-02';
                     allDates.forEach(date => {
                         let points = row.pointsByDate[date] || 0;
                         const starOverride = starOverrides[date];
@@ -9700,14 +9729,14 @@
                             } else {
                                 scoreClass = 'score-cell bonus-neutral';
                             }
-                            const starText = (starAwardCount > 0 && isCurrentMonth)
+                            const starText = (starAwardCount > 0 && showStarSymbols)
                                 ? (starAwardCount <= 3 ? '*'.repeat(starAwardCount) : `*x${starAwardCount}`)
                                 : '';
                             const displayWithStars = starText ? `${displayValue} <span class="star-added">${starText}</span>` : displayValue;
                             const titleWithStars = starAwardCount > 0
                                 ? (noteText ? `${noteText} | Stars awarded: +${starAwardCount}` : `Stars awarded: +${starAwardCount}`)
                                 : (noteText || '');
-                            if (starAwardCount > 0 && isCurrentMonth) {
+                            if (starAwardCount > 0 && showStarSymbols) {
                                 scoreClass = `${scoreClass} star-awarded star-awarded-green`.trim();
                             }
                             dailyDisplay.push(displayWithStars);
@@ -10517,6 +10546,21 @@
                 listGroupFilter.innerHTML = groupFilterSelect.innerHTML;
                 listGroupFilter.value = listSelected || 'all';
             }
+        }
+
+        // Month picker in Student List — changes here cascade to the main scoreMonth selector
+        function applyRecordScoreMonthPicker() {
+            const month = getElementValue('recordScoreMonthPicker') || getCurrentMonthKey();
+            const bounds = getMonthDateBounds(month);
+            // Sync the main month selector and date field
+            const scoreMonthEl = document.getElementById('scoreMonth');
+            if (scoreMonthEl) scoreMonthEl.value = month;
+            const firstDay = (bounds && bounds.min) ? bounds.min : (month + '-01');
+            setElementValue('scoreDate', firstDay);
+            renderRecordScoreDateStrip(month, firstDay);
+            populateScoreGroupFilter();
+            updateScoreStudentOptions(true);
+            loadRecordStudentTable();
         }
 
         function syncRecordScoreGroupFilter(syncClass = false) {
@@ -13750,12 +13794,18 @@
             if (!months.includes(todayMonth)) {
                 months.unshift(todayMonth);
             }
-            monthSelect.innerHTML = '<option value="">Select Month...</option>' + 
-                months.map(m => {
+            const monthOptionsHtml = months.map(m => {
                     const date = new Date(m + '-01');
                     return `<option value="${m}">${date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</option>`;
                 }).join('');
+            monthSelect.innerHTML = '<option value="">Select Month...</option>' + monthOptionsHtml;
             document.getElementById('scoreMonth').value = todayMonth;
+            // Populate the Student List month picker with the same options
+            const recordPicker = document.getElementById('recordScoreMonthPicker');
+            if (recordPicker) {
+                recordPicker.innerHTML = monthOptionsHtml;
+                recordPicker.value = todayMonth;
+            }
             populateScoreGroupFilter();
             renderRecordScoreDateStrip(todayMonth, today);
             updateScoreStudentOptions(false);
@@ -13763,6 +13813,17 @@
 
             document.getElementById('scoreStudent').onchange = loadExistingScore;
             document.getElementById('scoreDate').onchange = () => {
+                const d = getElementValue('scoreDate');
+                if (d) {
+                    // Auto-sync scoreMonth to match typed date — prevents silent wrong-month saves
+                    const mFromDate = d.substring(0, 7);
+                    const scoreMonthEl = document.getElementById('scoreMonth');
+                    if (scoreMonthEl && scoreMonthEl.value !== mFromDate) {
+                        scoreMonthEl.value = mFromDate;
+                        const picker = document.getElementById('recordScoreMonthPicker');
+                        if (picker) picker.value = mFromDate;
+                    }
+                }
                 renderRecordScoreDateStrip(getElementValue('scoreMonth') || getElementValue('scoreDate').substring(0, 7), getElementValue('scoreDate'));
                 loadExistingScore();
                 populateScoreGroupFilter();
@@ -13776,10 +13837,14 @@
                     if (!date || !String(date).startsWith(`${month}-`)) {
                         setElementValue('scoreDate', bounds.min || date);
                     }
+                    // Keep picker in sync
+                    const picker = document.getElementById('recordScoreMonthPicker');
+                    if (picker && picker.value !== month) picker.value = month;
                 }
                 renderRecordScoreDateStrip(month, getElementValue('scoreDate'));
                 populateScoreGroupFilter();
                 updateScoreStudentOptions(true);
+                loadRecordStudentTable();
             };
             if (listGroupFilter) {
                 listGroupFilter.onchange = () => syncRecordScoreGroupFilter();
@@ -14072,6 +14137,8 @@
             setElementValue('scoreDate', dateKey);
             const month = String(dateKey).substring(0, 7);
             setElementValue('scoreMonth', month);
+            const picker = document.getElementById('recordScoreMonthPicker');
+            if (picker) picker.value = month;
             renderRecordScoreDateStrip(month, dateKey);
             loadExistingScore();
             populateScoreGroupFilter();
@@ -14338,6 +14405,8 @@
                 setElementValue('scoreMonth', month);
                 previous.month = month;
             }
+            // Keep Student List month picker in sync
+            setSelectValueIfExists('recordScoreMonthPicker', previous.month, '');
 
             setElementValue('scoreStatusFilter', previous.status);
             populateScoreGroupFilter();
@@ -17441,7 +17510,7 @@
         }
 
         function renderLeadershipOverview() {
-            const posts = db.getLeadership();
+            const posts = db.getLeadership().filter(p => normalizePostHolderStatus(p.status) !== 'ended');
             const tbody = document.getElementById('officeLeadershipBody');
             if (!tbody) return;
             const todayKey = formatDateKey(new Date());
@@ -17503,7 +17572,7 @@
         }
 
         function loadClassReps() {
-            const groupReps = db.getGroupCRs();
+            const groupReps = db.getGroupCRs().filter(r => normalizePostHolderStatus(r.status) !== 'ended');
             const students = db.getStudents().filter(student => isVisibleOutsideScoreboard(student));
             const studentMap = new Map(students.map(s => [s.id, s]));
             const tbody = document.getElementById('classRepBody');
@@ -17622,7 +17691,11 @@
         }
 
         function getPartyPresident(party, studentMap) {
-            const member = (party.members || []).find(m => isPartyPresidentDesignation(m.designation));
+            // Only consider members whose tenure has not been ended
+            const member = (party.members || []).find(m =>
+                isPartyPresidentDesignation(m.designation) &&
+                normalizePostHolderStatus(m.status) !== 'ended'
+            );
             if (!member) return null;
             const student = studentMap.get(member.studentId);
             return { member, student };
@@ -18038,7 +18111,10 @@
         function endLeadershipTenure(postId) {
             if (currentUserRole !== 'admin') return;
             const data = db.getData();
-            data.leadership = (data.leadership || []).filter(item => item.id !== postId);
+            const post = (data.leadership || []).find(item => item.id === postId);
+            if (!post) { showAlert('Post not found.', 'warning'); return; }
+            post.status = 'ended';
+            post.ended_on = new Date().toISOString().split('T')[0];
             savePostHolderData(data);
         }
 
@@ -18067,28 +18143,35 @@
             const data = db.getData();
             const party = (data.parties || []).find(item => item.id === partyId);
             if (!party) return;
-            const member = (party.members || []).find(item => isPartyPresidentDesignation(item.designation));
+            // Find active (non-ended) president only
+            const member = (party.members || []).find(item =>
+                isPartyPresidentDesignation(item.designation) &&
+                normalizePostHolderStatus(item.status) !== 'ended'
+            );
             if (!member) {
-                showAlert('No party president is currently assigned for this party.', 'warning');
+                showAlert('No active party president is currently assigned for this party.', 'warning');
                 return;
             }
-            member.designation = '';
-            member.status = 'vacant';
+            // Mark as ended — keep designation so the history is intact, server merge preserves ended
+            member.status = 'ended';
+            member.ended_on = new Date().toISOString().split('T')[0];
             savePostHolderData(data);
         }
 
         function endAllPostHolderTenures() {
             if (currentUserRole !== 'admin') return;
-            if (!confirm('End tenure of all current post holders? This will vacate leadership, CR and party president roles immediately.')) return;
+            if (!confirm('End tenure of all current post holders? This will end all leadership, CR and party president roles immediately.')) return;
             const data = db.getData();
-            data.leadership = [];
-            data.class_reps = [];
-            data.group_crs = [];
+            const today = new Date().toISOString().split('T')[0];
+            (data.leadership || []).forEach(p => { p.status = 'ended'; p.ended_on = today; });
+            (data.class_reps || []).forEach(r => { r.status = 'ended'; r.ended_on = today; });
+            (data.group_crs || []).forEach(r => { r.status = 'ended'; r.ended_on = today; });
             (data.parties || []).forEach(party => {
                 (party.members || []).forEach(member => {
-                    if (isPartyPresidentDesignation(member.designation)) {
-                        member.designation = '';
-                        member.status = 'vacant';
+                    if (isPartyPresidentDesignation(member.designation) &&
+                            normalizePostHolderStatus(member.status) !== 'ended') {
+                        member.status = 'ended';
+                        member.ended_on = today;
                     }
                 });
             });
@@ -22084,14 +22167,68 @@
 
         let _feeModalStudentId = null;  // shared state for open modal
 
+        function openFeeModalNearAnchor(modalId, anchorEl) {
+            const modal = document.getElementById(modalId);
+            if (!modal) return;
+            modal.classList.remove('hidden');
+            const content = modal.querySelector('.validation-modal-content');
+            if (!content) return;
+            content.style.position = '';
+            content.style.left = '';
+            content.style.right = '';
+            content.style.top = '';
+            content.style.margin = '';
+            if (!anchorEl || window.innerWidth < 900) return;
+            try {
+                const rect = anchorEl.getBoundingClientRect();
+                const gap = 10;
+                const maxModalWidth = Math.max(360, Math.min(640, window.innerWidth - 24));
+                content.style.width = `min(92vw, ${maxModalWidth}px)`;
+                content.style.maxWidth = `${maxModalWidth}px`;
+
+                const contentRect = content.getBoundingClientRect();
+                const modalW = Math.ceil(contentRect.width || content.offsetWidth || 520);
+                const modalH = Math.ceil(contentRect.height || content.offsetHeight || 420);
+                const desiredTop = Math.max(12, Math.min(rect.top - 8, window.innerHeight - modalH - 12));
+
+                const rightCandidate = rect.right + gap;
+                const leftCandidate = rect.left - modalW - gap;
+                let desiredLeft;
+                if (rightCandidate + modalW <= window.innerWidth - 12) {
+                    desiredLeft = rightCandidate;
+                } else if (leftCandidate >= 12) {
+                    desiredLeft = leftCandidate;
+                } else {
+                    desiredLeft = Math.max(12, Math.floor((window.innerWidth - modalW) / 2));
+                }
+
+                content.style.position = 'fixed';
+                content.style.left = `${desiredLeft}px`;
+                content.style.top = `${desiredTop}px`;
+                content.style.margin = '0';
+            } catch (e) {
+                // Fallback to centered modal layout.
+            }
+        }
+
         function closeFeeModal(id) {
             const el = document.getElementById(id);
             if (el) el.classList.add('hidden');
+            const content = el ? el.querySelector('.validation-modal-content') : null;
+            if (content) {
+                content.style.position = '';
+                content.style.left = '';
+                content.style.right = '';
+                content.style.top = '';
+                content.style.margin = '';
+                content.style.width = '';
+                content.style.maxWidth = '';
+            }
             _feeModalStudentId = null;
         }
 
         // ── EDIT MODAL ────────────────────────────────────────────────────────────
-        function openFeeEditModal(studentId) {
+        function openFeeEditModal(studentId, anchorEl = null) {
             if (currentUserRole !== 'admin') return;
             _feeModalStudentId = studentId;
             const studentKey = String(studentId);
@@ -22112,7 +22249,7 @@
             document.getElementById('feeEditStartDate').dataset.originalStart = startVal || '';
             document.getElementById('feeEditResetWarn').style.display = 'none';
             updateFeeEditPreview();
-            document.getElementById('feeEditModal').classList.remove('hidden');
+            openFeeModalNearAnchor('feeEditModal', anchorEl);
         }
 
         function updateFeeEditPreview() {
@@ -22145,20 +22282,28 @@
             };
             // Start date change resets last_paid_date (existing behaviour, now made explicit)
             if (newStart !== origStart) {
+                if (!confirm('Changing start date will clear previous payment-history chain for this fee cycle. Continue?')) {
+                    return;
+                }
                 updates.start_date = newStart;
                 updates.last_paid_date = '';
+                updates.payment_history = [];
             }
 
             const saved = saveFeeRecord(studentId, updates);
             if (!saved) { showAlert('Save failed locally. Run Master Update and retry.', 'warning'); return; }
             closeFeeModal('feeEditModal');
-            await syncFeeChangeNow();
             loadFeesTab();
-            showAlert('Fee record updated', 'success');
+            showAlert('✅ Fee record updated instantly', 'success');
+            try {
+                await syncFeeChangeNow();
+            } catch (e) {
+                showAlert('Saved locally. Server sync will retry in background.', 'warning');
+            }
         }
 
         // ── PAY MODAL ─────────────────────────────────────────────────────────────
-        function openFeePayModal(studentId) {
+        function openFeePayModal(studentId, anchorEl = null) {
             if (currentUserRole !== 'admin') return;
             _feeModalStudentId = studentId;
             const studentKey = String(studentId);
@@ -22194,7 +22339,7 @@
             }
 
             document.getElementById('feePayNote').value = '';
-            document.getElementById('feePayModal').classList.remove('hidden');
+            openFeeModalNearAnchor('feePayModal', anchorEl);
         }
 
         async function confirmFeePayModal() {
@@ -22226,7 +22371,7 @@
         }
 
         // ── PARTIAL MODAL ─────────────────────────────────────────────────────────
-        function openFeePartialModal(studentId) {
+        function openFeePartialModal(studentId, anchorEl = null) {
             if (currentUserRole !== 'admin') return;
             _feeModalStudentId = studentId;
             const studentKey = String(studentId);
@@ -22246,7 +22391,7 @@
             document.getElementById('feePartialAmount').dataset.dueAmt = dueAmt || 0;
             document.getElementById('feePartialNote').value = '';
             updatePartialRemaining();
-            document.getElementById('feePartialModal').classList.remove('hidden');
+            openFeeModalNearAnchor('feePartialModal', anchorEl);
         }
 
         function updatePartialRemaining() {
@@ -22295,11 +22440,12 @@
         }
 
         // ── HISTORY MODAL ─────────────────────────────────────────────────────────
-        function openFeeHistoryModal(studentId) {
+        function openFeeHistoryModal(studentId, anchorEl = null) {
             const studentKey = String(studentId);
             const record = normalizeFeeRecord(db.getFeeRecords().find(r => String(r.studentId) === studentKey));
             const student = db.getStudents().find(s => s.id === studentId);
             const history = Array.isArray(record.payment_history) ? record.payment_history.slice() : [];
+            _feeModalStudentId = studentId;
             const baseAmt = record.amount !== null ? record.amount :
                 (Number.isFinite(Number(student && student.fees)) ? Number(student.fees) : null);
 
@@ -22312,12 +22458,13 @@
                 contentEl.innerHTML = '<p style="color:#94a3b8;text-align:center;padding:16px;">No payment history recorded yet.</p>';
             } else {
                 // Sort newest first for display
-                const sorted = history.slice().sort((a, b) => {
-                    const da = String(a.date || a.paid_on || '');
-                    const db2 = String(b.date || b.paid_on || '');
+                const sorted = history.map((entry, idx) => ({ entry, idx })).sort((a, b) => {
+                    const da = String(a.entry.date || a.entry.paid_on || '');
+                    const db2 = String(b.entry.date || b.entry.paid_on || '');
                     return db2.localeCompare(da);
                 });
-                const rows = sorted.map(entry => {
+                const rows = sorted.map(row => {
+                    const entry = row.entry;
                     const entryNote = String(entry.note || '').toLowerCase();
                     let typeLabel, typeCls;
                     if (entryNote.includes('early_payment_before_due')) {
@@ -22337,20 +22484,95 @@
                         <td>${formatDateLabel(entry.date || entry.paid_on || '-')}</td>
                         <td style="font-weight:600;">₹${Number(entry.amount) || 0}</td>
                         <td class="${typeCls}">${typeLabel}${noteSuffix}</td>
+                        <td class="fee-hist-delete"><button class="fee-delete-entry" onclick="removeFeeHistoryEntry(${studentId}, ${row.idx})">🗑️ Delete</button></td>
                     </tr>`;
                 }).join('');
                 contentEl.innerHTML = `
                     <table class="fee-history-table">
-                        <thead><tr><th>Date</th><th>Amount</th><th>Type / Note</th></tr></thead>
+                        <thead><tr><th>Date</th><th>Amount</th><th>Type / Note</th><th>Action</th></tr></thead>
                         <tbody>${rows}</tbody>
                     </table>`;
             }
-            document.getElementById('feeHistoryModal').classList.remove('hidden');
+            openFeeModalNearAnchor('feeHistoryModal', anchorEl);
+        }
+
+        function removeFeeHistoryEntry(studentId, entryIndex) {
+            if (currentUserRole !== 'admin') return;
+            const record = normalizeFeeRecord(db.getFeeRecords().find(r => String(r.studentId) === String(studentId)));
+            const history = Array.isArray(record.payment_history) ? record.payment_history.slice() : [];
+            const idx = parseInt(entryIndex, 10);
+            if (!Number.isFinite(idx) || idx < 0 || idx >= history.length) return;
+            history.splice(idx, 1);
+            saveFeeRecord(studentId, { payment_history: history });
+            loadFeesTab();
+            openFeeHistoryModal(studentId);
+        }
+
+        function clearFeePaymentHistory() {
+            if (currentUserRole !== 'admin' || _feeModalStudentId === null) return;
+            if (!confirm('Clear all payment history for this student?')) return;
+            saveFeeRecord(_feeModalStudentId, { payment_history: [] });
+            loadFeesTab();
+            openFeeHistoryModal(_feeModalStudentId);
+        }
+
+        function getAllFeeMonths(students, feeMap) {
+            const months = new Set();
+            const currentMonth = getCurrentMonthKey();
+            if (currentMonth) months.add(currentMonth);
+            (students || []).forEach(student => {
+                const record = getFeeRecordForStudent(student.id, feeMap);
+                const addMonth = (dateText) => {
+                    const raw = String(dateText || '').trim();
+                    if (/^\d{4}-\d{2}/.test(raw)) months.add(raw.slice(0, 7));
+                };
+                addMonth(record.start_date);
+                addMonth(record.last_paid_date);
+                addMonth(record.due_date);
+                (Array.isArray(record.payment_history) ? record.payment_history : []).forEach(entry => {
+                    addMonth(entry && (entry.date || entry.paid_on));
+                });
+            });
+            return Array.from(months).sort((a, b) => b.localeCompare(a));
+        }
+
+        function feeRecordMatchesMonth(record, selectedMonth, dueDate) {
+            if (!selectedMonth || selectedMonth === 'all') return true;
+            const month = String(selectedMonth).trim();
+            const inMonth = (dateText) => {
+                const raw = String(dateText || '').trim();
+                return raw.startsWith(`${month}-`) || raw === month;
+            };
+            if (inMonth(record.start_date)) return true;
+            if (inMonth(record.last_paid_date)) return true;
+            if (inMonth(record.due_date)) return true;
+            if (inMonth(dueDate)) return true;
+            return (Array.isArray(record.payment_history) ? record.payment_history : []).some(entry =>
+                inMonth(entry && (entry.date || entry.paid_on))
+            );
+        }
+
+        function getFeeCollectionAmount(record, selectedMonth) {
+            const history = Array.isArray(record.payment_history) ? record.payment_history : [];
+            if (!history.length) {
+                if (selectedMonth && selectedMonth !== 'all') return 0;
+                return (record.last_paid_date && Number.isFinite(Number(record.amount))) ? Number(record.amount) : 0;
+            }
+            if (!selectedMonth || selectedMonth === 'all') {
+                return history.reduce((sum, entry) => sum + (Number(entry && entry.amount) || 0), 0);
+            }
+            const month = String(selectedMonth).trim();
+            return history.reduce((sum, entry) => {
+                const d = String(entry && (entry.date || entry.paid_on) || '').trim();
+                if (d.startsWith(`${month}-`) || d === month) return sum + (Number(entry && entry.amount) || 0);
+                return sum;
+            }, 0);
         }
 
         function loadFeesTab() {
             const statusFilter = getElementValue('feesStatusFilter') || 'active';
             const dueFilter = getElementValue('feesDueFilter') || 'all';
+            const monthFilter = getElementValue('feesMonthFilter') || 'all';
             const search = (getElementValue('feesSearch') || '').trim().toLowerCase();
             const monthKey = getCurrentMonthKey();
             const today = new Date().toISOString().split('T')[0];
@@ -22370,6 +22592,16 @@
             const feeMap = getFeeRecordMap();
             let overdueCount = 0;
             let totalCollection = 0;
+
+            const monthSelect = document.getElementById('feesMonthFilter');
+            if (monthSelect) {
+                const selected = monthSelect.value || monthFilter || 'all';
+                const months = getAllFeeMonths(students, feeMap);
+                monthSelect.innerHTML = '<option value="all">All Months</option>' +
+                    months.map(m => `<option value="${m}">${m}</option>`).join('');
+                monthSelect.value = (selected === 'all' || months.includes(selected)) ? selected : 'all';
+            }
+            const effectiveMonthFilter = getElementValue('feesMonthFilter') || monthFilter || 'all';
 
             const availableGroups = Array.from(new Set(
                 filterStudentsByStatus(db.getStudents(), statusFilter, monthKey)
@@ -22409,6 +22641,7 @@
                 // Status with days sub-label
                 const paymentState = overdue ? 'past_due' : (record.last_paid_date ? 'paid' : 'due');
                 if (dueFilter !== 'all' && dueFilter !== paymentState) return '';
+                if (!feeRecordMatchesMonth(record, effectiveMonthFilter, dueDate)) return '';
 
                 let statusHtml;
                 if (overdue) {
@@ -22428,11 +22661,7 @@
                 }
 
                 if (overdue) overdueCount += 1;
-                if (Array.isArray(record.payment_history) && record.payment_history.length) {
-                    totalCollection += record.payment_history.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
-                } else if (record.last_paid_date && Number.isFinite(Number(record.amount))) {
-                    totalCollection += Number(record.amount);
-                }
+                totalCollection += getFeeCollectionAmount(record, effectiveMonthFilter);
 
                 const disAttr = isAdmin ? '' : 'disabled';
                 return `
@@ -22448,10 +22677,10 @@
                         <td>${statusHtml}</td>
                         <td>
                             <div class="fee-actions">
-                                <button class="fee-action-btn edit-btn" title="Edit fee details" ${disAttr} onclick="openFeeEditModal(${student.id})"><i class="fas fa-pencil-alt"></i></button>
-                                <button class="fee-action-btn pay-btn" title="Mark Paid" ${disAttr} onclick="openFeePayModal(${student.id})"><i class="fas fa-check"></i></button>
-                                <button class="fee-action-btn partial-btn" title="Partial Payment" ${disAttr} onclick="openFeePartialModal(${student.id})"><i class="fas fa-coins"></i></button>
-                                <button class="fee-action-btn hist-btn" title="Payment History" onclick="openFeeHistoryModal(${student.id})"><i class="fas fa-history"></i></button>
+                                <button class="fee-action-btn edit-btn" title="Edit fee details" ${disAttr} onclick="openFeeEditModal(${student.id}, this)"><i class="fas fa-pencil-alt"></i> ✏️</button>
+                                <button class="fee-action-btn pay-btn" title="Mark Paid" ${disAttr} onclick="openFeePayModal(${student.id}, this)"><i class="fas fa-check"></i> 💚</button>
+                                <button class="fee-action-btn partial-btn" title="Partial Payment" ${disAttr} onclick="openFeePartialModal(${student.id}, this)"><i class="fas fa-coins"></i> 🪙</button>
+                                <button class="fee-action-btn hist-btn" title="Payment History" onclick="openFeeHistoryModal(${student.id}, this)"><i class="fas fa-history"></i> 📜</button>
                             </div>
                         </td>
                     </tr>
@@ -24661,6 +24890,7 @@
 
         function getFeesExportRows() {
             const statusFilter = getElementValue('feesStatusFilter') || 'active';
+            const monthFilter = getElementValue('feesMonthFilter') || 'all';
             const search = (getElementValue('feesSearch') || '').trim().toLowerCase();
             const monthKey = getCurrentMonthKey();
             let students = filterStudentsByStatus(db.getStudents(), statusFilter, monthKey);
@@ -24687,6 +24917,9 @@
                 const startValue = getEffectiveFeeStartDate(record);
                 const periodValue = record.period_months || 1;
                 const dueDate = computeFeeDueDate({ ...record, start_date: startValue, period_months: periodValue });
+                if (!feeRecordMatchesMonth(record, monthFilter, dueDate)) {
+                    return null;
+                }
                 const overdue = isFeeOverdue({ ...record, start_date: startValue, period_months: periodValue });
                 const lastPaid = record.last_paid_date ? formatDateLabel(record.last_paid_date) : '';
                 const statusLabel = overdue ? 'Past Due' : (record.last_paid_date ? 'Paid' : 'Due');
@@ -24703,7 +24936,7 @@
                     'Status': statusLabel,
                     'Remarks': record.remarks || ''
                 };
-            });
+            }).filter(Boolean);
         }
 
         async function exportFeesData(format) {
