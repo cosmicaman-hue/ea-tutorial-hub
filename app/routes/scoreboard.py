@@ -231,6 +231,7 @@ _ACTIVITY_LOG_MAX = 50000
 _NON_ADMIN_EDIT_WINDOW_DAYS = 2
 _supabase_push_lock = threading.Lock()
 _supabase_last_pushed_stamp = ''
+_SYNC_OPS_MAX = 4000
 
 
 def _fees_module_enabled():
@@ -664,11 +665,53 @@ def _broadcast_sync_event(updated_at, source='server'):
 
 def _save_offline_data(payload):
     path = _offline_data_path()
+    if isinstance(payload, dict):
+        # Monotonic server-side version for optimistic sync checks.
+        current = _load_offline_data() or {}
+        prev_ver = _parse_int_safe(current.get('server_version'), 0)
+        next_ver = max(prev_ver + 1, _parse_int_safe(payload.get('server_version'), 0) or 0)
+        payload['server_version'] = next_ver if next_ver > 0 else 1
+        if not payload.get('updated_at'):
+            payload['updated_at'] = payload.get('server_updated_at') or _server_now_iso()
     _backup_offline_file(path)
     _atomic_write_json(path, payload)
     _backup_offline_hourly_immutable(payload)
     _supabase_push_snapshot_async(payload, reason='save_offline_data')
     return payload
+
+
+def _is_duplicate_sync_op(payload, op_id):
+    if not isinstance(payload, dict):
+        return False
+    op_key = str(op_id or '').strip()
+    if not op_key:
+        return False
+    rows = payload.get('_sync_ops') or []
+    if not isinstance(rows, list):
+        return False
+    for item in rows:
+        if isinstance(item, dict) and str(item.get('id') or '').strip() == op_key:
+            return True
+    return False
+
+
+def _record_sync_op(payload, op_id, actor=''):
+    if not isinstance(payload, dict):
+        return
+    op_key = str(op_id or '').strip()
+    if not op_key:
+        return
+    rows = payload.get('_sync_ops')
+    if not isinstance(rows, list):
+        rows = []
+    rows.append({
+        'id': op_key,
+        'at': _server_now_iso(),
+        'actor': str(actor or '').strip()[:80]
+    })
+    if len(rows) > _SYNC_OPS_MAX:
+        rows = rows[-_SYNC_OPS_MAX:]
+    payload['_sync_ops'] = rows
 
 
 def _parse_sync_stamp(value):
@@ -1028,7 +1071,7 @@ def _leadership_veto_quota(post_name):
     if role_type == 'co_leader':
         return 3
     if role_type == 'lop':
-        return 2
+        return 1
     return 0
 
 
@@ -2241,6 +2284,47 @@ def _append_activity_log_entries(target_data, actor_login_id, actor_role, incomi
     target_data['activity_log'] = _merge_activity_log_superset(target_data.get('activity_log', []), logs)
 
 
+def _query_activity_log_rows(payload, user_filter='', class_filter='', student_filter='', month_filter='', from_date='', to_date='', limit=2000):
+    rows = list(payload.get('activity_log') or []) if isinstance(payload, dict) else []
+    user_key = str(user_filter or '').strip().lower()
+    class_key = str(class_filter or '').strip()
+    student_key = str(student_filter or '').strip().lower()
+    month_key = str(month_filter or '').strip()
+    from_key = str(from_date or '').strip()
+    to_key = str(to_date or '').strip()
+    safe_limit = max(1, min(int(limit or 2000), 5000))
+
+    filtered = []
+    for item in rows:
+        if not isinstance(item, dict):
+            continue
+        actor = str(item.get('actor_login_id') or '').strip().lower()
+        cls = str(item.get('class') or '').strip()
+        roll = str(item.get('student_roll') or '').strip().lower()
+        name = str(item.get('student_name') or '').strip().lower()
+        month = str(item.get('month') or '').strip()
+        date = str(item.get('date') or '').strip()
+        if user_key and actor != user_key:
+            continue
+        if class_key and cls != class_key:
+            continue
+        if student_key and (student_key not in roll and student_key not in name):
+            continue
+        if month_key and month != month_key:
+            continue
+        if from_key and date and date < from_key:
+            continue
+        if to_key and date and date > to_key:
+            continue
+        filtered.append(item)
+
+    filtered.sort(
+        key=lambda x: _parse_sync_stamp(x.get('logged_at') or x.get('updated_at') or x.get('created_at')),
+        reverse=True
+    )
+    return filtered[:safe_limit]
+
+
 def _merge_election_votes_superset(existing_votes, incoming_votes, mode='party'):
     """Merge election votes by voter key and keep latest timestamped entry."""
     merged = {}
@@ -2655,6 +2739,12 @@ def _merge_resource_requests_superset(existing_requests, incoming_requests):
         prefer_next = next_stamp >= prev_stamp
         base = dict(prev if not prefer_next else nxt)
 
+        prev_status = str(prev.get('status') or '').strip().lower()
+        next_status = str(nxt.get('status') or '').strip().lower()
+        resolved_statuses = {'approved', 'rejected', 'fulfilled', 'cancelled'}
+        prev_resolved = prev_status in resolved_statuses
+        next_resolved = next_status in resolved_statuses
+
         # Preserve decisions/proof.
         for key in ('teacher_decision', 'teacher_remark', 'teacher_login_id', 'teacher_updated_at',
                     'admin_decision', 'admin_remark', 'admin_login_id', 'admin_updated_at',
@@ -2666,13 +2756,38 @@ def _merge_resource_requests_superset(existing_requests, incoming_requests):
             elif str(prev_val or '').strip() and not str(base.get(key) or '').strip():
                 base[key] = prev_val
 
-        # Preserve the furthest-along status.
-        prev_status = str(prev.get('status') or '').strip().lower()
-        next_status = str(nxt.get('status') or '').strip().lower()
-        if _resource_status_rank(next_status) >= _resource_status_rank(prev_status):
+        # Never downgrade a resolved request back to a pending/in-progress state.
+        # This protects against stale client snapshots re-opening already approved/rejected rows.
+        if prev_resolved and not next_resolved:
+            base['status'] = prev_status
+            for key in ('admin_decision', 'admin_remark', 'admin_login_id', 'admin_updated_at',
+                        'approved_at', 'fulfilled_at', 'teacher_decision', 'teacher_remark'):
+                prev_val = prev.get(key)
+                if str(prev_val or '').strip():
+                    base[key] = prev_val
+        # If both are resolved, keep the furthest status; on tie, prefer newer stamp.
+        elif prev_resolved and next_resolved:
+            prev_rank = _resource_status_rank(prev_status)
+            next_rank = _resource_status_rank(next_status)
+            if next_rank > prev_rank:
+                base['status'] = next_status
+            elif prev_rank > next_rank:
+                base['status'] = prev_status
+            else:
+                base['status'] = next_status if prefer_next else prev_status
+        elif _resource_status_rank(next_status) >= _resource_status_rank(prev_status):
             base['status'] = next_status or prev_status
         else:
             base['status'] = prev_status or next_status
+
+        # Keep created_at earliest, updated_at latest (by chosen record timestamp semantics).
+        prev_created = str(prev.get('created_at') or '').strip()
+        next_created = str(nxt.get('created_at') or '').strip()
+        if prev_created and next_created:
+            base['created_at'] = prev_created if prev_created <= next_created else next_created
+        elif prev_created or next_created:
+            base['created_at'] = prev_created or next_created
+        base['updated_at'] = str((nxt if prefer_next else prev).get('updated_at') or base.get('updated_at') or '').strip()
 
         return base
 
@@ -2693,7 +2808,9 @@ def _merge_resource_requests_superset(existing_requests, incoming_requests):
 
 
 def _merge_leadership_superset(existing_posts, incoming_posts):
-    """Merge leadership posts by id; never overwrite a populated holder with an empty one."""
+    """Merge leadership posts by id; never overwrite a populated holder with an empty one.
+    An 'ended' status is preserved: once a post is ended, a stale client cannot revive it
+    unless the incoming entry assigns a *different* holder (intentional reassignment)."""
     merged = {}
     def is_populated(p):
         return bool(str(p.get('holder') or '').strip() or str(p.get('roll') or '').strip())
@@ -2711,7 +2828,17 @@ def _merge_leadership_superset(existing_posts, incoming_posts):
             continue
         if is_populated(existing) and not is_populated(p):
             continue
-        merged[pid] = {**existing, **p}
+        new_entry = {**existing, **p}
+        # Preserve 'ended' against stale clients that still carry 'active' for the same holder.
+        prev_status = str(existing.get('status') or '').strip().lower()
+        new_status = str(p.get('status') or '').strip().lower()
+        same_holder = (
+            str(existing.get('holder') or '').strip().lower() ==
+            str(p.get('holder') or '').strip().lower()
+        )
+        if prev_status == 'ended' and new_status != 'ended' and same_holder:
+            new_entry['status'] = 'ended'
+        merged[pid] = new_entry
     return list(merged.values())
 
 
@@ -3722,13 +3849,19 @@ def offline_data():
         else:
             current_app.logger.debug(f"GET /offline-data: Returning {len(attendance_records)} attendance records")
         
-        resp = jsonify({'data': data, 'updated_at': updated_at})
+        # Keep sync snapshots lean for reliability/performance. Activity log is fetched
+        # via dedicated endpoint and should not inflate every pull payload.
+        data_out = dict(data)
+        data_out['activity_log'] = []
+        resp = jsonify({'data': data_out, 'updated_at': updated_at})
         resp.headers['Cache-Control'] = 'no-store'
         return resp
 
     payload = request.get_json(silent=True) or {}
     data = payload.get('data', payload)
     request_peers = payload.get('peers', []) if isinstance(payload, dict) else []
+    request_op_id = str(payload.get('op_id') or '').strip() if isinstance(payload, dict) else ''
+    request_base_version = _parse_int_safe(payload.get('base_version'), 0) if isinstance(payload, dict) else 0
     if not isinstance(data, dict):
         return jsonify({'success': False, 'error': 'Invalid payload'}), 400
 
@@ -3759,6 +3892,32 @@ def offline_data():
             return jsonify({'success': False, 'error': 'Peer replication disabled on master mode'}), 409
 
     existing = _load_offline_data() or {}
+    existing_version = _parse_int_safe(existing.get('server_version'), 0)
+    if request_op_id and _is_duplicate_sync_op(existing, request_op_id):
+        current_stamp = existing.get('server_updated_at') or existing.get('updated_at')
+        return jsonify({
+            'success': True,
+            'dedup': True,
+            'updated_at': current_stamp,
+            'server_version': existing_version
+        })
+
+    if (
+        request_base_version > 0 and
+        existing_version > 0 and
+        request_base_version != existing_version and
+        not replicated_auth and
+        not bool(payload.get('force_replace')) and
+        not bool(payload.get('authoritative_master_push'))
+    ):
+        current_stamp = existing.get('server_updated_at') or existing.get('updated_at')
+        return jsonify({
+            'success': False,
+            'error': 'Version conflict',
+            'code': 'stale_base_version',
+            'updated_at': current_stamp,
+            'server_version': existing_version
+        }), 409
     min_students = _min_safe_student_roster()
     if _is_tiny_roster(existing, min_students):
         existing, _ = _recover_tiny_roster_if_needed(existing, min_students=min_students)
@@ -3889,6 +4048,7 @@ def offline_data():
         _ensure_score_timestamps(merged)
         merged['updated_at'] = data.get('updated_at', existing.get('updated_at'))
         merged['server_updated_at'] = _server_now_iso()
+        _record_sync_op(merged, request_op_id, actor_login_id or 'Teacher')
         _save_offline_data(merged)
         _broadcast_sync_event(merged['server_updated_at'], source='teacher')
         if not is_replicated:
@@ -3897,7 +4057,7 @@ def offline_data():
             else:
                 patch = _build_teacher_replication_patch(merged, actor_login_id or 'Teacher')
                 _forward_offline_data_to_peers_async(patch, request_peers)
-        return jsonify({'success': True, 'updated_at': merged['server_updated_at']})
+        return jsonify({'success': True, 'updated_at': merged['server_updated_at'], 'server_version': _parse_int_safe(merged.get('server_version'), 0)})
 
     if actor_role == 'student':
         if current_user.is_authenticated:
@@ -3943,11 +4103,12 @@ def offline_data():
         )
         _ensure_score_timestamps(merged)
         merged['server_updated_at'] = _server_now_iso()
+        _record_sync_op(merged, request_op_id, actor_login_id or 'Student')
         _save_offline_data(merged)
         _broadcast_sync_event(merged['server_updated_at'], source='student')
         if not is_replicated:
             _forward_offline_data_to_peers_async(merged, request_peers)
-        return jsonify({'success': True, 'updated_at': merged['server_updated_at']})
+        return jsonify({'success': True, 'updated_at': merged['server_updated_at'], 'server_version': _parse_int_safe(merged.get('server_version'), 0)})
 
     if existing and incoming_stamp and existing_stamp and incoming_stamp < existing_stamp:
         # Trusted master push can override stale timestamp drift on peers.
@@ -4154,11 +4315,12 @@ def offline_data():
         data['server_updated_at'] = data.get('server_updated_at') or _server_now_iso()
     else:
         data['server_updated_at'] = _server_now_iso()
+    _record_sync_op(data, request_op_id, actor_login_id or ('replica' if is_replicated else 'Admin'))
     _save_offline_data(data)
     _broadcast_sync_event(data['server_updated_at'], source='replica' if is_replicated else 'client')
     if not is_replicated:
         _forward_offline_data_to_peers_async(data, request_peers)
-    return jsonify({'success': True, 'updated_at': data['server_updated_at']})
+    return jsonify({'success': True, 'updated_at': data['server_updated_at'], 'server_version': _parse_int_safe(data.get('server_version'), 0)})
 
 
 @points_bp.route('/offline-events')
@@ -4186,6 +4348,33 @@ def offline_events():
         'X-Accel-Buffering': 'no'
     }
     return Response(stream_with_context(generate()), mimetype='text/event-stream', headers=headers)
+
+
+@points_bp.route('/activity-log', methods=['GET'])
+@login_required
+def activity_log_data():
+    if str(current_user.role or '').strip().lower() != 'admin':
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 403
+
+    data = _load_offline_data() or {}
+    rows = _query_activity_log_rows(
+        data,
+        user_filter=request.args.get('user', ''),
+        class_filter=request.args.get('class', ''),
+        student_filter=request.args.get('student', ''),
+        month_filter=request.args.get('month', ''),
+        from_date=request.args.get('from', ''),
+        to_date=request.args.get('to', ''),
+        limit=request.args.get('limit', '3000')
+    )
+    user_values = sorted({str(item.get('actor_login_id') or '').strip() for item in (data.get('activity_log') or []) if str(item.get('actor_login_id') or '').strip()})
+    class_values = sorted({str(item.get('class') or '').strip() for item in (data.get('activity_log') or []) if str(item.get('class') or '').strip()})
+    return jsonify({
+        'success': True,
+        'rows': rows,
+        'users': user_values,
+        'classes': class_values
+    })
 
 
 @points_bp.route('/offline-server-health', methods=['POST'])

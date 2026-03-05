@@ -168,9 +168,9 @@
         }
 
         .sync-pill {
-            padding: 6px 12px;
+            padding: 8px 14px;
             border-radius: 999px;
-            font-size: 12px;
+            font-size: 13px;
             font-weight: 600;
             letter-spacing: 0.2px;
             border: 1px solid rgba(148, 163, 184, 0.3);
@@ -203,7 +203,7 @@
         }
 
         .sync-meta {
-            font-size: 12px;
+            font-size: 13px;
             color: var(--text-muted);
         }
 
@@ -596,6 +596,7 @@
             isolation: isolate;
             scroll-behavior: auto;
             -webkit-overflow-scrolling: touch;
+            scrollbar-gutter: stable both-edges;
             overscroll-behavior-x: contain;
         }
 
@@ -998,6 +999,40 @@
         }
         .score-cell.star-used-red:hover {
             background: transparent !important;
+        }
+        .score-cell.star-used-violet {
+            background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%);
+            color: #ffffff;
+            font-weight: 800;
+            font-size: 22px;
+            text-shadow: 0 0 6px rgba(0, 0, 0, 0.45);
+        }
+        .score-cell.star-used-split {
+            padding: 0 !important;
+            overflow: hidden;
+        }
+        .score-split-marker {
+            display: flex;
+            width: 100%;
+            min-height: 32px;
+            align-items: stretch;
+        }
+        .score-split-marker .half {
+            flex: 1 1 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 900;
+            color: #fff;
+            font-size: 19px;
+            letter-spacing: 0.2px;
+        }
+        .score-split-marker .half.disc {
+            background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%);
+            border-right: 1px solid rgba(255, 255, 255, 0.25);
+        }
+        .score-split-marker .half.normal {
+            background: linear-gradient(135deg, #f87171 0%, #b91c1c 100%);
         }
 
         .score-cell.veto-used {
@@ -1900,6 +1935,19 @@
             display: flex;
         }
 
+        .modal.no-backdrop {
+            background: transparent !important;
+            backdrop-filter: none !important;
+            -webkit-backdrop-filter: none !important;
+            pointer-events: none;
+        }
+
+        .modal.no-backdrop .modal-content {
+            pointer-events: auto;
+            box-shadow: 0 18px 44px rgba(2, 6, 23, 0.55), 0 2px 10px rgba(2, 6, 23, 0.32);
+            border: 1px solid rgba(125, 211, 252, 0.35);
+        }
+
         .modal-content {
             background: var(--bg-elevated);
             padding: 30px;
@@ -2214,12 +2262,25 @@
             justify-content: center;
             z-index: 10000;
             animation: iosFadeIn var(--dur-sm) var(--ease-out) both;
-            backdrop-filter: blur(3px);
-            -webkit-backdrop-filter: blur(3px);
+            backdrop-filter: blur(1.5px);
+            -webkit-backdrop-filter: blur(1.5px);
         }
 
         .validation-modal.hidden {
             display: none !important;
+        }
+
+        .validation-modal.no-backdrop {
+            background: transparent !important;
+            backdrop-filter: none !important;
+            -webkit-backdrop-filter: none !important;
+            pointer-events: none;
+        }
+
+        .validation-modal.no-backdrop .validation-modal-content {
+            pointer-events: auto;
+            box-shadow: 0 18px 44px rgba(2, 6, 23, 0.55), 0 2px 10px rgba(2, 6, 23, 0.32);
+            border-color: rgba(125, 211, 252, 0.35);
         }
 
         @keyframes fadeIn {
@@ -2235,13 +2296,43 @@
             background: var(--bg-card);
             border: 2px solid var(--border);
             border-radius: 12px;
-            box-shadow: 0 25px 80px rgba(0, 0, 0, 0.6);
+            box-shadow: 0 16px 42px rgba(0, 0, 0, 0.52);
             max-width: 500px;
             width: 90%;
             max-height: 86vh;
             overflow: auto;
             padding: 0;
             animation: fadeIn var(--dur-sm) var(--ease-out) both;
+        }
+
+        /* UI smoothness tune: keep transitions quick, reduce heavy perpetual effects. */
+        .form-card,
+        .scoreboard-wrapper,
+        .tab-content,
+        .validation-modal-content,
+        .modal-content {
+            transform: translateZ(0);
+            backface-visibility: hidden;
+        }
+
+        .header::after,
+        .fee-overdue,
+        .notif-live-dot,
+        .notif-live-dot.danger,
+        .notif-live-dot.warn {
+            animation-duration: 2.8s !important;
+        }
+
+        @media (max-width: 1024px), (pointer: coarse) {
+            .tab-entering .form-card,
+            .ios-rows-animate tbody tr,
+            .ios-rows-animate tbody tr:nth-child(-n+24) {
+                animation: none !important;
+            }
+            .validation-modal {
+                backdrop-filter: none !important;
+                -webkit-backdrop-filter: none !important;
+            }
         }
 
         @keyframes iosFadeIn {
@@ -2297,6 +2388,76 @@
             transition: background-color var(--dur-xs) var(--ease-out), box-shadow var(--dur-sm) var(--ease-out), color var(--dur-xs) var(--ease-out), transform var(--dur-xs) var(--spring);
         }
 
+        /* ── PIP Confirm Panel ─────────────────────────────────────────────────── */
+        /* Fixed bottom-right floating panel — no dark backdrop, page stays visible. */
+        #pipConfirmPanel {
+            position: fixed;
+            bottom: 28px;
+            right: 28px;
+            z-index: 13500;
+            width: min(440px, calc(100vw - 48px));
+            background: var(--bg-card);
+            border: 1px solid rgba(125, 211, 252, 0.45);
+            border-radius: 14px;
+            box-shadow: 0 24px 64px rgba(2,6,23,0.78), 0 4px 24px rgba(2,6,23,0.5);
+            animation: pipPopIn 0.36s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+            transform-origin: bottom right;
+        }
+
+        @keyframes pipPopIn {
+            0%   { opacity: 0; transform: scale(0.05); }
+            70%  { opacity: 1; transform: scale(1.04); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+
+        .pip-confirm-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 14px 18px 12px;
+            border-bottom: 1px solid var(--border);
+            background: linear-gradient(135deg, rgba(37,99,235,0.12), rgba(16,185,129,0.06));
+            border-radius: 14px 14px 0 0;
+        }
+
+        .pip-confirm-header h3 {
+            margin: 0;
+            color: var(--primary);
+            font-size: 17px;
+            font-weight: 700;
+        }
+
+        .pip-confirm-close {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            font-size: 18px;
+            line-height: 1;
+            cursor: pointer;
+            padding: 2px 6px;
+            border-radius: 4px;
+            transition: color 0.15s, background 0.15s;
+        }
+        .pip-confirm-close:hover { color: var(--text); background: rgba(255,255,255,0.06); }
+
+        .pip-confirm-body {
+            padding: 16px 18px;
+            color: var(--text);
+            font-size: 14px;
+            line-height: 1.6;
+            max-height: 55vh;
+            overflow-y: auto;
+        }
+
+        .pip-confirm-footer {
+            padding: 12px 18px 14px;
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+            border-top: 1px solid var(--border);
+        }
+        /* ─────────────────────────────────────────────────────────────────────── */
+
         .btn-primary {
             background: var(--primary);
             color: white;
@@ -2309,11 +2470,24 @@
 
         /* CONFIRM MODAL (used for Resources request/transaction confirmation) */
         .confirm-modal-content {
-            max-width: 780px;
+            max-width: 1080px;
+            width: min(97vw, 1080px);
         }
 
         .confirm-modal-body {
             font-size: 15px;
+            max-height: min(66vh, 680px);
+            overflow: auto;
+        }
+
+        .confirm-modal-content.resource-submit-dialog {
+            max-width: 1160px !important;
+            width: min(98vw, 1160px) !important;
+        }
+
+        .confirm-modal-body.resource-submit-dialog-body {
+            max-height: min(76vh, 780px);
+            font-size: 16px;
         }
 
         .confirm-details {
@@ -2344,6 +2518,54 @@
             color: var(--text);
             font-family: var(--number-font);
             text-align: right;
+        }
+
+        .resource-modal-wide {
+            max-width: 980px !important;
+            width: min(96vw, 980px) !important;
+        }
+
+        .validation-modal-content.anchored-popover,
+        .modal-content.anchored-popover {
+            position: fixed;
+            box-shadow: 0 20px 48px rgba(2, 6, 23, 0.55), 0 4px 16px rgba(2, 6, 23, 0.35);
+            border: 1px solid rgba(125, 211, 252, 0.35);
+            z-index: 12020;
+            animation: burstFromButton 0.38s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+        }
+
+        @keyframes burstFromButton {
+            0%   { opacity: 0; transform: scale(0.06); }
+            70%  { opacity: 1; transform: scale(1.03); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+
+        #resourceRequestsTable th.req-action-col,
+        #resourceRequestsTable td.req-action-col {
+            position: sticky;
+            right: 0;
+            z-index: 3;
+            background: rgba(15, 23, 42, 0.96);
+            backdrop-filter: blur(2px);
+            min-width: 280px;
+        }
+
+        #resourceRequestsTable thead th.req-action-col {
+            z-index: 4;
+        }
+
+        #resourceTransactionsTable {
+            table-layout: fixed;
+            width: 100%;
+        }
+
+        #resourceTransactionsTable th,
+        #resourceTransactionsTable td {
+            white-space: normal !important;
+            overflow-wrap: anywhere;
+            word-break: break-word;
+            vertical-align: top;
+            line-height: 1.35;
         }
 
         /* Resources: Transactions row states (override base scoreboard striping/hover). */
@@ -3104,6 +3326,21 @@
             </div>
         </div>
 
+        <!-- PIP CONFIRM PANEL — floats bottom-right, no full-screen backdrop -->
+        <div id="pipConfirmPanel" style="display:none;">
+            <div class="pip-confirm-header">
+                <h3 id="pipConfirmTitle">Confirm</h3>
+                <button class="pip-confirm-close" onclick="closePipConfirmModal(false)" title="Cancel">&#x2715;</button>
+            </div>
+            <div class="pip-confirm-body">
+                <div id="pipConfirmBody"></div>
+            </div>
+            <div class="pip-confirm-footer">
+                <button onclick="closePipConfirmModal(false)" class="secondary">Cancel</button>
+                <button onclick="closePipConfirmModal(true)" class="btn-primary">Confirm</button>
+            </div>
+        </div>
+
         <!-- FEE EDIT MODAL -->
         <div id="feeEditModal" class="validation-modal hidden">
             <div class="validation-modal-content" style="max-width:560px;">
@@ -3205,51 +3442,81 @@
             </div>
         </div>
         
-        <button
-            id="masterUpdateBtn"
-            class="master-update-btn"
-            data-allow="true"
-            onclick="runMasterUpdate()"
-            title="Push/Pull all configured servers for 3 seconds"
-        >
-            <i class="fas fa-bolt"></i> Master Update (3s)
-        </button>
+        <!-- Transaction Edit Modal -->
+        <div id="txnEditModal" class="validation-modal hidden">
+            <div class="validation-modal-content" style="max-width:520px;">
+                <div class="validation-modal-header">
+                    <h3><i class="fas fa-edit" style="color:#93c5fd;margin-right:8px;"></i>Edit Transaction</h3>
+                </div>
+                <div class="validation-modal-body">
+                    <div id="txnEditStudentInfo" style="font-size:13px;color:#94a3b8;margin-bottom:14px;"></div>
+                    <div id="txnEditCashFields" style="display:none;">
+                        <div style="margin-bottom:12px;">
+                            <label style="display:block;font-size:12px;color:#94a3b8;margin-bottom:4px;">Cash Charged (₹) <span style="color:#64748b;font-size:11px;">read-only</span></label>
+                            <input id="txnEditCashCharged" type="number" min="0" step="1" readonly style="width:100%;background:rgba(15,23,42,0.5);opacity:0.7;cursor:not-allowed;">
+                        </div>
+                        <div style="margin-bottom:12px;">
+                            <label style="display:block;font-size:12px;color:#94a3b8;margin-bottom:4px;">Cash Paid (₹)</label>
+                            <input id="txnEditCashPaid" type="number" min="0" step="1" oninput="updateTxnEditBalance()" style="width:100%;">
+                        </div>
+                        <div id="txnEditBalancePreview" style="font-size:13px;margin-bottom:12px;padding:8px 12px;background:rgba(15,23,42,0.5);border-radius:8px;border:1px solid rgba(148,163,184,0.2);"></div>
+                    </div>
+                    <div style="margin-bottom:12px;">
+                        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:#e2e8f0;">
+                            <input id="txnEditPendingSettlement" type="checkbox" style="width:16px;height:16px;">
+                            Mark as Pending Settlement (unsettled)
+                        </label>
+                        <div style="font-size:11px;color:#64748b;margin-top:4px;">Uncheck to mark as fully settled.</div>
+                    </div>
+                </div>
+                <div class="validation-modal-footer">
+                    <button class="secondary" onclick="closeTxnEditModal()">Cancel</button>
+                    <button class="btn-primary" onclick="saveTxnEdit()"><i class="fas fa-save"></i> Save</button>
+                </div>
+            </div>
+        </div>
 
         <!-- PERSISTENT SYNC BAR — visible to all roles -->
         <div id="globalSyncBar" style="
             display:flex;align-items:center;gap:10px;flex-wrap:wrap;
-            padding:6px 4px 6px 2px;margin-bottom:4px;
+            padding:10px 6px 10px 4px;margin-bottom:8px;
         ">
             <span id="syncStatus" class="sync-pill offline">Offline</span>
             <span id="roleBadge" class="sync-pill">Role: -</span>
-            <span id="lastSyncTime" class="sync-meta" style="flex:1;min-width:120px">Last sync: -</span>
+            <span id="lastSyncTime" class="sync-meta" style="flex:1;min-width:160px">Last sync: -</span>
             <a id="globalPublicBtn" class="secondary" data-allow="true"
                 href="/scoreboard/public"
-                style="padding:5px 12px;font-size:12px;text-decoration:none;display:inline-flex;align-items:center;gap:6px;"
+                style="padding:7px 14px;font-size:13px;text-decoration:none;display:inline-flex;align-items:center;gap:6px;"
                 title="Open public scoreboard page">
                 <i class="fas fa-globe"></i> Public
             </a>
             <a id="globalLoginBtn" class="secondary" data-allow="true"
                 href="/auth/login"
-                style="padding:5px 12px;font-size:12px;text-decoration:none;display:none;align-items:center;gap:6px;"
+                style="padding:7px 14px;font-size:13px;text-decoration:none;display:none;align-items:center;gap:6px;"
                 title="Go to login page">
                 <i class="fas fa-sign-in-alt"></i> Login
             </a>
             <button id="globalLogoutBtn" class="secondary" data-allow="true"
                 onclick="performLogout()"
-                style="padding:5px 12px;font-size:12px;display:none"
+                style="padding:7px 14px;font-size:13px;display:none"
                 title="Logout from this device">
                 <i class="fas fa-sign-out-alt"></i> Logout
             </button>
             <button id="globalPublishBtn" class="secondary" data-allow="true"
                 onclick="forcePublishNow()"
-                style="padding:5px 12px;font-size:12px;display:none"
+                style="padding:7px 14px;font-size:13px;display:none"
                 title="Admin only: publish this device snapshot to server now">
                 <i class="fas fa-upload"></i> Force Publish
             </button>
+            <button id="masterUpdateBtn" class="secondary" data-allow="true"
+                onclick="runMasterUpdate()"
+                style="padding:7px 14px;font-size:13px;display:none"
+                title="Admin/Teacher: push/pull all configured servers for 3 seconds">
+                <i class="fas fa-bolt"></i> Master Update (3s)
+            </button>
             <button id="globalRefreshBtn" class="secondary" data-allow="true"
                 onclick="pullFromServer(true, true)"
-                style="padding:5px 12px;font-size:12px;display:none"
+                style="padding:7px 14px;font-size:13px;display:none"
                 title="Pull latest data from server">
                 <i class="fas fa-sync-alt"></i> Refresh
             </button>
@@ -3563,6 +3830,7 @@
                     <button class="secondary" onclick="clearScoreForm()">Clear</button>
                     <button class="danger" onclick="deleteScore()">Delete Score</button>
                     <button onclick="saveScore()">Save Score</button>
+                    <button class="secondary" onclick="applyAwfForAllStudents()"><i class="fas fa-user-minus"></i> Apply AWF (-75) All</button>
                     <button class="secondary" onclick="applyLeaderAdjustment()"><i class="fas fa-shield-alt"></i> Leader/CoL Relief</button>
                 </div>
                 <div id="starTransferModule" style="margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--border);">
@@ -3590,6 +3858,21 @@
                     </div>
                     <div class="form-buttons">
                         <button onclick="transferStarsBetweenStudents()"><i class="fas fa-random"></i> Transfer Stars</button>
+                    </div>
+                </div>
+                <div id="starVetoConversionModule" style="margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--border);">
+                    <h4 style="margin-bottom: 8px;"><i class="fas fa-sync-alt"></i> Star -> VETO Conversion</h4>
+                    <p class="section-subtitle" style="margin-bottom: 10px;">
+                        Convert stars of selected student at fixed ratio: 5 stars = 1 VETO.
+                    </p>
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>Conversion Units</label>
+                            <input type="number" id="starToVetoUnits" min="1" step="1" value="1" placeholder="1">
+                        </div>
+                    </div>
+                    <div class="form-buttons">
+                        <button onclick="convertSelectedStudentStarsToVeto()"><i class="fas fa-star"></i> Convert 5* to 1V</button>
                     </div>
                 </div>
                 <p id="scoreHint" style="color: var(--text-muted); font-size: 12px; margin-top: 10px;">
@@ -4054,7 +4337,7 @@
                     </div>
                 </div>
                 <div class="form-buttons">
-                    <button onclick="submitResourceRequest()" data-allow="true"><i class="fas fa-paper-plane"></i> Submit Request</button>
+                    <button onclick="submitResourceRequest(this)" data-allow="true"><i class="fas fa-paper-plane"></i> Submit Request</button>
                     <button class="secondary" onclick="clearResourceRequestForm()" data-allow="true"><i class="fas fa-xmark"></i> Cancel</button>
                     <button class="secondary" onclick="loadResourcesTab()" data-allow="true"><i class="fas fa-rotate"></i> Refresh</button>
                     <button class="secondary" onclick="adminQuickCashPurchase('full_paid')" data-role-only="admin" data-allow="true"><i class="fas fa-money-bill-wave"></i> Cash Full Paid</button>
@@ -4124,7 +4407,6 @@
                                     <th style="width: 90px;">Req ID</th>
                                     <th style="width: 120px;">Month</th>
                                     <th style="width: 130px;">Requested</th>
-                                    <th style="width: 130px;">Approved</th>
                                     <th style="width: 120px;">Mode</th>
                                     <th>Student</th>
                                     <th style="width: 110px;">Roll</th>
@@ -4132,11 +4414,11 @@
                                     <th style="width: 90px;">Qty</th>
                                     <th style="width: 120px;">Cost/Points</th>
                                     <th style="width: 140px;">Status</th>
-                                    <th style="width: 280px;">Action</th>
+                                    <th class="req-action-col" style="width: 280px;">Action</th>
                                 </tr>
                             </thead>
                             <tbody id="resourceRequestsBody">
-                                <tr><td colspan="12" class="text-center loading">Loading...</td></tr>
+                                <tr><td colspan="11" class="text-center loading">Loading...</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -4169,7 +4451,7 @@
                         <input id="resourceTransactionsMonthFilter" type="month" min="2025-08" onchange="renderResourceTransactions()">
                     </div>
                 </div>
-                <div id="resourceTxnStudentPendingSummary" class="section-subtitle" style="display:none;margin:6px 0 10px;padding:8px 10px;border:1px solid rgba(148,163,184,0.25);border-radius:8px;background:rgba(15,23,42,0.6);"></div>
+                <div id="resourceTxnStudentPendingSummary" style="display:none;margin:8px 0 12px;padding:14px 18px;border:1px solid rgba(148,163,184,0.3);border-radius:10px;background:rgba(15,23,42,0.7);font-size:15px;line-height:1.6;"></div>
                 <div class="form-card" id="resourceSettlementCard" style="display:none;margin:8px 0 12px;padding:12px 14px;">
                     <div style="font-weight:700;margin-bottom:6px;">Pending Settlement Summary</div>
                     <div class="section-subtitle" style="margin-bottom:8px;">Consolidated per-student cash due/return for unsettled transactions.</div>
@@ -4198,18 +4480,18 @@
                         <table class="scoreboard" id="resourceTransactionsTable">
                             <thead>
                                 <tr>
-                                    <th style="width: 90px;">Txn ID</th>
-                                    <th style="width: 120px;">Month</th>
-                                    <th style="width: 120px;">Mode</th>
+                                    <th style="width: 72px;">Txn ID</th>
+                                    <th style="width: 92px;">Month</th>
+                                    <th style="width: 96px;">Mode</th>
                                     <th>Student</th>
-                                    <th style="width: 110px;">Roll</th>
+                                    <th style="width: 88px;">Roll</th>
                                     <th>Item</th>
-                                    <th style="width: 90px;">Qty</th>
-                                    <th style="width: 120px;">Points</th>
-                                    <th style="width: 120px;">Cash</th>
-                                    <th style="width: 140px;">Pending/Return</th>
-                                    <th style="width: 140px;">Txn Date</th>
-                                    <th style="width: 170px;">Action</th>
+                                    <th style="width: 66px;">Qty</th>
+                                    <th style="width: 86px;">Points</th>
+                                    <th style="width: 130px;">Cash</th>
+                                    <th style="width: 130px;">Pending/Return</th>
+                                    <th style="width: 104px;">Txn Date</th>
+                                    <th style="width: 140px;">Action</th>
                                 </tr>
                             </thead>
                             <tbody id="resourceTransactionsBody">
@@ -6216,6 +6498,9 @@
         const LOCAL_BACKUP_LIMIT = 1;
         const LOCAL_BACKUP_MAX_BYTES = 900000;
         const LOCAL_BACKUP_INTERVAL = 5 * 60 * 1000;
+        // Keep browser payload under localStorage quota. Full audit history should live on server.
+        const LOCAL_ACTIVITY_LOG_MAX = 1200;
+        const LOCAL_NOTIFICATION_HISTORY_MAX = 400;
         // Poll fallback for environments where SSE is flaky; keep modest to avoid mobile UI jitter.
         const AUTO_SYNC_INTERVAL_MS = 12 * 1000;
 
@@ -6298,6 +6583,12 @@
         let   _undoStack      = [];        // [{ label, snapshot, ts }, ...]
         // ── Write-ahead log ──────────────────────────────────────────────────────────
         const WAL_KEY = 'ea_sync_wal';     // localStorage key for the pending-sync WAL
+        let syncOpSeq = 0;
+        function createSyncOpId() {
+            syncOpSeq = (syncOpSeq + 1) % 1000000;
+            const rand = Math.random().toString(36).slice(2, 10);
+            return `op_${Date.now()}_${syncOpSeq}_${rand}`;
+        }
         const LIVE_EDIT_GUARD_MS = 6000;
         const ENABLE_REALTIME_SYNC = true;
         const ACTIVE_TAB_KEY = 'ea_active_tab';
@@ -6862,10 +7153,41 @@
                     localStorage.removeItem(LOCAL_BACKUP_KEY);
                     reclaimed = true;
                 }
+                if (localStorage.getItem(WAL_KEY)) {
+                    localStorage.removeItem(WAL_KEY);
+                    reclaimed = true;
+                }
             } catch (err) {
                 // ignore storage access errors
             }
             return reclaimed;
+        }
+
+        function buildLocalStorageSnapshot(data) {
+            const src = data && typeof data === 'object' ? data : {};
+            // Clone for browser storage compaction only; do not mutate in-memory/source payload.
+            const snapshot = JSON.parse(JSON.stringify(src));
+            if (Array.isArray(snapshot.activity_log) && snapshot.activity_log.length > LOCAL_ACTIVITY_LOG_MAX) {
+                snapshot.activity_log = snapshot.activity_log.slice(-LOCAL_ACTIVITY_LOG_MAX);
+            }
+            if (Array.isArray(snapshot.notification_history) && snapshot.notification_history.length > LOCAL_NOTIFICATION_HISTORY_MAX) {
+                snapshot.notification_history = snapshot.notification_history.slice(-LOCAL_NOTIFICATION_HISTORY_MAX);
+            }
+            return snapshot;
+        }
+
+        function buildEmergencyLocalStorageSnapshot(data) {
+            const snapshot = buildLocalStorageSnapshot(data);
+            // Last-resort browser cache compaction for quota pressure.
+            snapshot.activity_log = [];
+            snapshot.notification_history = [];
+            if (Array.isArray(snapshot.proposal_messages) && snapshot.proposal_messages.length > 250) {
+                snapshot.proposal_messages = snapshot.proposal_messages.slice(-250);
+            }
+            if (Array.isArray(snapshot.attendance) && snapshot.attendance.length > 1200) {
+                snapshot.attendance = snapshot.attendance.slice(-1200);
+            }
+            return snapshot;
         }
 
         function normalizeUserRole(roleValue) {
@@ -7630,9 +7952,7 @@
             };
 
             (data.leadership || []).forEach(post => {
-                const tenureMonths = getTenureMonthsForAssignment('leadership', post.post);
-                const ext = parseInt(post.tenure_extension_months, 10) || 0;
-                if (!isAssignmentEffectivelyActive(post.status, post.elected_on, tenureMonths, ext, dateKey)) return;
+                if (normalizePostHolderStatus(post.status || 'active') !== 'active') return;
                 const resolved = resolveLeadershipStudent(post);
                 if (!resolved || !resolved.id) return;
                 const sid = parseInt(resolved.id, 10);
@@ -7642,9 +7962,7 @@
             });
 
             (data.class_reps || []).forEach(rep => {
-                const tenureMonths = getTenureMonthsForAssignment('class_rep', rep.post || 'CR');
-                const ext = parseInt(rep.tenure_extension_months, 10) || 0;
-                if (!isAssignmentEffectivelyActive(rep.status, rep.elected_on, tenureMonths, ext, dateKey)) return;
+                if (normalizePostHolderStatus(rep.status || 'active') !== 'active') return;
                 const sid = parseInt(rep.studentId, 10);
                 if (!sid || !studentsById.has(sid)) return;
                 addSuffix(sid, 'CR');
@@ -7653,9 +7971,7 @@
             });
 
             (data.group_crs || []).forEach(rep => {
-                const tenureMonths = getTenureMonthsForAssignment('group_cr', rep.post || 'CR');
-                const ext = parseInt(rep.tenure_extension_months, 10) || 0;
-                if (!isAssignmentEffectivelyActive(rep.status || 'active', rep.elected_on, tenureMonths, ext, dateKey)) return;
+                if (normalizePostHolderStatus(rep.status || 'active') !== 'active') return;
                 const sid = parseInt(rep.studentId, 10);
                 if (!sid || !studentsById.has(sid)) return;
                 addSuffix(sid, 'CR');
@@ -7695,7 +8011,10 @@
             if (!student || !student.id) return false;
             const monthKey = String(month || '').trim();
             if (monthKey && monthKey !== getCurrentMonthKey()) {
-                return false;
+                const monthDesignations = Array.isArray(safeProp(student, '__month_designations'))
+                    ? safeProp(student, '__month_designations')
+                    : [];
+                return monthDesignations.some(d => !!normalizePostSuffix(String(d || '').trim()));
             }
             const dateKey = monthKey ? `${monthKey}-15` : formatDateKey(new Date());
             const ctx = buildRoleDisplayContext(dateKey);
@@ -7987,6 +8306,35 @@
             return '';
         }
 
+        function normalizePostSuffix(value) {
+            const raw = String(value || '').trim();
+            if (!raw) return '';
+            const cleaned = raw.replace(/[()]/g, '').trim();
+            const upper = cleaned.toUpperCase();
+            const compact = upper.replace(/\s+/g, '');
+
+            const direct = new Set(['CR', 'PP', 'DPP', 'L', 'LOP', 'COL', 'CITC', 'DWI', 'RM', 'SC', 'ECS', 'CCAI', 'CI', 'ECJ', 'WCI']);
+            if (direct.has(compact)) return compact === 'COL' ? 'CoL' : (compact === 'LOP' ? 'LoP' : compact);
+
+            const low = cleaned.toLowerCase();
+            if (low.includes('co-leader') || low.includes('co leader')) return 'CoL';
+            if (low.includes('leader of opposition')) return 'LoP';
+            if (low === 'leader') return 'L';
+            if (low.includes('class representative') || low.includes('group cr') || low === 'cr') return 'CR';
+            if (low.includes('party president')) return 'PP';
+            if (low.includes('deputy party president')) return 'DPP';
+            if (low.includes('resource manager')) return 'RM';
+            if (low.includes('sports captain')) return 'SC';
+            if (low.includes('coding') && low.includes('captain')) return 'CITC';
+            if (low.includes('discipline') && low.includes('welfare')) return 'DWI';
+            if (low.includes('english') && low.includes('senior')) return 'ECS';
+            if (low.includes('english') && low.includes('junior')) return 'ECJ';
+            if (low.includes('culture') || low.includes('creative')) return 'CCAI';
+            if (low.includes('communication') || low.includes('welcome')) return 'WCI';
+
+            return '';
+        }
+
         function getActivePostSuffixesForStudent(student, dateKey) {
             if (!student || !student.id) return [];
             const ctx = buildRoleDisplayContext(dateKey);
@@ -8244,15 +8592,38 @@
             let stars = globalStars;
             let vetos = globalVetos;
             if (monthKey && safeProp(student, 'id')) {
-                const monthProfileStars = !isCurrentMonth ? (parseInt(safeProp(student, '__month_star_count'), 10) || 0) : 0;
-                const monthProfileVetos = !isCurrentMonth ? (parseInt(safeProp(student, '__month_veto_count'), 10) || 0) : 0;
-                const monthStars = getStudentMonthStarAwardTotal(student.id, monthKey) + monthProfileStars;
-                const monthVetos = getStudentMonthVetoAwardTotal(student.id, monthKey) + monthProfileVetos;
+                // Use month carry-in counters for ALL months (including current month):
+                // visible = carry-in + awards - usage.
+                const hasProfileStars = safeProp(student, '__month_star_count') !== undefined && safeProp(student, '__month_star_count') !== null;
+                const monthProfileStars = parseInt(safeProp(student, '__month_star_count'), 10) || 0;
+                const monthProfileVetos = parseInt(safeProp(student, '__month_veto_count'), 10) || 0;
+                const monthAwardStars = getStudentMonthStarAwardTotal(student.id, monthKey);
+                const monthAwardVetos = getStudentMonthVetoAwardTotal(student.id, monthKey);
                 const usedStars = getStudentMonthNegativeDeltaTotal(student.id, monthKey, 'stars');
                 const usedVetos = getStudentMonthNegativeDeltaTotal(student.id, monthKey, 'vetos');
-                // Show month awards when present; otherwise show global counters adjusted for usage.
-                stars = monthStars > 0 ? monthStars : Math.max(0, globalStars - usedStars);
-                vetos = monthVetos > 0 ? monthVetos : Math.max(0, globalVetos - usedVetos);
+                const monthAvailableStars = Math.max(0, monthProfileStars + monthAwardStars - usedStars);
+                // Prefer roster month counters when available; fallback to global counters otherwise.
+                stars = hasProfileStars ? monthAvailableStars : Math.max(0, globalStars - usedStars);
+                // VETO display rule:
+                // - always include individual VETOs
+                // - include role-granted VETOs only while student is an active post holder for that month
+                // This prevents non-postholders from appearing with role grants.
+                const grantMap = (((db.getData() || {}).role_veto_monthly || {})[monthKey] || {});
+                const roleGrant = Math.max(0, parseInt(grantMap[String(student.id)] ?? grantMap[student.id], 10) || 0);
+                // IMPORTANT: month_veto_count can be historically polluted in legacy imports.
+                // Use global student.veto_count as the trusted individual veto baseline.
+                const individualCarryVetos = Math.max(0, globalVetos);
+                const allowRoleGrantDisplay = isOfficeHolderStudent(student, monthKey);
+                const visibleRoleGrant = allowRoleGrantDisplay ? roleGrant : 0;
+                if (isCurrentMonth) {
+                    // Current month already has role grants reconciled into student.veto_count.
+                    // Never add grant again in UI (prevents cumulative/double display like 3+5=8).
+                    vetos = Math.max(0, globalVetos);
+                } else if (allowRoleGrantDisplay) {
+                    vetos = Math.max(0, individualCarryVetos + visibleRoleGrant + monthAwardVetos - usedVetos);
+                } else {
+                    vetos = Math.max(0, individualCarryVetos + monthAwardVetos - usedVetos);
+                }
             }
             const designations = safeProp(student, 'id') ? getStudentDesignations(student.id, month) : [];
             const monthDesignations = !isCurrentMonth && Array.isArray(safeProp(student, '__month_designations'))
@@ -8267,6 +8638,15 @@
                 const autoSuffixes = getActivePostSuffixesForStudent(student, dateKey);
                 if (autoSuffixes.length) {
                     base = `${base} ${autoSuffixes.map(s => `(${s})`).join(' ')}`.trim();
+                }
+            } else if (!suspended && monthDesignations.length) {
+                const monthSuffixes = Array.from(new Set(
+                    monthDesignations
+                        .map(d => normalizePostSuffix(String(d || '').trim()))
+                        .filter(Boolean)
+                ));
+                if (monthSuffixes.length) {
+                    base = `${base} ${monthSuffixes.map(s => `(${s})`).join(' ')}`.trim();
                 }
             }
             const visibleBase = String(base || '').trim() || String(safeProp(student, '__month_name') || safeProp(student, 'base_name') || safeProp(student, 'name') || safeProp(student, 'roll') || 'Unknown');
@@ -8439,7 +8819,9 @@
                 data.scores = (data.scores || []).map(score => ({
                     ...score,
                     stars: parseInt(score.stars, 10) || 0,
-                    vetos: parseInt(score.vetos, 10) || 0
+                    vetos: parseInt(score.vetos, 10) || 0,
+                    star_usage_normal: Math.max(0, parseInt(score.star_usage_normal, 10) || 0),
+                    star_usage_disciplinary: Math.max(0, parseInt(score.star_usage_disciplinary, 10) || 0)
                 }));
                 data.parties = data.parties.map(party => ({
                     members: [],
@@ -8674,24 +9056,36 @@
                 }
                 this._cacheData = data;
                 this._monthScoresCache.clear();
-                const serialized = JSON.stringify(data);
+                const serializedFull = JSON.stringify(data);
+                const storageSnapshot = buildLocalStorageSnapshot(data);
+                const serialized = JSON.stringify(storageSnapshot);
                 let savedLocally = false;
                 try {
                     localStorage.setItem(this.storageKey, serialized);
                     savedLocally = true;
-                    this._idbWrite(serialized); // async write-through to IndexedDB (non-blocking)
+                    this._idbWrite(serializedFull); // keep full local snapshot in IndexedDB
                 } catch (err) {
                     if (reclaimLocalStorageSpace()) {
                         try {
                             localStorage.setItem(this.storageKey, serialized);
                             savedLocally = true;
-                            this._idbWrite(serialized);
+                            this._idbWrite(serializedFull);
                         } catch (retryErr) {
+                            // fall through to emergency fallback
+                        }
+                    }
+                    if (!savedLocally) {
+                        try {
+                            const emergency = JSON.stringify(buildEmergencyLocalStorageSnapshot(data));
+                            localStorage.setItem(this.storageKey, emergency);
+                            savedLocally = true;
+                            this._idbWrite(serializedFull);
+                        } catch (emergencyErr) {
                             // fall through to warning below
                         }
                     }
                     if (!savedLocally && !options.system) {
-                        showAlert('Local storage is full. Please run Master Update and reload.', 'warning');
+                        showAlert('Browser storage is full. Data is kept in-memory for this session. Please run Master Update once, then reload.', 'warning');
                     }
                 }
                 if (!options.skipBackup) {
@@ -8827,6 +9221,12 @@
                 score.stars = parseInt(score.stars, 10) || 0;
                 score.vetos = parseInt(score.vetos, 10) || 0;
                 const existing = data.scores.find(s => s.studentId === score.studentId && s.date === score.date);
+                const nextStarUsageNormal = score.star_usage_normal === undefined
+                    ? (existing ? (parseInt(existing.star_usage_normal, 10) || 0) : 0)
+                    : Math.max(0, parseInt(score.star_usage_normal, 10) || 0);
+                const nextStarUsageDisciplinary = score.star_usage_disciplinary === undefined
+                    ? (existing ? (parseInt(existing.star_usage_disciplinary, 10) || 0) : 0)
+                    : Math.max(0, parseInt(score.star_usage_disciplinary, 10) || 0);
                 if (existing) {
                     const oldStars = parseInt(existing.stars, 10) || 0;
                     const oldVetos = parseInt(existing.vetos, 10) || 0;
@@ -8835,6 +9235,8 @@
                     existing.notes = score.notes || '';
                     existing.stars = score.stars;
                     existing.vetos = score.vetos;
+                    existing.star_usage_normal = nextStarUsageNormal;
+                    existing.star_usage_disciplinary = nextStarUsageDisciplinary;
                     existing.recordedBy = score.recordedBy || existing.recordedBy;
                     existing.updated_at = new Date().toISOString();
                     applyStarVetoDelta(score.studentId, score.stars - oldStars, score.vetos - oldVetos);
@@ -8843,6 +9245,8 @@
                 }
                 score.id = Date.now();
                 score.updated_at = new Date().toISOString();
+                score.star_usage_normal = nextStarUsageNormal;
+                score.star_usage_disciplinary = nextStarUsageDisciplinary;
                 data.scores.push(score);
                 applyStarVetoDelta(score.studentId, score.stars, score.vetos);
                 this.saveData(data, { allowTeacher: true });
@@ -9544,6 +9948,8 @@
                     const pointsByDate = {};
                     const starsByDate = {};
                     const starUsageByDate = {};
+                    const starUsageNormalByDate = {};
+                    const starUsageDisciplinaryByDate = {};
                     const vetosByDate = {};
                     const notesByDate = {};
                     const hasEntryByDate = {};
@@ -9580,7 +9986,11 @@
                         const starDelta = parseInt(s.stars, 10) || 0;
                         starsByDate[date] = (starsByDate[date] || 0) + starDelta;
                         if (starDelta < 0) {
-                            starUsageByDate[date] = (starUsageByDate[date] || 0) + Math.abs(starDelta);
+                            const usageAbs = Math.abs(starDelta);
+                            starUsageByDate[date] = (starUsageByDate[date] || 0) + usageAbs;
+                            const breakdown = getScoreStarUsageBreakdown(s, usageAbs);
+                            starUsageNormalByDate[date] = (starUsageNormalByDate[date] || 0) + breakdown.normal;
+                            starUsageDisciplinaryByDate[date] = (starUsageDisciplinaryByDate[date] || 0) + breakdown.disciplinary;
                         }
                         vetosByDate[date] = (vetosByDate[date] || 0) + (parseInt(s.vetos, 10) || 0);
                         if (noteText) {
@@ -9612,14 +10022,24 @@
                         const points = pointsByDate[date] || 0;
                         const usageCount = starUsageByDate[date] || 0;
                         if (usageCount > 0) {
-                            const uses = usageCount;
-                            const starText = '*'.repeat(uses);
-                            starOverrides[date] = starText;
-                            starClasses[date] = 'star-used-red';
-                            if (points >= -50 && applyStarBonus) {
+                            const normalUses = Math.max(0, parseInt(starUsageNormalByDate[date], 10) || 0);
+                            const disciplinaryUses = Math.max(0, parseInt(starUsageDisciplinaryByDate[date], 10) || 0);
+                            if (normalUses > 0 && disciplinaryUses > 0) {
+                                const discText = formatStarUsageMarker(disciplinaryUses);
+                                const normalText = formatStarUsageMarker(normalUses);
+                                starOverrides[date] = `<span class="score-split-marker"><span class="half disc">${discText}</span><span class="half normal">${normalText}</span></span>`;
+                                starClasses[date] = 'star-used-split';
+                            } else if (disciplinaryUses > 0) {
+                                starOverrides[date] = formatStarUsageMarker(disciplinaryUses);
+                                starClasses[date] = 'star-used-violet';
+                            } else {
+                                starOverrides[date] = formatStarUsageMarker(normalUses || usageCount);
+                                starClasses[date] = 'star-used-red';
+                            }
+                            if (normalUses > 0 && points >= -50 && applyStarBonus) {
                                 const nextDate = addDays(date, 1);
                                 if (nextDate) {
-                                    bonusByDate[nextDate] = (bonusByDate[nextDate] || 0) + (100 * uses);
+                                    bonusByDate[nextDate] = (bonusByDate[nextDate] || 0) + (100 * normalUses);
                                     datesSet.add(nextDate);
                                 }
                             }
@@ -9747,6 +10167,11 @@
 
                     const dailySum = dailyScores.reduce((sum, p) => sum + p, 0);
                     let total = dailySum + (parseInt(row.monthlyImportedTotal, 10) || 0);
+                    const awfExtra = (Array.isArray(row.extraValues) ? row.extraValues : []).find(item => isAwfColumn(item));
+                    const awfActive = isAwfApplied(awfExtra && awfExtra.value);
+                    if (String(month || '').trim() >= '2026-02' && awfActive) {
+                        total -= 75;
+                    }
                     // For historical months, workbook total is authoritative for ranking/total.
                     if (String(month || '').trim() < '2026-02' && row.hasHistoricalMonthlyTotal) {
                         total = parseInt(row.monthlyImportedTotal, 10) || 0;
@@ -10677,6 +11102,9 @@
             // Force Publish button — admin only
             const publishBtn = document.getElementById('globalPublishBtn');
             if (publishBtn) publishBtn.style.display = (SERVER_SYNC.enabled && isAdmin) ? '' : 'none';
+            // Master Update button — admin + teacher
+            const masterBtn = document.getElementById('masterUpdateBtn');
+            if (masterBtn) masterBtn.style.display = (SERVER_SYNC.enabled && (isAdmin || isTeacher)) ? '' : 'none';
             updateAuthButtons();
 
             const isStudent = !isAdmin && !isTeacher;
@@ -11498,6 +11926,15 @@
                 if (adminDecision) base.admin_decision = adminDecision;
                 if (adminRemark) base.admin_remark = adminRemark;
                 base.urgent = !!(aa && aa.urgent) || !!(bb && bb.urgent);
+                // Hard protection: terminal statuses (approved/rejected/fulfilled/cancelled) are
+                // irreversible — once either side has a terminal status, never downgrade it back.
+                // This guards against stale client pushes that race with already-committed decisions.
+                const _TERMINAL = new Set(['approved', 'rejected', 'fulfilled', 'cancelled']);
+                const aaStatus = String(aa && aa.status || '').trim().toLowerCase();
+                const bbStatus = String(bb && bb.status || '').trim().toLowerCase();
+                if (_TERMINAL.has(aaStatus) && !_TERMINAL.has(bbStatus)) base.status = aaStatus;
+                else if (_TERMINAL.has(bbStatus) && !_TERMINAL.has(aaStatus)) base.status = bbStatus;
+                // (if both are terminal, the rank comparison above already chose the more-advanced one)
                 return base;
             };
             const add = (row) => {
@@ -11949,13 +12386,18 @@
             let timeoutCount = 0;
             let newestStamp = 0;
             let newestIso = '';
+            let newestServerVersion = 0;
+            let staleBaseVersionCount = 0;
+            const syncOpId = options.opId || createSyncOpId();
+            const syncBaseVersion = Number((data && data.server_version) || 0) || 0;
             for (const baseUrl of writeTargets) {
                 try {
+                    const reqBody = { data, peers: baseUrls, op_id: syncOpId, base_version: syncBaseVersion };
                     let resp = await fetchWithTimeout(buildSyncUrl(baseUrl, SERVER_SYNC.dataUrl), {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         credentials: 'include',
-                        body: JSON.stringify({ data, peers: baseUrls })
+                        body: JSON.stringify(reqBody)
                     }, 45000);
                     respondedCount += 1;
                     if (resp.status === 401 || resp.status === 403) {
@@ -11966,7 +12408,7 @@
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
                                 credentials: 'include',
-                                body: JSON.stringify({ data, peers: baseUrls })
+                                body: JSON.stringify(reqBody)
                             }, 45000);
                         }
                         if (resp.status === 401 || resp.status === 403) {
@@ -11978,6 +12420,12 @@
                         }
                     }
                     if (resp.status === 409) {
+                        try {
+                            const conflictPayload = await resp.json();
+                            if (String(conflictPayload && conflictPayload.code || '') === 'stale_base_version') {
+                                staleBaseVersionCount += 1;
+                            }
+                        } catch (_) {}
                         conflictCount += 1;
                         continue;
                     }
@@ -11989,6 +12437,8 @@
                         newestStamp = stamp;
                         newestIso = payload.updated_at || newestIso;
                     }
+                    const serverVer = Number(payload && payload.server_version || 0) || 0;
+                    if (serverVer > newestServerVersion) newestServerVersion = serverVer;
                 } catch (err) {
                     if (err && err.name === 'AbortError') {
                         timeoutCount += 1;
@@ -12002,6 +12452,7 @@
                 if (newestIso) {
                     savedData.server_updated_at = newestIso;
                     savedData.updated_at = newestIso;
+                    if (newestServerVersion > 0) savedData.server_version = newestServerVersion;
                     db.saveData(savedData, { system: true, skipSync: true, preserveTimestamp: true, skipBackup: true });
                     setLastSyncTime(newestIso);
                 } else {
@@ -12018,6 +12469,9 @@
                 // After merging server data locally, re-push so any local-only entries
                 // (e.g. CR assignments, leadership posts) that were newer than server reach the server.
                 scheduleServerPush(db.getData());
+                if (staleBaseVersionCount > 0 && !options.silent) {
+                    showAlert('Server had newer data. Refreshed and queued a safe re-sync.', 'info');
+                }
                 return true;
             }
             if (authFailureCount > 0) {
@@ -12690,6 +13144,13 @@
             return key === 'awf' || label === 'awf';
         }
 
+        function isAwfApplied(value) {
+            if (value === null || value === undefined) return false;
+            if (typeof value === 'number') return value !== 0;
+            const txt = String(value).trim().toUpperCase();
+            return txt === 'AWF' || txt === 'YES' || txt === 'Y' || txt === 'TRUE' || txt === '1';
+        }
+
         function getVisibleDateWindowIndices(allDates, month) {
             const dates = Array.isArray(allDates) ? allDates : [];
             if (!dates.length) return [];
@@ -13013,7 +13474,7 @@
             const roleType = getLeadershipRoleType(postName);
             if (roleType === 'leader') return 5;
             if (roleType === 'co_leader') return 3;
-            if (roleType === 'lop') return 2;
+            if (roleType === 'lop') return 1;
             return 0;
         }
 
@@ -13029,9 +13490,6 @@
 
             (data.leadership || []).forEach(post => {
                 if (normalizePostHolderStatus(post.status) !== 'active') return;
-                const tenureMonths = getTenureMonthsForAssignment('leadership', post.post);
-                const extensionMonths = parseInt(post.tenure_extension_months, 10) || 0;
-                if (!isAssignmentActiveByTenure(post.elected_on, tenureMonths, extensionMonths, dateKey)) return;
                 const quota = getLeadershipVetoQuota(post.post);
                 if (quota <= 0) return;
                 const resolved = resolveLeadershipStudent(post);
@@ -13040,27 +13498,21 @@
                 addQuota(resolved.id, quota);
             });
 
-            // CR quota: +2 once per student if either class CR or group CR is active.
-            const crStudents = new Set();
+            // CR quota: +2 per active CR assignment (class/group).
+            // If a student holds multiple active CR posts, grants are additive.
             (data.class_reps || []).forEach(rep => {
                 if (normalizePostHolderStatus(rep.status || 'active') !== 'active') return;
-                const tenureMonths = getTenureMonthsForAssignment('class_rep', rep.post || 'CR');
-                const extensionMonths = parseInt(rep.tenure_extension_months, 10) || 0;
-                if (!isAssignmentActiveByTenure(rep.elected_on, tenureMonths, extensionMonths, dateKey)) return;
                 const sid = parseInt(rep.studentId, 10);
-                if (sid) crStudents.add(sid);
+                if (sid && !isStudentPostHolderSuspendedById(sid, dateKey)) {
+                    addQuota(sid, 2);
+                }
             });
             (data.group_crs || []).forEach(rep => {
                 if (normalizePostHolderStatus(rep.status || 'active') !== 'active') return;
-                const tenureMonths = getTenureMonthsForAssignment('group_cr', rep.post || 'CR');
-                const extensionMonths = parseInt(rep.tenure_extension_months, 10) || 0;
-                if (!isAssignmentActiveByTenure(rep.elected_on, tenureMonths, extensionMonths, dateKey)) return;
                 const sid = parseInt(rep.studentId, 10);
-                if (sid) crStudents.add(sid);
-            });
-            crStudents.forEach(sid => {
-                if (isStudentPostHolderSuspendedById(sid, dateKey)) return;
-                addQuota(sid, 2);
+                if (sid && !isStudentPostHolderSuspendedById(sid, dateKey)) {
+                    addQuota(sid, 2);
+                }
             });
 
             return quotas;
@@ -13207,6 +13659,7 @@
             if (!prevMonth) return false;
             const prevRolls = (data.month_students && data.month_students[prevMonth]) || [];
             if (!prevRolls.length) return false;
+            const prevRoleGrants = (((data.role_veto_monthly || {})[prevMonth]) || {});
             // Build new month profiles: copy names/classes from prev profiles,
             // snapshot current star/veto totals from student records.
             const prevProfiles = (data.month_roster_profiles && data.month_roster_profiles[prevMonth]) || [];
@@ -13226,13 +13679,19 @@
                 if (!isValidStudentName(baseName)) return;
                 const classRaw = (student && student.class) || (prev && prev.class);
                 const classNum = parseInt(classRaw, 10);
+                const sid = student ? (parseInt(student.id, 10) || 0) : 0;
+                const prevGrant = sid > 0 ? Math.max(0, parseInt(prevRoleGrants[String(sid)] ?? prevRoleGrants[sid], 10) || 0) : 0;
+                const liveVetos = student ? Math.max(0, parseInt(student.veto_count, 10) || 0) : 0;
+                // Carry only individual veto balance to next month profile.
+                // Role grants are month-scoped and must reset fresh.
+                const carryIndividualVetos = Math.max(0, liveVetos - prevGrant);
                 newProfiles.push({
                     roll,
                     name: name || baseName,
                     base_name: baseName,
                     class: Number.isNaN(classNum) ? null : classNum,
                     month_star_count: student ? Math.max(0, parseInt(student.stars, 10) || 0) : 0,
-                    month_veto_count: student ? Math.max(0, parseInt(student.veto_count, 10) || 0) : 0,
+                    month_veto_count: carryIndividualVetos,
                     month_designations: []
                 });
             });
@@ -13246,6 +13705,94 @@
             return true;
         }
 
+        function _monthKeysAscFromData(data) {
+            const set = new Set();
+            Object.keys((data && data.month_students) || {}).forEach(m => { if (/^\d{4}-\d{2}$/.test(String(m || ''))) set.add(String(m)); });
+            Object.keys((data && data.month_roster_profiles) || {}).forEach(m => { if (/^\d{4}-\d{2}$/.test(String(m || ''))) set.add(String(m)); });
+            (Array.isArray((data && data.scores)) ? data.scores : []).forEach(row => {
+                const mk = String((row && row.month) || (row && row.date ? String(row.date).slice(0, 7) : '') || '').trim();
+                if (/^\d{4}-\d{2}$/.test(mk)) set.add(mk);
+            });
+            return Array.from(set).sort((a, b) => a.localeCompare(b));
+        }
+
+        function _buildMonthDeltaByRoll(data, monthKey, key = 'stars') {
+            const byRoll = new Map();
+            const studentsById = new Map((data.students || []).map(s => [parseInt(s.id, 10), normalizeRosterValue(s.roll)]));
+            (Array.isArray(data.scores) ? data.scores : []).forEach(row => {
+                const mk = String((row && row.month) || (row && row.date ? String(row.date).slice(0, 7) : '') || '').trim();
+                if (mk !== monthKey) return;
+                const sid = parseInt(row && row.studentId, 10) || 0;
+                const roll = studentsById.get(sid);
+                if (!roll) return;
+                const delta = parseInt(row && row[key], 10) || 0;
+                byRoll.set(roll, (byRoll.get(roll) || 0) + delta);
+            });
+            return byRoll;
+        }
+
+        /**
+         * Repair month counter carry-forward for stars across all months.
+         * Only updates month_roster_profiles.month_star_count fields.
+         * VETO counters are intentionally not rewritten here to avoid role-grant bleed.
+         * Returns number of profile fields changed.
+         */
+        function repairMonthCounterCarryForward(options = {}) {
+            const data = db.getData();
+            if (!data || currentUserRole !== 'admin') return 0;
+            data.month_roster_profiles = data.month_roster_profiles || {};
+            const monthsAsc = _monthKeysAscFromData(data);
+            if (monthsAsc.length < 2) return 0;
+
+            let changed = 0;
+            let prevFinalStars = new Map();
+
+            monthsAsc.forEach((monthKey, idx) => {
+                const profiles = Array.isArray(data.month_roster_profiles[monthKey]) ? data.month_roster_profiles[monthKey] : [];
+                if (!profiles.length) return;
+
+                // For first month, keep existing profile values as baseline.
+                if (idx === 0) {
+                    const dStars = _buildMonthDeltaByRoll(data, monthKey, 'stars');
+                    profiles.forEach(p => {
+                        const roll = normalizeRosterValue(p && p.roll);
+                        if (!roll) return;
+                        const startStars = Math.max(0, parseInt(p && p.month_star_count, 10) || 0);
+                        prevFinalStars.set(roll, Math.max(0, startStars + (dStars.get(roll) || 0)));
+                    });
+                    return;
+                }
+
+                // Star carry-in for this month should equal previous month final.
+                profiles.forEach(p => {
+                    const roll = normalizeRosterValue(p && p.roll);
+                    if (!roll) return;
+                    const expectedStars = Math.max(0, parseInt(prevFinalStars.get(roll), 10) || 0);
+                    const currStars = Math.max(0, parseInt(p && p.month_star_count, 10) || 0);
+                    if (currStars !== expectedStars) {
+                        p.month_star_count = expectedStars;
+                        changed += 1;
+                    }
+                });
+
+                // Advance final counters for next month.
+                const dStars = _buildMonthDeltaByRoll(data, monthKey, 'stars');
+                const nextFinalStars = new Map();
+                profiles.forEach(p => {
+                    const roll = normalizeRosterValue(p && p.roll);
+                    if (!roll) return;
+                    const startStars = Math.max(0, parseInt(p && p.month_star_count, 10) || 0);
+                    nextFinalStars.set(roll, Math.max(0, startStars + (dStars.get(roll) || 0)));
+                });
+                prevFinalStars = nextFinalStars;
+            });
+
+            if (changed > 0 && options.persist !== false) {
+                db.saveData(data, { system: true, skipBackup: true });
+            }
+            return changed;
+        }
+
         function loadScoreboard() {
             if (localRosterNeedsRecovery()) {
                 rosterRecoveryQueuedTab = 'scoreboard';
@@ -13255,6 +13802,19 @@
             }
             // Auto-create new month roster when the calendar rolls over
             autoCreateNewMonthRosterIfNeeded();
+            // Ensure star/veto month counters are properly carried forward month-to-month.
+            // This only updates month profile carry-in counters, never score rows.
+            try {
+                const fixed = repairMonthCounterCarryForward({ persist: true });
+                if (fixed > 0 && currentUserRole === 'admin') {
+                    console.log(`[CounterRepair] carry-forward corrected in ${fixed} month-profile fields`);
+                    if (SERVER_SYNC.enabled) {
+                        pushToServer(db.getData(), { silent: true }).catch(() => {});
+                    }
+                }
+            } catch (e) {
+                console.warn('[CounterRepair] skipped due to error:', e);
+            }
 
             const months = db.getMonths();
             const todayMonth = getCurrentMonthKey();
@@ -13902,6 +14462,7 @@
                 }
             }
             refreshStarTransferModule(true);
+            refreshStarVetoConversionModule();
             loadRecordStudentTable();
         }
 
@@ -13912,6 +14473,55 @@
             if (!base) return token;
             if (base.includes(token)) return base;
             return `${base} | ${token}`;
+        }
+
+        function promptStarUsageMode(usageCount) {
+            const count = Math.max(1, parseInt(usageCount, 10) || 1);
+            const answer = prompt(
+                `Star usage type for ${count} star(s):\n` +
+                `N = Normal usage (existing logic)\n` +
+                `D = Disciplinary usage (violet *; no score logic)`,
+                'N'
+            );
+            if (answer === null) return null;
+            const key = String(answer || '').trim().toUpperCase();
+            if (key === 'D' || key === 'DISC' || key === 'DISCIPLINARY') return 'disciplinary';
+            if (key === 'N' || key === 'NORMAL') return 'normal';
+            showAlert('Invalid choice. Enter N for Normal or D for Disciplinary.', 'warning');
+            return null;
+        }
+
+        function getScoreStarUsageBreakdown(scoreLike, usageAbs = null) {
+            const usage = Math.max(0, usageAbs == null ? Math.abs(parseInt(safeProp(scoreLike, 'stars'), 10) || 0) : (parseInt(usageAbs, 10) || 0));
+            if (usage <= 0) return { normal: 0, disciplinary: 0 };
+            let normal = Math.max(0, parseInt(safeProp(scoreLike, 'star_usage_normal'), 10) || 0);
+            let disciplinary = Math.max(0, parseInt(safeProp(scoreLike, 'star_usage_disciplinary'), 10) || 0);
+            const noteText = String(safeProp(scoreLike, 'notes') || '').toLowerCase();
+            const sum = normal + disciplinary;
+            if (sum <= 0) {
+                // Backward compatibility: infer disciplinary usage from notes if structured fields are absent.
+                if (noteText.includes('disciplinary')) {
+                    disciplinary = usage;
+                    normal = 0;
+                } else {
+                    normal = usage;
+                    disciplinary = 0;
+                }
+            } else if (sum < usage) {
+                normal += (usage - sum);
+            } else if (sum > usage) {
+                const overflow = sum - usage;
+                const reduceNormal = Math.min(overflow, normal);
+                normal -= reduceNormal;
+                disciplinary = Math.max(0, usage - normal);
+            }
+            return { normal, disciplinary };
+        }
+
+        function formatStarUsageMarker(count) {
+            const n = Math.max(0, parseInt(count, 10) || 0);
+            if (n <= 0) return '';
+            return n <= 3 ? '*'.repeat(n) : `*x${n}`;
         }
 
         function getStarTransferStudentsForContext(monthKey) {
@@ -13969,6 +14579,12 @@
             if (transferBtn) transferBtn.disabled = !hasCandidates;
         }
 
+        function refreshStarVetoConversionModule() {
+            const module = document.getElementById('starVetoConversionModule');
+            if (!module) return;
+            module.style.display = (currentUserRole === 'admin' || currentUserRole === 'teacher') ? '' : 'none';
+        }
+
         function transferStarsBetweenStudents() {
             if (currentUserRole !== 'admin' && currentUserRole !== 'teacher') {
                 showAlert('Only Admin or Teacher can transfer stars.', 'warning');
@@ -14011,7 +14627,7 @@
                 return;
             }
 
-            const availability = validateStarAvailability(fromId, -count);
+            const availability = validateStarAvailability(fromId, -count, month);
             if (!availability.valid) {
                 showValidationModal('Insufficient Stars', availability.message);
                 return;
@@ -14082,6 +14698,52 @@
                 loadExistingScore();
             }
             showAlert(`Transferred ${count} star(s): ${escapeHtml(fromRoll)} -> ${escapeHtml(toRoll)} on ${date}.`, 'success');
+        }
+
+        function convertSelectedStudentStarsToVeto() {
+            if (!(currentUserRole === 'admin' || currentUserRole === 'teacher')) {
+                showAlert('Only Admin or Teacher can convert stars to VETO.', 'warning');
+                return;
+            }
+            const studentId = parseInt(getElementValue('scoreStudent'), 10) || 0;
+            if (!studentId) {
+                showAlert('Select a student first in Record Score.', 'warning');
+                return;
+            }
+            const units = Math.max(1, parseInt(getElementValue('starToVetoUnits'), 10) || 1);
+            const starsNeeded = units * 5;
+            const vetoGain = units;
+            const data = db.getData();
+            const student = (data.students || []).find(s => parseInt(s.id, 10) === studentId);
+            if (!student) {
+                showAlert('Student not found.', 'danger');
+                return;
+            }
+            const availableStars = Math.max(0, parseInt(student.stars, 10) || 0);
+            if (availableStars < starsNeeded) {
+                showAlert(`Insufficient stars. Required ${starsNeeded}, available ${availableStars}.`, 'warning');
+                return;
+            }
+            const studentName = student.base_name || student.name || `ID ${studentId}`;
+            const ok = confirm(
+                `Convert ${starsNeeded} stars -> ${vetoGain} VETO for ${studentName} (${formatRollDisplay(student.roll)})?\n` +
+                `This updates the student's global counters immediately.`
+            );
+            if (!ok) return;
+
+            student.stars = availableStars - starsNeeded;
+            student.veto_count = Math.max(0, (parseInt(student.veto_count, 10) || 0) + vetoGain);
+            db.saveData(data, { allowTeacher: true });
+            if (SERVER_SYNC.enabled && (currentUserRole === 'admin' || currentUserRole === 'teacher')) {
+                pushToServer(db.getData(), { silent: true });
+            }
+            if (getActiveTabName() === 'add-score') {
+                updateScoreStudentOptions(true);
+                loadRecordStudentTable();
+                loadExistingScore();
+            }
+            loadScoreboard();
+            showAlert(`Converted ${starsNeeded} stars to ${vetoGain} VETO for ${studentName}.`, 'success');
         }
 
         function renderRecordScoreDateStrip(monthKey, selectedDate) {
@@ -14697,7 +15359,7 @@
             }
 
             if (stars !== 0) {
-                const starValidation = validateStarAvailability(studentId, stars);
+                const starValidation = validateStarAvailability(studentId, stars, month);
                 if (!starValidation.valid) {
                     showValidationModal('Insufficient Stars', starValidation.message);
                     return;
@@ -14718,6 +15380,8 @@
             const existingPoints = existingScore ? (parseInt(safeProp(existingScore, 'points'), 10) || 0) : 0;
             const existingStars = existingScore ? (parseInt(safeProp(existingScore, 'stars'), 10) || 0) : 0;
             const existingVetos = existingScore ? (parseInt(safeProp(existingScore, 'vetos'), 10) || 0) : 0;
+            let starUsageNormal = existingScore ? (parseInt(safeProp(existingScore, 'star_usage_normal'), 10) || 0) : 0;
+            let starUsageDisciplinary = existingScore ? (parseInt(safeProp(existingScore, 'star_usage_disciplinary'), 10) || 0) : 0;
             const attendanceRecord = getAttendanceRecord(studentId, date);
             const attendancePenalty = getAttendancePenaltyPointsForStatus(safeProp(attendanceRecord, 'status'));
 
@@ -14725,6 +15389,29 @@
             const finalPoints = existingPoints + points;
             let finalStars = existingStars + (starsEmpty ? 0 : stars);
             let finalVetos = existingVetos + (vetosEmpty ? 0 : vetos);
+            if (!starsEmpty && stars < 0) {
+                const usageCount = Math.abs(stars);
+                const usageMode = promptStarUsageMode(usageCount);
+                if (!usageMode) return;
+                if (usageMode === 'disciplinary') {
+                    starUsageDisciplinary += usageCount;
+                } else {
+                    starUsageNormal += usageCount;
+                }
+            }
+            if (!starsEmpty && stars > 0) {
+                // Undoing star usage reduces previously tracked usage counters.
+                let toReduce = Math.abs(stars);
+                if (starUsageNormal > 0) {
+                    const take = Math.min(toReduce, starUsageNormal);
+                    starUsageNormal -= take;
+                    toReduce -= take;
+                }
+                if (toReduce > 0 && starUsageDisciplinary > 0) {
+                    const take = Math.min(toReduce, starUsageDisciplinary);
+                    starUsageDisciplinary -= take;
+                }
+            }
 
             if (attendancePenalty < 0 && existingPoints === 0 && points === Math.abs(attendancePenalty)) {
                 const proceedPenaltyComp = confirm(
@@ -14761,11 +15448,16 @@
                 noteParts.push(`Score adjusted by ${currentLoginId || currentUserRole}: ${existingPoints} -> ${finalPoints} (delta ${points})`);
             }
             if (stars > 0 && starReason) noteParts.push(`Star reason: ${starReason}`);
+            if (stars < 0 && !starsEmpty) {
+                noteParts.push(starUsageDisciplinary > 0 ? 'Star usage: disciplinary/normal mix' : 'Star usage: normal');
+            }
             if (vetoReason) noteParts.push(`VETO reason: ${vetoReason}`);
             else if (vetos < 0 && !existingNotes) noteParts.push('VETO used');
             notesToSave = noteParts.join(' | ').trim();
 
             const resolved = resolveScoreForRole(studentId, date, month, finalPoints, finalStars, finalVetos, notesToSave);
+            resolved.score.star_usage_normal = Math.max(0, starUsageNormal);
+            resolved.score.star_usage_disciplinary = Math.max(0, starUsageDisciplinary);
             db.addScore(resolved.score);
             reconcileVetoCountersFromScores(month, { persist: false });
 
@@ -14801,11 +15493,11 @@
                     badge.textContent = resolved.score.stars;
                 } else if (badge) { badge.remove(); }
             }
-            const vetosWrapper = currentInputs[2].closest('.score-input-wrapper');
+            const vetosWrapper = currentInputs[3].closest('.score-input-wrapper');
             if (vetosWrapper) {
                 let badge = vetosWrapper.querySelector('.stored-veto-badge');
                 if (resolved.score.vetos) {
-                    if (!badge) { badge = document.createElement('span'); badge.className = 'stored-veto-badge'; badge.title = 'VETOs recorded for this date'; vetosWrapper.insertBefore(badge, currentInputs[2]); }
+                    if (!badge) { badge = document.createElement('span'); badge.className = 'stored-veto-badge'; badge.title = 'VETOs recorded for this date'; vetosWrapper.insertBefore(badge, currentInputs[3]); }
                     badge.textContent = resolved.score.vetos;
                 } else if (badge) { badge.remove(); }
             }
@@ -14925,7 +15617,7 @@
 
             // Validate availability only when removing/using existing stars.
             if (stars !== 0) {
-                const starValidation = validateStarAvailability(studentId, stars);
+                const starValidation = validateStarAvailability(studentId, stars, month);
                 if (!starValidation.valid) {
                     showValidationModal('Insufficient Stars', starValidation.message);
                     return;
@@ -14947,12 +15639,36 @@
             const existingPoints = existingScore ? (parseInt(safeProp(existingScore, 'points'), 10) || 0) : 0;
             const existingStars = existingScore ? (parseInt(safeProp(existingScore, 'stars'), 10) || 0) : 0;
             const existingVetos = existingScore ? (parseInt(safeProp(existingScore, 'vetos'), 10) || 0) : 0;
+            let starUsageNormal = existingScore ? (parseInt(safeProp(existingScore, 'star_usage_normal'), 10) || 0) : 0;
+            let starUsageDisciplinary = existingScore ? (parseInt(safeProp(existingScore, 'star_usage_disciplinary'), 10) || 0) : 0;
             const attendanceRecord = getAttendanceRecord(studentId, date);
             const attendancePenalty = getAttendancePenaltyPointsForStatus(safeProp(attendanceRecord, 'status'));
 
             const finalPoints = existingPoints + points;
             const finalStars = existingStars + (starsEmpty ? 0 : stars);
             const finalVetos = existingVetos + (vetosEmpty ? 0 : vetos);
+            if (!starsEmpty && stars < 0) {
+                const usageCount = Math.abs(stars);
+                const usageMode = promptStarUsageMode(usageCount);
+                if (!usageMode) return;
+                if (usageMode === 'disciplinary') {
+                    starUsageDisciplinary += usageCount;
+                } else {
+                    starUsageNormal += usageCount;
+                }
+            }
+            if (!starsEmpty && stars > 0) {
+                let toReduce = Math.abs(stars);
+                if (starUsageNormal > 0) {
+                    const take = Math.min(toReduce, starUsageNormal);
+                    starUsageNormal -= take;
+                    toReduce -= take;
+                }
+                if (toReduce > 0 && starUsageDisciplinary > 0) {
+                    const take = Math.min(toReduce, starUsageDisciplinary);
+                    starUsageDisciplinary -= take;
+                }
+            }
 
             if (attendancePenalty < 0 && existingPoints === 0 && points === Math.abs(attendancePenalty)) {
                 const proceedPenaltyComp = confirm(
@@ -14988,6 +15704,8 @@
             }
 
             const resolved = resolveScoreForRole(studentId, date, month, finalPoints, finalStars, finalVetos, notesToSave);
+            resolved.score.star_usage_normal = Math.max(0, starUsageNormal);
+            resolved.score.star_usage_disciplinary = Math.max(0, starUsageDisciplinary);
             const result = db.addScore(resolved.score);
             reconcileVetoCountersFromScores(month, { persist: false });
             clearRecordScoreDraft(studentId);
@@ -15011,6 +15729,73 @@
             } else {
                 updateAppealsTabNotification();
             }
+        }
+
+        function applyAwfForAllStudents() {
+            if (currentUserRole !== 'admin' && currentUserRole !== 'teacher') {
+                showAlert('Only Admin or Teacher can apply AWF.', 'warning');
+                return;
+            }
+
+            const selectedMonth = String(getElementValue('scoreMonth') || getCurrentMonthKey()).trim();
+            if (!/^\d{4}-\d{2}$/.test(selectedMonth)) {
+                showAlert('Select a valid month first.', 'warning');
+                return;
+            }
+            if (selectedMonth < '2026-02') {
+                showAlert('AWF deduction is allowed only from Feb 2026 onward.', 'warning');
+                return;
+            }
+            if (!isMonthAllowedForCurrentUser(selectedMonth)) {
+                showAlert(`You do not have access to modify month ${selectedMonth}.`, 'warning');
+                return;
+            }
+
+            const roster = getRecordScoreStudentCandidates(selectedMonth, 'all');
+            if (!Array.isArray(roster) || roster.length === 0) {
+                showAlert(`No students found for ${selectedMonth}.`, 'warning');
+                return;
+            }
+
+            const ok = confirm(
+                `Apply AWF (-75) for all ${roster.length} students in ${selectedMonth}?\n` +
+                'This sets AWF for the month and adjusts totals in scoreboard tally.'
+            );
+            if (!ok) return;
+
+            const data = db.getData();
+            if (!data.month_extra_columns) data.month_extra_columns = {};
+            if (!Array.isArray(data.month_extra_columns[selectedMonth])) data.month_extra_columns[selectedMonth] = [];
+
+            let awfColumn = data.month_extra_columns[selectedMonth].find(col => isAwfColumn(col));
+            if (!awfColumn) {
+                awfColumn = { key: 'awf', label: 'AWF' };
+                data.month_extra_columns[selectedMonth].push(awfColumn);
+            }
+            const awfKey = String(safeProp(awfColumn, 'key') || 'awf').trim() || 'awf';
+
+            if (!data.month_student_extras) data.month_student_extras = {};
+            if (!data.month_student_extras[selectedMonth]) data.month_student_extras[selectedMonth] = {};
+
+            roster.forEach(student => {
+                const rollKey = String(student.roll || '').trim().toUpperCase();
+                const nameKey = String(student.base_name || student.name || '').trim().toUpperCase();
+                const activeKey = rollKey || nameKey;
+                if (!activeKey) return;
+                if (!data.month_student_extras[selectedMonth][activeKey]) data.month_student_extras[selectedMonth][activeKey] = {};
+                data.month_student_extras[selectedMonth][activeKey][awfKey] = 'AWF';
+            });
+
+            db.saveData(data, { allowTeacher: true });
+            if (SERVER_SYNC.enabled && (currentUserRole === 'admin' || currentUserRole === 'teacher')) {
+                pushToServer(db.getData(), { silent: true });
+            }
+
+            const awfToggle = document.getElementById('toggleAWF');
+            if (awfToggle) awfToggle.checked = true;
+            loadMonthScoreboard(selectedMonth);
+            if (getActiveTabName() === 'add-score') loadRecordStudentTable();
+            showAlert(`AWF applied for ${roster.length} students in ${selectedMonth}.`, 'success');
         }
 
         async function applyLeaderAdjustment() {
@@ -18757,14 +19542,10 @@
             }
         }
 
+        let _activityLogRowsCache = [];
+
         function getActivityLogRows() {
-            const data = db.getData();
-            const rows = Array.isArray(data.activity_log) ? data.activity_log : [];
-            return rows.slice().sort((a, b) => {
-                const aa = Date.parse(String(a && a.logged_at || '')) || 0;
-                const bb = Date.parse(String(b && b.logged_at || '')) || 0;
-                return bb - aa;
-            });
+            return Array.isArray(_activityLogRowsCache) ? _activityLogRowsCache : [];
         }
 
         function populateActivityLogUserFilter(rows) {
@@ -18804,39 +19585,76 @@
                 if (el.tagName === 'SELECT') el.value = '';
                 else el.value = '';
             });
+            const userEl = document.getElementById('activityLogUserFilter');
+            const classEl = document.getElementById('activityLogClassFilter');
+            if (userEl && userEl.dataset) delete userEl.dataset.serverBound;
+            if (classEl && classEl.dataset) delete classEl.dataset.serverBound;
             loadActivityLogTab();
         }
 
-        function loadActivityLogTab() {
+        async function loadActivityLogTab() {
             const tbody = document.getElementById('activityLogBody');
             if (!tbody) return;
-            const rows = getActivityLogRows();
-            populateActivityLogUserFilter(rows);
-            populateActivityLogClassFilter(rows);
-
             const userFilter = String(getElementValue('activityLogUserFilter') || '').trim().toLowerCase();
             const classFilter = String(getElementValue('activityLogClassFilter') || '').trim();
             const studentFilter = String(getElementValue('activityLogStudentFilter') || '').trim().toLowerCase();
             const monthFilter = String(getElementValue('activityLogMonthFilter') || '').trim();
             const fromDate = String(getElementValue('activityLogFromDate') || '').trim();
             const toDate = String(getElementValue('activityLogToDate') || '').trim();
-
-            const filtered = rows.filter(item => {
-                if (!item || typeof item !== 'object') return false;
-                const actor = String(item.actor_login_id || '').trim().toLowerCase();
-                const cls = String(item.class || '').trim();
-                const roll = String(item.student_roll || '').trim().toLowerCase();
-                const name = String(item.student_name || '').trim().toLowerCase();
-                const month = String(item.month || '').trim();
-                const date = String(item.date || '').trim();
-                if (userFilter && actor !== userFilter) return false;
-                if (classFilter && cls !== classFilter) return false;
-                if (studentFilter && !roll.includes(studentFilter) && !name.includes(studentFilter)) return false;
-                if (monthFilter && month !== monthFilter) return false;
-                if (fromDate && date && date < fromDate) return false;
-                if (toDate && date && date > toDate) return false;
-                return true;
-            }).slice(0, 3000);
+            tbody.innerHTML = '<tr><td colspan="9" class="text-center" style="padding: 24px;">Loading activity log...</td></tr>';
+            let filtered = [];
+            try {
+                const qs = new URLSearchParams({
+                    limit: '3000',
+                    user: userFilter,
+                    class: classFilter,
+                    student: studentFilter,
+                    month: monthFilter,
+                    from: fromDate,
+                    to: toDate
+                });
+                const resp = await fetch(`/scoreboard/activity-log?${qs.toString()}`, { credentials: 'include', cache: 'no-store' });
+                const payload = await resp.json();
+                if (!resp.ok || !payload.success) throw new Error(payload.error || 'Failed to load activity log');
+                _activityLogRowsCache = Array.isArray(payload.rows) ? payload.rows : [];
+                const allUsers = Array.isArray(payload.users) ? payload.users.map(v => String(v || '')).filter(Boolean) : [];
+                const allClasses = Array.isArray(payload.classes) ? payload.classes.map(v => String(v || '')).filter(Boolean) : [];
+                const userSelect = document.getElementById('activityLogUserFilter');
+                if (userSelect && !userSelect.dataset.serverBound) {
+                    const current = userSelect.value || '';
+                    userSelect.innerHTML = '<option value="">All Users</option>' + allUsers.map(u => `<option value="${escapeHtml(u)}">${escapeHtml(u)}</option>`).join('');
+                    if (allUsers.map(u => u.toLowerCase()).includes(String(current || '').toLowerCase())) userSelect.value = current;
+                    userSelect.dataset.serverBound = '1';
+                }
+                const classSelect = document.getElementById('activityLogClassFilter');
+                if (classSelect && !classSelect.dataset.serverBound) {
+                    const current = classSelect.value || '';
+                    classSelect.innerHTML = '<option value="">All Classes</option>' + allClasses.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+                    if (allClasses.includes(current)) classSelect.value = current;
+                    classSelect.dataset.serverBound = '1';
+                }
+                filtered = _activityLogRowsCache;
+            } catch (err) {
+                const rows = getActivityLogRows();
+                populateActivityLogUserFilter(rows);
+                populateActivityLogClassFilter(rows);
+                filtered = rows.filter(item => {
+                    if (!item || typeof item !== 'object') return false;
+                    const actor = String(item.actor_login_id || '').trim().toLowerCase();
+                    const cls = String(item.class || '').trim();
+                    const roll = String(item.student_roll || '').trim().toLowerCase();
+                    const name = String(item.student_name || '').trim().toLowerCase();
+                    const month = String(item.month || '').trim();
+                    const date = String(item.date || '').trim();
+                    if (userFilter && actor !== userFilter) return false;
+                    if (classFilter && cls !== classFilter) return false;
+                    if (studentFilter && !roll.includes(studentFilter) && !name.includes(studentFilter)) return false;
+                    if (monthFilter && month !== monthFilter) return false;
+                    if (fromDate && date && date < fromDate) return false;
+                    if (toDate && date && date > toDate) return false;
+                    return true;
+                }).slice(0, 3000);
+            }
 
             if (!filtered.length) {
                 tbody.innerHTML = '<tr><td colspan="9" class="text-center" style="padding: 24px;">No activity log entries for selected filters.</td></tr>';
@@ -20014,12 +20832,19 @@
             titleEl.textContent = 'Cast Your Vote Now';
             metaEl.textContent = `Voter: ${getStudentDisplayNamePlain(voter)} (${voter.roll}) | Post: ${post}`;
             cardsEl.innerHTML = cardsHtml;
+            if (dialog.parentElement !== document.body) {
+                document.body.appendChild(dialog);
+            }
             dialog.classList.remove('hidden');
+            const content = dialog.querySelector('.validation-modal-content');
+            _centerModalInViewport(content, { maxWidth: 960, pad: 14 });
         }
 
         function closeGroupVoteDialog() {
             const dialog = document.getElementById('groupVoteDialog');
             if (!dialog) return;
+            const content = dialog.querySelector('.validation-modal-content');
+            _resetModalPosition(content);
             dialog.classList.add('hidden');
         }
 
@@ -20038,8 +20863,12 @@
             } else {
                 msgEl.textContent = message || '';
             }
+            if (modal.parentElement !== document.body) {
+                document.body.appendChild(modal);
+            }
             modal.classList.remove('hidden');
             const content = modal.querySelector('.result-modal-content') || modal;
+            _centerModalInViewport(content, { maxWidth: 860, pad: 14 });
             content.classList.remove('celebrate', 'melancholy');
             if (moodClass) content.classList.add(moodClass);
             if (confetti) confetti.style.display = moodClass === 'celebrate' ? 'block' : 'none';
@@ -20049,8 +20878,9 @@
         function closeGroupVoteResultModal() {
             const modal = document.getElementById('groupVoteResultModal');
             if (!modal) return;
-            modal.classList.add('hidden');
             const content = modal.querySelector('.result-modal-content') || modal;
+            _resetModalPosition(content);
+            modal.classList.add('hidden');
             content.classList.remove('celebrate', 'melancholy');
             const confetti = document.getElementById('groupVoteResultConfetti');
             const rain = document.getElementById('groupVoteResultRain');
@@ -22169,46 +22999,14 @@
         function openFeeModalNearAnchor(modalId, anchorEl) {
             const modal = document.getElementById(modalId);
             if (!modal) return;
+            if (modal.parentElement !== document.body) {
+                document.body.appendChild(modal);
+            }
             modal.classList.remove('hidden');
             modal.style.display = '';
             const content = modal.querySelector('.validation-modal-content');
             if (!content) return;
-            content.style.position = '';
-            content.style.left = '';
-            content.style.right = '';
-            content.style.top = '';
-            content.style.margin = '';
-            if (!anchorEl || window.innerWidth < 900) return;
-            try {
-                const rect = anchorEl.getBoundingClientRect();
-                const gap = 10;
-                const maxModalWidth = Math.max(360, Math.min(640, window.innerWidth - 24));
-                content.style.width = `min(92vw, ${maxModalWidth}px)`;
-                content.style.maxWidth = `${maxModalWidth}px`;
-
-                const contentRect = content.getBoundingClientRect();
-                const modalW = Math.ceil(contentRect.width || content.offsetWidth || 520);
-                const modalH = Math.ceil(contentRect.height || content.offsetHeight || 420);
-                const desiredTop = Math.max(12, Math.min(rect.top - 8, window.innerHeight - modalH - 12));
-
-                const rightCandidate = rect.right + gap;
-                const leftCandidate = rect.left - modalW - gap;
-                let desiredLeft;
-                if (rightCandidate + modalW <= window.innerWidth - 12) {
-                    desiredLeft = rightCandidate;
-                } else if (leftCandidate >= 12) {
-                    desiredLeft = leftCandidate;
-                } else {
-                    desiredLeft = Math.max(12, Math.floor((window.innerWidth - modalW) / 2));
-                }
-
-                content.style.position = 'fixed';
-                content.style.left = `${desiredLeft}px`;
-                content.style.top = `${desiredTop}px`;
-                content.style.margin = '0';
-            } catch (e) {
-                // Fallback to centered modal layout.
-            }
+            _centerModalInViewport(content, { maxWidth: 640, pad: 14 });
         }
 
         function closeFeeModal(id) {
@@ -22219,13 +23017,7 @@
             }
             const content = el ? el.querySelector('.validation-modal-content') : null;
             if (content) {
-                content.style.position = '';
-                content.style.left = '';
-                content.style.right = '';
-                content.style.top = '';
-                content.style.margin = '';
-                content.style.width = '';
-                content.style.maxWidth = '';
+                _resetModalPosition(content);
             }
             _feeModalStudentId = null;
         }
@@ -22757,15 +23549,15 @@
         }
 
         /**
-         * Save resource changes to LOCAL data first, then push full data to server.
-         * This prevents the bug where pushToServer(partial) + pullFromServer results in
-         * a 204 (not modified) because timestamps match, leaving local data stale.
+         * Save resource patch to local data, then sync the same patch to server.
+         * Resource writes are patch-safe and should not depend on full-snapshot upload.
          *
-         * @param {Object} patch - Object with arrays to merge, e.g.:
+         * @param {Object} patch - e.g.
          *   { resource_transactions: [txnRow], resource_cabinet: [item], resource_requests: [req] }
-         *   Each array item must have an `id` field.
+         * @param {Object} options
+         * @param {Object|null} options.syncPayload - Optional custom payload to sync instead of patch.
          */
-        function applyResourcePatchLocally(patch) {
+        function applyResourcePatchLocally(patch, options = {}) {
             const data = db.getData();
             const tables = ['resource_transactions', 'resource_cabinet', 'resource_requests', 'resource_advantage_deductions'];
             tables.forEach(table => {
@@ -22785,9 +23577,13 @@
             });
             data.updated_at = new Date().toISOString();
             db.saveData(data, currentUserRole === 'teacher' ? { allowTeacher: true } : {});
-            // Push full data to server in background
+            // Sync resource patch directly so roster-guarded full snapshot uploads
+            // do not cause approved/rejected request states to disappear on refresh.
             if (SERVER_SYNC.enabled) {
-                pushToServer(db.getData(), { silent: true }).catch(() => {});
+                const syncPayload = (options && typeof options.syncPayload === 'object' && options.syncPayload)
+                    ? options.syncPayload
+                    : patch;
+                pushToServer(syncPayload, { silent: true, allowPatch: true }).catch(() => {});
             }
         }
 
@@ -23328,16 +24124,30 @@
         function renderResourceRequests() {
             const tbody = document.getElementById('resourceRequestsBody');
             if (!tbody) return;
-            _showTableSkeleton('resourceRequestsBody', 12, 3);
+            _showTableSkeleton('resourceRequestsBody', 11, 3);
             const filter = String(getElementValue('resourceQueueFilter') || 'mine').trim().toLowerCase();
             const all = getResourceRequests().slice();
+            const txnRequestIds = new Set(
+                getResourceTransactions()
+                    .map(txn => parseInt(txn && txn.request_id, 10) || 0)
+                    .filter(Boolean)
+            );
             const rollKey = normalizeRoll(currentLoginId || '');
             const isTeacher = currentUserRole === 'teacher';
             const isAdmin = currentUserRole === 'admin';
 
             const visible = all.filter(req => {
                 const status = String(req && req.status || '').trim().toLowerCase();
+                const rid = parseInt(req && req.id, 10) || 0;
+                const resolved = (
+                    status === 'approved' ||
+                    status === 'rejected' ||
+                    status === 'fulfilled' ||
+                    status === 'cancelled' ||
+                    (rid > 0 && txnRequestIds.has(rid))
+                );
                 if (filter === 'mine') {
+                    if (resolved) return false; // hide already-resolved requests from the queue
                     if (currentUserRole === 'student') {
                         return normalizeRoll(req && req.student_roll || '') === rollKey;
                     }
@@ -23354,7 +24164,7 @@
             });
 
             if (!visible.length) {
-                tbody.innerHTML = `<tr><td colspan="12" class="text-center" style="padding: 22px;">No requests</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="11" class="text-center" style="padding: 22px;">No requests</td></tr>`;
                 return;
             }
 
@@ -23377,7 +24187,6 @@
                 const statusLabel = status.replace(/_/g, ' ').toUpperCase();
                 const modeLabel = adminVeto ? `${mode} (VETO)` : mode;
                 const requestedDate = req && req.created_at ? formatDateLabel(String(req.created_at).slice(0, 10)) : '-';
-                const approvedDate = (req && (req.approved_at || req.admin_approved_at)) ? formatDateLabel(String(req.approved_at || req.admin_approved_at).slice(0, 10)) : '-';
 
                 let actionHtml = `<span style="color: var(--text-muted); font-size: 12px;">-</span>`;
                 if ((isTeacher || isAdmin) && status === 'pending_teacher') {
@@ -23405,7 +24214,6 @@
                         <td>${rid || '-'}</td>
                         <td>${escapeHtml(String(req && req.month || ''))}</td>
                         <td>${escapeHtml(requestedDate)}</td>
-                        <td>${escapeHtml(approvedDate)}</td>
                         <td>${escapeHtml(modeLabel || '-')}</td>
                         <td>${studentName || '-'}</td>
                         <td>${escapeHtml(formatRollDisplay(roll))}</td>
@@ -23413,7 +24221,7 @@
                         <td>${qty}</td>
                         <td>${escapeHtml(costLabel)}</td>
                         <td>${escapeHtml(statusLabel)}</td>
-                        <td>${actionHtml}</td>
+                        <td class="req-action-col">${actionHtml}</td>
                     </tr>
                 `;
             }).join('');
@@ -23525,7 +24333,7 @@
                 });
             }
 
-            const updateSelectedStudentPendingSummary = (filteredRows, studentMap) => {
+            const updateSelectedStudentPendingSummary = (studentMap) => {
                 const summaryEl = document.getElementById('resourceTxnStudentPendingSummary');
                 if (!summaryEl) return;
                 if (!studentFilter || studentFilter === 'all') {
@@ -23533,12 +24341,28 @@
                     summaryEl.textContent = '';
                     return;
                 }
-                let totalPending = 0;
-                let matchedTxns = 0;
+                // Use ALL transactions for this student — ignore status/date/month filters
+                // so the pending total always reflects their full unsettled balance.
+                const allTxns = getResourceTransactions();
+                const studentTxns = allTxns.filter(txn => {
+                    const sid = parseInt(txn && txn.studentId, 10) || 0;
+                    const student = sid ? studentMap.get(sid) : null;
+                    const roll = normalizeRoll((txn && txn.student_roll) || (student && student.roll) || '');
+                    if (studentFilter.startsWith('id:')) {
+                        return sid === (parseInt(studentFilter.slice(3), 10) || 0);
+                    }
+                    if (studentFilter.startsWith('roll:')) {
+                        return !!normalizeRoll(studentFilter.slice(5)) && roll === normalizeRoll(studentFilter.slice(5));
+                    }
+                    return false;
+                });
+
+                let totalCashPending = 0;
+                let unsettledCount = 0;
                 let studentLabel = 'Selected Student';
-                filteredRows.forEach(txn => {
-                    const mode = String(txn && txn.type || '').trim().toLowerCase();
-                    if (mode !== 'cash_purchase') return;
+
+                studentTxns.forEach(txn => {
+                    // Resolve student label from any transaction (not just cash_purchase)
                     const sid = parseInt(txn && txn.studentId, 10) || 0;
                     const student = sid ? studentMap.get(sid) : null;
                     if (student && !studentLabel.includes('(')) {
@@ -23546,23 +24370,33 @@
                         const name = String(student.base_name || student.name || '').trim();
                         studentLabel = `${name || 'Selected Student'}${roll ? ` (${formatRollDisplay(roll)})` : ''}`;
                     }
-                    const cashPaid = Math.max(0, parseFloat(txn && txn.cash_paid) || 0);
+                    // Use the same isCompleted() gate as the table rows — this catches
+                    // pending_settlement:true for ALL modes, not just cash_purchase with due>0.
+                    if (isCompleted(txn)) return;
+                    unsettledCount++;
+
+                    // Add cash amount owed only for cash_purchase transactions.
+                    // Treat unsettled transactions as if nothing was paid yet — the admin
+                    // hasn't confirmed settlement, so we sum the full charged amount.
+                    const mode = String(txn && txn.type || '').trim().toLowerCase();
+                    if (mode !== 'cash_purchase') return;
                     const cashCharged = Math.max(0, parseFloat(txn && txn.cash_charged) || 0);
                     const fallbackCharged = Math.max(0, parseFloat(txn && txn.total_cost) || 0);
                     const charged = cashCharged || fallbackCharged;
                     if (!charged) return;
-                    const bal = computeResourceCashBalance(charged, cashPaid);
-                    const cashDueRaw = parseFloat(txn && txn.cash_due);
-                    const due = Math.max(0, Number.isFinite(cashDueRaw) ? cashDueRaw : bal.pending);
-                    if (due > 0) {
-                        totalPending += due;
-                        matchedTxns += 1;
-                    }
+                    totalCashPending += charged; // full amount, not (charged - paid)
                 });
+
                 summaryEl.style.display = '';
-                summaryEl.innerHTML = `<strong>${escapeHtml(studentLabel)}</strong> pending amount: <strong style="color:#fca5a5;">Rs ${escapeHtml(formatMoneyValue(totalPending))}</strong> <span style="color:var(--text-muted);">(from ${matchedTxns} pending transaction${matchedTxns === 1 ? '' : 's'})</span>`;
+                if (unsettledCount === 0) {
+                    summaryEl.innerHTML = `<span style="font-size:15px;font-weight:600;">${escapeHtml(studentLabel)}</span> &nbsp;—&nbsp; <span style="color:#4ade80;font-weight:600;">All transactions settled. No pending amount.</span>`;
+                } else if (totalCashPending > 0) {
+                    summaryEl.innerHTML = `<span style="font-size:15px;font-weight:600;">${escapeHtml(studentLabel)}</span> &nbsp;—&nbsp; Total pending cash: <span style="color:#fca5a5;font-size:18px;font-weight:700;">₹${escapeHtml(formatMoneyValue(totalCashPending))}</span> <span style="color:var(--text-muted);font-size:13px;">(${unsettledCount} unsettled transaction${unsettledCount === 1 ? '' : 's'})</span>`;
+                } else {
+                    summaryEl.innerHTML = `<span style="font-size:15px;font-weight:600;">${escapeHtml(studentLabel)}</span> &nbsp;—&nbsp; <span style="color:#fbbf24;font-weight:600;">${unsettledCount} transaction${unsettledCount === 1 ? '' : 's'} pending settlement</span> <span style="color:var(--text-muted);font-size:13px;">(no cash amount due)</span>`;
+                }
             };
-            updateSelectedStudentPendingSummary(rows, studentById);
+            updateSelectedStudentPendingSummary(studentById);
 
             if (!rows.length) {
                 tbody.innerHTML = `<tr><td colspan="12" class="text-center" style="padding: 22px;">No transactions</td></tr>`;
@@ -23604,13 +24438,17 @@
                 let action = `<span style="color: var(--text-muted); font-size: 12px;">-</span>`;
                 const actionParts = [];
                 if (currentUserRole === 'admin' && id && ((txn && txn.pending_settlement) || (mode === 'cash_purchase' && (cashDue > 0 || cashReturnDue > 0)))) {
-                    actionParts.push(`<button class="secondary" onclick="adminSettleResourceTransaction(${id})">Settle</button>`);
+                    actionParts.push(`<button class="secondary" onclick="adminSettleResourceTransaction(${id}, this, event)">Settle</button>`);
                 }
                 if (currentUserRole === 'admin' && advPtsDed > 0 && !advAlreadyReversed) {
-                    actionParts.push(`<button class="secondary" style="border-color:rgba(251,191,36,0.5);color:#fbbf24;font-size:11px;padding:3px 8px;margin-top:4px" onclick="adminReverseAdvantageDeduction(${id})" title="Reverse the ${advPtsDed}-point advantage deduction for this transaction">↩ Reverse Adv (${advPtsDed}pts)</button>`);
+                    actionParts.push(`<button class="secondary" style="border-color:rgba(251,191,36,0.5);color:#fbbf24;font-size:11px;padding:3px 8px;margin-top:4px" onclick="adminReverseAdvantageDeduction(${id}, this, event)" title="Reverse the ${advPtsDed}-point advantage deduction for this transaction">↩ Reverse Adv (${advPtsDed}pts)</button>`);
                 }
                 if (advAlreadyReversed) {
                     actionParts.push(`<span style="font-size:11px;color:#64748b">Adv reversed</span>`);
+                }
+                if (currentUserRole === 'admin' && id) {
+                    actionParts.push(`<button class="secondary" style="font-size:11px;padding:3px 8px;margin-top:4px" onclick="adminEditResourceTransaction(${id}, this, event)" title="Edit this transaction">✏ Edit</button>`);
+                    actionParts.push(`<button class="danger" style="font-size:11px;padding:3px 8px;margin-top:4px" onclick="adminDeleteResourceTransaction(${id}, this, event)" title="Delete this transaction">🗑 Delete</button>`);
                 }
                 if (actionParts.length) action = actionParts.join('<br>');
 
@@ -23636,8 +24474,26 @@
             _animateTableRows('resourceTransactionsTable');
         }
 
-        async function adminReverseAdvantageDeduction(transactionId) {
+        function _eventAnchorRect(_triggerBtn = null, evt = null) {
+            if (evt && Number.isFinite(evt.clientX) && Number.isFinite(evt.clientY)) {
+                return {
+                    left: evt.clientX,
+                    right: evt.clientX,
+                    top: evt.clientY,
+                    bottom: evt.clientY,
+                    width: 0,
+                    height: 0
+                };
+            }
+            if (_triggerBtn && typeof _triggerBtn.getBoundingClientRect === 'function') {
+                return _triggerBtn.getBoundingClientRect();
+            }
+            return null;
+        }
+
+        async function adminReverseAdvantageDeduction(transactionId, _triggerBtn = null, evt = null) {
             if (currentUserRole !== 'admin') return;
+            const _anchorRect = _eventAnchorRect(_triggerBtn, evt);
             const txnId = parseInt(transactionId, 10) || 0;
             if (!txnId) return;
             const data = db.getData();
@@ -23657,7 +24513,8 @@
                     <div class="row"><div class="k">Item</div><div class="v">${escapeHtml(ded.item_name || '-')} ×${ded.qty || 1}</div></div>
                     <div class="row"><div class="k" style="color:#fbbf24">Points to Restore</div><div class="v" style="color:#4ade80;font-weight:700">+${ded.points_deducted} pts</div></div>
                     <p style="margin-top:10px;font-size:12px;color:#94a3b8">This will permanently mark the deduction as reversed and restore the points to the student's monthly tally. The transaction record will not be changed.</p>
-                </div>`
+                </div>`,
+                { wide: true, centerViewport: true }
             );
             if (!confirmed) return;
 
@@ -23675,6 +24532,158 @@
             if (SERVER_SYNC.enabled) pushToServer(db.getData(), { silent: true }).catch(() => {});
             renderResourceTransactions();
             showAlert(`Advantage deduction reversed — ${ded.points_deducted} pts restored to ${studentName}'s tally.`, 'success');
+        }
+
+        // ── Transaction Delete ────────────────────────────────────────────────────
+        async function adminDeleteResourceTransaction(transactionId, _triggerBtn = null, evt = null) {
+            if (currentUserRole !== 'admin') return;
+            const _anchorRect = _eventAnchorRect(_triggerBtn, evt);
+            const txnId = parseInt(transactionId, 10) || 0;
+            if (!txnId) return;
+            const data = db.getData();
+            const txn = (data.resource_transactions || []).find(t => parseInt(t && t.id, 10) === txnId);
+            if (!txn) { showAlert('Transaction not found.', 'warning'); return; }
+
+            const studentById = new Map((db.getStudents() || []).map(s => [parseInt(s.id, 10), s]));
+            const student = studentById.get(parseInt(txn.studentId, 10));
+            const studentName = student ? String(student.base_name || student.name || '').trim() : String(txn.student_roll || 'Unknown');
+            const mode = String(txn.type || '').trim().toLowerCase();
+            const charged = Math.max(0, parseFloat(txn.cash_charged) || parseFloat(txn.total_cost) || 0);
+            const modeLabel = mode === 'cash_purchase' ? `Cash Purchase — ₹${Math.round(charged)}` : `Points Redemption`;
+
+            const confirmed = await openConfirmModal('Delete Transaction',
+                `<div class="confirm-details">
+                    <div class="row"><div class="k">Transaction ID</div><div class="v">${txnId}</div></div>
+                    <div class="row"><div class="k">Student</div><div class="v">${escapeHtml(studentName)}</div></div>
+                    <div class="row"><div class="k">Item</div><div class="v">${escapeHtml(String(txn.item_name || '-'))}</div></div>
+                    <div class="row"><div class="k">Type</div><div class="v">${escapeHtml(modeLabel)}</div></div>
+                    <p style="margin-top:10px;color:#f87171;font-size:12px;font-weight:600;">⚠ This permanently removes the transaction record. The associated request will remain as-is. This cannot be undone.</p>
+                </div>`,
+                { wide: true, centerViewport: true }
+            );
+            if (!confirmed) return;
+
+            pushUndoSnapshot('Delete resource transaction');
+            data.resource_transactions = (data.resource_transactions || []).filter(t => parseInt(t && t.id, 10) !== txnId);
+            db.saveData(data);
+            if (SERVER_SYNC.enabled) pushToServer(db.getData(), { silent: true }).catch(() => {});
+            renderResourceTransactions();
+            showAlert('Transaction deleted.', 'success');
+        }
+
+        // ── Transaction Edit ──────────────────────────────────────────────────────
+        let _txnEditId = 0;
+
+        function adminEditResourceTransaction(transactionId, _triggerBtn = null, evt = null) {
+            if (currentUserRole !== 'admin') return;
+            const _anchorRect = _eventAnchorRect(_triggerBtn, evt);
+            const txnId = parseInt(transactionId, 10) || 0;
+            if (!txnId) return;
+            const data = db.getData();
+            const txn = (data.resource_transactions || []).find(t => parseInt(t && t.id, 10) === txnId);
+            if (!txn) { showAlert('Transaction not found.', 'warning'); return; }
+
+            _txnEditId = txnId;
+            const studentById = new Map((db.getStudents() || []).map(s => [parseInt(s.id, 10), s]));
+            const student = studentById.get(parseInt(txn.studentId, 10));
+            const studentName = student ? String(student.base_name || student.name || '').trim() : '';
+            const roll = student ? formatRollDisplay(student.roll) : formatRollDisplay(String(txn.student_roll || ''));
+            const mode = String(txn.type || '').trim().toLowerCase();
+            const isCash = mode === 'cash_purchase';
+
+            const infoEl = document.getElementById('txnEditStudentInfo');
+            if (infoEl) {
+                infoEl.innerHTML = `<strong style="color:#e2e8f0">${escapeHtml(studentName || roll)}</strong>${studentName ? ` <span style="color:#64748b">(${escapeHtml(roll)})</span>` : ''} &nbsp;·&nbsp; ${escapeHtml(String(txn.item_name || ''))} ×${parseInt(txn.qty, 10) || 1} &nbsp;·&nbsp; ${escapeHtml(String(txn.month || ''))}<br><span style="color:#64748b;font-size:11px;">Txn ID: ${txnId}</span>`;
+            }
+
+            const cashFieldsEl = document.getElementById('txnEditCashFields');
+            if (cashFieldsEl) cashFieldsEl.style.display = isCash ? '' : 'none';
+
+            if (isCash) {
+                const charged = Math.max(0, parseFloat(txn.cash_charged) || parseFloat(txn.total_cost) || 0);
+                const el = document.getElementById('txnEditCashCharged');
+                if (el) el.value = Math.round(charged);
+                const paidEl = document.getElementById('txnEditCashPaid');
+                if (paidEl) paidEl.value = Math.max(0, parseFloat(txn.cash_paid) || 0);
+                updateTxnEditBalance();
+            }
+
+            const pendingEl = document.getElementById('txnEditPendingSettlement');
+            if (pendingEl) pendingEl.checked = !!(txn.pending_settlement);
+
+            const modal = document.getElementById('txnEditModal');
+            if (modal) {
+                if (modal.parentElement !== document.body) {
+                    document.body.appendChild(modal);
+                }
+                modal.classList.remove('hidden');
+                const content = modal.querySelector('.validation-modal-content');
+                _centerModalInViewport(content, { maxWidth: 560, pad: 14 });
+            }
+        }
+
+        function closeTxnEditModal() {
+            const modal = document.getElementById('txnEditModal');
+            if (modal) {
+                const content = modal.querySelector('.validation-modal-content');
+                _resetModalPosition(content);
+                modal.classList.add('hidden');
+            }
+            _txnEditId = 0;
+        }
+
+        function updateTxnEditBalance() {
+            const preview = document.getElementById('txnEditBalancePreview');
+            if (!preview) return;
+            const chargedEl = document.getElementById('txnEditCashCharged');
+            const paidEl = document.getElementById('txnEditCashPaid');
+            const charged = Math.max(0, parseFloat(chargedEl && chargedEl.value) || 0);
+            const paid = Math.max(0, parseFloat(paidEl && paidEl.value) || 0);
+            const due = Math.max(0, charged - paid);
+            const ret = Math.max(0, paid - charged);
+            if (due > 0) {
+                preview.innerHTML = `<span style="color:#fca5a5">Cash Due: ₹${Math.round(due)}</span>`;
+            } else if (ret > 0) {
+                preview.innerHTML = `<span style="color:#fbbf24">Return Due: ₹${Math.round(ret)}</span>`;
+            } else {
+                preview.innerHTML = `<span style="color:#4ade80">Fully Paid — ₹${Math.round(charged)}</span>`;
+            }
+        }
+
+        function saveTxnEdit() {
+            if (currentUserRole !== 'admin') return;
+            if (!_txnEditId) return;
+            const data = db.getData();
+            const idx = (data.resource_transactions || []).findIndex(t => parseInt(t && t.id, 10) === _txnEditId);
+            if (idx < 0) { showAlert('Transaction not found.', 'warning'); closeTxnEditModal(); return; }
+
+            const txn = data.resource_transactions[idx];
+            const mode = String(txn.type || '').trim().toLowerCase();
+            const nowIso = new Date().toISOString();
+            const updates = { updated_at: nowIso };
+
+            if (mode === 'cash_purchase') {
+                const chargedEl = document.getElementById('txnEditCashCharged');
+                const paidEl2 = document.getElementById('txnEditCashPaid');
+                const charged = Math.max(0, parseFloat(chargedEl && chargedEl.value) || 0);
+                const paid = Math.max(0, parseFloat(paidEl2 && paidEl2.value) || 0);
+                const due = Math.max(0, charged - paid);
+                const ret = Math.max(0, paid - charged);
+                updates.cash_paid = paid;
+                updates.cash_due = due;
+                updates.cash_return_due = ret;
+            }
+
+            const pendingEl = document.getElementById('txnEditPendingSettlement');
+            updates.pending_settlement = pendingEl ? pendingEl.checked : txn.pending_settlement;
+
+            pushUndoSnapshot('Edit resource transaction');
+            data.resource_transactions[idx] = { ...txn, ...updates };
+            db.saveData(data);
+            if (SERVER_SYNC.enabled) pushToServer(db.getData(), { silent: true }).catch(() => {});
+            closeTxnEditModal();
+            renderResourceTransactions();
+            showAlert('Transaction updated.', 'success');
         }
 
         function computeResourceCashPricing(totalCashCost, monthTotalPoints) {
@@ -23770,7 +24779,7 @@
                     <div class="row"><div class="k">Cash Paid Now</div><div class="v">₹${Math.round(cashPaid)}</div></div>
                     <div class="row"><div class="k">Pending</div><div class="v">₹${Math.round(cashDue)}</div></div>
                 </div>
-            `);
+            `, { wide: true, centerViewport: true });
             if (!confirmed) {
                 return;
             }
@@ -23814,8 +24823,9 @@
             showAlert(action === 'due' ? 'Emergency purchase recorded (cash due)' : 'Cash purchase recorded', 'success');
         }
 
-        async function adminSettleResourceTransaction(txnId) {
+        async function adminSettleResourceTransaction(txnId, _triggerBtn = null, evt = null) {
             if (currentUserRole !== 'admin') return;
+            const _anchorRect = _eventAnchorRect(_triggerBtn, evt);
             const id = parseInt(txnId, 10) || 0;
             if (!id) return;
             const txn = getResourceTransactions().find(t => parseInt(t && t.id, 10) === id) || null;
@@ -23873,7 +24883,7 @@
                 `;
             }
 
-            const confirmed = await openConfirmModal('Settle Transaction', confirmHtml);
+            const confirmed = await openConfirmModal('Settle Transaction', confirmHtml, { wide: true, centerViewport: true });
             if (!confirmed) return;
 
             const nowIso = new Date().toISOString();
@@ -23923,16 +24933,31 @@
             }
             let points = requested;
             if (points > remaining) {
-                if (!confirm(`Only ${Math.round(remaining)} excess points are remaining for ${monthKey}. Redeem remaining instead?`)) {
-                    return;
-                }
+                const trimConfirm = await openConfirmModal(
+                    'Adjust Redeem Points',
+                    `<div class="confirm-details">
+                        <div class="row"><div class="k">Requested</div><div class="v">${Math.round(points)} pts</div></div>
+                        <div class="row"><div class="k">Remaining</div><div class="v">${Math.round(remaining)} pts</div></div>
+                        <div class="row"><div class="k">Action</div><div class="v">Redeem remaining points only</div></div>
+                    </div>`,
+                    { wide: false, centerViewport: true }
+                );
+                if (!trimConfirm) return;
                 points = remaining;
             }
 
             const remark = String(getElementValue('resourceManualRedeemRemark') || '').trim();
-            if (!confirm(`Manual redeem ${Math.round(points)} points for ${String(student.base_name || student.name || '').trim()} (${formatRollDisplay(student.roll)}) in ${monthKey}?`)) {
-                return;
-            }
+            const manualConfirm = await openConfirmModal(
+                'Confirm Manual Redeem',
+                `<div class="confirm-details">
+                    <div class="row"><div class="k">Student</div><div class="v">${escapeHtml(String(student.base_name || student.name || '').trim())} (${escapeHtml(formatRollDisplay(student.roll))})</div></div>
+                    <div class="row"><div class="k">Month</div><div class="v">${escapeHtml(monthKey)}</div></div>
+                    <div class="row"><div class="k">Points</div><div class="v">${Math.round(points)} pts</div></div>
+                    <div class="row"><div class="k">Remark</div><div class="v">${escapeHtml(remark || '-')}</div></div>
+                </div>`,
+                { wide: true, centerViewport: true }
+            );
+            if (!manualConfirm) return;
 
             const nowIso = new Date().toISOString();
             const txnRow = {
@@ -23966,7 +24991,9 @@
             showAlert('Manual redeem recorded', 'success');
         }
 
-        async function submitResourceRequest() {
+        async function submitResourceRequest(_triggerBtn = null) {
+            const _anchorRect = (_triggerBtn && typeof _triggerBtn.getBoundingClientRect === 'function')
+                ? _triggerBtn.getBoundingClientRect() : null;
             const mode = String(getElementValue('resourceRequestMode') || 'redeem_points').trim().toLowerCase();
             const itemId = parseInt(getElementValue('resourceRequestItem'), 10) || 0;
             const qty = Math.max(1, parseInt(getElementValue('resourceRequestQty'), 10) || 1);
@@ -24047,7 +25074,7 @@
                     </div>
                     <p style="margin-top: 10px; color: var(--text-muted);">This will add an urgent request to the Requests Queue. Approve it below to create the transaction.</p>
                 `;
-                const confirmed = await openConfirmModal('Submit Urgent Request', confirmHtml);
+                const confirmed = await openConfirmModal('Submit Urgent Request', confirmHtml, { wide: true, submitFlow: true, maxWidth: 1160 });
                 if (!confirmed) return;
                 if (mode === 'cash_purchase') {
                     const _payOpt = document.querySelector('#confirmBody input[name="cashPayOption"]:checked');
@@ -24107,7 +25134,7 @@
                         <div class="row"><div class="k">Admin Veto</div><div class="v">${adminVeto ? 'ON' : 'OFF'}</div></div>
                     </div>
                 `;
-                const confirmed = await openConfirmModal('Submit Request', confirmHtml);
+                const confirmed = await openConfirmModal('Submit Request', confirmHtml, { wide: true, submitFlow: true, maxWidth: 1160 });
                 if (!confirmed) return;
                 if (mode === 'cash_purchase') {
                     const _payOpt = document.querySelector('#confirmBody input[name="cashPayOption"]:checked');
@@ -24160,7 +25187,7 @@
                     </div>
                     <p style="margin-top: 10px; color: var(--text-muted);">This request will enter <strong>Pending Teacher</strong>. You can then recommend it to Admin from the Requests Queue.</p>
                 `;
-                const confirmed = await openConfirmModal('Submit Teacher Request', confirmHtml);
+                const confirmed = await openConfirmModal('Submit Teacher Request', confirmHtml, { wide: true, submitFlow: true, maxWidth: 1160 });
                 if (!confirmed) return;
                 const reqRow = {
                     id: Date.now(),
@@ -24213,7 +25240,7 @@
                         }
                     </div>
                 `;
-                const confirmed = await openConfirmModal('Submit Request', confirmHtml);
+                const confirmed = await openConfirmModal('Submit Request', confirmHtml, { wide: true, submitFlow: true, maxWidth: 1160 });
                 if (!confirmed) return;
                 if (mode === 'cash_purchase') {
                     const _payOpt = document.querySelector('#confirmBody input[name="cashPayOption"]:checked');
@@ -24283,11 +25310,32 @@
 
         async function adminApproveResourceRequest(requestId, _triggerBtn) {
             if (currentUserRole !== 'admin') return;
+            // Capture rect immediately at click time — before _btnSetLoading, async ops, or any modal
+            // that might change layout. This is the only reliable moment the button is in its
+            // original viewport position.
+            const _anchorRect = (_triggerBtn && typeof _triggerBtn.getBoundingClientRect === 'function')
+                ? _triggerBtn.getBoundingClientRect() : null;
             const rid = parseInt(requestId, 10) || 0;
             if (!rid) return;
             const _restoreApproveBtn = _btnSetLoading(_triggerBtn);
             const req = getResourceRequests().find(r => parseInt(r && r.id, 10) === rid) || null;
             if (!req) { _restoreApproveBtn(); return; }
+            const reqStatus = String(req.status || '').trim().toLowerCase();
+            if (['approved', 'rejected', 'fulfilled', 'cancelled'].includes(reqStatus)) {
+                showAlert('This request is already resolved. Refreshing queue...', 'info');
+                _restoreApproveBtn();
+                renderResourceRequests();
+                return;
+            }
+
+            // Guard: if a transaction already exists for this request, it was already approved.
+            // The request may be re-appearing due to a sync lag — block re-processing it.
+            const existingTxn = getResourceTransactions().find(t => parseInt(t && t.request_id, 10) === rid);
+            if (existingTxn) {
+                showAlert('This request already has a transaction — it was approved previously. If the queue still shows it, do a Master Update to sync latest data.', 'warning');
+                _restoreApproveBtn();
+                return;
+            }
 
             const nowIso = new Date().toISOString();
             const remark = String(getElementValue(`resourceAdminRemark-${rid}`) || '').trim();
@@ -24394,7 +25442,7 @@
                     if (!modal || !modalBody) { resolve(null); return; }
                     if (titleEl) titleEl.textContent = 'Half-Price Advantage';
                     modalBody.innerHTML = advHtml;
-                    openModal('detailsModal');
+                    openModal('detailsModal', { centerViewport: true, maxWidth: 980 });
                     const inp = document.getElementById('_advChoice');
                     const onChoice = () => {
                         inp.removeEventListener('change', onChoice);
@@ -24425,28 +25473,9 @@
             }
             // ─────────────────────────────────────────────────────────────────────
 
-            // Standard confirmation summary
             const balFinal = mode === 'cash_purchase' ? computeResourceCashBalance(charged, cashPaid) : null;
             const cashDue = mode === 'cash_purchase' ? Math.max(0, balFinal.pending) : 0;
             const cashReturnDue = mode === 'cash_purchase' ? Math.max(0, balFinal.return_due) : 0;
-
-            const confirmHtml = `
-                <div class="confirm-details">
-                    <div class="row"><div class="k">Student</div><div class="v">${escapeHtml(studentName || '-')} (${escapeHtml(roll)})</div></div>
-                    <div class="row"><div class="k">Month</div><div class="v">${escapeHtml(monthKey)}</div></div>
-                    <div class="row"><div class="k">Item</div><div class="v">${escapeHtml(String(req.item_name||'').trim())} ×${qty}</div></div>
-                    ${mode === 'redeem_points'
-                        ? `<div class="row"><div class="k">Points Used</div><div class="v">${Math.round(totalPointsCost)} pts</div></div>`
-                        : `<div class="row"><div class="k">Cash Charged</div><div class="v">₹${Math.round(charged)}${useAdvantage ? ' <span style="color:#4ade80">(half-price)</span>' : ''}</div></div>
-                           <div class="row"><div class="k">Cash Paid</div><div class="v">₹${Math.round(cashPaid)}</div></div>
-                           <div class="row"><div class="k">Pending</div><div class="v">₹${Math.round(cashDue)}</div></div>
-                           <div class="row"><div class="k">Return</div><div class="v">₹${Math.round(cashReturnDue)}</div></div>
-                           ${useAdvantage ? `<div class="row"><div class="k" style="color:#fbbf24">Pts Deducted</div><div class="v" style="color:#fbbf24;font-weight:700">−${advantagePointsDeducted} pts</div></div>` : ''}`
-                    }
-                    <div class="row"><div class="k">Admin Veto</div><div class="v">${adminVeto ? 'ON' : 'OFF'}</div></div>
-                </div>`;
-            const confirmed = await openConfirmModal('Confirm Approval', confirmHtml);
-            if (!confirmed) { _restoreApproveBtn(); return; }
 
             pushUndoSnapshot('Approve resource request');
 
@@ -26306,6 +27335,10 @@
         function _animateTableRows(tableId) {
             const tbl = document.getElementById(tableId);
             if (!tbl) return;
+            if (window.matchMedia && window.matchMedia('(max-width: 1024px), (pointer: coarse)').matches) {
+                tbl.classList.remove('ios-rows-animate');
+                return;
+            }
             if ((window.__EA_SUPPRESS_TABLE_ANIM_UNTIL || 0) > Date.now()) {
                 tbl.classList.remove('ios-rows-animate');
                 return;
@@ -26317,7 +27350,7 @@
                 return;
             }
             // Ultra-smooth mode: avoid animating huge tables, and cap stagger length.
-            const animatedRows = totalRows > 90 ? 0 : Math.min(totalRows, 24);
+            const animatedRows = totalRows > 70 ? 0 : Math.min(totalRows, 14);
             tbl.classList.remove('ios-rows-animate');
             if (animatedRows <= 0) return;
             requestAnimationFrame(() => {
@@ -26333,14 +27366,156 @@
             });
         }
 
-        function openModal(modalId) {
+        function _positionModalContentNearAnchor(content, anchorEl, options = {}) {
+            if (!content) return;
+            // Clear any previous anchoring so we start clean.
+            content.classList.remove('anchored-popover', 'popover-side-right', 'popover-side-left');
+            content.style.position = '';
+            content.style.left = '';
+            content.style.right = '';
+            content.style.top = '';
+            content.style.margin = '';
+            content.style.maxHeight = '';
+            content.style.visibility = '';
+            content.style.transformOrigin = '';
+            content.style.animation = '';
+            if (!anchorEl || window.innerWidth < 560) return; // very small screens: keep centered
+            try {
+                // Use a pre-captured rect when available (captured before modal was shown)
+                // to avoid scroll-lock effects from the modal backdrop corrupting coordinates.
+                const rect = options.preRect || anchorEl.getBoundingClientRect();
+                const gap = Math.max(10, parseInt(options.gap, 10) || 12);
+                const viewportPad = 12;
+                const hardMaxW = Math.min(parseInt(options.maxWidth, 10) || 980, window.innerWidth - (viewportPad * 2));
+
+                const rightSpace = Math.max(220, Math.floor(window.innerWidth - rect.right - gap - viewportPad));
+                const leftSpace = Math.max(220, Math.floor(rect.left - gap - viewportPad));
+                let side = rightSpace >= leftSpace ? 'right' : 'left';
+                let sideSpace = side === 'right' ? rightSpace : leftSpace;
+                if (sideSpace < 260) {
+                    side = rightSpace >= leftSpace ? 'right' : 'left';
+                    sideSpace = Math.max(rightSpace, leftSpace);
+                }
+
+                const desiredWidth = Math.max(260, Math.min(hardMaxW, sideSpace));
+                // Cap at 75 % of viewport height so there is always positioning headroom.
+                // Without this cap, a near-full-height dialog forces desiredTop to 12 px (screen top).
+                // Tall content scrolls inside the capped dialog.
+                const maxH = Math.max(260, Math.floor(window.innerHeight * 0.75));
+
+                // Step 1: commit fixed position & size so the browser can lay out the content.
+                content.style.position = 'fixed';
+                content.style.visibility = 'hidden'; // invisible while we measure
+                content.style.animation = 'none';    // suppress burst animation during measurement
+                content.style.width = `${desiredWidth}px`;
+                content.style.maxWidth = `${desiredWidth}px`;
+                content.style.maxHeight = `${maxH}px`;
+                content.style.overflowY = 'auto';    // scroll tall content within the cap
+                content.style.top = '0';
+                content.style.left = '0';
+                content.style.margin = '0';
+
+                // Step 2: double-rAF lets the browser complete a full layout pass first,
+                // so offsetHeight reflects the actual rendered height of the content.
+                requestAnimationFrame(() => requestAnimationFrame(() => {
+                    const modalH = Math.ceil(content.offsetHeight || 260);
+                    const modalW = Math.ceil(content.offsetWidth || desiredWidth);
+
+                    // Vertical: centre the dialog on the button's Y-midpoint, clamped to viewport.
+                    const btnMidY = rect.top + rect.height / 2;
+                    let desiredTop = Math.round(btnMidY - modalH / 2);
+                    desiredTop = Math.max(viewportPad, Math.min(desiredTop, window.innerHeight - modalH - viewportPad));
+
+                    const desiredLeft = side === 'right'
+                        ? Math.min(window.innerWidth - modalW - viewportPad, rect.right + gap)
+                        : Math.max(viewportPad, rect.left - modalW - gap);
+
+                    // transform-origin: the exact point on the dialog where the button centre lives.
+                    // This makes the "burst" animation appear to originate FROM the button.
+                    const originX = side === 'right' ? 0 : modalW;
+                    const originY = Math.max(0, Math.min(Math.round(btnMidY - desiredTop), modalH));
+
+                    content.style.top = `${desiredTop}px`;
+                    content.style.left = `${desiredLeft}px`;
+                    content.style.transformOrigin = `${originX}px ${originY}px`;
+                    content.style.animation = '';    // allow CSS burst animation to run
+                    content.style.visibility = '';   // reveal
+                    content.classList.add('anchored-popover', side === 'right' ? 'popover-side-right' : 'popover-side-left');
+                }));
+            } catch (e) {
+                // Fallback: just reveal centered.
+                content.style.visibility = '';
+                content.style.animation = '';
+            }
+        }
+
+        function _resetModalPosition(content) {
+            if (!content) return;
+            content.classList.remove('anchored-popover', 'popover-side-right', 'popover-side-left');
+            content.style.position = '';
+            content.style.left = '';
+            content.style.right = '';
+            content.style.top = '';
+            content.style.margin = '';
+            content.style.width = '';
+            content.style.maxWidth = '';
+            content.style.maxHeight = '';
+            content.style.minHeight = '';
+            content.style.visibility = '';
+            content.style.transform = '';
+            content.style.transformOrigin = '';
+            content.style.animation = '';
+            content.style.overflowY = '';
+        }
+
+        function _centerModalInViewport(content, options = {}) {
+            if (!content) return;
+            const viewportPad = Math.max(12, parseInt(options.pad, 10) || 14);
+            const hardMaxW = Math.min(
+                parseInt(options.maxWidth, 10) || 980,
+                Math.max(260, window.innerWidth - (viewportPad * 2))
+            );
+            const preferredW = Math.max(420, Math.floor(window.innerWidth * 0.5));
+            const maxH = Math.max(260, Math.floor(window.innerHeight * 0.84));
+            const minH = Math.max(220, Math.floor(window.innerHeight * 0.5));
+            content.classList.remove('anchored-popover', 'popover-side-right', 'popover-side-left');
+            content.style.position = 'fixed';
+            content.style.left = '50%';
+            content.style.top = '50%';
+            content.style.right = 'auto';
+            content.style.margin = '0';
+            content.style.transform = 'translate(-50%, -50%)';
+            content.style.width = `${Math.min(hardMaxW, preferredW)}px`;
+            content.style.maxWidth = `${hardMaxW}px`;
+            content.style.maxHeight = `${maxH}px`;
+            content.style.minHeight = `${minH}px`;
+            content.style.overflowY = 'auto';
+            content.style.visibility = '';
+            content.style.transformOrigin = '50% 50%';
+        }
+
+        function openModal(modalId, options = {}) {
             const modal = document.getElementById(modalId);
             if (!modal) return;
-            // Ensure entrance animation replays on every open
+            if (modal.parentElement !== document.body) {
+                document.body.appendChild(modal);
+            }
             const content = modal.querySelector('.modal-content');
-            if (content) { content.style.animation = 'none'; void content.offsetWidth; content.style.animation = ''; }
+            modal.classList.toggle('no-backdrop', !!options.noBackdrop);
             modal.classList.remove('modal-exiting');
             modal.classList.add('active');
+            if (options && options.centerViewport) {
+                _centerModalInViewport(content, { maxWidth: options.maxWidth || 980, pad: 14 });
+            } else if (options && options.anchorEl) {
+                // Anchored path: positioning function controls animation timing via double-rAF.
+                // Pass through preRect if caller captured the button position at click-time.
+                _positionModalContentNearAnchor(content, options.anchorEl,
+                    { maxWidth: options.maxWidth || 980, gap: 12, preRect: options.preRect || null });
+            } else {
+                // Centered path: force animation replay so entrance always runs.
+                if (content) { content.style.animation = 'none'; void content.offsetWidth; content.style.animation = ''; }
+                _resetModalPosition(content);
+            }
         }
 
         function closeModal(modalId = 'detailsModal') {
@@ -26352,11 +27527,14 @@
                 modal.classList.add('modal-exiting');
                 setTimeout(() => {
                     modal.classList.remove('active', 'modal-exiting');
+                    modal.classList.remove('no-backdrop');
                     content.style.animation = '';
+                    _resetModalPosition(content);
                     modal.dispatchEvent(new Event('_modalClosed'));
                 }, 145);
             } else {
                 modal.classList.remove('active');
+                modal.classList.remove('no-backdrop');
                 modal.dispatchEvent(new Event('_modalClosed'));
             }
         }
@@ -26453,23 +27631,93 @@
             const messageEl = document.getElementById('validationMessage');
             if (titleEl) titleEl.textContent = title;
             if (messageEl) messageEl.innerHTML = message;
-            if (modal) modal.classList.remove('hidden');
+            if (modal) {
+                if (modal.parentElement !== document.body) {
+                    document.body.appendChild(modal);
+                }
+                modal.classList.remove('hidden');
+                const content = modal.querySelector('.validation-modal-content');
+                _centerModalInViewport(content, { maxWidth: 760, pad: 14 });
+            }
         }
 
         function closeValidationModal() {
             const modal = document.getElementById('validationModal');
-            if (modal) modal.classList.add('hidden');
+            if (modal) {
+                const content = modal.querySelector('.validation-modal-content');
+                _resetModalPosition(content);
+                modal.classList.add('hidden');
+            }
+        }
+
+        /* PIP CONFIRM PANEL — floats fixed bottom-right, no backdrop */
+        let _pipConfirmResolver = null;
+
+        function openPipConfirmModal(title, htmlBody) {
+            const panel = document.getElementById('pipConfirmPanel');
+            const titleEl = document.getElementById('pipConfirmTitle');
+            const bodyEl  = document.getElementById('pipConfirmBody');
+            if (!panel || !titleEl || !bodyEl) {
+                // Fallback: use the regular confirm modal if PIP element is missing
+                return openConfirmModal(title, htmlBody, {});
+            }
+            if (titleEl) titleEl.textContent = String(title || 'Confirm');
+            if (bodyEl)  bodyEl.innerHTML = htmlBody || '';
+            // Replay entrance animation each time
+            panel.style.animation = 'none';
+            void panel.offsetWidth;
+            panel.style.animation = '';
+            panel.style.display = '';
+            return new Promise(resolve => { _pipConfirmResolver = resolve; });
+        }
+
+        function closePipConfirmModal(confirmed) {
+            const panel = document.getElementById('pipConfirmPanel');
+            if (panel) panel.style.display = 'none';
+            if (typeof _pipConfirmResolver === 'function') {
+                const resolver = _pipConfirmResolver;
+                _pipConfirmResolver = null;
+                resolver(Boolean(confirmed));
+            }
         }
 
         /* CONFIRM MODAL FUNCTIONS (Resources) */
         let _confirmModalResolver = null;
-        function openConfirmModal(title, htmlBody) {
+        function openConfirmModal(title, htmlBody, options = {}) {
             const modal = document.getElementById('confirmModal');
             const titleEl = document.getElementById('confirmTitle');
             const bodyEl = document.getElementById('confirmBody');
+            const contentEl = modal ? modal.querySelector('.validation-modal-content') : null;
             if (titleEl) titleEl.textContent = String(title || 'Confirm');
             if (bodyEl) bodyEl.innerHTML = htmlBody || '';
-            if (modal) modal.classList.remove('hidden');
+            if (contentEl) {
+                contentEl.classList.toggle('resource-modal-wide', !!options.wide);
+                contentEl.classList.toggle('resource-submit-dialog', !!options.submitFlow);
+            }
+            if (bodyEl) {
+                bodyEl.classList.toggle('resource-submit-dialog-body', !!options.submitFlow);
+            }
+            // Capture anchor rect BEFORE showing the modal backdrop, so that any
+            // scroll-lock or layout shift triggered by removing 'hidden' does not
+            // corrupt the button's viewport coordinates.
+            const preRect = options.preRect || (
+                (options.anchorEl && typeof options.anchorEl.getBoundingClientRect === 'function')
+                    ? options.anchorEl.getBoundingClientRect()
+                    : null
+            );
+            if (modal) {
+                if (modal.parentElement !== document.body) {
+                    document.body.appendChild(modal);
+                }
+                modal.classList.toggle('no-backdrop', !!options.noBackdrop);
+                modal.classList.remove('hidden');
+                if (options.centerViewport) {
+                    _centerModalInViewport(contentEl, { maxWidth: options.maxWidth || (options.wide ? 1080 : 980), pad: 14 });
+                } else {
+                    _positionModalContentNearAnchor(contentEl, options.anchorEl || null,
+                        { maxWidth: options.maxWidth || 980, gap: 12, preRect });
+                }
+            }
             return new Promise((resolve) => {
                 _confirmModalResolver = resolve;
             });
@@ -26477,7 +27725,18 @@
 
         function closeConfirmModal(confirmed) {
             const modal = document.getElementById('confirmModal');
-            if (modal) modal.classList.add('hidden');
+            const bodyEl = document.getElementById('confirmBody');
+            const contentEl = modal ? modal.querySelector('.validation-modal-content') : null;
+            if (contentEl) {
+                contentEl.classList.remove('resource-modal-wide');
+                contentEl.classList.remove('resource-submit-dialog');
+                _resetModalPosition(contentEl);
+            }
+            if (bodyEl) bodyEl.classList.remove('resource-submit-dialog-body');
+            if (modal) {
+                modal.classList.remove('no-backdrop');
+                modal.classList.add('hidden');
+            }
             if (typeof _confirmModalResolver === 'function') {
                 const resolver = _confirmModalResolver;
                 _confirmModalResolver = null;
@@ -26486,10 +27745,28 @@
         }
 
         /* STAR/VETO VALIDATION & COUNTER UPDATE */
-        function validateStarAvailability(studentId, requestedStars) {
+        function getAvailableStarsForMonth(studentId, monthKey = '') {
+            const sid = parseInt(studentId, 10) || 0;
+            const student = db.getStudents().find(s => s.id === sid);
+            if (!student) return 0;
+            const month = String(monthKey || getCurrentMonthKey()).trim() || getCurrentMonthKey();
+            const profileMap = getMonthRosterProfileMap(month);
+            const rollKey = String(student.roll || '').trim().toUpperCase();
+            const profile = profileMap instanceof Map ? profileMap.get(rollKey) : safeProp(profileMap, rollKey);
+            const hasProfileStars = profile && profile.month_star_count !== undefined && profile.month_star_count !== null;
+            if (hasProfileStars) {
+                const carry = Math.max(0, parseInt(profile.month_star_count, 10) || 0);
+                const awards = getStudentMonthStarAwardTotal(sid, month);
+                const used = getStudentMonthNegativeDeltaTotal(sid, month, 'stars');
+                return Math.max(0, carry + awards - used);
+            }
+            return Math.max(0, parseInt(safeProp(student, 'stars'), 10) || 0);
+        }
+
+        function validateStarAvailability(studentId, requestedStars, monthKey = '') {
             const student = db.getStudents().find(s => s.id === studentId);
             if (!student) return { valid: false, message: 'Student not found.' };
-            const availableStars = parseInt(safeProp(student, 'stars'), 10) || 0;
+            const availableStars = getAvailableStarsForMonth(studentId, monthKey);
             if (requestedStars < 0 && availableStars < Math.abs(requestedStars)) {
                 return {
                     valid: false,
@@ -26683,7 +27960,13 @@
                 updateSyncStatus('syncing', 'Connecting');
                 // forceFull=true on initial load: skip ?since so every page refresh always
                 // fetches a fresh full snapshot — prevents stale data after ?since 204 responses.
-                pullFromServer(false, true).catch(() => {});
+                if (currentUserRole === 'admin') {
+                    try {
+                        await pullFromServer(false, true);
+                    } catch (_) {}
+                } else {
+                    pullFromServer(false, true).catch(() => {});
+                }
                 setTimeout(() => refreshAllowedMonthsFromServer().catch(() => {}), 600);
                 if (ENABLE_REALTIME_SYNC) {
                     startRealtimeSync();
