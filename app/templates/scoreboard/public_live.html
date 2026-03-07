@@ -471,6 +471,10 @@
             const isHist   = month < '2026-02';
             const histTotals = new Map();
             const histHas    = new Set();
+            // Per-student, per-date score sums and normal star usage counts (for +100 bonus)
+            const perDateScore     = new Map(); // sid -> { date -> pts }
+            const perDateStarNorm  = new Map(); // sid -> { date -> normalUses }
+            const applyStarBonus   = month >= '2026-02';
 
             (latest.scores || []).forEach(sc => {
                 const sid = parseInt(sc && sc.studentId, 10);
@@ -488,8 +492,43 @@
                         return;
                     }
                 }
-                totals.set(sid, (totals.get(sid) || 0) + (parseInt(sc && sc.points, 10) || 0));
+                const pts  = parseInt(sc && sc.points, 10) || 0;
+                const date = String(sc && sc.date || '').trim();
+                totals.set(sid, (totals.get(sid) || 0) + pts);
+
+                // Track per-date scores and normal star usage for bonus computation
+                if (applyStarBonus && date) {
+                    if (!perDateScore.has(sid)) perDateScore.set(sid, {});
+                    perDateScore.get(sid)[date] = (perDateScore.get(sid)[date] || 0) + pts;
+
+                    const starDelta = parseInt(sc && sc.stars, 10) || 0;
+                    if (starDelta < 0) {
+                        const usageAbs     = Math.abs(starDelta);
+                        let normal         = Math.max(0, parseInt(sc && sc.star_usage_normal, 10) || 0);
+                        let disciplinary   = Math.max(0, parseInt(sc && sc.star_usage_disciplinary, 10) || 0);
+                        if (normal + disciplinary <= 0) {
+                            if (note.includes('disciplinary')) { disciplinary = usageAbs; normal = 0; }
+                            else                               { normal = usageAbs; disciplinary = 0; }
+                        }
+                        if (normal > 0) {
+                            if (!perDateStarNorm.has(sid)) perDateStarNorm.set(sid, {});
+                            perDateStarNorm.get(sid)[date] = (perDateStarNorm.get(sid)[date] || 0) + normal;
+                        }
+                    }
+                }
             });
+
+            // Apply star +100 bonus per normal star use where that day's score >= -50
+            if (applyStarBonus) {
+                perDateStarNorm.forEach((dateMap, sid) => {
+                    if (!totals.has(sid)) return;
+                    const dateScores = perDateScore.get(sid) || {};
+                    Object.entries(dateMap).forEach(([date, normalUses]) => {
+                        if ((dateScores[date] || 0) >= -50 && normalUses > 0)
+                            totals.set(sid, (totals.get(sid) || 0) + (100 * normalUses));
+                    });
+                });
+            }
 
             const attLatest = new Map();
             (latest.attendance || []).forEach(a => {
