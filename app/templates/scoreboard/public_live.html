@@ -4,118 +4,381 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>EA Live Scoreboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@900&family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
     <style>
+        /* ── Variables ── */
         :root {
-            --bg: #0b1020;
-            --card: #111827;
-            --line: #26324d;
-            --text: #e5e7eb;
-            --muted: #9aa6bf;
-            --good: #34d399;
-            --bad: #f87171;
-            --accent: #60a5fa;
+            --bg:        #04071a;
+            --bg2:       #0a1628;
+            --card:      #0f172a;
+            --card2:     #111827;
+            --line:      rgba(148,163,184,.15);
+            --text:      #e2e8f0;
+            --muted:     #94a3b8;
+            --good:      #22c55e;
+            --bad:       #ff2222;
+            --accent:    #60a5fa;
+            --gold:      #fbbf24;
+            --silver:    #cbd5e1;
+            --bronze:    #fb923c;
+            --radius:    12px;
         }
-        * { box-sizing: border-box; }
+        body.light {
+            --bg:        #f0f4ff;
+            --bg2:       #e8eef8;
+            --card:      #ffffff;
+            --card2:     #f8fafc;
+            --line:      rgba(100,116,139,.18);
+            --text:      #0f172a;
+            --muted:     #475569;
+            --good:      #15803d;
+            --bad:       #dc2626;
+            --accent:    #2563eb;
+            --gold:      #b45309;
+            --silver:    #475569;
+            --bronze:    #c2410c;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
         body {
-            margin: 0;
-            font-family: "Segoe UI", Tahoma, Arial, sans-serif;
-            background: linear-gradient(180deg, #0b1020 0%, #0f172a 100%);
+            font-family: 'Inter', 'Segoe UI', Tahoma, Arial, sans-serif;
+            background: var(--bg);
             color: var(--text);
+            min-height: 100vh;
+            transition: background .3s, color .3s;
         }
-        .wrap { max-width: 1200px; margin: 0 auto; padding: 14px; }
-        .head {
+
+        /* ── HEADER ── */
+        .header {
+            position: relative;
+            overflow: hidden;
+            isolation: isolate;
+            background: linear-gradient(135deg, #04071a 0%, #0a1628 50%, #06131f 100%);
+            padding: 32px 20px 28px;
+            text-align: center;
+        }
+        body.light .header { background: linear-gradient(135deg, #1e3a5f 0%, #1d4ed8 50%, #1e3a5f 100%); }
+
+        /* Grid drift */
+        .hdr-grid {
+            position: absolute; inset: 0; z-index: 0;
+            background-image: linear-gradient(rgba(96,165,250,.06) 1px, transparent 1px),
+                              linear-gradient(90deg, rgba(96,165,250,.06) 1px, transparent 1px);
+            background-size: 46px 46px;
+            animation: hdrGridDrift 24s linear infinite;
+        }
+        @keyframes hdrGridDrift { to { background-position: 46px 46px; } }
+
+        /* Orbs */
+        .hdr-orb {
+            position: absolute; z-index: 0; border-radius: 50%;
+            filter: blur(58px); opacity: .55;
+            animation: hdrOrbBreath 8s ease-in-out infinite alternate;
+        }
+        .hdr-orb-1 { width: 220px; height: 220px; top: -60px; left: -40px;  background: radial-gradient(circle, #4f46e5, transparent 70%); animation-delay: 0s; }
+        .hdr-orb-2 { width: 180px; height: 180px; top: -30px; right: 10%;  background: radial-gradient(circle, #0891b2, transparent 70%); animation-delay: 2s; }
+        .hdr-orb-3 { width: 160px; height: 160px; bottom: -50px; left: 30%; background: radial-gradient(circle, #7c3aed, transparent 70%); animation-delay: 4s; }
+        .hdr-orb-4 { width: 130px; height: 130px; top: 10px; right: -20px;  background: radial-gradient(circle, #d97706, transparent 70%); animation-delay: 1s; }
+        @keyframes hdrOrbBreath { from { transform: scale(1); } to { transform: scale(1.22); } }
+
+        /* Scan beam */
+        .hdr-scan {
+            position: absolute; inset: 0; z-index: 0;
+            background: linear-gradient(90deg, transparent 0%, rgba(125,211,252,.07) 50%, transparent 100%);
+            transform: skewX(-18deg);
+            animation: hdrScanBeam 8s ease-in-out infinite;
+        }
+        @keyframes hdrScanBeam { 0%,100% { transform: skewX(-18deg) translateX(-120%); } 50% { transform: skewX(-18deg) translateX(220%); } }
+
+        /* Meteors */
+        .hdr-meteors { position: absolute; inset: 0; z-index: 0; overflow: hidden; }
+        .hdr-meteor {
+            position: absolute; top: -10px;
+            width: 2px; height: 60px;
+            background: linear-gradient(180deg, rgba(255,255,255,.85), transparent);
+            border-radius: 2px;
+            transform: rotate(-32deg);
+            animation: hdrMeteor 7s linear infinite;
+        }
+        .hdr-meteor:nth-child(1) { left: 15%; animation-delay: 0s; }
+        .hdr-meteor:nth-child(2) { left: 35%; animation-delay: 1.4s; }
+        .hdr-meteor:nth-child(3) { left: 55%; animation-delay: 2.8s; }
+        .hdr-meteor:nth-child(4) { left: 72%; animation-delay: 4.2s; }
+        .hdr-meteor:nth-child(5) { left: 88%; animation-delay: 5.6s; }
+        @keyframes hdrMeteor { 0% { transform: rotate(-32deg) translateY(-80px); opacity: 1; } 80% { opacity: 1; } 100% { transform: rotate(-32deg) translateY(160px); opacity: 0; } }
+
+        /* Pulsing rings */
+        .hdr-ring {
+            position: absolute; z-index: 0;
+            left: 50%; top: 50%; transform: translate(-50%, -50%);
+            width: 340px; height: 90px;
+            border: 1px solid rgba(125,211,252,.18);
+            border-radius: 50%;
+            animation: hdrRingPulse 4s ease-in-out infinite;
+        }
+        .hdr-ring-2 { width: 480px; height: 130px; animation-delay: 2s; }
+        @keyframes hdrRingPulse { 0%,100% { opacity: .18; transform: translate(-50%,-50%) scale(1); } 50% { opacity: .55; transform: translate(-50%,-50%) scale(1.06); } }
+
+        .header-content { position: relative; z-index: 2; }
+        .header h1 {
+            font-family: 'Cinzel Decorative', Georgia, serif;
+            font-size: clamp(22px, 5vw, 46px);
+            font-weight: 900;
+            letter-spacing: clamp(3px, 1.5vw, 12px);
+            background: linear-gradient(90deg, #94a3b8 0%, #7dd3fc 25%, #ffffff 50%, #7dd3fc 75%, #94a3b8 100%);
+            background-size: 200% auto;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            filter: drop-shadow(0 0 22px rgba(125,211,252,.60));
+            animation: hdrShimmer 5s linear infinite;
+        }
+        @keyframes hdrShimmer { from { background-position: 200% center; } to { background-position: -200% center; } }
+
+        .header-sub {
+            margin-top: 6px;
+            font-size: 13px;
+            color: rgba(148,163,184,.8);
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+        body.light .header h1 { filter: drop-shadow(0 0 18px rgba(255,255,255,.55)); }
+        body.light .header-sub { color: rgba(255,255,255,.7); }
+
+        /* ── TOP CONTROLS ── */
+        .controls-bar {
             display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
-            margin-bottom: 12px;
+            max-width: 1100px; margin: 18px auto 0; padding: 0 16px;
         }
-        h1 { margin: 0; font-size: 20px; }
-        .pill {
-            border: 1px solid var(--line);
-            background: rgba(96,165,250,.12);
-            color: #bfdbfe;
-            border-radius: 999px;
-            padding: 4px 10px;
-            font-size: 12px;
-        }
-        .meta { color: var(--muted); font-size: 12px; }
-        .controls {
-            display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
-            margin-bottom: 10px;
-        }
-        select, button {
+        .controls-bar label { color: var(--muted); font-size: 13px; }
+
+        select {
             background: var(--card); color: var(--text);
             border: 1px solid var(--line); border-radius: 8px;
-            padding: 8px 10px;
+            padding: 7px 12px; font-size: 13px; cursor: pointer;
+            transition: border-color .2s;
         }
-        button { cursor: pointer; }
-        .table-wrap {
-            border: 1px solid var(--line);
-            border-radius: 10px;
-            overflow: auto;
+        select:focus { outline: none; border-color: var(--accent); }
+
+        .btn {
+            background: linear-gradient(135deg, rgba(37,99,235,.85), rgba(16,185,129,.85));
+            color: #fff; border: none; border-radius: 8px;
+            padding: 7px 16px; font-size: 13px; font-weight: 600;
+            cursor: pointer; transition: opacity .2s, transform .1s;
+        }
+        .btn:hover { opacity: .88; }
+        .btn:active { transform: scale(.97); }
+
+        .btn-icon {
+            background: var(--card); color: var(--text);
+            border: 1px solid var(--line); border-radius: 8px;
+            padding: 7px 12px; font-size: 14px; cursor: pointer;
+            transition: background .2s;
+        }
+        .btn-icon:hover { background: var(--card2); }
+
+        .sync-pill {
+            margin-left: auto;
+            background: rgba(30,58,138,.25); border: 1px solid rgba(96,165,250,.3);
+            color: var(--accent); border-radius: 999px;
+            padding: 4px 12px; font-size: 12px; font-weight: 600;
+            transition: all .3s;
+        }
+        .sync-pill.ok   { background: rgba(22,163,74,.18); border-color: rgba(34,197,94,.4); color: #22c55e; }
+        .sync-pill.fail { background: rgba(220,38,38,.18); border-color: rgba(248,113,113,.4); color: #f87171; }
+
+        .login-pill {
+            text-decoration: none;
+            background: var(--card); color: var(--accent);
+            border: 1px solid rgba(96,165,250,.3); border-radius: 999px;
+            padding: 4px 12px; font-size: 12px; font-weight: 600;
+            transition: background .2s;
+        }
+        .login-pill:hover { background: rgba(96,165,250,.12); }
+
+        /* ── WRAP ── */
+        .wrap { max-width: 1100px; margin: 16px auto 40px; padding: 0 16px; }
+
+        /* ── TABLE CARD ── */
+        .table-card {
             background: var(--card);
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            overflow: hidden;
+            box-shadow: 0 8px 32px rgba(0,0,0,.35);
         }
+        body.light .table-card { box-shadow: 0 4px 20px rgba(0,0,0,.10); }
+
+        .table-scroll { overflow-x: auto; }
+
         table {
-            width: 100%;
-            border-collapse: collapse;
-            min-width: 760px;
+            width: 100%; border-collapse: collapse; min-width: 520px;
         }
-        th, td {
-            padding: 9px 10px;
-            border-bottom: 1px solid rgba(148,163,184,.18);
-            text-align: left;
+        thead th {
+            background: linear-gradient(135deg, #0f172a, #1e293b);
+            color: #94a3b8;
+            padding: 12px 14px;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: .8px;
+            border-bottom: 1px solid var(--line);
+            position: sticky; top: 0; z-index: 2;
             white-space: nowrap;
-            font-size: 14px;
         }
-        th { color: #cbd5e1; background: #0f172a; position: sticky; top: 0; z-index: 1; }
-        .rank { width: 70px; text-align: center; }
-        .score { text-align: right; font-weight: 700; }
-        .pos { color: var(--good); }
-        .neg { color: var(--bad); }
-        .empty { padding: 24px; color: var(--muted); text-align: center; }
-        .anon td { color: var(--muted); font-size: 13px; }
-        .divider td {
-            border-top: 2px dashed rgba(148,163,184,.35);
-            padding: 4px 10px;
+        body.light thead th { background: linear-gradient(135deg, #e2e8f0, #f1f5f9); color: #475569; }
+
+        tbody tr {
+            border-bottom: 1px solid var(--line);
+            transition: background .15s;
+        }
+        tbody tr:last-child { border-bottom: none; }
+        tbody tr:hover td { background: rgba(96,165,250,.06); }
+        body.light tbody tr:hover td { background: rgba(37,99,235,.05); }
+
+        tbody tr:nth-child(even) td { background: rgba(255,255,255,.02); }
+        body.light tbody tr:nth-child(even) td { background: rgba(0,0,0,.02); }
+
+        td {
+            padding: 11px 14px;
+            font-size: 14px;
+            white-space: nowrap;
+            vertical-align: middle;
+        }
+
+        /* ── RANK CELL ── */
+        .rank-cell { width: 70px; text-align: center; font-weight: 700; }
+
+        .rank-badge {
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 32px; height: 32px; border-radius: 50%;
+            font-size: 13px; font-weight: 900;
+        }
+        .rank-badge.gold   { background: linear-gradient(135deg, #d97706, #fbbf24); color: #1c1100; box-shadow: 0 0 12px rgba(251,191,36,.5); }
+        .rank-badge.silver { background: linear-gradient(135deg, #94a3b8, #cbd5e1); color: #0f172a; box-shadow: 0 0 8px rgba(203,213,225,.3); }
+        .rank-badge.bronze { background: linear-gradient(135deg, #c2410c, #fb923c); color: #fff; box-shadow: 0 0 8px rgba(251,146,60,.3); }
+        .rank-badge.plain  { background: rgba(148,163,184,.10); color: var(--muted); }
+
+        /* Top-3 row tints */
+        tbody tr.row-gold   td { background: rgba(251,191,36,.06); }
+        tbody tr.row-silver td { background: rgba(203,213,225,.04); }
+        tbody tr.row-bronze td { background: rgba(251,146,60,.05); }
+        tbody tr.row-gold:hover   td, tbody tr.row-silver:hover td, tbody tr.row-bronze:hover td { background: rgba(96,165,250,.06); }
+
+        /* ── SCORE CELL ── */
+        .score-cell { text-align: right; font-weight: 800; font-size: 15px; }
+        .pos { color: var(--good); text-shadow: 0 0 8px rgba(34,197,94,.4); }
+        .neg { color: var(--bad);  text-shadow: 0 0 8px rgba(255,34,34,.4); }
+        body.light .pos { text-shadow: none; }
+        body.light .neg { text-shadow: none; }
+
+        /* ── ROLL / NAME ── */
+        .roll-cell { font-family: monospace; font-size: 13px; color: var(--muted); }
+
+        /* ── ANON rows ── */
+        tr.anon td { color: var(--muted); font-size: 13px; }
+
+        /* ── DIVIDER ── */
+        tr.divider td {
+            border-top: 2px dashed rgba(148,163,184,.25);
+            padding: 6px 14px;
             font-size: 11px;
             color: #475569;
-            background: transparent;
-            letter-spacing: .05em;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+            background: transparent !important;
+        }
+
+        /* ── EMPTY ── */
+        .empty { padding: 36px; color: var(--muted); text-align: center; font-size: 14px; }
+
+        /* ── FOOTER ── */
+        .footer {
+            text-align: center; padding: 20px;
+            color: var(--muted); font-size: 12px;
+            border-top: 1px solid var(--line);
+        }
+
+        /* ── RESPONSIVE ── */
+        @media (max-width: 600px) {
+            .header h1 { letter-spacing: 3px; }
+            .hdr-ring, .hdr-ring-2 { display: none; }
+            .hdr-orb { filter: blur(36px); }
+            .controls-bar { gap: 8px; }
         }
     </style>
 </head>
 <body>
-    <div class="wrap">
-        <div class="head">
-            <h1>Excel Academy Live Scoreboard</h1>
-            <span class="pill">Public View</span>
-            <a href="/auth/login" class="pill" style="text-decoration:none;">Login</a>
+    <div class="header">
+        <div class="hdr-grid"></div>
+        <div class="hdr-orb hdr-orb-1"></div>
+        <div class="hdr-orb hdr-orb-2"></div>
+        <div class="hdr-orb hdr-orb-3"></div>
+        <div class="hdr-orb hdr-orb-4"></div>
+        <div class="hdr-scan"></div>
+        <div class="hdr-ring"></div>
+        <div class="hdr-ring hdr-ring-2"></div>
+        <div class="hdr-meteors">
+            <span class="hdr-meteor"></span>
+            <span class="hdr-meteor"></span>
+            <span class="hdr-meteor"></span>
+            <span class="hdr-meteor"></span>
+            <span class="hdr-meteor"></span>
         </div>
-        <div class="controls">
-            <label for="monthSel" class="meta">Month</label>
-            <select id="monthSel"></select>
-            <button id="refreshBtn" type="button">Refresh</button>
-            <span id="syncMeta" class="meta">Sync: -</span>
-        </div>
-        <div class="table-wrap">
-            <table id="tbl">
-                <thead>
-                    <tr>
-                        <th class="rank">Rank</th>
-                        <th>Roll</th>
-                        <th>Name</th>
-                        <th>Class</th>
-                        <th class="score">Total</th>
-                    </tr>
-                </thead>
-                <tbody id="body">
-                    <tr><td colspan="5" class="empty">Loading…</td></tr>
-                </tbody>
-            </table>
+        <div class="header-content">
+            <h1>EXCEL ACADEMY</h1>
+            <div class="header-sub">Live Scoreboard &mdash; Public View</div>
         </div>
     </div>
+
+    <div class="controls-bar">
+        <label for="monthSel">Month</label>
+        <select id="monthSel"></select>
+        <button class="btn" id="refreshBtn" type="button">&#8635; Refresh</button>
+        <button class="btn-icon" id="themeBtn" type="button" title="Toggle theme">&#9790;</button>
+        <a href="/auth/login" class="login-pill">Login</a>
+        <span id="syncMeta" class="sync-pill">Syncing…</span>
+    </div>
+
+    <div class="wrap">
+        <div class="table-card">
+            <div class="table-scroll">
+                <table id="tbl">
+                    <thead>
+                        <tr>
+                            <th class="rank-cell">Rank</th>
+                            <th>Roll</th>
+                            <th>Name</th>
+                            <th>Class</th>
+                            <th style="text-align:right">Total</th>
+                        </tr>
+                    </thead>
+                    <tbody id="body">
+                        <tr><td colspan="5" class="empty">Loading…</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="footer">
+                Auto-refreshes every 4 seconds &nbsp;&bull;&nbsp; Top 15 shown with names &nbsp;&bull;&nbsp; Remaining participants shown by roll only
+            </div>
+        </div>
+    </div>
+
     <script>
-        const monthSel = document.getElementById('monthSel');
-        const body = document.getElementById('body');
-        const syncMeta = document.getElementById('syncMeta');
+        /* ── Theme ── */
+        (function () {
+            if (localStorage.getItem('ea_pub_theme') === 'light') document.body.classList.add('light');
+        })();
+        document.getElementById('themeBtn').addEventListener('click', () => {
+            document.body.classList.toggle('light');
+            localStorage.setItem('ea_pub_theme', document.body.classList.contains('light') ? 'light' : 'dark');
+        });
+
+        /* ── Data helpers ── */
+        const monthSel  = document.getElementById('monthSel');
+        const body      = document.getElementById('body');
+        const syncMeta  = document.getElementById('syncMeta');
         const refreshBtn = document.getElementById('refreshBtn');
         let latest = null;
 
@@ -123,106 +386,105 @@
             const n = Date.parse(String(v || ''));
             return Number.isFinite(n) ? n : 0;
         }
-
         function normStatus(v) {
             const s = String(v || '').toLowerCase();
             return ['present', 'absent', 'late', 'leave'].includes(s) ? s : 'present';
         }
-
         function penaltyOf(status) {
             if (status === 'absent') return -20;
-            if (status === 'late') return -5;
+            if (status === 'late')   return -5;
             return 0;
         }
+        function rollKey(v) { return String(v || '').trim().toUpperCase(); }
 
         function monthKeys(data) {
             const set = new Set();
-            (data.months || []).forEach(m => set.add(String(m || '').trim()));
-            (data.scores || []).forEach(s => set.add(String(s && s.month || '').trim()));
+            (data.months  || []).forEach(m => set.add(String(m || '').trim()));
+            (data.scores  || []).forEach(s => set.add(String(s && s.month || '').trim()));
             (data.attendance || []).forEach(a => {
                 const d = String(a && a.date || '').trim();
                 if (d.length >= 7) set.add(d.slice(0, 7));
             });
             const out = Array.from(set).filter(v => /^\d{4}-\d{2}$/.test(v));
             const now = new Date();
-            const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+            const cur  = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
             const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-            const prevMonth = `${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, '0')}`;
-            const allowed = new Set([currentMonth, prevMonth]);
-            const filtered = out.filter(v => allowed.has(v));
-            filtered.sort((a, b) => b.localeCompare(a));
-            return filtered;
-        }
-
-        function rollKey(v) {
-            return String(v || '').trim().toUpperCase();
+            const prv  = `${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, '0')}`;
+            return out.filter(v => v === cur || v === prv).sort((a, b) => b.localeCompare(a));
         }
 
         function getMonthRosterRolls(data, month) {
             const rolls = new Set();
-            const monthStudents = data && data.month_students && data.month_students[month];
-            const monthProfiles = data && data.month_roster_profiles && data.month_roster_profiles[month];
-            (Array.isArray(monthStudents) ? monthStudents : []).forEach(v => {
-                const r = rollKey(v);
-                if (r) rolls.add(r);
-            });
-            (Array.isArray(monthProfiles) ? monthProfiles : []).forEach(p => {
-                const r = rollKey(p && p.roll);
-                if (r) rolls.add(r);
-            });
+            const ms = data && data.month_students && data.month_students[month];
+            const mp = data && data.month_roster_profiles && data.month_roster_profiles[month];
+            (Array.isArray(ms) ? ms : []).forEach(v => { const r = rollKey(v); if (r) rolls.add(r); });
+            (Array.isArray(mp) ? mp : []).forEach(p => { const r = rollKey(p && p.roll); if (r) rolls.add(r); });
             return rolls;
         }
 
+        function rankBadge(rank) {
+            if (rank === 1) return `<span class="rank-badge gold">1</span>`;
+            if (rank === 2) return `<span class="rank-badge silver">2</span>`;
+            if (rank === 3) return `<span class="rank-badge bronze">3</span>`;
+            return `<span class="rank-badge plain">${rank}</span>`;
+        }
+
+        function rowTintClass(rank) {
+            if (rank === 1) return 'row-gold';
+            if (rank === 2) return 'row-silver';
+            if (rank === 3) return 'row-bronze';
+            return '';
+        }
+
+        function esc(s) {
+            return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        }
+
+        /* ── Render ── */
         function render(data) {
             latest = data || {};
             const months = monthKeys(latest);
-            // Prefer localStorage over in-memory value so user's month selection
-            // survives the 4-second polling cycle and data refreshes.
-            const saved = localStorage.getItem('ea_pub_month') || '';
-            const old = saved || String(monthSel.value || '');
+            const saved  = localStorage.getItem('ea_pub_month') || '';
+            const old    = saved || String(monthSel.value || '');
             monthSel.innerHTML = months.map(m => `<option value="${m}">${m}</option>`).join('');
             const month = months.includes(old) ? old : (months[0] || '');
             monthSel.value = month;
 
             if (!month) {
-                body.innerHTML = '<tr><td colspan="5" class="empty">No month data</td></tr>';
+                body.innerHTML = '<tr><td colspan="5" class="empty">No month data available</td></tr>';
                 return;
             }
 
-            const rosterRolls = getMonthRosterRolls(latest, month);
+            const rosterRolls  = getMonthRosterRolls(latest, month);
             const baseStudents = (latest.students || []).filter(s => s && s.active !== false);
-            const visibleStudents = rosterRolls.size
+            const visible      = rosterRolls.size
                 ? baseStudents.filter(s => rosterRolls.has(rollKey(s && s.roll)))
                 : baseStudents;
-            const dedupByRoll = new Map();
-            visibleStudents.forEach(s => {
-                const roll = rollKey(s && s.roll);
-                if (!roll) return;
-                if (!dedupByRoll.has(roll)) dedupByRoll.set(roll, s);
+            const dedupByRoll  = new Map();
+            visible.forEach(s => {
+                const r = rollKey(s && s.roll);
+                if (r && !dedupByRoll.has(r)) dedupByRoll.set(r, s);
             });
             const students = Array.from(dedupByRoll.values());
-            const byId = new Map(students.map(s => [parseInt(s.id, 10), s]));
-            const totals = new Map(students.map(s => [parseInt(s.id, 10), 0]));
-            const isHistoricalMonth = month < '2026-02';
-            const historicalWorkbookTotals = new Map();
-            const historicalHasWorkbookTotal = new Set();
+            const byId     = new Map(students.map(s => [parseInt(s.id, 10), s]));
+            const totals   = new Map(students.map(s => [parseInt(s.id, 10), 0]));
+            const isHist   = month < '2026-02';
+            const histTotals = new Map();
+            const histHas    = new Set();
 
             (latest.scores || []).forEach(sc => {
                 const sid = parseInt(sc && sc.studentId, 10);
                 if (!sid || !totals.has(sid)) return;
-                const m = String(sc && sc.month || '').trim();
-                if (m !== month) return;
+                if (String(sc && sc.month || '').trim() !== month) return;
                 const note = String(sc && sc.notes || '').trim().toLowerCase();
-                if (isHistoricalMonth) {
+                if (isHist) {
                     const isExcelTotal = note.startsWith('excel_total_score') || note.startsWith('excel_total_from_dates');
                     const isExcelDaily = note.startsWith('excel_daily_score');
-                    const isExcelStar = note.startsWith('excel_star_usage');
-                    // Historical months must render strictly from Excel-imported rows only.
+                    const isExcelStar  = note.startsWith('excel_star_usage');
                     if (!isExcelTotal && !isExcelDaily && !isExcelStar) return;
                     if (isExcelTotal) {
-                        historicalWorkbookTotals.set(sid, (historicalWorkbookTotals.get(sid) || 0) + (parseInt(sc && sc.points, 10) || 0));
-                        historicalHasWorkbookTotal.add(sid);
-                        // Do not add workbook-total rows into daily accumulation.
+                        histTotals.set(sid, (histTotals.get(sid) || 0) + (parseInt(sc && sc.points, 10) || 0));
+                        histHas.add(sid);
                         return;
                     }
                 }
@@ -232,84 +494,74 @@
             const attLatest = new Map();
             (latest.attendance || []).forEach(a => {
                 const sid = parseInt(a && a.studentId, 10);
-                const d = String(a && a.date || '').trim();
+                const d   = String(a && a.date || '').trim();
                 if (!sid || !d.startsWith(month)) return;
-                const key = `${sid}|${d}`;
+                const key  = `${sid}|${d}`;
                 const prev = attLatest.get(key);
-                const prevTs = parseStamp(prev && (prev.updated_at || prev.created_at));
-                const nextTs = parseStamp((a && (a.updated_at || a.created_at)) || '');
-                if (!prev || nextTs >= prevTs) attLatest.set(key, a);
+                const pts  = parseStamp(prev && (prev.updated_at || prev.created_at));
+                const nts  = parseStamp((a && (a.updated_at || a.created_at)) || '');
+                if (!prev || nts >= pts) attLatest.set(key, a);
             });
             attLatest.forEach(a => {
                 const sid = parseInt(a && a.studentId, 10);
-                if (!sid || !totals.has(sid)) return;
-                totals.set(sid, (totals.get(sid) || 0) + penaltyOf(normStatus(a && a.status)));
+                if (sid && totals.has(sid))
+                    totals.set(sid, (totals.get(sid) || 0) + penaltyOf(normStatus(a && a.status)));
             });
 
-            // For historical months, workbook total is authoritative if present.
-            if (isHistoricalMonth) {
-                historicalHasWorkbookTotal.forEach(sid => {
-                    totals.set(sid, historicalWorkbookTotals.get(sid) || 0);
-                });
-            }
+            if (isHist) histHas.forEach(sid => totals.set(sid, histTotals.get(sid) || 0));
 
             const rows = Array.from(totals.entries()).map(([sid, total]) => {
                 const s = byId.get(sid) || {};
-                return {
-                    roll: rollKey(s.roll || ''),
-                    name: String(s.base_name || s.name || '').trim() || '-',
-                    classVal: s.class || '-',
-                    total: total || 0
-                };
-            }).sort((a, b) => {
-                if (b.total !== a.total) return b.total - a.total;
-                return a.roll.localeCompare(b.roll);
-            });
+                return { roll: rollKey(s.roll || ''), name: String(s.base_name || s.name || '').trim() || '-', classVal: s.class || '-', total: total || 0 };
+            }).sort((a, b) => b.total !== a.total ? b.total - a.total : a.roll.localeCompare(b.roll));
 
             if (!rows.length) {
-                body.innerHTML = '<tr><td colspan="5" class="empty">No rows</td></tr>';
+                body.innerHTML = '<tr><td colspan="5" class="empty">No data for this month</td></tr>';
                 return;
             }
 
             const TOP_FULL = 15;
             body.innerHTML = rows.map((r, i) => {
-                const rank = i + 1;
-                const cls = r.total > 0 ? 'pos' : (r.total < 0 ? 'neg' : '');
+                const rank    = i + 1;
+                const cls     = r.total > 0 ? 'pos' : (r.total < 0 ? 'neg' : '');
+                const tint    = rowTintClass(rank);
+
                 if (rank <= TOP_FULL) {
-                    return `<tr>
-                        <td class="rank">${rank}</td>
-                        <td>${r.roll || '-'}</td>
-                        <td>${r.name}</td>
-                        <td>${r.classVal}</td>
-                        <td class="score ${cls}">${r.total}</td>
+                    return `<tr class="${tint}">
+                        <td class="rank-cell">${rankBadge(rank)}</td>
+                        <td class="roll-cell">${esc(r.roll || '-')}</td>
+                        <td>${esc(r.name)}</td>
+                        <td style="color:var(--muted);font-size:13px">${esc(r.classVal)}</td>
+                        <td class="score-cell ${cls}">${r.total}</td>
                     </tr>`;
                 }
-                // Rank 16+: roll number only — name and class hidden to protect privacy
                 const divider = rank === TOP_FULL + 1
-                    ? `<tr class="divider"><td colspan="5">— remaining participants —</td></tr>`
+                    ? `<tr class="divider"><td colspan="5">&#8213; remaining participants &#8213;</td></tr>`
                     : '';
                 return `${divider}<tr class="anon">
-                    <td class="rank">${rank}</td>
-                    <td>${r.roll || '-'}</td>
-                    <td>—</td>
-                    <td>—</td>
-                    <td class="score ${cls}">${r.total}</td>
+                    <td class="rank-cell"><span class="rank-badge plain">${rank}</span></td>
+                    <td class="roll-cell">${esc(r.roll || '-')}</td>
+                    <td style="color:var(--muted)">&#8212;</td>
+                    <td style="color:var(--muted)">&#8212;</td>
+                    <td class="score-cell ${cls}">${r.total}</td>
                 </tr>`;
             }).join('');
         }
 
+        /* ── Fetch ── */
         async function fetchAndRender() {
             try {
-                const ts = Date.now();
-                const resp = await fetch(`/scoreboard/offline-data?_=${ts}`, { cache: 'no-store', credentials: 'same-origin' });
+                const resp = await fetch(`/scoreboard/offline-data?_=${Date.now()}`, { cache: 'no-store', credentials: 'same-origin' });
                 if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
                 const payload = await resp.json();
-                const data = payload && payload.data ? payload.data : {};
-                render(data);
+                render(payload && payload.data ? payload.data : {});
                 const stamp = payload && payload.updated_at ? payload.updated_at : '';
-                syncMeta.textContent = `Sync: ${stamp ? new Date(stamp).toLocaleString() : 'ok'}`;
+                const label = stamp ? new Date(stamp).toLocaleTimeString() : 'ok';
+                syncMeta.textContent = `Last sync: ${label}`;
+                syncMeta.className = 'sync-pill ok';
             } catch (e) {
-                syncMeta.textContent = 'Sync: failed';
+                syncMeta.textContent = 'Sync failed';
+                syncMeta.className = 'sync-pill fail';
             }
         }
 
