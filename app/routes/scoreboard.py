@@ -64,29 +64,72 @@ DEFAULT_LEADERSHIP = [
 ]
 
 
+_storage_root_cache = ''
+
+
+def _storage_root_path():
+    """
+    Choose a durable storage root.
+    Priority:
+    1) EA_STORAGE_ROOT (explicit override)
+    2) RENDER_DISK_PATH/ea_tutorial_hub (Render persistent disk)
+    3) /var/data/ea_tutorial_hub (common Render mount)
+    4) Flask instance_path (fallback)
+    """
+    global _storage_root_cache
+    if _storage_root_cache:
+        return _storage_root_cache
+    candidates = []
+    explicit = str(os.getenv('EA_STORAGE_ROOT', '') or '').strip()
+    if explicit:
+        candidates.append(explicit)
+    render_disk = str(os.getenv('RENDER_DISK_PATH', '') or '').strip()
+    if not render_disk:
+        render_disk = str(os.getenv('RENDER_DISK_MOUNT_PATH', '') or '').strip()
+    if render_disk:
+        candidates.append(os.path.join(render_disk, 'ea_tutorial_hub'))
+    candidates.append('/var/data/ea_tutorial_hub')
+    candidates.append(current_app.instance_path)
+
+    for root in candidates:
+        try:
+            os.makedirs(root, exist_ok=True)
+            if os.path.isdir(root):
+                _storage_root_cache = root
+                return root
+        except Exception:
+            continue
+    _storage_root_cache = current_app.instance_path
+    return _storage_root_cache
+
+
+def _legacy_instance_file(name):
+    return os.path.join(current_app.instance_path, name)
+
+
 def _politics_file_path():
-    return os.path.join(current_app.instance_path, 'scoreboard_politics.json')
+    return os.path.join(_storage_root_path(), 'scoreboard_politics.json')
 
 
 def _offline_data_path():
-    return os.path.join(current_app.instance_path, 'offline_scoreboard_data.json')
+    return os.path.join(_storage_root_path(), 'offline_scoreboard_data.json')
 
 
 def _offline_backup_dir():
-    return os.path.join(current_app.instance_path, 'offline_scoreboard_backups')
+    return os.path.join(_storage_root_path(), 'offline_scoreboard_backups')
 
 def _offline_hourly_backup_dir():
-    return os.path.join(current_app.instance_path, 'offline_scoreboard_hourly_backups')
+    return os.path.join(_storage_root_path(), 'offline_scoreboard_hourly_backups')
 
 def _offline_startup_restore_dir():
-    return os.path.join(current_app.instance_path, 'startup_restore_points')
+    return os.path.join(_storage_root_path(), 'startup_restore_points')
 
 def _restore_points_meta_path():
-    return os.path.join(current_app.instance_path, 'restore_points_meta.json')
+    return os.path.join(_storage_root_path(), 'restore_points_meta.json')
 
 
 def _device_log_path():
-    return os.path.join(current_app.instance_path, 'device_log.json')
+    return os.path.join(_storage_root_path(), 'device_log.json')
 
 def _load_restore_points_meta():
     path = _restore_points_meta_path()
@@ -239,7 +282,22 @@ def _fees_module_enabled():
     return raw in ('1', 'true', 'yes', 'on')
 
 
+def _supabase_enabled():
+    raw = str(os.getenv('EA_DISABLE_SUPABASE', '0') or '0').strip().lower()
+    return raw not in ('1', 'true', 'yes', 'on')
+
+
 def _supabase_snapshot_config():
+    if not _supabase_enabled():
+        return {
+            'enabled_read': False,
+            'enabled_write': False,
+            'url': '',
+            'read_key': '',
+            'write_key': '',
+            'table': '',
+            'row_id': '',
+        }
     url = str(os.getenv('SUPABASE_URL', '') or '').strip().rstrip('/')
     service_key = str(os.getenv('SUPABASE_SERVICE_ROLE_KEY', '') or '').strip()
     anon_key = str(os.getenv('SUPABASE_ANON_KEY', '') or '').strip()
@@ -574,6 +632,13 @@ def _load_latest_offline_backup():
 
 def _load_offline_data():
     path = _offline_data_path()
+    legacy_path = _legacy_instance_file('offline_scoreboard_data.json')
+    if (not os.path.exists(path)) and os.path.exists(legacy_path):
+        try:
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            shutil.copy2(legacy_path, path)
+        except Exception:
+            pass
     # Fallback seed stamp: fixed old date so any real pushed data always wins the
     # timestamp comparison.  Using datetime.now() here caused Render to reject local
     # pushes with 409 because the seed appeared "newer" than real data.
@@ -802,15 +867,19 @@ def _iter_offline_recovery_candidate_paths():
     Yield local snapshot files that can be used to recover from a corrupt/tiny roster.
     This never deletes any files; it only reads candidates.
     """
-    instance_dir = current_app.instance_path
+    storage_dir = _storage_root_path()
+    legacy_instance_dir = current_app.instance_path
     paths = set()
     # Prefer explicitly marked stable backups when available.
     patterns = [
-        os.path.join(instance_dir, 'offline_scoreboard_data.STABLE_BACKUP*.json'),
-        os.path.join(instance_dir, 'offline_scoreboard_data.pre_*.json'),
+        os.path.join(storage_dir, 'offline_scoreboard_data.STABLE_BACKUP*.json'),
+        os.path.join(storage_dir, 'offline_scoreboard_data.pre_*.json'),
         os.path.join(_offline_backup_dir(), '*.json'),
         os.path.join(_offline_hourly_backup_dir(), '*.json'),
         os.path.join(_offline_startup_restore_dir(), '*.json'),
+        # Legacy instance-path snapshots (for migration/recovery only)
+        os.path.join(legacy_instance_dir, 'offline_scoreboard_data.STABLE_BACKUP*.json'),
+        os.path.join(legacy_instance_dir, 'offline_scoreboard_data.pre_*.json'),
     ]
     for pattern in patterns:
         try:
@@ -3566,7 +3635,7 @@ def _load_politics_data():
 
 
 def _save_politics_data(data):
-    os.makedirs(current_app.instance_path, exist_ok=True)
+    os.makedirs(_storage_root_path(), exist_ok=True)
     payload = {
         'parties': _normalize_parties(data.get('parties', [])),
         'leadership': _normalize_leadership(data.get('leadership', []))
@@ -4686,13 +4755,15 @@ def offline_restore_points():
     if current_user.role != 'admin':
         return jsonify({'success': False, 'error': 'Unauthorized'}), 403
 
+    storage_root = os.path.normpath(_storage_root_path())
     candidates = []
     roots = [
         ('live', _offline_data_path()),
         ('rolling', _offline_backup_dir()),
         ('hourly', _offline_hourly_backup_dir()),
         ('startup', _offline_startup_restore_dir()),
-        ('instance', current_app.instance_path)
+        ('storage', storage_root),
+        ('legacy-instance', current_app.instance_path)
     ]
 
     seen = set()
@@ -4700,7 +4771,7 @@ def offline_restore_points():
         if source == 'live':
             path = root
             if os.path.isfile(path):
-                rel = os.path.relpath(path, current_app.instance_path)
+                rel = os.path.relpath(path, storage_root)
                 key = rel.replace('\\', '/')
                 if key not in seen:
                     seen.add(key)
@@ -4711,12 +4782,15 @@ def offline_restore_points():
         for name in os.listdir(root):
             if not name.endswith('.json'):
                 continue
-            if source == 'instance' and not name.startswith('offline_scoreboard_data'):
+            if source == 'legacy-instance' and not name.startswith('offline_scoreboard_data'):
                 continue
             path = os.path.join(root, name)
             if not os.path.isfile(path):
                 continue
-            rel = os.path.relpath(path, current_app.instance_path)
+            if source == 'legacy-instance':
+                rel = f"legacy/{name}"
+            else:
+                rel = os.path.relpath(path, storage_root)
             key = rel.replace('\\', '/')
             if key in seen:
                 continue
@@ -4757,8 +4831,14 @@ def offline_restore_point_lock():
         return jsonify({'success': False, 'error': 'Invalid restore id'}), 400
     lock_state = bool(payload.get('locked'))
     label = str(payload.get('label') or '').strip()
-    source_path = os.path.normpath(os.path.join(current_app.instance_path, restore_id))
-    if not source_path.startswith(os.path.normpath(current_app.instance_path)):
+    storage_root = os.path.normpath(_storage_root_path())
+    if restore_id.startswith('legacy/'):
+        source_path = os.path.normpath(os.path.join(current_app.instance_path, restore_id.split('/', 1)[1]))
+        allowed_root = os.path.normpath(current_app.instance_path)
+    else:
+        source_path = os.path.normpath(os.path.join(storage_root, restore_id))
+        allowed_root = storage_root
+    if not source_path.startswith(allowed_root):
         return jsonify({'success': False, 'error': 'Invalid restore path'}), 400
     if not os.path.isfile(source_path):
         return jsonify({'success': False, 'error': 'Restore file not found'}), 404
@@ -4786,8 +4866,14 @@ def offline_restore():
     if '..' in restore_id:
         return jsonify({'success': False, 'error': 'Invalid restore id'}), 400
 
-    source_path = os.path.normpath(os.path.join(current_app.instance_path, restore_id))
-    if not source_path.startswith(os.path.normpath(current_app.instance_path)):
+    storage_root = os.path.normpath(_storage_root_path())
+    if restore_id.startswith('legacy/'):
+        source_path = os.path.normpath(os.path.join(current_app.instance_path, restore_id.split('/', 1)[1]))
+        allowed_root = os.path.normpath(current_app.instance_path)
+    else:
+        source_path = os.path.normpath(os.path.join(storage_root, restore_id))
+        allowed_root = storage_root
+    if not source_path.startswith(allowed_root):
         return jsonify({'success': False, 'error': 'Invalid restore path'}), 400
     if not os.path.isfile(source_path):
         return jsonify({'success': False, 'error': 'Restore file not found'}), 404
@@ -4804,7 +4890,7 @@ def offline_restore():
     current = _load_offline_data()
     if isinstance(current, dict):
         stamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        safety = os.path.join(current_app.instance_path, f'offline_scoreboard_data.pre_ui_restore_{stamp}.json')
+        safety = os.path.join(storage_root, f'offline_scoreboard_data.pre_ui_restore_{stamp}.json')
         _atomic_write_json(safety, current)
 
     data['server_updated_at'] = _server_now_iso()
