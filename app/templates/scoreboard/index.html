@@ -3,442 +3,7 @@
 {% block title %}Scoreboard - Student Scoring System{% endblock %}
 
 {% block content %}
-<style>
-    .scoreboard-container {
-        display: flex;
-        flex-direction: column;
-        height: 100%;
-        gap: 20px;
-        padding: 20px;
-    }
-    
-    .filter-section {
-        display: flex;
-        gap: 15px;
-        flex-wrap: wrap;
-        align-items: center;
-        padding: 15px;
-        background: #f8f9fa;
-        border-radius: 8px;
-        border: 1px solid #dee2e6;
-    }
-    
-    .filter-group {
-        display: flex;
-        gap: 10px;
-        align-items: center;
-    }
-    
-    .filter-group label {
-        font-weight: 600;
-        color: #495057;
-        margin: 0;
-    }
-    
-    .filter-group input,
-    .filter-group select {
-        padding: 8px 12px;
-        border: 1px solid #dee2e6;
-        border-radius: 6px;
-        font-size: 0.95rem;
-    }
-    
-    .month-tabs {
-        display: flex;
-        gap: 8px;
-        overflow-x: auto;
-        padding: 10px 0;
-        margin-bottom: 10px;
-    }
-    
-    .month-tab {
-        padding: 8px 16px;
-        border: 1px solid #dee2e6;
-        border-radius: 20px;
-        background: white;
-        cursor: pointer;
-        white-space: nowrap;
-        transition: all 0.3s;
-    }
-    
-    .month-tab:hover {
-        border-color: #007bff;
-        color: #007bff;
-    }
-    
-    .month-tab.active {
-        background: #007bff;
-        color: white;
-        border-color: #007bff;
-    }
-    
-    .actions-bar {
-        display: flex;
-        gap: 10px;
-        justify-content: space-between;
-        align-items: center;
-        flex-wrap: wrap;
-    }
-    
-    .search-box {
-        flex: 1;
-        min-width: 250px;
-        padding: 8px 12px;
-        border: 1px solid #dee2e6;
-        border-radius: 6px;
-        font-size: 0.95rem;
-    }
-    
-    .admin-actions {
-        display: flex;
-        gap: 8px;
-    }
-    
-    .btn-action {
-        padding: 8px 16px;
-        border: 1px solid #dee2e6;
-        border-radius: 6px;
-        background: white;
-        cursor: pointer;
-        font-weight: 500;
-        transition: all 0.3s;
-        font-size: 0.9rem;
-    }
-    
-    .btn-action:hover {
-        background: #f8f9fa;
-        border-color: #007bff;
-        color: #007bff;
-    }
-    
-    .btn-add { background: #28a745; color: white; border-color: #28a745; }
-    .btn-add:hover { background: #218838; border-color: #218838; }
-    
-    .btn-import { background: #007bff; color: white; border-color: #007bff; }
-    .btn-import:hover { background: #0056b3; border-color: #0056b3; }
-    
-    .table-wrapper {
-        flex: 1;
-        overflow: auto;
-        border: 1px solid #dee2e6;
-        border-radius: 8px;
-    }
 
-    .scoreboard-layout {
-        display: grid;
-        grid-template-columns: minmax(0, 1fr) 320px;
-        gap: 20px;
-        align-items: start;
-    }
-
-    .side-panel {
-        position: sticky;
-        top: 20px;
-    }
-
-    .side-card {
-        background: #ffffff;
-        border: 1px solid #dee2e6;
-        border-radius: 10px;
-        padding: 16px;
-        box-shadow: 0 2px 6px rgba(0,0,0,0.05);
-    }
-
-    .side-tabs {
-        display: flex;
-        gap: 6px;
-        margin-bottom: 12px;
-    }
-
-    .side-tab {
-        flex: 1;
-        padding: 8px 10px;
-        border: 1px solid #dee2e6;
-        background: #f8f9fa;
-        border-radius: 8px;
-        font-weight: 600;
-        cursor: pointer;
-        font-size: 0.85rem;
-    }
-
-    .side-tab.active {
-        background: #007bff;
-        color: #fff;
-        border-color: #007bff;
-    }
-
-    .side-form {
-        display: grid;
-        gap: 8px;
-        margin-bottom: 12px;
-    }
-
-    .side-form input {
-        padding: 8px 10px;
-        border: 1px solid #dee2e6;
-        border-radius: 6px;
-        font-size: 0.85rem;
-    }
-
-    .side-table {
-        width: 100%;
-        border-collapse: collapse;
-        font-size: 0.85rem;
-    }
-
-    .side-table th,
-    .side-table td {
-        padding: 8px 6px;
-        border-bottom: 1px solid #dee2e6;
-        text-align: left;
-    }
-
-    .side-actions {
-        display: flex;
-        gap: 6px;
-        flex-wrap: wrap;
-    }
-
-    .score-editable {
-        cursor: pointer;
-    }
-
-    .score-editable:hover {
-        background: #e9f2ff;
-    }
-
-    @media (max-width: 1200px) {
-        .scoreboard-layout {
-            grid-template-columns: 1fr;
-        }
-        .side-panel {
-            position: static;
-        }
-    }
-    
-    .scoreboard-table {
-        width: 100%;
-        border-collapse: collapse;
-        background: white;
-    }
-    
-    .scoreboard-table thead {
-        background: #f8f9fa;
-        position: sticky;
-        top: 0;
-        z-index: 10;
-    }
-    
-    .scoreboard-table th {
-        padding: 12px;
-        text-align: left;
-        font-weight: 600;
-        border-bottom: 2px solid #dee2e6;
-        color: #495057;
-        font-size: 0.9rem;
-    }
-    
-    .scoreboard-table td {
-        padding: 12px;
-        border-bottom: 1px solid #dee2e6;
-        font-size: 0.9rem;
-    }
-    
-    .scoreboard-table tbody tr:hover {
-        background: #f8f9fa;
-    }
-    
-    .student-name {
-        color: #007bff;
-        cursor: pointer;
-        font-weight: 500;
-        text-decoration: none;
-    }
-    
-    .student-name:hover {
-        text-decoration: underline;
-    }
-    
-    .rank-badge {
-        display: inline-block;
-        padding: 4px 8px;
-        border-radius: 4px;
-        font-weight: bold;
-        font-size: 0.85rem;
-    }
-    
-    .rank-1 { background: #ffd700; color: #333; }
-    .rank-2 { background: #c0c0c0; color: #333; }
-    .rank-3 { background: #cd7f32; color: white; }
-    
-    .score-cell {
-        text-align: center;
-        font-weight: 500;
-    }
-    
-    .score-positive { color: #28a745; }
-    .score-negative { color: #dc3545; }
-    .score-neutral { color: #495057; }
-    
-    .delete-btn {
-        padding: 4px 8px;
-        background: #dc3545;
-        color: white;
-        border: none;
-        border-radius: 4px;
-        cursor: pointer;
-        font-size: 0.8rem;
-    }
-    
-    .delete-btn:hover {
-        background: #c82333;
-    }
-    
-    .modal {
-        display: none;
-        position: fixed;
-        z-index: 1000;
-        left: 0;
-        top: 0;
-        width: 100%;
-        height: 100%;
-        background-color: rgba(0, 0, 0, 0.4);
-    }
-    
-    .modal.show {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    }
-    
-    .modal-content {
-        background-color: #fefefe;
-        padding: 30px;
-        border-radius: 10px;
-        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-        width: 90%;
-        max-width: 600px;
-        max-height: 90vh;
-        overflow-y: auto;
-    }
-    
-    .modal-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 20px;
-    }
-    
-    .modal-header h2 {
-        margin: 0;
-    }
-    
-    .close-btn {
-        background: none;
-        border: none;
-        font-size: 1.5rem;
-        cursor: pointer;
-        color: #666;
-    }
-    
-    .close-btn:hover {
-        color: #333;
-    }
-    
-    .form-group {
-        margin-bottom: 15px;
-    }
-    
-    .form-group label {
-        display: block;
-        margin-bottom: 5px;
-        font-weight: 600;
-        color: #495057;
-    }
-    
-    .form-group input,
-    .form-group select,
-    .form-group textarea {
-        width: 100%;
-        padding: 10px;
-        border: 1px solid #dee2e6;
-        border-radius: 6px;
-        font-size: 0.95rem;
-        box-sizing: border-box;
-        font-family: inherit;
-    }
-    
-    .form-row {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 15px;
-    }
-    
-    .form-actions {
-        display: flex;
-        gap: 10px;
-        justify-content: flex-end;
-        margin-top: 20px;
-    }
-    
-    .btn-primary {
-        padding: 10px 20px;
-        background: #007bff;
-        color: white;
-        border: none;
-        border-radius: 6px;
-        cursor: pointer;
-        font-weight: 600;
-    }
-    
-    .btn-primary:hover {
-        background: #0056b3;
-    }
-    
-    .btn-secondary {
-        padding: 10px 20px;
-        background: #6c757d;
-        color: white;
-        border: none;
-        border-radius: 6px;
-        cursor: pointer;
-        font-weight: 600;
-    }
-    
-    .btn-secondary:hover {
-        background: #5a6268;
-    }
-    
-    .alert {
-        padding: 12px 15px;
-        border-radius: 6px;
-        margin-bottom: 15px;
-    }
-    
-    .alert-success {
-        background: #d4edda;
-        border: 1px solid #c3e6cb;
-        color: #155724;
-    }
-    
-    .alert-error {
-        background: #f8d7da;
-        border: 1px solid #f5c6cb;
-        color: #721c24;
-    }
-    
-    .admin-only {
-        display: none;
-    }
-    
-    .admin-only.visible {
-        display: flex;
-    }
-    
-    .hidden {
-        display: none;
-    }
-</style>
 
 <div class="scoreboard-container">
     <!-- Alert Messages -->
@@ -479,7 +44,8 @@
                 <option value="D">D</option>
             </select>
         </div>
-        <button class="btn-action" onclick="applyFilters()" style="margin-left: auto;">🔍 Apply Filters</button>
+        <button class="btn-action btn-import" id="applyFiltersBtn" onclick="applyFilters()" style="margin-left: auto;">🔍 Apply Filters</button>
+        <button class="btn-action" id="clearFiltersBtn" onclick="clearFilters()" style="display: none;">❌ Clear Filters</button>
     </div>
     
     <!-- Month Tabs -->
@@ -794,6 +360,8 @@
                 currentDateTo = new Date(data.date_to);
                 renderTable();
                 updateMonthTabs();
+                document.getElementById('applyFiltersBtn').classList.add('filters-active');
+                document.getElementById('clearFiltersBtn').style.display = 'inline-block';
             } else {
                 showAlert('Error: ' + data.error, 'error');
             }
@@ -801,6 +369,23 @@
             console.error('Error applying filters:', error);
             showAlert('Error loading data', 'error');
         }
+    }
+
+    function clearFilters() {
+        const today = new Date().toISOString().split('T')[0];
+        const monthStart = new Date();
+        monthStart.setDate(1);
+        const monthStartStr = monthStart.toISOString().split('T')[0];
+        
+        document.getElementById('filterDateFrom').value = monthStartStr;
+        document.getElementById('filterDateTo').value = today;
+        document.getElementById('filterClass').value = 'All';
+        document.getElementById('filterGroup').value = 'All';
+        document.getElementById('searchBox').value = '';
+
+        applyFilters();
+        document.getElementById('applyFiltersBtn').classList.remove('filters-active');
+        document.getElementById('clearFiltersBtn').style.display = 'none';
     }
     
     function updateMonthTabs() {

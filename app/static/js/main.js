@@ -182,3 +182,29 @@ function debounce(func, wait) {
         timeout = setTimeout(later, wait);
     };
 }
+
+// Theme switching
+function toggleTheme() {
+    const body = document.body;
+    const isLight = body.classList.toggle('light-mode');
+    localStorage.setItem('ea_theme', isLight ? 'light' : 'dark');
+    updateThemeButton(isLight);
+}
+
+function updateThemeButton(isLight) {
+    const themeToggleBtn = document.getElementById('themeToggleBtn');
+    if (themeToggleBtn) {
+        themeToggleBtn.innerHTML = isLight
+            ? '<i class="fas fa-moon"></i> Dark'
+            : '<i class="fas fa-sun"></i> Light';
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    const savedTheme = localStorage.getItem('ea_theme') || 'dark';
+    if (savedTheme === 'light') {
+        document.body.classList.add('light-mode');
+    }
+    updateThemeButton(savedTheme === 'light');
+});
+

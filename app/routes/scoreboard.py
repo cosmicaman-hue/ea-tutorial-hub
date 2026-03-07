@@ -1196,50 +1196,22 @@ def _reconcile_role_veto_monthly(data, month_key=None, date_key=None):
     resolved_month = str(month_key or _server_now_iso()[:7]).strip()
     if not re.match(r'^\d{4}-\d{2}$', resolved_month):
         resolved_month = _server_now_iso()[:7]
-    applied_month = str(data.get('role_veto_applied_month') or '').strip()
 
-    # Ensure monthly role grants do not accumulate across months.
-    if applied_month and applied_month != resolved_month:
-        prev_state = data['role_veto_monthly'].get(applied_month, {})
-        if isinstance(prev_state, dict):
-            for sid_text, grant_value in prev_state.items():
-                sid = _parse_int_safe(sid_text, 0)
-                grant = max(0, _parse_int_safe(grant_value, 0))
-                if sid <= 0 or grant <= 0:
-                    continue
-                student = by_id.get(sid)
-                if not student:
-                    continue
-                student['veto_count'] = max(0, _parse_int_safe(student.get('veto_count'), 0) - grant)
-
+    # Compute current role-grant quotas for active postholders.
     target = _compute_active_role_veto_quotas(data, date_key=date_key)
-    existing = data['role_veto_monthly'].get(resolved_month, {})
-    if not isinstance(existing, dict):
-        existing = {}
-
-    next_state = {}
-    all_ids = set()
-    all_ids.update(str(k) for k in existing.keys())
-    all_ids.update(str(k) for k in target.keys())
-
-    for sid_text in all_ids:
-        sid = _parse_int_safe(sid_text, 0)
-        if sid <= 0:
-            continue
-        old_grant = _parse_int_safe(existing.get(str(sid)), 0)
-        new_grant = _parse_int_safe(target.get(sid), 0)
-        if new_grant > 0:
-            next_state[str(sid)] = new_grant
-        delta = new_grant - old_grant
-        if delta == 0:
-            continue
-        student = by_id.get(sid)
-        if not student:
-            continue
-        student['veto_count'] = max(0, _parse_int_safe(student.get('veto_count'), 0) + delta)
-
+    next_state = {str(sid): grant for sid, grant in target.items() if grant > 0}
     data['role_veto_monthly'][resolved_month] = next_state
     data['role_veto_applied_month'] = resolved_month
+
+    # Role-grant VETOs are stored in role_veto_count only — veto_count (individual
+    # carry) is never touched here so admin corrections are permanently preserved.
+    students = data.get('students', []) or []
+    for student in students:
+        sid = _parse_int_safe(student.get('id'), 0)
+        if sid <= 0:
+            continue
+        grant = max(0, _parse_int_safe(target.get(sid), 0))
+        student['role_veto_count'] = grant
 
 
 def _reconcile_veto_counters_from_scores(data, month_key=None):
@@ -1254,28 +1226,56 @@ def _reconcile_veto_counters_from_scores(data, month_key=None):
     if not isinstance(grants, dict):
         grants = {}
 
-    net_by_student = {}
-    for row in data.get('scores', []) or []:
-        if not isinstance(row, dict):
-            continue
-        if str(row.get('month') or '').strip() != month:
-            continue
-        sid = _parse_int_safe(row.get('studentId'), 0)
-        if sid <= 0:
-            continue
-        net_by_student[sid] = net_by_student.get(sid, 0) + _parse_int_safe(row.get('vetos'), 0)
-
-    if not net_by_student:
-        return
     students = data.get('students', []) or []
     by_id = { _parse_int_safe(s.get('id'), 0): s for s in students if _parse_int_safe(s.get('id'), 0) > 0 }
-    for sid, net in net_by_student.items():
+    carry_by_student = {}
+    month_profiles = {}
+    carry_month = month
+    try:
+        if month == _server_now_iso()[:7]:
+            dt = datetime.strptime(month + '-01', '%Y-%m-%d')
+            prev_year = dt.year if dt.month > 1 else dt.year - 1
+            prev_month = dt.month - 1 if dt.month > 1 else 12
+            carry_month = f"{prev_year:04d}-{prev_month:02d}"
+    except Exception:
+        carry_month = month
+    if isinstance(data.get('month_roster_profiles'), dict):
+        month_profiles = data.get('month_roster_profiles', {}).get(carry_month, {}) or {}
+    profile_rows = month_profiles if isinstance(month_profiles, list) else list((month_profiles or {}).values())
+    roll_to_sid = {
+        _normalize_roll_value(s.get('roll')): _parse_int_safe(s.get('id'), 0)
+        for s in students
+        if _parse_int_safe(s.get('id'), 0) > 0 and _normalize_roll_value(s.get('roll'))
+    }
+    for profile in profile_rows:
+        if not isinstance(profile, dict):
+            continue
+        roll = _normalize_roll_value(profile.get('roll'))
+        if not roll:
+            continue
+        sid = roll_to_sid.get(roll, 0)
+        if sid <= 0:
+            continue
+        carry_by_student[sid] = max(0, _parse_int_safe(profile.get('month_veto_count'), 0))
+
+    # Role-grant VETOs (expire monthly) are stored separately in role_veto_count.
+    # individual veto_count is never touched here — it is set by admin and carries
+    # forward via month_roster_profiles; role grants must not pollute it.
+    for k, v in grants.items():
+        sid = _parse_int_safe(k, 0)
+        if sid <= 0:
+            continue
         student = by_id.get(sid)
         if not student:
             continue
-        grant = _parse_int_safe(grants.get(str(sid)), 0)
-        expected = max(0, grant + _parse_int_safe(net, 0))
-        student['veto_count'] = expected
+        student['role_veto_count'] = max(0, _parse_int_safe(v, 0))
+    # Zero out role_veto_count for any student no longer in the grant list
+    grant_sids = {_parse_int_safe(k, 0) for k in grants.keys()}
+    for student in students:
+        sid = _parse_int_safe(student.get('id'), 0)
+        if sid > 0 and sid not in grant_sids:
+            if student.get('role_veto_count', 0) != 0:
+                student['role_veto_count'] = 0
 
 
 def _merge_teacher_scores(existing_data, incoming_data):
