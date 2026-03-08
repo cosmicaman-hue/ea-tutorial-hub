@@ -14804,9 +14804,10 @@
         }
 
         function isAssignmentEffectivelyActive(statusValue, electedOn, tenureMonths = 2, extensionMonths = 0, onDate = '') {
+            // Tenure expiry is informational only — a post holder stays active until the
+            // admin explicitly ends or suspends them. We only check the status field here.
             const statusInfo = getPostHolderStatusInfo(statusValue, electedOn, tenureMonths, extensionMonths);
-            if (statusInfo.key !== 'active') return false;
-            return isAssignmentActiveByTenure(electedOn, tenureMonths, extensionMonths, onDate);
+            return statusInfo.key === 'active';
         }
 
         function renderPostStatusBadge(statusInfo) {
@@ -19805,7 +19806,9 @@
                         <td>${electedDate}</td>
                         <td>
                             <button class="secondary" onclick="editLeadership(${post.id})" style="font-size: 12px;">Edit</button>
-                            <button class="secondary" onclick="deleteLeadership(${post.id})" style="font-size: 12px;">Delete</button>
+                            <button class="secondary" onclick="deleteLeadership(${post.id})" style="font-size: 12px; color: #fbbf24;" title="${normalizePostHolderStatus(post.status) === 'active' ? 'End tenure — keeps history' : 'Permanently remove'}">
+                                ${normalizePostHolderStatus(post.status) === 'active' ? 'End Tenure' : 'Remove'}
+                            </button>
                         </td>
                     </tr>
                 `;
@@ -19898,18 +19901,37 @@
 
         function deleteLeadership(postId) {
             const post = db.getLeadership().find(p => p.id === postId);
-            if (!post) {
-                showAlert('Leadership post not found.', 'warning');
-                return;
+            if (!post) { showAlert('Leadership post not found.', 'warning'); return; }
+            const today = new Date().toISOString().split('T')[0];
+            const postName = post.post || 'Unknown';
+            const isActive = normalizePostHolderStatus(post.status) === 'active';
+            if (isActive) {
+                // Primary action: end tenure — keeps record in history
+                if (confirm(`Mark "${postName}" as tenure-ended?\n\nThe record will be preserved in history.`)) {
+                    db.updateLeadership(postId, { status: 'ended', ended_on: today });
+                    syncPostHolderHistory({ persist: true });
+                    refreshAllPostHolderViews();
+                    showAlert(`"${postName}" marked tenure-ended. Record preserved in history.`, 'success');
+                }
+            } else {
+                // Already ended/suspended — offer permanent removal with strong confirmation
+                const really = confirm(`Permanently remove "${postName}" from all records?\n\nThis deletes the post and cannot be undone.`);
+                if (really) {
+                    db.deleteLeadership(postId);
+                    refreshAllPostHolderViews();
+                    showAlert('Leadership post permanently removed.', 'success');
+                }
             }
-            const confirmMsg = normalizePostHolderStatus(post.status) === 'active' 
-                ? `Delete active post "${post.post || 'Unknown'}" and all associated records?`
-                : `Delete "${post.post || 'Unknown'}" post?`;
-            if (confirm(confirmMsg)) {
+        }
+
+        function hardDeleteLeadership(postId) {
+            const post = db.getLeadership().find(p => p.id === postId);
+            if (!post) { showAlert('Post not found.', 'warning'); return; }
+            const postName = post.post || 'Unknown';
+            if (confirm(`PERMANENTLY DELETE "${postName}"?\n\nThis removes all records and history. This cannot be undone.`)) {
                 db.deleteLeadership(postId);
-                // Comprehensive refresh to update all tabs immediately
                 refreshAllPostHolderViews();
-                showAlert('Leadership post deleted. All views updated.', 'success');
+                showAlert('Post permanently deleted.', 'success');
             }
         }
 
@@ -20126,11 +20148,26 @@
         }
 
         function deleteClassRep(repId) {
-            if (confirm('Delete this class representative?')) {
-                db.deleteClassRep(repId);
-                loadClassReps();
-                loadOfficeHolders();
-                showAlert('Class representative deleted', 'success');
+            const rep = db.getClassReps().find(r => r.id === repId);
+            if (!rep) { showAlert('Class rep not found.', 'warning'); return; }
+            const today = new Date().toISOString().split('T')[0];
+            const label = `CR – Class ${rep.class || '?'}`;
+            const isActive = normalizePostHolderStatus(rep.status) === 'active';
+            if (isActive) {
+                if (confirm(`Mark "${label}" as tenure-ended?\n\nThe record will be preserved in history.`)) {
+                    db.updateClassRep(repId, { status: 'ended', ended_on: today });
+                    syncPostHolderHistory({ persist: true });
+                    loadClassReps();
+                    loadOfficeHolders();
+                    showAlert(`${label} marked tenure-ended. Record preserved in history.`, 'success');
+                }
+            } else {
+                if (confirm(`Permanently remove "${label}" from all records?\n\nThis cannot be undone.`)) {
+                    db.deleteClassRep(repId);
+                    loadClassReps();
+                    loadOfficeHolders();
+                    showAlert('Class rep permanently removed.', 'success');
+                }
             }
         }
 
