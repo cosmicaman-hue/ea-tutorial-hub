@@ -11407,10 +11407,10 @@
                         if (transferOut > 0 || transferIn > 0) {
                             if (transferOut > 0 && transferIn > 0) {
                                 // Edge case: both on same date
-                                starOverrides[date] = `<span style="display:inline-block;transform:rotate(180deg)" title="Star sent">🌠</span><span title="Star received">💫</span>`;
+                                starOverrides[date] = `<span style="display:inline-block;transform:scaleX(-1)" title="Star sent">💫</span><span title="Star received">💫</span>`;
                                 starClasses[date] = 'star-transfer-both';
                             } else if (transferOut > 0) {
-                                starOverrides[date] = `<span style="display:inline-block;transform:rotate(180deg)" title="Star sent (${transferOut})">🌠</span>`;
+                                starOverrides[date] = `<span style="display:inline-block;transform:scaleX(-1)" title="Star sent (${transferOut})">💫</span>`;
                                 starClasses[date] = 'star-transfer-out';
                             } else {
                                 starOverrides[date] = `<span title="Star received (${transferIn})">💫</span>`;
@@ -11424,7 +11424,7 @@
                             const normalUses = Math.max(0, parseInt(starUsageNormalByDate[date], 10) || 0);
                             const disciplinaryUses = Math.max(0, parseInt(starUsageDisciplinaryByDate[date], 10) || 0);
                             // If there's also a transfer on this date, combine the display
-                            const _xferPrefix = transferOut > 0 ? `<span style="display:inline-block;transform:rotate(180deg)" title="Star sent">🌠</span> ` : transferIn > 0 ? `<span title="Star received">💫</span> ` : '';
+                            const _xferPrefix = transferOut > 0 ? `<span style="display:inline-block;transform:scaleX(-1)" title="Star sent">💫</span> ` : transferIn > 0 ? `<span title="Star received">💫</span> ` : '';
                             if (normalUses > 0 && disciplinaryUses > 0) {
                                 const discText = formatStarUsageMarker(disciplinaryUses);
                                 const normalText = formatStarUsageMarker(normalUses);
