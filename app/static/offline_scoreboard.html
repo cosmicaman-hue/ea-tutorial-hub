@@ -1696,6 +1696,37 @@
             font-size: 22px;
             text-shadow: 0 0 6px rgba(0, 0, 0, 0.45);
         }
+        /* Star transfer cells — sender gets 🌠(rotated), receiver gets 💫 */
+        .score-cell.star-transfer-out {
+            background: linear-gradient(135deg, #312e81 0%, #4338ca 100%) !important;
+            color: #ffffff !important;
+            font-size: 20px;
+            text-align: center !important;
+            vertical-align: middle !important;
+            box-shadow: inset 0 0 0 2px rgba(167, 139, 250, 0.5);
+            text-shadow: 0 0 8px rgba(167, 139, 250, 0.6);
+        }
+        .score-cell.star-transfer-in {
+            background: linear-gradient(135deg, #0c4a6e 0%, #0284c7 100%) !important;
+            color: #ffffff !important;
+            font-size: 20px;
+            text-align: center !important;
+            vertical-align: middle !important;
+            box-shadow: inset 0 0 0 2px rgba(125, 211, 252, 0.5);
+            text-shadow: 0 0 8px rgba(125, 211, 252, 0.6);
+        }
+        .score-cell.star-transfer-both {
+            background: linear-gradient(135deg, #312e81 0%, #0284c7 100%) !important;
+            color: #ffffff !important;
+            font-size: 18px;
+            text-align: center !important;
+            vertical-align: middle !important;
+        }
+        .score-cell.star-transfer-out:hover,
+        .score-cell.star-transfer-in:hover,
+        .score-cell.star-transfer-both:hover {
+            background: transparent !important;
+        }
         .score-cell.star-used-split {
             padding: 0 !important;
             overflow: hidden;
@@ -11289,6 +11320,8 @@
                     const starUsageByDate = {};
                     const starUsageNormalByDate = {};
                     const starUsageDisciplinaryByDate = {};
+                    const starTransferOutByDate = {};
+                    const starTransferInByDate = {};
                     const vetosByDate = {};
                     const notesByDate = {};
                     const hasEntryByDate = {};
@@ -11324,7 +11357,14 @@
                         pointsByDate[date] = (pointsByDate[date] || 0) + (parseInt(s.points, 10) || 0);
                         const starDelta = parseInt(s.stars, 10) || 0;
                         starsByDate[date] = (starsByDate[date] || 0) + starDelta;
-                        if (starDelta < 0) {
+                        const _sNote = String(safeProp(s, 'notes') || '').toLowerCase();
+                        const _isTransferOut = !!(safeProp(s, 'star_transfer_out') || (_sNote.includes('[star transfer') && _sNote.includes('out to')));
+                        const _isTransferIn  = !!(safeProp(s, 'star_transfer_in')  || (_sNote.includes('[star transfer') && _sNote.includes('in from')));
+                        if (_isTransferOut) {
+                            starTransferOutByDate[date] = (starTransferOutByDate[date] || 0) + Math.abs(starDelta);
+                        } else if (_isTransferIn) {
+                            starTransferInByDate[date] = (starTransferInByDate[date] || 0) + Math.abs(starDelta);
+                        } else if (starDelta < 0) {
                             const usageAbs = Math.abs(starDelta);
                             starUsageByDate[date] = (starUsageByDate[date] || 0) + usageAbs;
                             const breakdown = getScoreStarUsageBreakdown(s, usageAbs);
@@ -11351,7 +11391,7 @@
                     const starOverrides = {};
                     const starClasses = {};
                     const bonusByDate = {};
-                    const starDates = new Set([...Object.keys(pointsByDate), ...Object.keys(starsByDate), ...Object.keys(starUsageByDate)]);
+                    const starDates = new Set([...Object.keys(pointsByDate), ...Object.keys(starsByDate), ...Object.keys(starUsageByDate), ...Object.keys(starTransferOutByDate), ...Object.keys(starTransferInByDate)]);
                     const isCurrentMonth = String(month || '').trim() === getCurrentMonthKey();
                     // Star +100 bonus on next day only applies from Feb 2026 onwards.
                     // Historical months (Aug 24 – Jan 26) already have the bonus baked
@@ -11360,19 +11400,41 @@
                     starDates.forEach(date => {
                         const points = pointsByDate[date] || 0;
                         const usageCount = starUsageByDate[date] || 0;
+                        const transferOut = starTransferOutByDate[date] || 0;
+                        const transferIn  = starTransferInByDate[date]  || 0;
+
+                        // ── Transfer cells: emoji only, no bonus ──────────────────────
+                        if (transferOut > 0 || transferIn > 0) {
+                            if (transferOut > 0 && transferIn > 0) {
+                                // Edge case: both on same date
+                                starOverrides[date] = `<span style="display:inline-block;transform:rotate(180deg)" title="Star sent">🌠</span><span title="Star received">💫</span>`;
+                                starClasses[date] = 'star-transfer-both';
+                            } else if (transferOut > 0) {
+                                starOverrides[date] = `<span style="display:inline-block;transform:rotate(180deg)" title="Star sent (${transferOut})">🌠</span>`;
+                                starClasses[date] = 'star-transfer-out';
+                            } else {
+                                starOverrides[date] = `<span title="Star received (${transferIn})">💫</span>`;
+                                starClasses[date] = 'star-transfer-in';
+                            }
+                            // Regular star uses on the same date still get processed below
+                        }
+                        // ─────────────────────────────────────────────────────────────
+
                         if (usageCount > 0) {
                             const normalUses = Math.max(0, parseInt(starUsageNormalByDate[date], 10) || 0);
                             const disciplinaryUses = Math.max(0, parseInt(starUsageDisciplinaryByDate[date], 10) || 0);
+                            // If there's also a transfer on this date, combine the display
+                            const _xferPrefix = transferOut > 0 ? `<span style="display:inline-block;transform:rotate(180deg)" title="Star sent">🌠</span> ` : transferIn > 0 ? `<span title="Star received">💫</span> ` : '';
                             if (normalUses > 0 && disciplinaryUses > 0) {
                                 const discText = formatStarUsageMarker(disciplinaryUses);
                                 const normalText = formatStarUsageMarker(normalUses);
-                                starOverrides[date] = `<span class="score-split-marker"><span class="half disc">${discText}</span><span class="half normal">${normalText}</span></span>`;
+                                starOverrides[date] = `${_xferPrefix}<span class="score-split-marker"><span class="half disc">${discText}</span><span class="half normal">${normalText}</span></span>`;
                                 starClasses[date] = 'star-used-split';
                             } else if (disciplinaryUses > 0) {
-                                starOverrides[date] = formatStarUsageMarker(disciplinaryUses);
+                                starOverrides[date] = `${_xferPrefix}${formatStarUsageMarker(disciplinaryUses)}`;
                                 starClasses[date] = 'star-used-red';
                             } else {
-                                starOverrides[date] = formatStarUsageMarker(normalUses || usageCount);
+                                starOverrides[date] = `${_xferPrefix}${formatStarUsageMarker(normalUses || usageCount)}`;
                                 starClasses[date] = 'star-used-green';
                             }
                             if (normalUses > 0 && points >= -50 && applyStarBonus) {
@@ -15977,6 +16039,11 @@
             let normal = Math.max(0, parseInt(safeProp(scoreLike, 'star_usage_normal'), 10) || 0);
             let disciplinary = Math.max(0, parseInt(safeProp(scoreLike, 'star_usage_disciplinary'), 10) || 0);
             const noteText = String(safeProp(scoreLike, 'notes') || '').toLowerCase();
+            // Transfer records are never a normal or disciplinary star use — skip bonus/class logic
+            if (safeProp(scoreLike, 'star_transfer_out') || safeProp(scoreLike, 'star_transfer_in') ||
+                    noteText.includes('[star transfer')) {
+                return { normal: 0, disciplinary: 0 };
+            }
             const sum = normal + disciplinary;
             if (sum <= 0) {
                 // Backward compatibility: infer disciplinary usage from notes if structured fields are absent.
@@ -16129,6 +16196,7 @@
                     ...fromExisting,
                     month,
                     stars: fromNextStars,
+                    star_transfer_out: (parseInt(fromExisting.star_transfer_out, 10) || 0) + count,
                     notes: appendTransferNote(fromExisting.notes, `${transferTag} OUT to ${toRoll}`),
                     updated_at: timestamp
                 }
@@ -16139,6 +16207,7 @@
                     points: 0,
                     stars: fromNextStars,
                     vetos: 0,
+                    star_transfer_out: count,
                     notes: `${transferTag} OUT to ${toRoll}`,
                     recordedBy: currentUserRole
                 };
@@ -16148,6 +16217,7 @@
                     ...toExisting,
                     month,
                     stars: toNextStars,
+                    star_transfer_in: (parseInt(toExisting.star_transfer_in, 10) || 0) + count,
                     notes: appendTransferNote(toExisting.notes, `${transferTag} IN from ${fromRoll}`),
                     updated_at: timestamp
                 }
@@ -16158,6 +16228,7 @@
                     points: 0,
                     stars: toNextStars,
                     vetos: 0,
+                    star_transfer_in: count,
                     notes: `${transferTag} IN from ${fromRoll}`,
                     recordedBy: currentUserRole
                 };
@@ -16165,6 +16236,9 @@
             pushUndoSnapshot(`Transfer ${count} star(s): ${fromRoll} -> ${toRoll}`);
             db.addScore(fromPayload);
             db.addScore(toPayload);
+            // Keep global student.stars counters in sync with the transfer
+            updateStudentStarCounter(fromId, -count);
+            updateStudentStarCounter(toId, +count);
 
             if (SERVER_SYNC.enabled) {
                 pushToServer(db.getData(), { silent: true });
