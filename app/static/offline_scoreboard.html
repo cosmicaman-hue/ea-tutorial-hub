@@ -15618,6 +15618,60 @@
                     }
                 });
                 // ─────────────────────────────────────────────────────────────────────
+
+                // ── Auto-resume suspended post-holders when vote power ≥ 0 ──────────
+                // Runs every time the scoreboard loads (current month + admin only).
+                // If a suspended holder's current month total gives vote power ≥ 0,
+                // their post is automatically reinstated without admin intervention.
+                {
+                    const _arData = db.getData();
+                    const _arResumed = [];
+                    const _arDate = formatDateKey(new Date());
+                    const _arReason = 'Auto-resumed: vote power restored to 0 or positive';
+
+                    // Helper: check + resume a single entry
+                    function _tryResumeEntry(entry) {
+                        if (normalizePostHolderStatus(entry.status || 'active') !== 'suspended') return;
+                        const _sid = parseInt(entry.studentId, 10) || 0;
+                        if (!_sid) return;
+                        const _monthTotal = getStudentMonthTotal(_sid, monthKey);
+                        const _vp = computeVotePower(_monthTotal);
+                        if (_vp >= 0) {
+                            entry.status = 'active';
+                            entry.auto_suspend_waived = true;
+                            entry.resumed_on = _arDate;
+                            entry.resume_reason = _arReason;
+                            _arResumed.push(entry.postName || entry.post || entry.title || entry.designation || 'Post');
+                        }
+                    }
+
+                    ['leadership', 'group_crs', 'class_reps'].forEach(tbl => {
+                        (_arData[tbl] || []).forEach(entry => _tryResumeEntry(entry));
+                    });
+                    (_arData.parties || []).forEach(party => {
+                        (party.members || []).forEach(member => {
+                            if (!isPartyPresidentDesignation(member.designation)) return;
+                            let _msid = parseInt(member.studentId, 10);
+                            if (!_msid && member.roll) {
+                                _msid = (new Map((_arData.students || []).map(s =>
+                                    [normalizeRoll(s.roll), parseInt(s.id, 10)]))).get(normalizeRoll(member.roll)) || 0;
+                            }
+                            if (!_msid) return;
+                            // Attach studentId so _tryResumeEntry can read it
+                            const _origId = member.studentId;
+                            member.studentId = _msid;
+                            _tryResumeEntry(member);
+                            member.studentId = _origId || _msid;
+                        });
+                    });
+
+                    if (_arResumed.length > 0) {
+                        savePostHolderData(_arData);
+                        refreshAllPostHolderViews();
+                        showAlert(`Post auto-resumed (vote power restored): ${_arResumed.join(', ')}`, 'success');
+                    }
+                }
+                // ─────────────────────────────────────────────────────────────────────
             }
             // ─────────────────────────────────────────────────────────────────────────
 
@@ -16667,50 +16721,57 @@
                             recordedBy: currentUserRole
                         });
                     }
-
-                    // ── Auto-resume suspended posts ──────────────────────────────────
-                    // A normal star use (bonus earned) lifts any active suspension.
-                    const _phData = db.getData();
-                    const _resumedPosts = [];
-                    const _todayKey = formatDateKey(new Date());
-                    // Leadership / CR tables
-                    ['leadership', 'group_crs', 'class_reps'].forEach(tbl => {
-                        (_phData[tbl] || []).forEach(entry => {
-                            if (parseInt(entry.studentId, 10) === studentId &&
-                                    normalizePostHolderStatus(entry.status || 'active') === 'suspended') {
-                                entry.status = 'active';
-                                entry.auto_suspend_waived = true;
-                                entry.resumed_on = _todayKey;
-                                entry.resume_reason = 'Auto-resumed: star used (bonus earned)';
-                                _resumedPosts.push(entry.postName || entry.post || entry.title || tbl);
-                            }
-                        });
-                    });
-                    // Party President table (stored inside data.parties[].members[])
-                    (_phData.parties || []).forEach(party => {
-                        (party.members || []).forEach(member => {
-                            if (!isPartyPresidentDesignation(member.designation)) return;
-                            let sid = parseInt(member.studentId, 10);
-                            if (!sid) {
-                                const roll = normalizeRoll(member.roll || '');
-                                sid = roll ? (new Map((_phData.students || []).map(s => [normalizeRoll(s.roll), parseInt(s.id, 10)])).get(roll) || 0) : 0;
-                            }
-                            if (sid !== studentId) return;
-                            if (normalizePostHolderStatus(member.status || 'active') === 'suspended') {
-                                member.status = 'active';
-                                member.auto_suspend_waived = true;
-                                member.resumed_on = _todayKey;
-                                member.resume_reason = 'Auto-resumed: star used (bonus earned)';
-                                _resumedPosts.push(member.designation || 'Party President');
-                            }
-                        });
-                    });
-                    if (_resumedPosts.length > 0) {
-                        savePostHolderData(_phData);
-                        showAlert(`Post auto-resumed: ${_resumedPosts.join(', ')} — star bonus earned!`, 'success');
-                    }
-                    // ────────────────────────────────────────────────────────────────
                 }
+
+                // ── Auto-resume suspended posts ──────────────────────────────────
+                // Any star use to counter negative marking lifts an active suspension,
+                // regardless of whether a bonus was earned (works for penalties > -50 too).
+                const _phData = db.getData();
+                const _resumedPosts = [];
+                const _todayKey = formatDateKey(new Date());
+                // Leadership / CR tables
+                ['leadership', 'group_crs', 'class_reps'].forEach(tbl => {
+                    (_phData[tbl] || []).forEach(entry => {
+                        if (parseInt(entry.studentId, 10) === studentId &&
+                                normalizePostHolderStatus(entry.status || 'active') === 'suspended') {
+                            entry.status = 'active';
+                            entry.auto_suspend_waived = true;
+                            entry.resumed_on = _todayKey;
+                            entry.resume_reason = nextDayBonus > 0
+                                ? 'Auto-resumed: star used (bonus earned)'
+                                : 'Auto-resumed: star used to counter negative marking';
+                            _resumedPosts.push(entry.postName || entry.post || entry.title || tbl);
+                        }
+                    });
+                });
+                // Party President table (stored inside data.parties[].members[])
+                (_phData.parties || []).forEach(party => {
+                    (party.members || []).forEach(member => {
+                        if (!isPartyPresidentDesignation(member.designation)) return;
+                        let sid = parseInt(member.studentId, 10);
+                        if (!sid) {
+                            const roll = normalizeRoll(member.roll || '');
+                            sid = roll ? (new Map((_phData.students || []).map(s => [normalizeRoll(s.roll), parseInt(s.id, 10)])).get(roll) || 0) : 0;
+                        }
+                        if (sid !== studentId) return;
+                        if (normalizePostHolderStatus(member.status || 'active') === 'suspended') {
+                            member.status = 'active';
+                            member.auto_suspend_waived = true;
+                            member.resumed_on = _todayKey;
+                            member.resume_reason = nextDayBonus > 0
+                                ? 'Auto-resumed: star used (bonus earned)'
+                                : 'Auto-resumed: star used to counter negative marking';
+                            _resumedPosts.push(member.designation || 'Party President');
+                        }
+                    });
+                });
+                if (_resumedPosts.length > 0) {
+                    savePostHolderData(_phData);
+                    refreshAllPostHolderViews();
+                    loadScoreboard();
+                    showAlert(`Post auto-resumed: ${_resumedPosts.join(', ')} — star used to counter negative marking.`, 'success');
+                }
+                // ────────────────────────────────────────────────────────────────
 
                 return resolved;
             }
@@ -20435,7 +20496,10 @@
             }
             pushUndoSnapshot(isSuspending ? 'Suspend leader' : 'Reinstate leader');
             post.status = isSuspending ? 'suspended' : 'active';
+            if (!isSuspending) { post.auto_suspend_waived = true; post.resumed_on = formatDateKey(new Date()); }
             savePostHolderData(data);
+            refreshAllPostHolderViews();
+            loadScoreboard();
         }
 
         // ── Admin Waiver: Admin can waive automatic suspension for a post holder ──
@@ -20560,7 +20624,10 @@
                 return;
             }
             rep.status = normalizePostHolderStatus(rep.status) === 'suspended' ? 'active' : 'suspended';
+            if (!isSuspending) { rep.auto_suspend_waived = true; rep.resumed_on = formatDateKey(new Date()); }
             savePostHolderData(data);
+            refreshAllPostHolderViews();
+            loadScoreboard();
         }
 
         function toggleGroupCRSuspension(repId) {
@@ -20574,7 +20641,10 @@
                 return;
             }
             rep.status = normalizePostHolderStatus(rep.status) === 'suspended' ? 'active' : 'suspended';
+            if (!isSuspending) { rep.auto_suspend_waived = true; rep.resumed_on = formatDateKey(new Date()); }
             savePostHolderData(data);
+            refreshAllPostHolderViews();
+            loadScoreboard();
         }
 
         function togglePartyPresidentSuspension(partyId) {
@@ -20602,6 +20672,8 @@
                 delete member.resumed_on;
             }
             savePostHolderData(data);
+            refreshAllPostHolderViews();
+            loadScoreboard();
         }
 
         function endLeadershipTenure(postId) {
@@ -29837,13 +29909,17 @@
             const rollKey = String(student.roll || '').trim().toUpperCase();
             const profile = profileMap instanceof Map ? profileMap.get(rollKey) : safeProp(profileMap, rollKey);
             const hasProfileStars = profile && profile.month_star_count !== undefined && profile.month_star_count !== null;
+            // Global counter (student.stars) is the authoritative running total updated on every award/use.
+            const globalStars = Math.max(0, parseInt(student.stars, 10) || 0);
             if (hasProfileStars) {
                 const carry = Math.max(0, parseInt(profile.month_star_count, 10) || 0);
                 const awards = getStudentMonthStarAwardTotal(sid, month);
                 const used = getStudentMonthNegativeDeltaTotal(sid, month, 'stars');
-                return Math.max(0, carry + awards - used);
+                // Take the higher of profile-based and global counter so accumulated
+                // stars are never invisible due to a stale/zero roster month_star_count.
+                return Math.max(0, Math.max(carry + awards - used, globalStars));
             }
-            return Math.max(0, parseInt(safeProp(student, 'stars'), 10) || 0);
+            return globalStars;
         }
 
         function validateStarAvailability(studentId, requestedStars, monthKey = '') {
