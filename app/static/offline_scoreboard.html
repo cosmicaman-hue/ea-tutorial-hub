@@ -1727,6 +1727,14 @@
         .score-cell.star-transfer-both:hover {
             background: transparent !important;
         }
+        .star-transfer-score {
+            display: inline-block;
+            font-size: 12px;
+            font-weight: 700;
+            margin-left: 2px;
+            vertical-align: middle;
+            opacity: 0.92;
+        }
         .score-cell.star-used-split {
             padding: 0 !important;
             overflow: hidden;
@@ -11405,15 +11413,16 @@
 
                         // ── Transfer cells: emoji only, no bonus ──────────────────────
                         if (transferOut > 0 || transferIn > 0) {
+                            const _tPts = points !== 0 ? `<span class="star-transfer-score">${points}</span>` : '';
                             if (transferOut > 0 && transferIn > 0) {
                                 // Edge case: both on same date
-                                starOverrides[date] = `<span style="display:inline-block;transform:scaleX(-1)" title="Star sent">💫</span><span title="Star received">💫</span>`;
+                                starOverrides[date] = `<span style="display:inline-block;transform:scaleX(-1)" title="Star sent">💫</span>${_tPts}<span title="Star received">💫</span>`;
                                 starClasses[date] = 'star-transfer-both';
                             } else if (transferOut > 0) {
-                                starOverrides[date] = `<span style="display:inline-block;transform:scaleX(-1)" title="Star sent (${transferOut})">💫</span>`;
+                                starOverrides[date] = `<span style="display:inline-block;transform:scaleX(-1)" title="Star sent (${transferOut})">💫</span>${_tPts}`;
                                 starClasses[date] = 'star-transfer-out';
                             } else {
-                                starOverrides[date] = `<span title="Star received (${transferIn})">💫</span>`;
+                                starOverrides[date] = `<span title="Star received (${transferIn})">💫</span>${_tPts}`;
                                 starClasses[date] = 'star-transfer-in';
                             }
                             // Regular star uses on the same date still get processed below
@@ -11507,7 +11516,7 @@
                         const starOverride = starOverrides[date];
                         const starClass = starClasses[date] || '';
                         const starAwardCount = Math.max(0, parseInt(safeProp(row.starsByDate, date), 10) || 0);
-                        if (starOverride) {
+                        if (starOverride && !starClass.startsWith('star-transfer')) {
                             points = 0;
                         }
                         if (bonusDates[date]) {
