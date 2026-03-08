@@ -507,8 +507,11 @@
                         let normal         = Math.max(0, parseInt(sc && sc.star_usage_normal, 10) || 0);
                         let disciplinary   = Math.max(0, parseInt(sc && sc.star_usage_disciplinary, 10) || 0);
                         if (normal + disciplinary <= 0) {
-                            if (note.includes('disciplinary')) { disciplinary = usageAbs; normal = 0; }
-                            else                               { normal = usageAbs; disciplinary = 0; }
+                            // Transfer records are not a bonus-eligible star use
+                            const isTransfer = (sc.star_transfer_out || sc.star_transfer_in) || note.includes('[star transfer');
+                            if (isTransfer)                        { /* no bonus */ }
+                            else if (note.includes('disciplinary')) { disciplinary = usageAbs; normal = 0; }
+                            else                                    { normal = usageAbs; disciplinary = 0; }
                         }
                         if (normal > 0) {
                             if (!perDateStarNorm.has(sid)) perDateStarNorm.set(sid, {});
