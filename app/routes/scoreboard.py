@@ -414,6 +414,112 @@ def _supabase_push_snapshot_async(payload, reason='snapshot_save'):
     ).start()
 
 
+# ── GitHub Gist cloud backup (Supabase-free alternative) ─────────────────────
+# Set GITHUB_GIST_TOKEN (personal access token, gist scope) and
+# GITHUB_GIST_ID (the Gist ID) on both master PC and Render.
+# Create the Gist once at https://gist.github.com — can be secret/private.
+_gist_push_lock = threading.Lock()
+_gist_last_pushed_stamp = ''
+
+
+def _gist_config():
+    token   = str(os.getenv('GITHUB_GIST_TOKEN', '') or '').strip()
+    gist_id = str(os.getenv('GITHUB_GIST_ID', '') or '').strip()
+    filename = str(os.getenv('GITHUB_GIST_FILENAME', 'ea_snapshot.json') or 'ea_snapshot.json').strip()
+    return {
+        'enabled_read':  bool(gist_id),           # public gists readable without token
+        'enabled_write': bool(token and gist_id),
+        'token':   token,
+        'gist_id': gist_id,
+        'filename': filename,
+    }
+
+
+def _gist_fetch_snapshot(timeout_sec=15):
+    cfg = _gist_config()
+    if not cfg.get('enabled_read'):
+        return None, 'not-configured'
+    headers = {
+        'Accept': 'application/vnd.github.v3+json',
+        'User-Agent': 'EA-Scoreboard/1.0',
+    }
+    if cfg['token']:
+        headers['Authorization'] = f"token {cfg['token']}"
+    try:
+        req = urllib.request.Request(
+            f"https://api.github.com/gists/{cfg['gist_id']}",
+            headers=headers, method='GET'
+        )
+        with urllib.request.urlopen(req, timeout=timeout_sec) as resp:
+            meta = json.loads(resp.read().decode('utf-8', errors='replace'))
+        file_info = (meta.get('files') or {}).get(cfg['filename'], {})
+        # Large files are truncated in the API response; follow raw_url instead.
+        raw_url = file_info.get('raw_url', '')
+        content = None
+        if raw_url:
+            req2 = urllib.request.Request(raw_url, headers=headers, method='GET')
+            with urllib.request.urlopen(req2, timeout=timeout_sec) as r2:
+                content = r2.read().decode('utf-8', errors='replace')
+        else:
+            content = file_info.get('content') or ''
+        if content:
+            data = json.loads(content)
+            if isinstance(data, dict):
+                data.pop('fee_records', None)
+                return data, 'gist'
+    except Exception as exc:
+        current_app.logger.warning('Gist fetch snapshot exception: %s', exc)
+    return None, 'error'
+
+
+def _gist_push_snapshot(payload, reason='snapshot_save', timeout_sec=20):
+    cfg = _gist_config()
+    if not cfg.get('enabled_write'):
+        return False
+    if not isinstance(payload, dict):
+        return False
+    mirror_payload = _payload_for_external_replication(payload)
+    stamp = str(mirror_payload.get('server_updated_at') or mirror_payload.get('updated_at') or '').strip()
+    global _gist_last_pushed_stamp
+    with _gist_push_lock:
+        if stamp and stamp == _gist_last_pushed_stamp:
+            return True
+    content = json.dumps(mirror_payload, ensure_ascii=False)
+    body = json.dumps({'files': {cfg['filename']: {'content': content}}}).encode('utf-8')
+    headers = {
+        'Authorization': f"token {cfg['token']}",
+        'Content-Type': 'application/json',
+        'Accept': 'application/vnd.github.v3+json',
+        'User-Agent': 'EA-Scoreboard/1.0',
+    }
+    try:
+        req = urllib.request.Request(
+            f"https://api.github.com/gists/{cfg['gist_id']}",
+            data=body, headers=headers, method='PATCH'
+        )
+        with urllib.request.urlopen(req, timeout=timeout_sec):
+            pass
+        if stamp:
+            with _gist_push_lock:
+                _gist_last_pushed_stamp = stamp
+        current_app.logger.info('Gist snapshot pushed (%s)', reason)
+        return True
+    except Exception as exc:
+        current_app.logger.warning('Gist push snapshot exception: %s', exc)
+        return False
+
+
+def _gist_push_snapshot_async(payload, reason='snapshot_save'):
+    cfg = _gist_config()
+    if not cfg.get('enabled_write'):
+        return
+    threading.Thread(
+        target=_gist_push_snapshot,
+        args=(payload, reason),
+        daemon=True
+    ).start()
+
+
 def _do_peer_sync_cycle(app):
     """One bidirectional sync cycle with all configured peers."""
     peers = _get_sync_peers()
@@ -646,9 +752,9 @@ def _load_offline_data():
     if not os.path.exists(path):
         data = _load_latest_offline_backup()
         if not data:
-            supa_data, _ = _supabase_fetch_snapshot()
-            if isinstance(supa_data, dict):
-                data = supa_data
+            gist_data, _ = _gist_fetch_snapshot()
+            if isinstance(gist_data, dict):
+                data = gist_data
         if data:
             try:
                 _atomic_write_json(path, data)
@@ -676,9 +782,9 @@ def _load_offline_data():
     except Exception:
         data = _load_latest_offline_backup()
         if not data:
-            supa_data, _ = _supabase_fetch_snapshot()
-            if isinstance(supa_data, dict):
-                data = supa_data
+            gist_data, _ = _gist_fetch_snapshot()
+            if isinstance(gist_data, dict):
+                data = gist_data
         if data:
             try:
                 _atomic_write_json(path, data)
@@ -741,7 +847,7 @@ def _save_offline_data(payload):
     _backup_offline_file(path)
     _atomic_write_json(path, payload)
     _backup_offline_hourly_immutable(payload)
-    _supabase_push_snapshot_async(payload, reason='save_offline_data')
+    _gist_push_snapshot_async(payload, reason='save_offline_data')
     return payload
 
 
@@ -4600,7 +4706,7 @@ def offline_force_publish():
     # Default mode: queue remote replication in background and return fast.
     # This avoids user-visible publish failures caused by WAN/Supabase timeouts.
     if not wait_for_results:
-        _supabase_push_snapshot_async(data, reason='force_publish')
+        _gist_push_snapshot_async(data, reason='force_publish')
         _forward_offline_data_to_peers_async(data, request_peers)
         return jsonify({
             'success': True,
@@ -4608,11 +4714,11 @@ def offline_force_publish():
             'mode': 'queued',
             'used_fallback_snapshot': used_fallback_snapshot,
             'updated_at': data.get('server_updated_at'),
-            'supabase': {'status': 'queued'},
+            'gist': {'status': 'queued'},
             'peers': []
         })
 
-    supabase_result = {'status': 'skipped'}
+    gist_result = {'status': 'skipped'}
 
     peers = _get_sync_peers() + _normalize_peer_list(request_peers)
     peers = list(dict.fromkeys(peers))
@@ -4636,19 +4742,19 @@ def offline_force_publish():
     result_lock = threading.Lock()
     threads = []
 
-    def _push_supabase_worker():
-        nonlocal supabase_result
+    def _push_gist_worker():
+        nonlocal gist_result
         started = time.time()
         try:
-            ok = _supabase_push_snapshot(data, reason='force_publish', timeout_sec=10)
+            ok = _gist_push_snapshot(data, reason='force_publish', timeout_sec=15)
             elapsed_ms = int((time.time() - started) * 1000)
-            supabase_result = {
+            gist_result = {
                 'status': 'ok' if ok else 'failed',
                 'latency_ms': elapsed_ms,
             }
         except Exception as exc:
             elapsed_ms = int((time.time() - started) * 1000)
-            supabase_result = {
+            gist_result = {
                 'status': 'failed',
                 'latency_ms': elapsed_ms,
                 'error': str(exc),
@@ -4686,7 +4792,7 @@ def offline_force_publish():
         with result_lock:
             peer_results.append(result)
 
-    supa_thread = threading.Thread(target=_push_supabase_worker, daemon=True)
+    supa_thread = threading.Thread(target=_push_gist_worker, daemon=True)
     supa_thread.start()
     threads.append(supa_thread)
     for base in peer_targets:
@@ -4704,7 +4810,7 @@ def offline_force_publish():
     for t in threads:
         if t.is_alive():
             if t is supa_thread:
-                supabase_result = {'status': 'timeout', 'error': 'Timed out'}
+                gist_result = {'status': 'timeout', 'error': 'Timed out'}
             else:
                 # Best-effort: workers append own results; on timeout add synthetic entry.
                 pass
@@ -4715,13 +4821,13 @@ def offline_force_publish():
             peer_results.append({'base_url': base, 'status': 'timeout', 'error': 'Timed out', 'latency_ms': 16000})
 
     peer_ok = any(item.get('status') == 'ok' for item in peer_results) if peer_targets else False
-    replication_ok = bool(peer_ok or supabase_result.get('status') == 'ok')
+    replication_ok = bool(peer_ok or gist_result.get('status') == 'ok')
     return jsonify({
         'success': True,
         'replication_ok': replication_ok,
         'used_fallback_snapshot': used_fallback_snapshot,
         'updated_at': data.get('server_updated_at'),
-        'supabase': supabase_result,
+        'gist': gist_result,
         'peers': peer_results
     })
 
