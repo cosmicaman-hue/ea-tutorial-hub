@@ -1,5 +1,6 @@
 import os
 from flask import Flask, redirect, url_for, request, flash
+from werkzeug.middleware.proxy_fix import ProxyFix
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy import text
 from datetime import timedelta
@@ -112,9 +113,13 @@ def create_app():
     setup_logging(app)
     register_error_handlers(app)
     
+    # Trust Railway / Render / any single reverse-proxy hop so Flask sees
+    # the real HTTPS scheme and host (fixes Secure cookie + redirect URLs).
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
+
     # Create upload folder if not exists
     os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-    
+
     # Register blueprints
     from app.routes.auth import auth_bp
     from app.routes.scoreboard import points_bp
