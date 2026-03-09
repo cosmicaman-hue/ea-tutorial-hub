@@ -2729,16 +2729,16 @@
             font-family: var(--number-font);
         }
 
-        /* ══ TOP SCORER CARD — aurora + lightning + cracker sparks ══ */
+        /* ══ TOP SCORER CARD — deep black + orbs + starfield ══ */
         #topScorerCard h4 {
             color: #ffffff !important;
             opacity: 1 !important;
             font-size: 13px;
             font-weight: 800;
-            letter-spacing: 1px;
-            text-shadow: 0 0 10px rgba(255,255,255,0.5);
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            text-shadow: 0 0 14px rgba(255,255,255,0.8), 0 0 28px rgba(251,191,36,0.5);
         }
-        /* Wider than the three sibling stat cards */
         .stats-grid:has(#topScorerCard) {
             grid-template-columns: repeat(3, 1fr) 2fr;
         }
@@ -2746,38 +2746,47 @@
             position: relative;
             overflow: hidden;
             isolation: isolate;
-            background: #080c18 !important;
-            border: 1.5px solid rgba(251,191,36,0.35);
-            box-shadow: 0 0 32px rgba(251,191,36,0.18), 0 14px 32px rgba(0,0,0,0.45) !important;
+            background: #000000 !important;
+            border: 1.5px solid rgba(251,191,36,0.55);
+            box-shadow:
+                0 0 0 1px rgba(0,0,0,0.8),
+                0 0 40px rgba(251,191,36,0.28),
+                0 0 80px rgba(251,191,36,0.10),
+                0 14px 32px rgba(0,0,0,0.8) !important;
         }
         #topScorerCard:hover {
-            box-shadow: 0 0 48px rgba(251,191,36,0.30), 0 20px 40px rgba(0,0,0,0.5) !important;
+            border-color: rgba(251,191,36,0.85);
+            box-shadow:
+                0 0 60px rgba(251,191,36,0.45),
+                0 0 100px rgba(251,191,36,0.15),
+                0 20px 40px rgba(0,0,0,0.9) !important;
         }
 
-        /* Rotating conic aurora behind everything */
+        /* Rotating conic aurora — vivid border glow */
         .ts-aurora {
             position: absolute;
-            inset: -55%;
+            inset: -60%;
             background: conic-gradient(
                 from 0deg,
-                #fbbf24, #f59e0b, #ef4444,
+                #fbbf24, #f97316, #ef4444,
                 #a855f7, #3b82f6, #06b6d4,
                 #10b981, #fbbf24
             );
             border-radius: 50%;
-            opacity: 0.55;
-            animation: tsAuroraRotate 6s linear infinite;
+            opacity: 0.80;
+            animation: tsAuroraRotate 5s linear infinite;
             z-index: 0;
             will-change: transform;
         }
-        /* Second inner dark vignette to keep text legible */
+        /* Pure black vignette — makes interior truly black */
         #topScorerCard::before {
             content: '';
             position: absolute;
-            inset: 3px;
-            background: radial-gradient(ellipse at 45% 60%,
-                rgba(12,8,30,0.82) 0%,
-                rgba(10,15,35,0.90) 100%
+            inset: 2px;
+            background: radial-gradient(ellipse at 50% 50%,
+                rgba(0,0,2,0.98) 0%,
+                rgba(0,0,4,0.96) 55%,
+                rgba(0,0,8,0.90) 100%
             );
             border-radius: 8px;
             z-index: 1;
@@ -2787,6 +2796,96 @@
             to   { transform: rotate(360deg); }
         }
 
+        /* Floating glowing orbs */
+        .ts-orb {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(24px);
+            z-index: 2;
+            pointer-events: none;
+            will-change: transform, opacity;
+        }
+        .ts-orb-1 {
+            width: 100px; height: 100px;
+            background: radial-gradient(circle, rgba(251,191,36,0.60) 0%, transparent 70%);
+            top: -28px; right: 8%;
+            animation: tsOrbDrift1 7s ease-in-out infinite;
+        }
+        .ts-orb-2 {
+            width: 75px; height: 75px;
+            background: radial-gradient(circle, rgba(139,92,246,0.50) 0%, transparent 70%);
+            bottom: -18px; left: 12%;
+            animation: tsOrbDrift2 9s ease-in-out 1.5s infinite;
+        }
+        .ts-orb-3 {
+            width: 60px; height: 60px;
+            background: radial-gradient(circle, rgba(56,189,248,0.45) 0%, transparent 70%);
+            top: 35%; right: 28%;
+            animation: tsOrbDrift3 11s ease-in-out 3s infinite;
+        }
+        @keyframes tsOrbDrift1 {
+            0%,100% { transform: translate(0,0) scale(1);        opacity: 0.70; }
+            33%      { transform: translate(-14px,18px) scale(1.2); opacity: 1.00; }
+            66%      { transform: translate(10px,-12px) scale(0.85); opacity: 0.45; }
+        }
+        @keyframes tsOrbDrift2 {
+            0%,100% { transform: translate(0,0) scale(1);        opacity: 0.55; }
+            40%      { transform: translate(18px,-14px) scale(1.25); opacity: 0.90; }
+            75%      { transform: translate(-10px,10px) scale(0.8); opacity: 0.35; }
+        }
+        @keyframes tsOrbDrift3 {
+            0%,100% { transform: translate(0,0) scale(1);        opacity: 0.50; }
+            50%      { transform: translate(-12px,14px) scale(1.35); opacity: 0.85; }
+        }
+
+        /* Starfield — CSS box-shadow dot technique */
+        .ts-stars { position: absolute; inset: 0; z-index: 2; pointer-events: none; overflow: hidden; }
+        .ts-stars::before, .ts-stars::after {
+            content: '';
+            position: absolute;
+            top: 0; left: 0;
+            width: 2px; height: 2px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.95);
+        }
+        .ts-stars::before {
+            box-shadow:
+                18px 12px 0 0 rgba(255,255,255,0.90),  42px 35px 0 0 rgba(255,220,100,0.80),
+                76px  8px 0 0 rgba(255,255,255,0.70), 110px 28px 0 0 rgba(255,255,255,0.85),
+               138px 15px 0 0 rgba(255,220,100,0.75), 165px 42px 0 0 rgba(255,255,255,0.60),
+               195px 10px 0 0 rgba(255,255,255,0.90), 222px 30px 0 0 rgba(255,220,100,0.65),
+               252px 18px 0 0 rgba(255,255,255,0.80), 280px 38px 0 0 rgba(255,255,255,0.70),
+               308px 12px 0 0 rgba(255,220,100,0.85), 332px 28px 0 0 rgba(255,255,255,0.60),
+                 8px 58px 0 0 rgba(255,255,255,0.75),  36px 68px 0 0 rgba(255,220,100,0.80),
+                64px 78px 0 0 rgba(255,255,255,0.65),  92px 60px 0 0 rgba(255,255,255,0.90),
+               120px 74px 0 0 rgba(255,220,100,0.70), 150px 62px 0 0 rgba(255,255,255,0.80),
+               180px 82px 0 0 rgba(255,255,255,0.60), 212px 67px 0 0 rgba(255,220,100,0.75),
+               242px 80px 0 0 rgba(255,255,255,0.85), 270px 57px 0 0 rgba(255,255,255,0.70),
+               300px 72px 0 0 rgba(255,220,100,0.65), 328px 84px 0 0 rgba(255,255,255,0.80),
+                16px 98px 0 0 rgba(255,255,255,0.70),  56px 104px 0 0 rgba(255,220,100,0.80),
+                96px 94px 0 0 rgba(255,255,255,0.90), 136px 108px 0 0 rgba(255,255,255,0.65),
+               176px 100px 0 0 rgba(255,220,100,0.75), 216px 110px 0 0 rgba(255,255,255,0.80);
+            animation: tsStarTwinkle 4s ease-in-out infinite;
+        }
+        .ts-stars::after {
+            width: 1px; height: 1px;
+            box-shadow:
+                28px 22px 0 0 rgba(255,255,255,0.55),  60px 48px 0 0 rgba(255,220,100,0.65),
+                90px 24px 0 0 rgba(255,255,255,0.50), 128px 52px 0 0 rgba(255,255,255,0.70),
+               158px 26px 0 0 rgba(255,220,100,0.60), 188px 54px 0 0 rgba(255,255,255,0.50),
+               230px 22px 0 0 rgba(255,255,255,0.65), 264px 50px 0 0 rgba(255,220,100,0.55),
+               290px 24px 0 0 rgba(255,255,255,0.60), 320px 46px 0 0 rgba(255,255,255,0.55),
+                32px 90px 0 0 rgba(255,220,100,0.65),  72px 112px 0 0 rgba(255,255,255,0.50),
+               114px 88px 0 0 rgba(255,255,255,0.60), 154px 114px 0 0 rgba(255,220,100,0.55),
+               194px 92px 0 0 rgba(255,255,255,0.65), 234px 118px 0 0 rgba(255,255,255,0.50),
+               274px 90px 0 0 rgba(255,220,100,0.60), 314px 110px 0 0 rgba(255,255,255,0.55);
+            animation: tsStarTwinkle 4s ease-in-out 2s infinite;
+        }
+        @keyframes tsStarTwinkle {
+            0%,100% { opacity: 1; }
+            50%      { opacity: 0.25; }
+        }
+
         /* Lightning streaks */
         .ts-lightning {
             position: absolute;
@@ -2794,12 +2893,12 @@
             width: 2px;
             background: linear-gradient(180deg,
                 transparent 0%,
-                rgba(251,191,36,0.9) 40%,
-                rgba(255,255,255,0.95) 50%,
-                rgba(251,191,36,0.9) 60%,
+                rgba(251,191,36,1) 40%,
+                rgba(255,255,255,1) 50%,
+                rgba(251,191,36,1) 60%,
                 transparent 100%
             );
-            z-index: 3;
+            z-index: 4;
             pointer-events: none;
             opacity: 0;
         }
@@ -2808,8 +2907,8 @@
         @keyframes tsLightning {
             0%,82%,100% { opacity: 0; transform: scaleY(0) translateY(-50%); }
             83%          { opacity: 1; transform: scaleY(1) translateY(0); }
-            85%          { opacity: 0; transform: scaleY(1) translateY(0); }
-            87%          { opacity: 0.6; transform: scaleY(0.8) translateY(10%); }
+            85%          { opacity: 0; }
+            87%          { opacity: 0.7; transform: scaleY(0.8) translateY(10%); }
             89%          { opacity: 0; }
         }
 
@@ -2823,29 +2922,30 @@
             animation: tsSpark var(--sd, 1.8s) ease-out var(--ss, 0s) infinite;
         }
         @keyframes tsSpark {
-            0%   { transform: translate(0, 0) scale(1);    opacity: 1; }
+            0%   { transform: translate(0,0) scale(1);                            opacity: 1; }
             70%  { opacity: 0.5; }
-            100% { transform: translate(var(--tx, 20px), var(--ty, -40px)) scale(0.1); opacity: 0; }
+            100% { transform: translate(var(--tx,20px),var(--ty,-40px)) scale(0.1); opacity: 0; }
         }
 
-        /* Name shimmer sweep */
+        /* Name shimmer — vivid gold-to-white sweep */
         #topScorerCard .top-scorer-name {
             background: linear-gradient(90deg,
-                #fde68a 0%, #fbbf24 30%, #ffffff 50%, #fbbf24 70%, #fde68a 100%
+                #fde68a 0%, #fbbf24 25%, #ffffff 50%, #fbbf24 75%, #fde68a 100%
             );
             background-size: 200% auto;
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
-            animation: tsNameShimmer 2.5s linear infinite;
+            animation: tsNameShimmer 2s linear infinite;
+            filter: drop-shadow(0 0 8px rgba(251,191,36,0.85));
         }
         @keyframes tsNameShimmer {
             from { background-position: 200% center; }
             to   { background-position: -200% center; }
         }
         body.light-mode #topScorerCard {
-            background: #0f172a !important;
-            border-color: rgba(245,158,11,0.45);
+            background: #000000 !important;
+            border-color: rgba(245,158,11,0.65);
         }
         body.light-mode #topScorerCard .top-scorer-name {
             -webkit-text-fill-color: transparent;
@@ -4852,11 +4952,15 @@
                 </div>
                 <div class="stat-card" id="topScorerCard">
                     <div class="ts-aurora"></div>
+                    <div class="ts-stars"></div>
+                    <div class="ts-orb ts-orb-1"></div>
+                    <div class="ts-orb ts-orb-2"></div>
+                    <div class="ts-orb ts-orb-3"></div>
                     <div class="ts-sparks" id="tsSparksContainer"></div>
                     <div class="ts-lightning ts-l1"></div>
                     <div class="ts-lightning ts-l2"></div>
-                    <h4 style="position:relative;z-index:2;">🏆 Top Scorer</h4>
-                    <div class="value" id="topScorer" style="font-size:16px;word-break:break-word;position:relative;z-index:2;">-</div>
+                    <h4 style="position:relative;z-index:5;">🏆 Top Scorer</h4>
+                    <div class="value" id="topScorer" style="font-size:16px;word-break:break-word;position:relative;z-index:5;">-</div>
                 </div>
             </div>
 
