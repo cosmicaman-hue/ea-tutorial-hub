@@ -422,35 +422,6 @@
             return rolls;
         }
 
-        function parseNumericTotal(v) {
-            const n = parseInt(v, 10);
-            return Number.isFinite(n) ? n : NaN;
-        }
-
-        function resolveDirectMonthTotal(data, month, student) {
-            if (!student) return NaN;
-            const roll = rollKey(student.roll || '');
-            const monthProfiles = data && data.month_roster_profiles && data.month_roster_profiles[month];
-            const rosterProfile = (Array.isArray(monthProfiles) ? monthProfiles : [])
-                .find(p => rollKey(p && p.roll) === roll) || null;
-            const profileData = student.profile_data || {};
-            const candidates = [
-                rosterProfile && rosterProfile.month_total_score,
-                rosterProfile && rosterProfile.total_score,
-                rosterProfile && rosterProfile.sheet_total_score,
-                rosterProfile && rosterProfile.net_score,
-                student.sheet_total_score,
-                profileData.total_score,
-                profileData.sheet_total_score,
-                student.total_score
-            ];
-            for (const value of candidates) {
-                const parsed = parseNumericTotal(value);
-                if (Number.isFinite(parsed)) return parsed;
-            }
-            return NaN;
-        }
-
         function rankBadge(rank) {
             if (rank === 1) return `<span class="rank-badge gold">1</span>`;
             if (rank === 2) return `<span class="rank-badge silver">2</span>`;
@@ -583,15 +554,11 @@
 
             const rows = Array.from(totals.entries()).map(([sid, total]) => {
                 const s = byId.get(sid) || {};
-                const directStoredTotal = resolveDirectMonthTotal(latest, month, s);
-                const resolvedTotal = Number.isFinite(directStoredTotal)
-                    ? directStoredTotal
-                    : (total || 0);
                 return {
                     roll: rollKey(s.roll || ''),
                     name: String(s.base_name || s.name || '').trim() || '-',
                     classVal: s.class || '-',
-                    total: resolvedTotal
+                    total: total || 0
                 };
             }).sort((a, b) => b.total !== a.total ? b.total - a.total : a.roll.localeCompare(b.roll));
 
