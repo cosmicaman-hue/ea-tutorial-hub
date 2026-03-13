@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=0.9">
     <title>EXCEL ACADEMY LEADERSHIP BOARD - Offline System</title>
     <link rel="manifest" href="/scoreboard/manifest.webmanifest">
     <meta name="theme-color" content="#0b1020">
@@ -459,18 +459,19 @@
 
         /* ── Drifting tech grid ── */
         .hdr-grid {
-            position: absolute; inset: 0;
+            position: absolute; inset: -46px;
             background-image:
                 linear-gradient(rgba(56,189,248,0.055) 1px, transparent 1px),
                 linear-gradient(90deg, rgba(56,189,248,0.055) 1px, transparent 1px);
             background-size: 46px 46px;
+            background-position: 0 0;
             animation: hdrGridDrift 24s linear infinite;
             pointer-events: none; z-index: 0;
-            will-change: background-position;
+            will-change: transform;
         }
         @keyframes hdrGridDrift {
-            from { background-position: 0 0; }
-            to   { background-position: 46px 46px; }
+            from { transform: translate(0, 0); }
+            to   { transform: translate(46px, 46px); }
         }
 
         /* ── Floating colour orbs (nebula blobs) ── */
@@ -485,17 +486,17 @@
 
         /* ── Diagonal scan beam ── */
         .hdr-scan {
-            position:absolute; top:0; bottom:0; left:-80%; width:42%;
+            position:absolute; top:0; bottom:0; left:0; width:42%;
             background:linear-gradient(90deg,transparent,rgba(125,211,252,0.11) 38%,rgba(255,255,255,0.09) 50%,rgba(125,211,252,0.11) 62%,transparent);
-            transform:skewX(-18deg);
             animation:hdrScanBeam 8s cubic-bezier(0.4,0,0.6,1) 1s infinite;
             pointer-events:none; z-index:1;
+            will-change: transform, opacity;
         }
         @keyframes hdrScanBeam {
-            0%   { left:-80%; opacity:0; }
+            0%   { transform: translateX(-200%) skewX(-18deg); opacity:0; }
             8%   { opacity:1; }
             92%  { opacity:1; }
-            100% { left:155%; opacity:0; }
+            100% { transform: translateX(400%) skewX(-18deg); opacity:0; }
         }
 
         /* ── Shooting meteors ── */
@@ -543,9 +544,147 @@
             flex-direction: column;
             align-items: center;
             text-align: center;
-            gap: 6px;
+            gap: 10px;
             position: relative;
             z-index: 2;
+        }
+
+        /* ── Brand card ── */
+        .header-brand {
+            position: relative;
+            padding: 20px 36px 18px;
+            border-radius: 22px;
+            border: 1px solid rgba(125, 211, 252, 0.22);
+            background: linear-gradient(160deg, rgba(15, 23, 42, 0.84) 0%, rgba(2, 6, 23, 0.64) 100%);
+            box-shadow:
+                inset 0 1px 0 rgba(255,255,255,0.09),
+                0 20px 50px rgba(2, 6, 23, 0.58),
+                0 0 0 1px rgba(125,211,252,0.04),
+                0 0 50px rgba(59,130,246,0.10);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            width: min(96%, 960px);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            animation: hdrBrandEnter 0.9s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+            will-change: transform, opacity;
+        }
+
+        /* Inner shimmer sweep */
+        .header-brand::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: 22px;
+            background: linear-gradient(
+                108deg,
+                transparent 28%,
+                rgba(125,211,252,0.055) 46%,
+                rgba(255,255,255,0.04) 50%,
+                rgba(125,211,252,0.055) 54%,
+                transparent 72%
+            );
+            animation: hdrBrandSweep 7s ease-in-out 1.8s infinite;
+            pointer-events: none;
+            z-index: 0;
+            will-change: transform, opacity;
+        }
+
+        /* Animated bottom accent line — scaleX only (GPU composited) */
+        .header-brand::after {
+            content: '';
+            position: absolute;
+            left: 8%; right: 8%;
+            bottom: -1px;
+            height: 2px;
+            border-radius: 2px;
+            background: linear-gradient(90deg, rgba(125,211,252,0), rgba(125,211,252,0.95), rgba(125,211,252,0));
+            transform-origin: center;
+            animation: hdrBrandLineAnim 3.5s ease-in-out infinite;
+            will-change: transform, opacity;
+        }
+
+        @keyframes hdrBrandEnter {
+            from { opacity: 0; transform: translateY(-20px) scale(0.97); }
+            to   { opacity: 1; transform: translateY(0)     scale(1);    }
+        }
+        @keyframes hdrBrandSweep {
+            0%   { transform: translateX(-130%); opacity: 0; }
+            12%  { opacity: 1; }
+            88%  { opacity: 1; }
+            100% { transform: translateX(130%);  opacity: 0; }
+        }
+        @keyframes hdrBrandLineAnim {
+            0%, 100% { transform: scaleX(0.55); opacity: 0.55; }
+            50%       { transform: scaleX(1);    opacity: 1.00; }
+        }
+
+        /* Text content wrapper (sits above ::before sweep layer) */
+        .header-brand-content {
+            position: relative;
+            z-index: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            gap: 3px;
+        }
+
+        /* Animated gradient divider between text and chips */
+        .header-brand-divider {
+            position: relative;
+            z-index: 1;
+            height: 1px;
+            width: 68%;
+            margin: 13px auto 2px;
+            background: linear-gradient(90deg, transparent, rgba(125,211,252,0.32), transparent);
+            transform-origin: center;
+            animation: hdrDividerPulse 3.5s ease-in-out 0.6s infinite;
+            will-change: transform, opacity;
+        }
+        @keyframes hdrDividerPulse {
+            0%, 100% { transform: scaleX(0.74); opacity: 0.50; }
+            50%       { transform: scaleX(1);    opacity: 1.00; }
+        }
+
+        /* Entrance animation shared by text elements */
+        @keyframes hdrElemEnter {
+            from { opacity: 0; transform: translateY(12px); }
+            to   { opacity: 1; transform: translateY(0);    }
+        }
+
+        .header-kicker {
+            font-size: clamp(10px, 0.9vw, 12px);
+            letter-spacing: 2.6px;
+            text-transform: uppercase;
+            color: rgba(186, 230, 253, 0.88);
+            margin-bottom: 6px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 9px;
+            animation: hdrElemEnter 0.7s ease 0.15s both;
+        }
+        /* Pulsing dots flanking the kicker text */
+        .header-kicker::before,
+        .header-kicker::after {
+            content: '';
+            display: inline-block;
+            width: 6px; height: 6px;
+            border-radius: 50%;
+            flex-shrink: 0;
+            background: rgba(125,211,252,0.90);
+            box-shadow: 0 0 7px rgba(125,211,252,0.75);
+            animation: hdrKickerDot 2.2s ease-in-out infinite;
+            will-change: transform, opacity;
+        }
+        .header-kicker::after {
+            animation-delay: 1.1s;
+        }
+        @keyframes hdrKickerDot {
+            0%, 100% { opacity: 0.45; transform: scale(1);    }
+            50%       { opacity: 1;   transform: scale(1.45); }
         }
 
         .header h1 {
@@ -564,7 +703,9 @@
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
-            animation: hdrTitleShimmer 4s linear infinite;
+            animation:
+                hdrTitleShimmer 4s linear infinite,
+                hdrElemEnter    0.7s ease 0.28s both;
             filter: drop-shadow(0 0 22px rgba(125,211,252,0.60)) drop-shadow(0 0 6px rgba(99,102,241,0.40));
         }
         @keyframes hdrTitleShimmer {
@@ -580,6 +721,7 @@
             color: rgba(186, 230, 253, 0.90);
             font-family: var(--display-font);
             text-shadow: 0 0 14px rgba(125,211,252,0.35);
+            animation: hdrElemEnter 0.7s ease 0.40s both;
         }
 
         .header .tagline {
@@ -588,6 +730,54 @@
             text-transform: uppercase;
             color: rgba(148,163,184,0.70);
             font-family: var(--display-font);
+            animation: hdrElemEnter 0.7s ease 0.54s both;
+        }
+
+        .header-meta {
+            position: relative;
+            z-index: 1;
+            margin-top: 2px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .header-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 5px 12px;
+            border-radius: 999px;
+            border: 1px solid rgba(125,211,252,0.26);
+            background: rgba(15,23,42,0.55);
+            color: rgba(224,242,254,0.92);
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 0.4px;
+            transition: border-color 0.3s, box-shadow 0.3s, background 0.3s;
+        }
+        .header-chip:nth-child(1) { animation: hdrElemEnter 0.6s ease 0.68s both; }
+        .header-chip:nth-child(2) { animation: hdrElemEnter 0.6s ease 0.83s both; }
+        .header-chip:nth-child(3) { animation: hdrElemEnter 0.6s ease 0.98s both; }
+        .header-chip:hover {
+            border-color: rgba(125,211,252,0.55);
+            background: rgba(15,23,42,0.78);
+            box-shadow: 0 0 14px rgba(125,211,252,0.20);
+        }
+        .header-chip i { font-size: 10px; opacity: 0.95; }
+        .header-chip:nth-child(1) i { color: #fbbf24; }
+        .header-chip:nth-child(2) i { color: #34d399; }
+        .header-chip:nth-child(3) i { color: #60a5fa; }
+
+        body.light-mode .header-brand {
+            background: linear-gradient(160deg, rgba(15,23,42,0.86) 0%, rgba(2,6,23,0.68) 100%);
+            border-color: rgba(125,211,252,0.28);
+        }
+        body.light-mode .header-chip {
+            background: rgba(15,23,42,0.62);
+            border-color: rgba(125,211,252,0.32);
+            color: rgba(224,242,254,0.96);
         }
 
         /* CONTROLS */
@@ -1762,6 +1952,11 @@
         .score-split-marker .half.normal {
             background: linear-gradient(135deg, #065f46 0%, #047857 100%);
         }
+        .score-split-marker .half.transfer-in {
+            background: linear-gradient(135deg, #1e3a5f 0%, #2563eb 100%);
+            border-right: 1px solid rgba(255, 255, 255, 0.25);
+            font-size: 15px;
+        }
 
         .score-cell.veto-used {
             background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
@@ -1830,27 +2025,31 @@
 
         .rank-cell {
             font-weight: 700;
-            color: #f59e0b;
+            color: #ffd166;
             text-align: center;
             font-size: clamp(18px, 1.6vw, 24px);
             font-family: var(--number-font);
+            text-shadow: 0 1px 2px rgba(0,0,0,0.6);
         }
 
         .total-cell {
-            color: #fde68a;
+            color: #fff0b8;
             text-align: center;
             font-size: clamp(18px, 1.6vw, 24px);
             font-family: var(--number-font);
+            text-shadow: 0 1px 2px rgba(0,0,0,0.6);
         }
 
         .top-scorer-name {
-            color: #fde68a;
+            color: #fff0b8;
             font-weight: 900;
-            letter-spacing: 0.4px;
-            text-shadow: 0 0 14px rgba(251, 191, 36, 0.55), 0 0 6px rgba(15, 23, 42, 0.6);
+            letter-spacing: 0.35px;
+            text-shadow:
+                0 1px 2px rgba(0,0,0,0.6),
+                0 0 8px rgba(251, 191, 36, 0.20);
         }
         .stat-card .top-scorer-name {
-            font-size: clamp(20px, 2.2vw, 30px);
+            font-size: clamp(20px, 2.2vw, 31px);
         }
         .scoreboard tr.top-scorer-row td {
             background: linear-gradient(90deg, rgba(250, 204, 21, 0.12), rgba(251, 191, 36, 0.06));
@@ -1891,10 +2090,11 @@
 
         .vote-cell {
             font-weight: 800;
-            color: #38bdf8;
+            color: #b8f0ff;
             text-align: center;
             font-size: clamp(17px, 1.5vw, 22px);
             font-family: var(--number-font);
+            text-shadow: 0 1px 2px rgba(0,0,0,0.6);
         }
 
         .blink {
@@ -2211,13 +2411,13 @@
         .post-holder-name {
             padding: 1px 6px;
             border-radius: 6px;
-            color: #f0f9ff;
+            color: #ffffff;
             background: linear-gradient(135deg, rgba(14, 165, 233, 0.2), rgba(34, 211, 238, 0.18));
             border: 1px solid rgba(125, 211, 252, 0.42);
             box-shadow: 0 0 0 1px rgba(14, 165, 233, 0.2) inset;
             text-shadow:
-                0 0 4px rgba(125, 211, 252, 0.55),
-                0 0 1px rgba(255, 255, 255, 0.5);
+                0 1px 2px rgba(0,0,0,0.65),
+                0 0 4px rgba(125, 211, 252, 0.40);
             transition: box-shadow var(--dur-sm) var(--ease-out), transform var(--dur-sm) var(--spring-soft);
         }
         .post-holder-name:hover {
@@ -2595,23 +2795,26 @@
 
         .meta-star {
             background: linear-gradient(135deg, rgba(250, 204, 21, 0.35), rgba(245, 158, 11, 0.50));
-            color: #fef08a;
+            color: #fff7b3;
             border: 1px solid rgba(250, 204, 21, 0.55);
             box-shadow: 0 0 6px rgba(245,158,11,0.20);
+            text-shadow: 0 1px 2px rgba(0,0,0,0.55);
         }
 
         .meta-veto {
             background: linear-gradient(135deg, rgba(248, 113, 113, 0.30), rgba(239, 68, 68, 0.48));
-            color: #fecaca;
+            color: #ffe2e2;
             border: 1px solid rgba(248, 113, 113, 0.55);
             box-shadow: 0 0 6px rgba(239,68,68,0.18);
+            text-shadow: 0 1px 2px rgba(0,0,0,0.55);
         }
 
         .designation-chip {
             background: linear-gradient(135deg, rgba(96, 165, 250, 0.30), rgba(99, 102, 241, 0.45));
-            color: #dbeafe;
+            color: #f3f8ff;
             border: 1px solid rgba(96, 165, 250, 0.55);
             box-shadow: 0 0 5px rgba(96,165,250,0.18);
+            text-shadow: 0 1px 2px rgba(0,0,0,0.5);
         }
 
         /* FORMS */
@@ -2737,7 +2940,7 @@
             font-weight: 800;
             letter-spacing: 2px;
             text-transform: uppercase;
-            text-shadow: 0 0 14px rgba(255,255,255,0.8), 0 0 28px rgba(251,191,36,0.5);
+            text-shadow: 0 0 8px rgba(255,255,255,0.45), 0 0 16px rgba(251,191,36,0.25);
         }
         .stats-grid:has(#topScorerCard) {
             grid-template-columns: repeat(3, 1fr) 2fr;
@@ -2927,21 +3130,38 @@
             100% { transform: translate(var(--tx,20px),var(--ty,-40px)) scale(0.1); opacity: 0; }
         }
 
-        /* Name shimmer — vivid gold-to-white sweep */
+        /* Name shimmer — stronger hierarchy for the top scorer card */
         #topScorerCard .top-scorer-name {
+            display: inline-block;
+            padding: 6px 14px 8px;
+            border-radius: 14px;
             background: linear-gradient(90deg,
-                #fde68a 0%, #fbbf24 25%, #ffffff 50%, #fbbf24 75%, #fde68a 100%
+                #fffdf0 0%, #fde68a 24%, #fbbf24 50%, #fde68a 76%, #fffdf0 100%
             );
             background-size: 200% auto;
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
-            animation: tsNameShimmer 2s linear infinite;
-            filter: drop-shadow(0 0 8px rgba(251,191,36,0.85));
+            font-size: clamp(24px, 2.7vw, 38px) !important;
+            line-height: 1.06;
+            letter-spacing: 0.45px;
+            animation: tsNameShimmer 2.8s linear infinite, tsNameSoftPulse 3.4s ease-in-out infinite alternate;
+            filter:
+                drop-shadow(0 1px 2px rgba(0,0,0,0.65))
+                drop-shadow(0 0 10px rgba(251,191,36,0.34));
+            position: relative;
         }
         @keyframes tsNameShimmer {
             from { background-position: 200% center; }
             to   { background-position: -200% center; }
+        }
+        @keyframes tsNameSoftPulse {
+            from { filter:
+                drop-shadow(0 1px 2px rgba(0,0,0,0.62))
+                drop-shadow(0 0 8px rgba(251,191,36,0.28)); }
+            to   { filter:
+                drop-shadow(0 1px 2px rgba(0,0,0,0.68))
+                drop-shadow(0 0 12px rgba(251,191,36,0.38)); }
         }
         body.light-mode #topScorerCard {
             background: #000000 !important;
@@ -3902,6 +4122,12 @@
             .header h1 { font-size: 18px; letter-spacing: 2px; }
             .header .subhead { font-size: 12px; letter-spacing: 1.5px; }
             .header .tagline { font-size: 10px; letter-spacing: 1px; opacity: 0.7; }
+            .header-brand { padding: 12px 16px 11px; border-radius: 16px; width: min(96%, 960px); }
+            .header-kicker { letter-spacing: 1.8px; margin-bottom: 3px; gap: 6px; }
+            .header-kicker::before, .header-kicker::after { width: 5px; height: 5px; }
+            .header-brand-divider { margin: 9px auto 2px; }
+            .header-meta { margin-top: 2px; gap: 5px; }
+            .header-chip { font-size: 10px; padding: 4px 9px; }
             .container { padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px)); }
             .form-grid { grid-template-columns: 1fr; }
             .controls { grid-template-columns: 1fr; }
@@ -4187,6 +4413,275 @@
             content: ' LIVE'; font-size: 9px; color: #4ade80; font-weight: 800;
             margin-left: 4px; vertical-align: middle;
         }
+
+        /* NOTIFICATIONS iOS GLASS OVERRIDES */
+        #notifications-tab .notif-shell {
+            border-radius: 16px;
+            border: 1px solid rgba(148,163,184,0.2);
+            background: linear-gradient(145deg, rgba(15,23,42,0.74), rgba(2,6,23,0.56));
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            padding: 12px;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), 0 16px 34px rgba(0,0,0,0.35);
+        }
+        #notifications-tab .notif-filter-bar {
+            gap: 8px;
+            margin-bottom: 12px;
+            padding: 8px;
+            border-radius: 12px;
+            background: rgba(15,23,42,0.46);
+            border: 1px solid rgba(148,163,184,0.18);
+        }
+        #notifications-tab .notif-filter-bar button {
+            padding: 6px 14px;
+            border-radius: 999px;
+            background: rgba(30,41,59,0.58);
+            color: #a8b5c8;
+            border-color: rgba(148,163,184,0.28);
+        }
+        #notifications-tab .notif-filter-bar button:hover {
+            color: #e2e8f0;
+            border-color: rgba(148,163,184,0.52);
+            transform: translateY(-1px);
+        }
+        #notifications-tab .notif-section-card {
+            border-radius: 14px;
+            border: 1px solid rgba(148,163,184,0.18);
+            background: linear-gradient(165deg, rgba(15,23,42,0.62), rgba(2,6,23,0.42));
+            padding: 10px;
+            margin-top: 10px;
+        }
+        #notifications-tab .notif-section-header {
+            color: #94a3b8;
+            margin: 2px 0 10px;
+            padding: 0 2px;
+            border-bottom: none;
+        }
+        #notifications-tab .notif-section-header i { color: #93c5fd; }
+        #notifications-tab .notif-count-badge {
+            padding: 2px 9px;
+            border-radius: 999px;
+            background: rgba(99,102,241,0.24);
+            color: #c7d2fe;
+            border: 1px solid rgba(129,140,248,0.55);
+        }
+        #notifications-tab .notif-card {
+            position: relative;
+            padding: 12px 13px;
+            border-radius: 12px;
+            border: 1px solid rgba(148,163,184,0.18);
+            border-left-width: 1px;
+            background: linear-gradient(160deg, rgba(30,41,59,0.72), rgba(15,23,42,0.56));
+            box-shadow: 0 8px 20px rgba(2,6,23,0.25);
+            overflow: hidden;
+        }
+        #notifications-tab .notif-card::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(110deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02) 35%, transparent 70%);
+            opacity: 0.65;
+            pointer-events: none;
+        }
+        #notifications-tab .notif-card:hover { transform: translateY(-1px); }
+        #notifications-tab .notif-card.selected {
+            border-color: rgba(129,140,248,0.7);
+            box-shadow: 0 0 0 1px rgba(129,140,248,0.35), 0 10px 24px rgba(30,64,175,0.2);
+        }
+        #notifications-tab .notif-card.danger { border-color: rgba(248,113,113,0.45); }
+        #notifications-tab .notif-card.warn   { border-color: rgba(252,211,77,0.45); }
+        #notifications-tab .notif-card.info   { border-color: rgba(125,211,252,0.45); }
+        #notifications-tab .notif-card-icon { width: 22px; color: #93c5fd; filter: drop-shadow(0 0 8px rgba(255,255,255,0.08)); }
+        #notifications-tab .notif-card.danger .notif-card-icon { color: #fca5a5; }
+        #notifications-tab .notif-card.warn   .notif-card-icon { color: #fcd34d; }
+        #notifications-tab .notif-card.info   .notif-card-icon { color: #7dd3fc; }
+        #notifications-tab .notif-card-body { position: relative; z-index: 1; }
+        #notifications-tab .notif-card-title-row { display:flex; align-items:center; gap:8px; margin-bottom:4px; flex-wrap: wrap; }
+        #notifications-tab .notif-card-title { color: #f1f5f9; }
+        #notifications-tab .notif-card-detail { color: #cbd5e1; }
+        #notifications-tab .notif-card-meta { color: #94a3b8; margin-top: 5px; }
+        #notifications-tab .notif-severity-pill {
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            border-radius: 999px;
+            padding: 2px 7px;
+            border: 1px solid transparent;
+        }
+        #notifications-tab .notif-severity-pill.danger { color:#fecaca; background: rgba(239,68,68,0.2); border-color: rgba(248,113,113,0.5); }
+        #notifications-tab .notif-severity-pill.warn   { color:#fde68a; background: rgba(245,158,11,0.2); border-color: rgba(252,211,77,0.5); }
+        #notifications-tab .notif-severity-pill.info   { color:#bae6fd; background: rgba(56,189,248,0.2); border-color: rgba(125,211,252,0.5); }
+        #notifications-tab .notif-live-dot { width: 8px; height: 8px; box-shadow: 0 0 7px rgba(56,189,248,0.65); }
+        #notifications-tab .notif-detail-panel {
+            border-radius: 12px;
+            border: 1px solid rgba(148,163,184,0.24);
+            background: linear-gradient(160deg, rgba(30,41,59,0.74), rgba(15,23,42,0.62));
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+        }
+        #notifications-tab .notif-history-row {
+            border-radius: 10px;
+            border: 1px solid rgba(148,163,184,0.15);
+            background: rgba(15,23,42,0.45);
+            padding: 9px 10px;
+        }
+        #notifications-tab .notif-history-row:hover {
+            background: rgba(30,41,59,0.62);
+            border-color: rgba(148,163,184,0.32);
+        }
+        body.light-mode #notifications-tab .notif-shell {
+            background: linear-gradient(150deg, rgba(255,255,255,0.88), rgba(240,246,255,0.72));
+            border-color: rgba(148,163,184,0.28);
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.8), 0 12px 24px rgba(15,23,42,0.08);
+        }
+        body.light-mode #notifications-tab .notif-filter-bar {
+            background: rgba(241,245,249,0.72);
+            border-color: rgba(148,163,184,0.24);
+        }
+        body.light-mode #notifications-tab .notif-filter-bar button {
+            background: rgba(255,255,255,0.75);
+            color: #475569;
+        }
+        body.light-mode #notifications-tab .notif-filter-bar button:hover { color: #0f172a; }
+        body.light-mode #notifications-tab .notif-section-card {
+            background: linear-gradient(165deg, rgba(255,255,255,0.82), rgba(240,246,255,0.68));
+            border-color: rgba(148,163,184,0.24);
+        }
+        body.light-mode #notifications-tab .notif-card {
+            background: linear-gradient(160deg, rgba(255,255,255,0.86), rgba(241,245,249,0.76));
+            border-color: rgba(148,163,184,0.28);
+            box-shadow: 0 6px 16px rgba(15,23,42,0.08);
+        }
+        body.light-mode #notifications-tab .notif-card-title { color: #0f172a; }
+        body.light-mode #notifications-tab .notif-card-detail { color: #334155; }
+        body.light-mode #notifications-tab .notif-card-meta { color: #64748b; }
+        body.light-mode #notifications-tab .notif-detail-panel {
+            background: linear-gradient(160deg, rgba(255,255,255,0.9), rgba(241,245,249,0.82));
+            border-color: rgba(148,163,184,0.3);
+        }
+        body.light-mode #notifications-tab .ndp-title { color: #0f172a; }
+        body.light-mode #notifications-tab .ndp-detail { color: #334155; }
+        body.light-mode #notifications-tab .nhr-title { color: #0f172a; }
+        body.light-mode #notifications-tab .nhr-stamp { color: #64748b; }
+
+        /* ── Notification click popup modal ── */
+        .notif-popup-overlay {
+            position: fixed; inset: 0;
+            background: rgba(2, 6, 23, 0.72);
+            backdrop-filter: blur(7px);
+            -webkit-backdrop-filter: blur(7px);
+            z-index: 10500;
+            display: flex; align-items: center; justify-content: center;
+            padding: 20px;
+            animation: npoOverlayIn 0.22s ease both;
+        }
+        @keyframes npoOverlayIn {
+            from { opacity: 0; }
+            to   { opacity: 1; }
+        }
+        .notif-popup-box {
+            position: relative;
+            border-radius: 22px;
+            padding: 36px 40px 30px;
+            background: linear-gradient(158deg, rgba(15,23,42,0.98) 0%, rgba(2,6,23,0.96) 100%);
+            border: 1px solid rgba(148,163,184,0.22);
+            box-shadow:
+                inset 0 1px 0 rgba(255,255,255,0.08),
+                0 36px 80px rgba(0,0,0,0.70),
+                0 0 0 1px rgba(125,211,252,0.04);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            overflow-y: auto;
+            animation: npoBoxIn 0.32s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+        }
+        @keyframes npoBoxIn {
+            from { opacity: 0; transform: scale(0.86) translateY(24px); }
+            to   { opacity: 1; transform: scale(1)    translateY(0);    }
+        }
+        .notif-popup-box.danger {
+            border-color: rgba(239,68,68,0.38);
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.07), 0 36px 80px rgba(0,0,0,0.68), 0 0 72px rgba(239,68,68,0.14);
+        }
+        .notif-popup-box.warn {
+            border-color: rgba(245,158,11,0.38);
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.07), 0 36px 80px rgba(0,0,0,0.68), 0 0 72px rgba(245,158,11,0.12);
+        }
+        .notif-popup-box.info {
+            border-color: rgba(56,189,248,0.38);
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.07), 0 36px 80px rgba(0,0,0,0.68), 0 0 72px rgba(56,189,248,0.12);
+        }
+        .notif-popup-close {
+            position: absolute; top: 14px; right: 16px;
+            width: 34px; height: 34px; border-radius: 50%;
+            border: 1px solid rgba(148,163,184,0.28);
+            background: rgba(30,41,59,0.65);
+            color: rgba(148,163,184,0.85);
+            font-size: 15px; cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            transition: background 0.2s, color 0.2s, border-color 0.2s;
+        }
+        .notif-popup-close:hover {
+            background: rgba(248,113,113,0.22);
+            border-color: rgba(248,113,113,0.55);
+            color: #fca5a5;
+        }
+        .notif-popup-level-badge {
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 5px 16px; border-radius: 999px;
+            font-size: 11px; font-weight: 700;
+            letter-spacing: 1px; text-transform: uppercase;
+            margin-bottom: 20px;
+        }
+        .notif-popup-level-badge.danger { background: rgba(239,68,68,0.18);  border: 1px solid rgba(239,68,68,0.45);  color: #fca5a5; }
+        .notif-popup-level-badge.warn   { background: rgba(245,158,11,0.18); border: 1px solid rgba(245,158,11,0.45); color: #fcd34d; }
+        .notif-popup-level-badge.info   { background: rgba(56,189,248,0.18); border: 1px solid rgba(56,189,248,0.45);  color: #7dd3fc; }
+        .notif-popup-big-icon {
+            font-size: clamp(44px, 8vw, 60px);
+            margin-bottom: 18px;
+            display: block;
+            filter: drop-shadow(0 0 18px currentColor);
+        }
+        .notif-popup-title {
+            font-size: clamp(18px, 3.5vw, 26px);
+            font-weight: 800; color: #f1f5f9;
+            margin-bottom: 14px; line-height: 1.3;
+        }
+        .notif-popup-detail {
+            font-size: clamp(13px, 2vw, 15px);
+            color: #cbd5e1; line-height: 1.65;
+            margin-bottom: 16px;
+        }
+        .notif-popup-meta {
+            font-size: 12px; color: #475569;
+            padding-top: 14px;
+            border-top: 1px solid rgba(148,163,184,0.14);
+        }
+        .notif-popup-dismiss {
+            display: block; width: 100%;
+            margin-top: 26px; padding: 12px 0;
+            border-radius: 12px;
+            border: 1px solid rgba(148,163,184,0.28);
+            background: rgba(30,41,59,0.5);
+            color: rgba(203,213,225,0.9);
+            font-size: 14px; font-weight: 600; cursor: pointer;
+            transition: background 0.2s, border-color 0.2s;
+        }
+        .notif-popup-dismiss:hover {
+            background: rgba(30,41,59,0.85);
+            border-color: rgba(148,163,184,0.5);
+        }
+        body.light-mode .notif-popup-overlay { background: rgba(15,23,42,0.58); }
+        body.light-mode .notif-popup-box {
+            background: linear-gradient(158deg, rgba(255,255,255,0.97) 0%, rgba(241,245,249,0.95) 100%);
+            border-color: rgba(148,163,184,0.32);
+            box-shadow: 0 36px 80px rgba(15,23,42,0.22), 0 0 60px rgba(59,130,246,0.06);
+        }
+        body.light-mode .notif-popup-close   { background: rgba(241,245,249,0.85); color: #64748b; }
+        body.light-mode .notif-popup-title   { color: #0f172a; }
+        body.light-mode .notif-popup-detail  { color: #334155; }
+        body.light-mode .notif-popup-meta    { color: #64748b; border-top-color: rgba(148,163,184,0.25); }
+        body.light-mode .notif-popup-dismiss { background: rgba(241,245,249,0.8); color: #334155; }
 
         /* ═══════════════════════════════════════════════════════════════════
            iOS-STYLE MOTION PRIMITIVES
@@ -4537,6 +5032,203 @@
             color: var(--text-muted);
             font-weight: 600;
         }
+
+        /* ===== VOTING ANIMATIONS & STYLES ===== */
+        .vote-action-bar {
+            display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+            padding: 10px 14px; background: linear-gradient(135deg, rgba(99,102,241,0.12), rgba(168,85,247,0.10));
+            border-radius: 10px; border: 1px solid rgba(99,102,241,0.25); margin-bottom: 12px;
+        }
+        .vote-action-bar .bar-label { font-weight: 700; font-size: 13px; flex: 1; color: var(--text-primary); }
+        .vote-btn-nota { background: linear-gradient(135deg,#f59e0b,#d97706)!important; color:#fff!important; border:none!important; font-weight:700!important; transition: transform .15s, box-shadow .15s!important; }
+        .vote-btn-nota:hover { transform:scale(1.07)!important; box-shadow:0 4px 14px rgba(245,158,11,.45)!important; }
+        .vote-btn-abstain { background: linear-gradient(135deg,#64748b,#475569)!important; color:#fff!important; border:none!important; font-weight:700!important; transition: transform .15s, box-shadow .15s!important; }
+        .vote-btn-abstain:hover { transform:scale(1.07)!important; box-shadow:0 4px 14px rgba(100,116,139,.45)!important; }
+        .vote-btn-cast { background: linear-gradient(135deg,#10b981,#059669)!important; color:#fff!important; border:none!important; font-weight:700!important; transition: transform .15s, box-shadow .15s!important; }
+        .vote-btn-cast:hover:not([disabled]) { transform:scale(1.07)!important; box-shadow:0 4px 14px rgba(16,185,129,.45)!important; }
+        .vote-row-enter { animation: voteRowIn .35s ease both; }
+        @keyframes voteRowIn { from { opacity:0; transform:translateX(-18px); } to { opacity:1; transform:none; } }
+        .row-enter { animation: rowEntrySlide .42s cubic-bezier(.25,1,.5,1) both; }
+        @keyframes rowEntrySlide { from { opacity:0; transform:translateX(-14px); } to { opacity:1; transform:none; } }
+        .vote-registered-flash { animation: voteFlash .6s ease; }
+        @keyframes voteFlash { 0%,100%{ background:transparent; } 50%{ background:rgba(16,185,129,.22); } }
+        .vote-locked-badge { display:inline-block; padding:3px 10px; border-radius:20px; background:rgba(99,102,241,.15); color:#a78bfa; font-size:11px; font-weight:700; letter-spacing:.5px; }
+
+        /* ===== WORLD CUP WINNER REVEAL ===== */
+        #winnerRevealOverlay {
+            position:fixed; inset:0; z-index:99999; display:flex; align-items:center; justify-content:center;
+            background:rgba(0,0,0,.92); overflow:hidden;
+        }
+        #winnerRevealOverlay.hidden { display:none!important; }
+        .winner-stage {
+            position:relative; width:min(96vw,900px); min-height:480px; border-radius:24px;
+            background:linear-gradient(135deg,#0f0c29,#302b63,#24243e);
+            border:2px solid rgba(255,215,0,.35); box-shadow:0 0 80px rgba(255,215,0,.25),0 0 200px rgba(255,215,0,.08);
+            display:flex; align-items:center; justify-content:center; overflow:hidden;
+            animation: stageIn .5s cubic-bezier(.34,1.56,.64,1) both;
+        }
+        @keyframes stageIn { from{transform:scale(.7) translateY(60px);opacity:0;} to{transform:none;opacity:1;} }
+        .winner-cup-zone {
+            flex:0 0 auto; display:flex; align-items:center; justify-content:center;
+            animation: cupZoomIn 1.4s cubic-bezier(.22,1,.36,1) both;
+            padding: 20px 0 20px 30px;
+        }
+        @keyframes cupZoomIn {
+            0%  { transform:scale(.05) translateZ(-1200px); opacity:0; filter:blur(12px); }
+            60% { transform:scale(1.18) translateZ(0); opacity:1; filter:blur(0); }
+            80% { transform:scale(.95); }
+            100%{ transform:scale(1); opacity:1; }
+        }
+        .winner-cup-emoji {
+            font-size: clamp(80px,14vw,160px); line-height:1;
+            filter: drop-shadow(0 0 30px gold) drop-shadow(0 0 60px rgba(255,215,0,.6));
+            animation: cupGlow 2s ease-in-out infinite alternate;
+        }
+        @keyframes cupGlow { from{ filter:drop-shadow(0 0 20px gold); } to{ filter:drop-shadow(0 0 50px gold) drop-shadow(0 0 80px #ffd700); } }
+        .winner-cup-zone.slide-left {
+            animation: cupSlideLeft .9s cubic-bezier(.34,1.56,.64,1) both;
+        }
+        @keyframes cupSlideLeft { from{ transform:translateX(0); } to{ transform:translateX(-20px); } }
+        .winner-info-zone {
+            flex:1; padding:30px 30px 30px 20px; opacity:0;
+            animation: winnerInfoReveal .8s ease .5s both;
+        }
+        @keyframes winnerInfoReveal { from{opacity:0;transform:translateX(40px);} to{opacity:1;transform:none;} }
+        .winner-post-label {
+            font-size:14px; text-transform:uppercase; letter-spacing:2px; color:#a78bfa; font-weight:700; margin-bottom:8px;
+        }
+        .winner-crown { font-size:40px; display:block; margin-bottom:4px; animation: crownBounce 1s ease-in-out infinite alternate; }
+        @keyframes crownBounce { from{transform:translateY(0);} to{transform:translateY(-8px);} }
+        .winner-name {
+            font-size:clamp(28px,5vw,52px); font-weight:900; color:#ffd700;
+            text-shadow:0 0 20px rgba(255,215,0,.6), 0 2px 4px rgba(0,0,0,.8);
+            line-height:1.1; margin-bottom:12px;
+            animation: nameReveal 1s cubic-bezier(.34,1.56,.64,1) .7s both;
+        }
+        @keyframes nameReveal { from{opacity:0;transform:scale(.5) translateY(20px);letter-spacing:8px;} to{opacity:1;transform:none;letter-spacing:normal;} }
+        .winner-tagline {
+            font-size:18px; color:#e2e8f0; margin-bottom:16px; font-style:italic;
+            animation: fadeInUp .6s ease 1.2s both;
+        }
+        .winner-stats {
+            display:flex; flex-wrap:wrap; gap:10px; margin-bottom:20px;
+            animation: fadeInUp .6s ease 1.4s both;
+        }
+        .winner-stat-badge {
+            padding:6px 14px; border-radius:20px; font-size:13px; font-weight:700;
+            background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); color:#e2e8f0;
+        }
+        @keyframes fadeInUp { from{opacity:0;transform:translateY(16px);} to{opacity:1;transform:none;} }
+        .winner-close-btn {
+            padding:10px 28px; border-radius:50px; border:2px solid #ffd700; background:transparent;
+            color:#ffd700; font-size:15px; font-weight:700; cursor:pointer; transition:all .2s;
+            animation: fadeInUp .6s ease 1.6s both;
+        }
+        .winner-close-btn:hover { background:#ffd700; color:#1a1a2e; transform:scale(1.05); }
+        .winner-detail-btn {
+            padding:10px 18px; border-radius:14px; border:1px solid rgba(125,211,252,.35); background:rgba(14,165,233,.12);
+            color:#e0f2fe; font-size:14px; font-weight:700; cursor:pointer; transition:all .2s;
+            animation: fadeInUp .6s ease 1.5s both;
+            margin:0 12px 12px 0;
+        }
+        .winner-detail-btn:hover { background:rgba(14,165,233,.22); border-color:rgba(125,211,252,.55); transform:translateY(-1px); }
+        .vote-detail-grid { display:grid; gap:10px; margin-top:10px; }
+        .vote-detail-card { border:1px solid rgba(148,163,184,.22); border-radius:14px; padding:12px; background:rgba(15,23,42,.34); }
+        .vote-detail-card h4 { margin:0 0 8px; font-size:15px; }
+        .vote-detail-meta { font-size:12px; color:#cbd5e1; margin-bottom:8px; }
+        .vote-detail-list { margin:0; padding-left:18px; color:#e2e8f0; }
+        .vote-detail-list li { margin-bottom:4px; }
+        .vote-history-hero {
+            border: 1px solid rgba(148,163,184,.22);
+            border-radius: 18px;
+            padding: 18px;
+            background: linear-gradient(145deg, rgba(15,23,42,.82), rgba(30,41,59,.56));
+            box-shadow: 0 18px 40px rgba(2,6,23,.28);
+        }
+        .vote-history-headline {
+            display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;
+            margin-bottom: 14px;
+        }
+        .vote-history-title {
+            font-size: 24px; font-weight: 900; color: #f8fafc;
+        }
+        .vote-history-chip {
+            display:inline-flex; align-items:center; gap:6px; padding:6px 12px; border-radius:999px;
+            background: rgba(99,102,241,.16); border:1px solid rgba(129,140,248,.32); color:#c7d2fe; font-size:12px; font-weight:700;
+        }
+        .vote-history-podium {
+            display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:12px; margin-top:14px;
+        }
+        .vote-history-rank {
+            border-radius:16px; padding:16px; position:relative; overflow:hidden;
+            border:1px solid rgba(148,163,184,.22); background: rgba(15,23,42,.46);
+        }
+        .vote-history-rank.winner {
+            background: linear-gradient(135deg, rgba(250,204,21,.22), rgba(245,158,11,.14));
+            border-color: rgba(250,204,21,.45);
+            animation: winnerGlowPulse 2.4s ease-in-out infinite alternate;
+        }
+        .vote-history-rank.runnerup {
+            background: linear-gradient(135deg, rgba(148,163,184,.18), rgba(100,116,139,.10));
+            border-color: rgba(148,163,184,.34);
+        }
+        @keyframes winnerGlowPulse {
+            from { box-shadow: 0 0 0 rgba(250,204,21,0); transform: translateY(0); }
+            to { box-shadow: 0 0 28px rgba(250,204,21,.16); transform: translateY(-2px); }
+        }
+        .vote-history-rank-title { font-size:12px; text-transform:uppercase; letter-spacing:1.2px; color:#cbd5e1; margin-bottom:6px; }
+        .vote-history-rank-name { font-size:20px; font-weight:900; color:#fff; margin-bottom:6px; }
+        .vote-history-rank-meta { font-size:13px; color:#dbeafe; }
+        .vote-history-candidate-table { width:100%; border-collapse:collapse; margin-top:16px; }
+        .vote-history-candidate-table th, .vote-history-candidate-table td { padding:10px 12px; border-bottom:1px solid rgba(148,163,184,.14); text-align:left; }
+        .vote-history-candidate-table th { color:#94a3b8; font-size:12px; text-transform:uppercase; letter-spacing:1px; }
+        .vote-history-candidate-table tr.top-row td { background: rgba(250,204,21,.08); }
+
+        /* nullified style */
+        .winner-stage.nullified { background:linear-gradient(135deg,#1a0505,#2d0808,#1a0505); border-color:rgba(239,68,68,.3); }
+        .nullified .winner-name { color:#ef4444; text-shadow:0 0 20px rgba(239,68,68,.5); }
+        .nullified .winner-cup-emoji { filter:drop-shadow(0 0 20px rgba(239,68,68,.5)) grayscale(.6); }
+        .nullified .winner-close-btn { border-color:#ef4444; color:#ef4444; }
+        .nullified .winner-close-btn:hover { background:#ef4444; color:#fff; }
+
+        /* Confetti particles */
+        .confetti-particle {
+            position:absolute; width:10px; height:10px; border-radius:2px; pointer-events:none;
+            animation: confettiFall linear both;
+        }
+        @keyframes confettiFall {
+            0%  { transform:translateY(-20px) rotate(0deg) scale(1); opacity:1; }
+            100%{ transform:translateY(110vh) rotate(720deg) scale(.5); opacity:0; }
+        }
+        .balloon {
+            position:absolute; font-size:32px; pointer-events:none; bottom:-60px;
+            animation: balloonFloat ease-in both;
+        }
+        @keyframes balloonFloat {
+            0%  { transform:translateY(0) rotate(-5deg); opacity:1; }
+            100%{ transform:translateY(-120vh) rotate(10deg); opacity:.3; }
+        }
+        .ribbon {
+            position:absolute; width:4px; border-radius:2px; pointer-events:none; top:-20px;
+            animation: ribbonFall ease-in both;
+        }
+        @keyframes ribbonFall {
+            0%  { transform:translateY(-20px) rotateX(0); opacity:1; }
+            100%{ transform:translateY(110vh) rotateX(1080deg); opacity:0; }
+        }
+
+        /* Voting section emoji polish */
+        .voting-section-badge {
+            display:inline-flex; align-items:center; gap:6px; padding:3px 10px;
+            background:linear-gradient(135deg,rgba(99,102,241,.2),rgba(168,85,247,.15));
+            border-radius:20px; font-size:11px; font-weight:700; color:#a78bfa;
+            border:1px solid rgba(99,102,241,.3); margin-left:8px; vertical-align:middle;
+        }
+        .voter-card-highlight {
+            background:linear-gradient(135deg,rgba(16,185,129,.08),rgba(5,150,105,.05));
+            border:1px solid rgba(16,185,129,.25); border-radius:12px; padding:12px 16px; margin-bottom:12px;
+        }
+        .voted-badge { display:inline-block; padding:2px 8px; border-radius:10px; background:rgba(16,185,129,.2); color:#10b981; font-size:11px; font-weight:700; }
     </style>
 </head>
 <body>
@@ -4558,9 +5250,20 @@
             <span class="hdr-meteor"></span>
         </div>
         <div class="container">
-            <h1>EXCEL ACADEMY</h1>
-            <div class="subhead">STUDENT LEADERSHIP BOARD</div>
-            <div class="tagline">Database and Ranking System</div>
+            <div class="header-brand">
+                <div class="header-brand-content">
+                    <div class="header-kicker">Excel Academy Network</div>
+                    <h1>EXCEL ACADEMY</h1>
+                    <div class="subhead">STUDENT LEADERSHIP BOARD</div>
+                    <div class="tagline">Database and Ranking System</div>
+                </div>
+                <div class="header-brand-divider"></div>
+                <div class="header-meta">
+                    <span class="header-chip"><i class="fas fa-bolt"></i> Live Sync</span>
+                    <span class="header-chip"><i class="fas fa-shield-alt"></i> Audit Safe</span>
+                    <span class="header-chip"><i class="fas fa-globe-asia"></i> LAN + Cloud Ready</span>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -5160,6 +5863,26 @@
                     </div>
                     <div class="form-buttons">
                         <button onclick="convertSelectedStudentStarsToVeto()"><i class="fas fa-star"></i> Convert 5* to 1V</button>
+                    </div>
+                </div>
+                <div id="pointsStarConversionModule" style="margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--border);">
+                    <h4 style="margin-bottom: 8px;"><i class="fas fa-coins"></i> Points -> Star Conversion</h4>
+                    <p class="section-subtitle" style="margin-bottom: 10px;">
+                        Convert points to stars for selected student. Rule: 150 points = 1 star. Student must have minimum points.
+                    </p>
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>Stars to Convert</label>
+                            <input type="number" id="pointsToStarUnits" min="1" step="1" value="1" placeholder="1">
+                        </div>
+                        <div class="form-group">
+                            <label>Min Points Required (Admin)</label>
+                            <input type="number" id="pointsToStarMinPoints" min="0" step="10" value="250">
+                        </div>
+                    </div>
+                    <div class="form-buttons">
+                        <button onclick="convertSelectedStudentPointsToStar()"><i class="fas fa-star"></i> Convert Points to Star</button>
+                        <button id="savePointsStarConfigBtn" class="secondary" onclick="savePointsStarConfig()" style="display:none;"><i class="fas fa-save"></i> Save Min Criteria</button>
                     </div>
                 </div>
                 <p id="scoreHint" style="color: var(--text-muted); font-size: 12px; margin-top: 10px;">
@@ -6511,19 +7234,19 @@
             </div>
 
             <div class="form-card">
-                <h3><i class="fas fa-users"></i> Group Voting Booth (Student Vote)</h3>
-                <p class="section-subtitle">For CR elections, any student can vote. One vote per student per post.</p>
+                <h3><i class="fas fa-users"></i> 🗳️ Group Voting Booth <span class="voting-section-badge">Student Vote</span></h3>
+                <p class="section-subtitle">For CR elections — one vote per student per post. Select voter, then cast vote directly below. 🔒 Vote counts are hidden until conclusion.</p>
                 <div class="form-grid">
                     <div class="form-group">
-                        <label>Student Voter *</label>
+                        <label>🧑 Student Voter *</label>
                         <select id="groupVoteStudent" onchange="updateGroupVoteStudentDetails(); loadGroupVotingCandidates();"></select>
                     </div>
                     <div class="form-group">
-                        <label>Post *</label>
+                        <label>🏅 Post *</label>
                         <select id="groupVotePost" onchange="loadGroupVotingCandidates()"></select>
                     </div>
                     <div class="form-group">
-                        <label>Group Filter</label>
+                        <label>🔍 Group Filter</label>
                         <select id="groupVoteGroupFilter" onchange="populateGroupVoteStudentSelect(); updateGroupVoteStudentDetails(); loadGroupVotingCandidates();">
                             <option value="">All Groups</option>
                             <option value="A">Group A</option>
@@ -6533,7 +7256,7 @@
                         </select>
                     </div>
                 </div>
-                <div class="group-vote-info-grid">
+                <div class="group-vote-info-grid" id="groupVoterInfoGrid" style="display:none;">
                     <div class="group-vote-info-card">
                         <span class="label">Class</span>
                         <span class="value" id="groupVoteStudentClass">-</span>
@@ -6546,21 +7269,26 @@
                         <span class="label">Party</span>
                         <span class="value" id="groupVoteStudentParty">-</span>
                     </div>
+                    <div class="group-vote-info-card">
+                        <span class="label">⚡ Vote Power</span>
+                        <span class="value" id="groupVoteStudentVotePower">-</span>
+                    </div>
                 </div>
-                <div class="form-buttons" style="margin-top: 10px;">
-                    <button class="secondary" onclick="loadGroupVotingCandidates()">Refresh</button>
-                    <button onclick="openGroupVoteDialog()">Open Voting Booth</button>
+                <div id="groupVoteInlineActions" class="vote-action-bar hidden" style="margin-top:12px;">
+                    <span class="bar-label" id="groupVoteActionLabel">🗳️ Select your vote:</span>
+                    <button class="vote-btn-nota" onclick="submitGroupVoteChoice('nota')" title="None of the Above">🚫 NOTA</button>
+                    <button class="vote-btn-abstain" onclick="submitGroupVoteChoice('abstain')" title="Abstain from voting">⏭️ Abstain</button>
                 </div>
-                <div id="groupVoteStatus" class="section-subtitle" style="margin-top: 12px;"></div>
-                <div class="scoreboard-wrapper" style="margin-top: 15px;">
+                <div id="groupVoteStatus" class="section-subtitle" style="margin-top: 10px;"></div>
+                <div class="scoreboard-wrapper" style="margin-top: 12px;">
                     <div class="scoreboard-scroll">
                         <table class="scoreboard">
                             <thead>
                                 <tr>
-                                    <th>Candidate</th>
-                                    <th style="width: 120px;">Roll</th>
-                                    <th style="width: 120px;">Class</th>
-                                    <th style="width: 120px;">Votes</th>
+                                    <th>🎯 Candidate</th>
+                                    <th style="width: 110px;">Roll</th>
+                                    <th style="width: 80px;">Class</th>
+                                    <th style="width: 100px;">Group</th>
                                     <th style="width: 160px;">Action</th>
                                 </tr>
                             </thead>
@@ -6572,9 +7300,9 @@
                         </table>
                     </div>
                 </div>
-                <div class="form-buttons" style="margin-top: 12px; justify-content: flex-start;">
-                    <button class="secondary" onclick="renderGroupVoteResults(getGroupVoteSelectedPost(), true, true)">Conclude Voting</button>
-                    <button onclick="renderGroupVoteResults(getGroupVoteSelectedPost(), false, true)">Results</button>
+                <div class="form-buttons" style="margin-top: 14px; justify-content: flex-start;">
+                    <button class="secondary" onclick="loadGroupVotingCandidates()">🔄 Refresh</button>
+                    <button class="secondary" onclick="concludeAndReveal('student')">🏁 Conclude &amp; Reveal</button>
                 </div>
                 <div id="groupVoteResult" class="section-subtitle" style="margin-top: 15px;"></div>
             </div>
@@ -6660,20 +7388,24 @@
         <!-- TAB: TEACHER VOTING -->
         <div id="teacher-voting-tab" class="tab-content hidden">
             <div class="form-card">
-                <h3><i class="fas fa-vote-yea"></i> Teacher Voting Booth</h3>
-                <p class="section-subtitle">Teachers vote with vote power = highest student vote power + 5.</p>
+                <h3><i class="fas fa-vote-yea"></i> 👩‍🏫 Teacher Voting Booth <span class="voting-section-badge">Final Round</span></h3>
+                <p class="section-subtitle">Teachers cast their votes after student voting. Vote power = highest student vote power + 5. 🔒 Results hidden until conclusion.</p>
+                <div id="studentVotingSummaryBanner" class="voter-card-highlight" style="display:none; margin-bottom:14px;">
+                    <strong>📊 Student Voting Summary</strong>
+                    <div id="studentVotingSummaryText" style="margin-top:6px; font-size:13px; color:var(--text-secondary);"></div>
+                </div>
                 <div class="form-grid">
                     <div class="form-group">
-                        <label>Teacher *</label>
+                        <label>👩‍🏫 Teacher *</label>
                         <select id="teacherVoteTeacher" onchange="updateTeacherVotePower(); loadTeacherVotingCandidates();"></select>
                     </div>
                     <div class="form-group">
-                        <label>Post *</label>
-                        <select id="teacherVotePost" onchange="loadTeacherVotingCandidates()"></select>
+                        <label>🏅 Post *</label>
+                        <select id="teacherVotePost" onchange="loadTeacherVotingCandidates(); updateStudentVotingSummary();"></select>
                     </div>
                     <div class="form-group">
-                        <label>Vote Power</label>
-                        <div id="teacherVotePowerDisplay" style="padding: 10px 12px; font-weight:700;">-</div>
+                        <label>⚡ Vote Power</label>
+                        <div id="teacherVotePowerDisplay" style="padding: 10px 12px; font-weight:700; font-size:20px; color:#fbbf24;">-</div>
                     </div>
                 </div>
                 <div id="teacherVoteStatus" class="section-subtitle" style="margin-top: 8px;"></div>
@@ -6682,24 +7414,44 @@
                         <table class="scoreboard">
                             <thead>
                                 <tr>
-                                    <th>Candidate</th>
-                                    <th style="width: 120px;">Roll</th>
-                                    <th style="width: 120px;">Class</th>
-                                    <th style="width: 120px;">Weighted Votes</th>
+                                    <th>🎯 Candidate</th>
+                                    <th style="width: 110px;">Roll</th>
+                                    <th style="width: 80px;">Class</th>
+                                    <th style="width: 100px;">Group</th>
                                     <th style="width: 160px;">Action</th>
                                 </tr>
                             </thead>
                             <tbody id="teacherVotingBody">
-                                <tr><td colspan="5" class="text-center loading">Select teacher & post</td></tr>
+                                <tr><td colspan="5" class="text-center loading">Select teacher &amp; post</td></tr>
                             </tbody>
                         </table>
                     </div>
                 </div>
-                <div class="form-buttons" style="margin-top: 10px; justify-content:flex-start;">
-                    <button class="secondary" onclick="renderTeacherVoteResults(getElementValue('teacherVotePost'), true, true)">Conclude Voting</button>
-                    <button onclick="renderTeacherVoteResults(getElementValue('teacherVotePost'), false, true)">Results</button>
+                <div class="form-buttons" style="margin-top: 14px; justify-content:flex-start;">
+                    <button class="secondary" onclick="loadTeacherVotingCandidates()">🔄 Refresh</button>
+                    <button class="secondary" onclick="concludeAndReveal('teacher')">🏆 Conclude &amp; Reveal Winner</button>
                 </div>
                 <div id="teacherVoteResult" class="section-subtitle" style="margin-top: 12px;"></div>
+            </div>
+            <div class="form-card" id="adminVotingHistoryCard">
+                <h3><i class="fas fa-history"></i> Voting History</h3>
+                <p class="section-subtitle">Admin-only historical result view for votes recorded in the current month.</p>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>Post</label>
+                        <select id="voteHistoryPost" onchange="handleVoteHistoryPostChange()">
+                            <option value="">Select Post...</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Month</label>
+                        <select id="voteHistoryMonth" onchange="renderVotingHistoryResult()">
+                            <option value="">Select Month...</option>
+                        </select>
+                    </div>
+                </div>
+                <div id="voteHistoryEmpty" class="section-subtitle" style="margin-top:12px;">Select a post to load voting months.</div>
+                <div id="voteHistoryResult" style="margin-top:14px;"></div>
             </div>
         </div>
 
@@ -6818,7 +7570,7 @@
             <div class="form-card">
                 <h3><i class="fas fa-bell"></i> Notifications</h3>
                 <p class="section-subtitle">Live post-holder alerts and system messages.</p>
-
+                <div class="notif-shell">
                 <!-- Filter + Refresh bar -->
                 <div class="notif-filter-bar">
                     <button id="notifF_all"    onclick="setNotifFilter('all')"    data-allow="true" class="nf-active">All</button>
@@ -6829,6 +7581,7 @@
                 </div>
 
                 <!-- Live alerts -->
+                <div class="notif-section-card">
                 <div class="notif-section-header">
                     <span><i class="fas fa-broadcast-tower"></i>Live Alerts</span>
                     <span class="notif-count-badge" id="notifLiveCount">0</span>
@@ -6839,8 +7592,10 @@
 
                 <!-- Inline detail panel (shown on card click) -->
                 <div id="notifDetailPanel" class="notif-detail-panel" style="display:none"></div>
+                </div>
 
                 <!-- History log -->
+                <div class="notif-section-card">
                 <div class="notif-section-header" style="margin-top:22px">
                     <span><i class="fas fa-history"></i>Notification Log</span>
                     <button id="notifClearHistBtn" onclick="clearNotificationHistory()" data-allow="true"
@@ -6850,6 +7605,8 @@
                 </div>
                 <div id="notifHistoryList" style="display:grid;gap:3px">
                     <div class="notif-empty"><i class="fas fa-inbox"></i><p>No log entries yet.</p></div>
+                </div>
+                </div>
                 </div>
             </div>
         </div>
@@ -7393,6 +8150,28 @@
                     VETO usage ≤ 1 total &nbsp;|&nbsp;
                     Must be Active student
                 </div>
+                <div id="goodConductFormulaEditor" class="form-grid" style="margin-bottom: 12px; display:none;">
+                    <div class="form-group">
+                        <label>Min Attendance %</label>
+                        <input type="number" id="gcMinAttendance" min="0" max="100" step="1" value="75">
+                    </div>
+                    <div class="form-group">
+                        <label>Min Avg Score</label>
+                        <input type="number" id="gcMinAvgScore" step="1" value="0">
+                    </div>
+                    <div class="form-group">
+                        <label>Lowest Month Must Be ≥</label>
+                        <input type="number" id="gcMinLowestMonth" step="1" value="-100">
+                    </div>
+                    <div class="form-group">
+                        <label>Max VETOs Used</label>
+                        <input type="number" id="gcMaxVetoUsage" min="0" step="1" value="1">
+                    </div>
+                </div>
+                <div id="goodConductFormulaActions" class="form-buttons" style="margin-bottom: 10px; display:none;">
+                    <button onclick="saveGoodConductFormula()"><i class="fas fa-save"></i> Save Formula</button>
+                    <button class="secondary" onclick="resetGoodConductFormula()"><i class="fas fa-undo"></i> Reset Default</button>
+                </div>
                 <div class="controls" style="margin-bottom: 12px;">
                     <div class="control-group">
                         <label>Filter</label>
@@ -7703,6 +8482,7 @@
                     <button class="close-btn" onclick="closeModal()">X</button>
                 </div>
             <div id="modalBody"></div>
+            <div id="admin-master-controls"></div>
         </div>
     </div>
 
@@ -7862,6 +8642,23 @@
         </div>
     </div>
 
+    <!-- World Cup Winner Reveal Overlay -->
+    <div id="winnerRevealOverlay" class="hidden">
+        <div class="winner-stage" id="winnerStage">
+            <div class="winner-cup-zone" id="winnerCupZone">
+                <span class="winner-cup-emoji" id="winnerCupEmoji">🏆</span>
+            </div>
+            <div class="winner-info-zone" id="winnerInfoZone">
+                <div class="winner-post-label" id="winnerPostLabel">POST</div>
+                <span class="winner-crown" id="winnerCrown">👑</span>
+                <div class="winner-name" id="winnerNameEl">Winner</div>
+                <div class="winner-tagline" id="winnerTagline"></div>
+                <div class="winner-stats" id="winnerStatsEl"></div>
+                <button class="winner-close-btn" onclick="closeWinnerReveal()">✕ Close</button>
+            </div>
+        </div>
+    </div>
+
     <!-- JSON IMPORT INPUT -->
     <input type="file" id="jsonFile" accept=".json" style="display: none;">
     <input type="file" id="studentsExcelFile" accept=".xlsx,.xls,.xlsm" style="display: none;">
@@ -7881,7 +8678,18 @@
         const SERVER_URLS_KEY = 'ea_server_sync_urls';
         const DEFAULT_PRIMARY_SERVER_URL = 'http://192.168.0.183:5000';
         const DEFAULT_BACKUP_SERVER_URL = 'http://192.168.0.163:5000';
-        const DEFAULT_RENDER_SERVER_URL = 'https://ea-tutorial-hub.onrender.com';
+        const DEFAULT_RENDER_SERVER_URL = 'https://excel-academy.up.railway.app';
+        // One-time migration: purge the old Render URL from localStorage if still present
+        (function _purgeOldRenderUrl() {
+            try {
+                const _OLD = 'https://ea-tutorial-hub.onrender.com';
+                const _raw = JSON.parse(localStorage.getItem(SERVER_URLS_KEY) || '[]');
+                if (Array.isArray(_raw) && _raw.some(u => String(u || '').includes('onrender.com'))) {
+                    const _cleaned = _raw.filter(u => !String(u || '').includes('onrender.com'));
+                    localStorage.setItem(SERVER_URLS_KEY, JSON.stringify(_cleaned));
+                }
+            } catch(e) {}
+        })();
         // Guardrail: if a snapshot ever drops below this roster size, treat it as corrupt/stale.
         // This prevents the known "20 students" stale snapshot from being applied anywhere.
         const MIN_SAFE_STUDENT_ROSTER = 25;
@@ -10025,7 +10833,9 @@
                 // - always include individual VETOs
                 // - include role-granted VETOs only while student is an active post holder for that month
                 // This prevents non-postholders from appearing with role grants.
-                const grantMap = (((db.getData() || {}).role_veto_monthly || {})[monthKey] || {});
+                const grantMap = isCurrentMonth
+                    ? Object.fromEntries(getActiveRoleVetoQuotas(`${monthKey}-15`))
+                    : ((((db.getData() || {}).role_veto_monthly || {})[monthKey]) || {});
                 const roleGrant = Math.max(0, parseInt(grantMap[String(student.id)] ?? grantMap[student.id], 10) || 0);
                 // For current month use live global counter; for historical months use the
                 // per-month profile value (month_veto_count) which is sourced from the
@@ -10036,12 +10846,16 @@
                 const allowRoleGrantDisplay = isOfficeHolderStudent(student, monthKey);
                 const visibleRoleGrant = allowRoleGrantDisplay ? roleGrant : 0;
                 if (isCurrentMonth) {
-                    // Current month should use live global counters.
-                    // Month profile carry can be stale after roster/profile imports.
+                    // Current month stars still use live global count, but VETO display should
+                    // use the month's carry profile for individual balance so stale role grants
+                    // embedded in student.veto_count are not double-counted.
                     stars = Math.max(0, globalStars);
-                    // Current month already has role grants reconciled into student.veto_count.
-                    // Never add grant again in UI (prevents cumulative/double display like 3+5=8).
-                    vetos = Math.max(0, globalVetos);
+                    const liveIndividualVetos = Math.max(0, globalVetos - visibleRoleGrant);
+                    const currentIndividualCarry = safeProp(student, '__month_veto_count') !== undefined && safeProp(student, '__month_veto_count') !== null
+                        ? Math.min(Math.max(0, monthProfileVetos), liveIndividualVetos)
+                        : liveIndividualVetos;
+                    const currentIndividualVetos = Math.max(0, currentIndividualCarry + monthAwardVetos - usedVetos);
+                    vetos = Math.max(0, currentIndividualVetos + visibleRoleGrant);
                 } else if (allowRoleGrantDisplay) {
                     vetos = Math.max(0, individualCarryVetos + visibleRoleGrant + monthAwardVetos - usedVetos);
                 } else {
@@ -10333,6 +11147,7 @@
             data.election_individual_votes = (data.election_individual_votes || []).map(vote => ({
                 ...vote,
                 post: String(vote.post || ''),
+                month_key: String(vote.month_key || String(vote.timestamp || '').substring(0, 7) || ''),
                 voterStudentId: parseInt(vote.voterStudentId, 10) || vote.voterStudentId,
                 candidateId: vote.candidateId === null || vote.candidateId === undefined ? null : (parseInt(vote.candidateId, 10) || vote.candidateId),
                 voteType: ['candidate', 'abstain', 'nota'].includes(String(vote.voteType || '').toLowerCase())
@@ -10343,6 +11158,7 @@
             data.election_teacher_votes = (data.election_teacher_votes || []).map(vote => ({
                 ...vote,
                 post: String(vote.post || ''),
+                month_key: String(vote.month_key || String(vote.timestamp || '').substring(0, 7) || ''),
                 teacherId: parseInt(vote.teacherId, 10) || vote.teacherId,
                 candidateId: parseInt(vote.candidateId, 10) || vote.candidateId,
                 votePower: parseFloat(vote.votePower) || 0,
@@ -10721,6 +11537,12 @@
                     existing.star_usage_disciplinary = nextStarUsageDisciplinary;
                     existing.recordedBy = score.recordedBy || existing.recordedBy;
                     existing.updated_at = new Date().toISOString();
+                    // Transfer metadata must be explicitly copied when present in the incoming
+                    // payload — the merge above only covers listed fields, so star_transfer_in/out
+                    // would be silently lost if the incoming score carries them (e.g. the transfer
+                    // function always sets these on its payload).
+                    if (score.star_transfer_in  !== undefined) existing.star_transfer_in  = score.star_transfer_in;
+                    if (score.star_transfer_out !== undefined) existing.star_transfer_out = score.star_transfer_out;
                     applyStarVetoDelta(score.studentId, score.stars - oldStars, score.vetos - oldVetos);
                     this.saveData(data, { allowTeacher: true });
                     return { score: existing, updated: true };
@@ -10980,6 +11802,7 @@
             recordIndividualVote(vote) {
                 const data = this.getData();
                 data.election_individual_votes = data.election_individual_votes || [];
+                vote.month_key = String(vote.month_key || String(vote.timestamp || '').substring(0, 7) || getCurrentMonthKey());
                 const existing = data.election_individual_votes.find(v =>
                     String(v.post || '') === String(vote.post || '') &&
                     String(v.voterStudentId) === String(vote.voterStudentId)
@@ -11004,6 +11827,7 @@
             recordTeacherVote(vote) {
                 const data = this.getData();
                 data.election_teacher_votes = data.election_teacher_votes || [];
+                vote.month_key = String(vote.month_key || String(vote.timestamp || '').substring(0, 7) || getCurrentMonthKey());
                 const existing = data.election_teacher_votes.find(v =>
                     String(v.post || '') === String(vote.post || '') &&
                     String(v.teacherId) === String(vote.teacherId)
@@ -11267,13 +12091,28 @@
                     const group = groupMatch ? groupMatch[1].toUpperCase() : '';
                     data.group_crs = data.group_crs || [];
                     const existing = data.group_crs.find(item => item.group === group);
+                    const _nowIso = new Date().toISOString();
                     if (existing) {
+                        // Explicitly close the old CR's open history record before switching
+                        if (existing.studentId && existing.studentId !== candidate.studentId) {
+                            const _oldKey = `group_cr:${group}`;
+                            data.post_holder_history = data.post_holder_history || [];
+                            const _oldRecord = data.post_holder_history.find(r =>
+                                r.assignment_key === _oldKey && !r.end_date
+                            );
+                            if (_oldRecord) {
+                                _oldRecord.end_date = electedOn;
+                                _oldRecord.status = 'ended';
+                                _oldRecord.updated_at = _nowIso;
+                            }
+                        }
                         existing.studentId = candidate.studentId;
                         existing.post = normalizedPost;
                         existing.elected_on = electedOn;
                         existing.status = 'active';
                         existing.tenure_extension_months = 0;
                         existing.tenure_extensions = [];
+                        existing.updated_at = _nowIso;
                     } else {
                         data.group_crs.push({
                             id: Date.now(),
@@ -11283,7 +12122,8 @@
                             elected_on: electedOn,
                             status: 'active',
                             tenure_extension_months: 0,
-                            tenure_extensions: []
+                            tenure_extensions: [],
+                            updated_at: _nowIso
                         });
                     }
                 }
@@ -11470,13 +12310,34 @@
                         const starDelta = parseInt(s.stars, 10) || 0;
                         starsByDate[date] = (starsByDate[date] || 0) + starDelta;
                         const _sNote = String(safeProp(s, 'notes') || '').toLowerCase();
-                        const _isTransferOut = !!(safeProp(s, 'star_transfer_out') || (_sNote.includes('[star transfer') && _sNote.includes('out to')));
-                        const _isTransferIn  = !!(safeProp(s, 'star_transfer_in')  || (_sNote.includes('[star transfer') && _sNote.includes('in from')));
+                        // Read explicit transfer field amounts — survive subsequent addScore merges and
+                        // are reliable even when the stars field was overwritten (Math.abs(starDelta)
+                        // would then return 0 or the wrong value).
+                        const _transferOutAmt = parseInt(safeProp(s, 'star_transfer_out'), 10) || 0;
+                        const _transferInAmt  = parseInt(safeProp(s, 'star_transfer_in'),  10) || 0;
+                        const _isTransferOut = !!(_transferOutAmt || (_sNote.includes('[star transfer') && _sNote.includes('out to')));
+                        const _isTransferIn  = !!(_transferInAmt  || (_sNote.includes('[star transfer') && _sNote.includes('in from')));
                         if (_isTransferOut) {
-                            starTransferOutByDate[date] = (starTransferOutByDate[date] || 0) + Math.abs(starDelta);
+                            starTransferOutByDate[date] = (starTransferOutByDate[date] || 0) + (_transferOutAmt || Math.abs(starDelta));
                         } else if (_isTransferIn) {
-                            starTransferInByDate[date] = (starTransferInByDate[date] || 0) + Math.abs(starDelta);
-                        } else if (starDelta < 0) {
+                            starTransferInByDate[date] = (starTransferInByDate[date] || 0) + (_transferInAmt || Math.abs(starDelta));
+                        }
+                        // Usage detection — star_usage_disciplinary / star_usage_normal are the
+                        // authoritative source. saveScore accumulates stars (finalStars = existing +
+                        // delta), so a disciplinary usage (-1) applied on top of a transfer-in (+3)
+                        // yields stars = +2 (positive). The old starDelta < 0 check misses this.
+                        // Reading explicit fields directly catches it regardless of the net sign.
+                        const _explicitUsageNormal = Math.max(0, parseInt(safeProp(s, 'star_usage_normal'), 10) || 0);
+                        const _explicitUsageDisc   = Math.max(0, parseInt(safeProp(s, 'star_usage_disciplinary'), 10) || 0);
+                        const _explicitUsage = _explicitUsageNormal + _explicitUsageDisc;
+                        if (_explicitUsage > 0) {
+                            // Bypass getScoreStarUsageBreakdown (returns 0 for transfer entries).
+                            starUsageByDate[date] = (starUsageByDate[date] || 0) + _explicitUsage;
+                            starUsageNormalByDate[date] = (starUsageNormalByDate[date] || 0) + _explicitUsageNormal;
+                            starUsageDisciplinaryByDate[date] = (starUsageDisciplinaryByDate[date] || 0) + _explicitUsageDisc;
+                        } else if (!_isTransferOut && starDelta < 0) {
+                            // Fallback for legacy entries that predate explicit usage fields.
+                            // Skip transfer-out entries — their negative delta is the transfer, not usage.
                             const usageAbs = Math.abs(starDelta);
                             starUsageByDate[date] = (starUsageByDate[date] || 0) + usageAbs;
                             const breakdown = getScoreStarUsageBreakdown(s, usageAbs);
@@ -11536,19 +12397,42 @@
                         if (usageCount > 0) {
                             const normalUses = Math.max(0, parseInt(starUsageNormalByDate[date], 10) || 0);
                             const disciplinaryUses = Math.max(0, parseInt(starUsageDisciplinaryByDate[date], 10) || 0);
-                            // If there's also a transfer on this date, combine the display
-                            const _xferPrefix = transferOut > 0 ? `<span style="display:inline-block;transform:scaleX(-1)" title="Star sent">💫</span> ` : transferIn > 0 ? `<span title="Star received">💫</span> ` : '';
-                            if (normalUses > 0 && disciplinaryUses > 0) {
-                                const discText = formatStarUsageMarker(disciplinaryUses);
-                                const normalText = formatStarUsageMarker(normalUses);
-                                starOverrides[date] = `${_xferPrefix}<span class="score-split-marker"><span class="half disc">${discText}</span><span class="half normal">${normalText}</span></span>`;
-                                starClasses[date] = 'star-used-split';
-                            } else if (disciplinaryUses > 0) {
-                                starOverrides[date] = `${_xferPrefix}${formatStarUsageMarker(disciplinaryUses)}`;
-                                starClasses[date] = 'star-used-red';
+                            const transferOutIcon = transferOut > 0
+                                ? `<span style="display:inline-block;transform:scaleX(-1)" title="Star sent (${transferOut})">💫</span> `
+                                : '';
+                            if (transferIn > 0) {
+                                // Transfer-in + usage on the same day: render as a split cell.
+                                // Left half = transfer received icon; right half = usage marker.
+                                const _transferHalf = `<span class="half transfer-in" title="Star received (${transferIn})">💫</span>`;
+                                let _usageHalf, _usageClass;
+                                if (normalUses > 0 && disciplinaryUses > 0) {
+                                    // Three-way: transfer | disc | normal — nest inner split inside right half
+                                    _usageHalf = `<span class="half disc" style="flex:1"><span class="score-split-marker" style="min-height:unset"><span class="half disc">${formatStarUsageMarker(disciplinaryUses)}</span><span class="half normal">${formatStarUsageMarker(normalUses)}</span></span></span>`;
+                                    _usageClass = 'star-used-split';
+                                } else if (disciplinaryUses > 0) {
+                                    _usageHalf = `<span class="half disc">${formatStarUsageMarker(disciplinaryUses)}</span>`;
+                                    _usageClass = 'star-used-red';
+                                } else {
+                                    _usageHalf = `<span class="half normal">${formatStarUsageMarker(normalUses || usageCount)}</span>`;
+                                    _usageClass = 'star-used-green';
+                                }
+                                starOverrides[date] = `${transferOutIcon}<span class="score-split-marker">${_transferHalf}${_usageHalf}</span>`;
+                                starClasses[date] = `${transferOut > 0 ? 'star-transfer-out ' : ''}star-transfer-in ${_usageClass}`.trim();
                             } else {
-                                starOverrides[date] = `${_xferPrefix}${formatStarUsageMarker(normalUses || usageCount)}`;
-                                starClasses[date] = 'star-used-green';
+                                // No transfer-in: prefix with transfer-out emoji if applicable, else pure usage
+                                const _xferPrefix = transferOutIcon;
+                                if (normalUses > 0 && disciplinaryUses > 0) {
+                                    const discText = formatStarUsageMarker(disciplinaryUses);
+                                    const normalText = formatStarUsageMarker(normalUses);
+                                    starOverrides[date] = `${_xferPrefix}<span class="score-split-marker"><span class="half disc">${discText}</span><span class="half normal">${normalText}</span></span>`;
+                                    starClasses[date] = 'star-used-split';
+                                } else if (disciplinaryUses > 0) {
+                                    starOverrides[date] = `${_xferPrefix}${formatStarUsageMarker(disciplinaryUses)}`;
+                                    starClasses[date] = 'star-used-red';
+                                } else {
+                                    starOverrides[date] = `${_xferPrefix}${formatStarUsageMarker(normalUses || usageCount)}`;
+                                    starClasses[date] = 'star-used-green';
+                                }
                             }
                             if (normalUses > 0 && points >= -50 && applyStarBonus) {
                                 const nextDate = addDays(date, 1);
@@ -12037,6 +12921,15 @@
             return formatDateKey(new Date()).substring(0, 7);
         }
 
+        function getPreviousMonthKey(monthKey) {
+            const value = String(monthKey || '').trim();
+            if (!/^\d{4}-\d{2}$/.test(value)) return '';
+            const [yearStr, monthStr] = value.split('-');
+            const dt = new Date(parseInt(yearStr, 10), parseInt(monthStr, 10) - 1, 1);
+            dt.setMonth(dt.getMonth() - 1);
+            return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}`;
+        }
+
         async function refreshAllowedMonthsFromServer() {
             if (!SERVER_SYNC.enabled || !currentLoginId) return;
             try {
@@ -12310,6 +13203,80 @@
 
         function getStudentMonthVetoAwardTotal(studentId, monthKey) {
             return getStudentMonthPositiveDeltaTotal(studentId, monthKey, 'vetos');
+        }
+
+        function computeExpectedIndividualVetoCarryForMonth(studentId, monthKey) {
+            const sid = parseInt(studentId, 10) || 0;
+            const month = String(monthKey || '').trim();
+            if (!sid || !/^\d{4}-\d{2}$/.test(month)) return null;
+            const prevMonth = getPreviousMonthKey(month);
+            if (!prevMonth) return null;
+            const student = db.getStudents().find(s => parseInt(s.id, 10) === sid);
+            if (!student) return null;
+            const profileMap = getMonthRosterProfileMap(prevMonth);
+            const rollKey = String(student.roll || '').trim().toUpperCase();
+            const prevProfile = profileMap instanceof Map ? profileMap.get(rollKey) : safeProp(profileMap, rollKey);
+            if (!prevProfile) return null;
+            const prevCarry = Math.max(0, parseInt(safeProp(prevProfile, 'month_veto_count'), 10) || 0);
+            const prevAwards = getStudentMonthVetoAwardTotal(sid, prevMonth);
+            const prevUsed = getStudentMonthNegativeDeltaTotal(sid, prevMonth, 'vetos');
+            return Math.max(0, prevCarry + prevAwards - prevUsed);
+        }
+
+        function pruneVotingHistoryToCurrentMonth(options = {}) {
+            if (currentUserRole !== 'admin') return false;
+            const data = db.getData();
+            const currentMonth = getCurrentMonthKey();
+            let changed = false;
+            const keepVote = (vote) => {
+                const monthKey = String(vote && (vote.month_key || String(vote.timestamp || '').substring(0, 7)) || '').trim();
+                return monthKey === currentMonth;
+            };
+            const nextIndividual = (data.election_individual_votes || []).filter(keepVote);
+            if (nextIndividual.length !== (data.election_individual_votes || []).length) {
+                data.election_individual_votes = nextIndividual;
+                changed = true;
+            }
+            const nextTeacher = (data.election_teacher_votes || []).filter(keepVote);
+            if (nextTeacher.length !== (data.election_teacher_votes || []).length) {
+                data.election_teacher_votes = nextTeacher;
+                changed = true;
+            }
+            if (!changed) return false;
+            if (options.persist === false) return true;
+            db.saveData(data);
+            return true;
+        }
+
+        function repairMonthRosterProfileVetoCarries(options = {}) {
+            if (currentUserRole !== 'admin') return false;
+            const data = db.getData();
+            const profileMonths = Object.keys((data && data.month_roster_profiles) || {})
+                .filter(m => /^\d{4}-\d{2}$/.test(String(m || '')))
+                .sort();
+            let changed = false;
+            profileMonths.forEach(month => {
+                const profiles = data.month_roster_profiles[month];
+                if (!Array.isArray(profiles) || !profiles.length) return;
+                profiles.forEach(profile => {
+                    if (!profile || typeof profile !== 'object') return;
+                    const rollKey = String(profile.roll || '').trim().toUpperCase();
+                    if (!rollKey) return;
+                    const student = (data.students || []).find(s => String(s.roll || '').trim().toUpperCase() === rollKey);
+                    if (!student) return;
+                    const expected = computeExpectedIndividualVetoCarryForMonth(student.id, month);
+                    if (expected === null) return;
+                    const current = Math.max(0, parseInt(profile.month_veto_count, 10) || 0);
+                    if (current !== expected) {
+                        profile.month_veto_count = expected;
+                        changed = true;
+                    }
+                });
+            });
+            if (!changed) return false;
+            if (options.persist === false) return true;
+            db.saveData(data);
+            return true;
         }
 
         function formatRollDisplay(roll) {
@@ -12626,6 +13593,8 @@
 
             const isStudent = !isAdmin && !isTeacher;
             setTabVisibility('my-dashboard', isStudent);
+            renderPointsStarConfigUI();
+            renderGoodConductFormulaUI();
             if (isStudent) {
                 // Detect positions and load dashboard on first call
                 currentStudentPositions = detectStudentPositions();
@@ -13684,7 +14653,7 @@
             return Array.from(merged.values());
         }
 
-        // Merge group_crs: match by id, never drop entries, prefer populated
+        // Merge group_crs: match by id, never drop entries, prefer newer entry by timestamp
         function mergeGroupCRsSuperset(localCRs, remoteCRs) {
             const merged = new Map();
             const add = (arr) => {
@@ -13693,12 +14662,21 @@
                     if (!id) return;
                     const existing = merged.get(id);
                     if (!existing) { merged.set(id, { ...cr, id }); return; }
-                    // Prefer the entry with a studentId assigned
+                    // Never overwrite a populated entry with an empty one
                     const existingHas = !!(existing.studentId);
                     const newHas = !!(cr.studentId);
-                    if (newHas || !existingHas) {
-                        merged.set(id, { ...existing, ...cr, id });
+                    if (!newHas && existingHas) return;
+                    // When both have a student, prefer the entry with the newer updated_at / elected_on
+                    if (newHas && existingHas) {
+                        const existingStamp = parseSyncStamp(existing.updated_at || existing.elected_on || '');
+                        const newStamp = parseSyncStamp(cr.updated_at || cr.elected_on || '');
+                        if (existingStamp > newStamp) {
+                            // Existing is newer (e.g. just approved locally) — keep it, ignore stale incoming
+                            merged.set(id, { ...cr, ...existing, id });
+                            return;
+                        }
                     }
+                    merged.set(id, { ...existing, ...cr, id });
                 });
             };
             add(localCRs);
@@ -14368,7 +15346,7 @@
                     method: 'POST',
                     credentials: 'include',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ data: db.getData(), peers: baseUrls, wait_for_results: false })
+                    body: JSON.stringify({ data: db.getData(), peers: baseUrls, wait_for_results: true })
                 }), 120000);
                 const contentType = String(resp.headers.get('content-type') || '').toLowerCase();
                 if (resp.status === 401 || resp.status === 403 || contentType.includes('text/html')) {
@@ -14409,10 +15387,12 @@
                 } catch (pullErr) {
                     // Best effort pull only.
                 }
+                const gistStatus = payload.gist && payload.gist.status ? String(payload.gist.status).toUpperCase() : 'SKIPPED';
+                const peerDetail = peerItems.map(p => `${(p.base_url||'peer').replace(/https?:\/\//,'').split('/')[0]}: ${String(p.status||'?').toUpperCase()}${p.error ? ' ('+p.error+')' : ''}`).join(' | ');
                 if (replicated) {
-                    showAlert(`Force Publish complete. Supabase: ${supabaseStatus}. Peers OK: ${peerOk}, Failed: ${peerFail}.`, 'success');
+                    showAlert(`Force Publish complete ✓  Gist: ${gistStatus}  •  ${peerDetail || 'No peers configured'}`, 'success', 0);
                 } else {
-                    showAlert(`Force Publish saved locally, but remote replication did not confirm. Supabase: ${supabaseStatus}. Peers OK: ${peerOk}, Failed: ${peerFail}.`, 'warning');
+                    showAlert(`Force Publish saved locally — remote sync FAILED.  Gist: ${gistStatus}  •  ${peerDetail || 'No peers configured'}`, 'warning', 0);
                 }
                 refreshServerHealth();
                 refreshSupabaseHealth();
@@ -15060,6 +16040,12 @@
                 if (!sid || quota <= 0) return;
                 quotas.set(sid, (quotas.get(sid) || 0) + quota);
             };
+            const crQuotaByStudent = new Map();
+            const markCrQuota = (studentId) => {
+                const sid = parseInt(studentId, 10);
+                if (!sid) return;
+                crQuotaByStudent.set(sid, 2);
+            };
 
             (data.leadership || []).forEach(post => {
                 if (normalizePostHolderStatus(post.status) !== 'active') return;
@@ -15071,24 +16057,56 @@
                 addQuota(resolved.id, quota);
             });
 
-            // CR quota: +2 per active CR assignment (class/group).
-            // If a student holds multiple active CR posts, grants are additive.
+            // CR quota: max +2 total, even if a student appears in both class/group CR tables.
             (data.class_reps || []).forEach(rep => {
                 if (normalizePostHolderStatus(rep.status || 'active') !== 'active') return;
                 const sid = parseInt(rep.studentId, 10);
                 if (sid && !isStudentPostHolderSuspendedById(sid, dateKey)) {
-                    addQuota(sid, 2);
+                    markCrQuota(sid);
                 }
             });
             (data.group_crs || []).forEach(rep => {
                 if (normalizePostHolderStatus(rep.status || 'active') !== 'active') return;
                 const sid = parseInt(rep.studentId, 10);
                 if (sid && !isStudentPostHolderSuspendedById(sid, dateKey)) {
-                    addQuota(sid, 2);
+                    markCrQuota(sid);
                 }
             });
+            crQuotaByStudent.forEach((quota, sid) => addQuota(sid, quota));
 
             return quotas;
+        }
+
+        function getAvailableVetosForMonth(studentId, monthKey = '') {
+            const sid = parseInt(studentId, 10) || 0;
+            const student = db.getStudents().find(s => s.id === sid);
+            if (!student) return 0;
+            const month = String(monthKey || getCurrentMonthKey()).trim() || getCurrentMonthKey();
+            const individualVetos = Math.max(0, parseInt(safeProp(student, 'veto_count'), 10) || 0);
+            const liveGrantMap = Object.fromEntries(getActiveRoleVetoQuotas(`${month}-15`));
+            const liveRoleVetos = Math.max(0, parseInt(liveGrantMap[String(sid)] ?? liveGrantMap[sid], 10) || 0);
+            if (month === getCurrentMonthKey()) {
+                const profileMap = getMonthRosterProfileMap(month);
+                const rollKey = String(student.roll || '').trim().toUpperCase();
+                const profile = profileMap instanceof Map ? profileMap.get(rollKey) : safeProp(profileMap, rollKey);
+                const carry = Math.max(0, parseInt(safeProp(profile, 'month_veto_count'), 10) || 0);
+                const awards = getStudentMonthVetoAwardTotal(sid, month);
+                const used = getStudentMonthNegativeDeltaTotal(sid, month, 'vetos');
+                const liveIndividual = Math.max(0, individualVetos - liveRoleVetos);
+                const currentCarry = profile ? Math.min(carry, liveIndividual) : liveIndividual;
+                return Math.max(0, currentCarry + awards - used + liveRoleVetos);
+            }
+            const profileMap = getMonthRosterProfileMap(month);
+            const rollKey = String(student.roll || '').trim().toUpperCase();
+            const profile = profileMap instanceof Map ? profileMap.get(rollKey) : safeProp(profileMap, rollKey);
+            const carry = Math.max(0, parseInt(safeProp(profile, 'month_veto_count'), 10) || 0);
+            const awards = getStudentMonthVetoAwardTotal(sid, month);
+            const used = getStudentMonthNegativeDeltaTotal(sid, month, 'vetos');
+            const grantMap = (((db.getData() || {}).role_veto_monthly || {})[month] || {});
+            const roleGrant = isOfficeHolderStudent(student, month)
+                ? Math.max(0, parseInt(grantMap[String(sid)] ?? grantMap[sid], 10) || 0)
+                : 0;
+            return Math.max(0, carry + awards + roleGrant - used);
         }
 
         function applyMonthlyRoleVetoGrants(options = {}) {
@@ -15237,9 +16255,8 @@
             if (!prevMonth) return false;
             const prevRolls = (data.month_students && data.month_students[prevMonth]) || [];
             if (!prevRolls.length) return false;
-            const prevRoleGrants = (((data.role_veto_monthly || {})[prevMonth]) || {});
             // Build new month profiles: copy names/classes from prev profiles,
-            // snapshot current star/veto totals from student records.
+            // carry VETOs from previous month profile + previous month's actual veto rows.
             const prevProfiles = (data.month_roster_profiles && data.month_roster_profiles[prevMonth]) || [];
             const studentsByRoll = new Map();
             (data.students || []).forEach(s => {
@@ -15258,11 +16275,10 @@
                 const classRaw = (student && student.class) || (prev && prev.class);
                 const classNum = parseInt(classRaw, 10);
                 const sid = student ? (parseInt(student.id, 10) || 0) : 0;
-                const prevGrant = sid > 0 ? Math.max(0, parseInt(prevRoleGrants[String(sid)] ?? prevRoleGrants[sid], 10) || 0) : 0;
-                const liveVetos = student ? Math.max(0, parseInt(student.veto_count, 10) || 0) : 0;
-                // Carry only individual veto balance to next month profile.
-                // Role grants are month-scoped and must reset fresh.
-                const carryIndividualVetos = Math.max(0, liveVetos - prevGrant);
+                const computedCarry = sid > 0 ? computeExpectedIndividualVetoCarryForMonth(sid, todayMonth) : null;
+                const carryIndividualVetos = computedCarry === null
+                    ? (prev ? Math.max(0, parseInt(prev.month_veto_count, 10) || 0) : 0)
+                    : computedCarry;
                 newProfiles.push({
                     roll,
                     name: name || baseName,
@@ -15654,8 +16670,7 @@
             }).join('');
             // Only rebuild the header when the structure actually changes (month, dates, extra cols).
             // Filter-only calls leave dates/cols unchanged — skip the DOM write to avoid layout thrash.
-            const _headerKey = `${month}|${dates.join(',')}|${monthExtraCols.map(c => c.key || c.label || '').join('|')}`;
-            if (_headerKey !== _sbLastHeaderKey) {
+                                            const _headerKey = `${month}|${dates.join(',')}|${monthExtraCols.map(c => c.key || c.label || '').join('|')}`;            if (_headerKey !== _sbLastHeaderKey) {
                 _sbLastHeaderKey = _headerKey;
                 headerRow.innerHTML = `
                     <th class="sticky-left rank-cell" style="width: 70px;">Rank</th>
@@ -15681,7 +16696,7 @@
                 if (topEl) {
                     topEl.innerHTML = topNameHtml;
                     topEl.classList.add('top-scorer-name');
-                    topEl.style.fontSize = 'clamp(20px, 2.2vw, 30px)';
+                    topEl.style.fontSize = '';
                 }
                 // Inject cracker spark particles into the top scorer card
                 const sparksEl = document.getElementById('tsSparksContainer');
@@ -15760,37 +16775,10 @@
                     }
                 });
 
-                // VETO depletion check: post-holders must maintain positive VETO; 72h grace → suspend
-                // Penalty: Leader -200, Co-Leader -150, all others (CR/LoP) -100
-                // An admin waiver or active VETO shield blocks the suspension.
+                // VETO depletion does NOT trigger auto-suspension or penalties.
+                // Clean up any stale veto-warn keys that may have been set previously.
                 _rdc.officeHolderIds.forEach(sid => {
-                    const wKey = `ea_veto_warn_${sid}`;
-                    if (_depletedHolders.has(sid)) {
-                        const stored = localStorage.getItem(wKey);
-                        if (!stored) {
-                            localStorage.setItem(wKey, String(_NOW_MS));
-                        } else {
-                            const warnSince = parseInt(stored, 10);
-                            if (warnSince >= _EFFECT_FROM_MS && (_NOW_MS - warnSince) >= _72H_MS) {
-                                const _exemption = _getAutoSuspendExemption(sid);
-                                if (_exemption) {
-                                    // Waiver or VETO shield active — block suspension
-                                    _consumeAutoSuspendExemption(sid, _exemption.type, wKey);
-                                    _depletedHolders.delete(sid);
-                                } else {
-                                    // Determine penalty by role suffix
-                                    const _suf = _rdc.suffixesById.get(sid) || new Set();
-                                    const _penalty = _suf.has('L') ? -200 : _suf.has('CoL') ? -150 : -100;
-                                    _autoSuspendPostHolder(sid, null,
-                                        'VETO power depleted for 72+ hours', _penalty);
-                                    localStorage.removeItem(wKey);
-                                    _depletedHolders.delete(sid);
-                                }
-                            }
-                        }
-                    } else {
-                        localStorage.removeItem(wKey); // VETO restored — cancel the clock
-                    }
+                    localStorage.removeItem(`ea_veto_warn_${sid}`);
                 });
                 // ─────────────────────────────────────────────────────────────────────
 
@@ -15809,7 +16797,7 @@
                         if (normalizePostHolderStatus(entry.status || 'active') !== 'suspended') return;
                         const _sid = parseInt(entry.studentId, 10) || 0;
                         if (!_sid) return;
-                        const _monthTotal = getStudentMonthTotal(_sid, monthKey);
+                        const _monthTotal = getStudentMonthTotal(_sid, month);
                         const _vp = computeVotePower(_monthTotal);
                         if (_vp >= 0) {
                             entry.status = 'active';
@@ -16025,6 +17013,7 @@
             renderRecordScoreDateStrip(todayMonth, today);
             updateScoreStudentOptions(false);
             loadRecordStudentTable();
+            renderPointsStarConfigUI();
 
             document.getElementById('scoreStudent').onchange = loadExistingScore;
             document.getElementById('scoreDate').onchange = () => {
@@ -16413,6 +17402,115 @@
             showAlert(`Converted ${starsNeeded} stars to ${vetoGain} VETO for ${studentName}.`, 'success');
         }
 
+        function getPointsStarConversionConfig() {
+            const data = db.getData() || {};
+            const raw = (data.points_star_conversion && typeof data.points_star_conversion === 'object')
+                ? data.points_star_conversion
+                : {};
+            return {
+                points_per_star: 150, // fixed rule
+                min_points: Math.max(0, parseInt(raw.min_points, 10) || 250)
+            };
+        }
+
+        function renderPointsStarConfigUI() {
+            const cfg = getPointsStarConversionConfig();
+            setElementValue('pointsToStarMinPoints', cfg.min_points);
+            const btn = document.getElementById('savePointsStarConfigBtn');
+            if (btn) btn.style.display = currentUserRole === 'admin' ? '' : 'none';
+            const minInput = document.getElementById('pointsToStarMinPoints');
+            if (minInput) minInput.disabled = currentUserRole !== 'admin';
+        }
+
+        function savePointsStarConfig() {
+            if (currentUserRole !== 'admin') {
+                showAlert('Only Admin can update minimum points criteria.', 'warning');
+                return;
+            }
+            const cfg = getPointsStarConversionConfig();
+            const minPoints = Math.max(0, parseInt(getElementValue('pointsToStarMinPoints'), 10) || cfg.min_points);
+            const data = db.getData();
+            data.points_star_conversion = {
+                points_per_star: 150,
+                min_points: minPoints
+            };
+            db.saveData(data);
+            if (SERVER_SYNC.enabled) pushToServer(db.getData(), { silent: true }).catch(() => {});
+            renderPointsStarConfigUI();
+            showAlert(`Points->Star minimum criteria saved: ${minPoints} points.`, 'success');
+        }
+
+        function convertSelectedStudentPointsToStar() {
+            if (!(currentUserRole === 'admin' || currentUserRole === 'teacher')) {
+                showAlert('Only Admin or Teacher can convert points to stars.', 'warning');
+                return;
+            }
+            const studentId = parseInt(getElementValue('scoreStudent'), 10) || 0;
+            const date = getElementValue('scoreDate');
+            const month = getElementValue('scoreMonth') || (date ? date.substring(0, 7) : getCurrentMonthKey());
+            if (!studentId) {
+                showAlert('Select a student first in Record Score.', 'warning');
+                return;
+            }
+            if (!date || !month) {
+                showAlert('Select date and month first.', 'warning');
+                return;
+            }
+
+            const cfg = getPointsStarConversionConfig();
+            const units = Math.max(1, parseInt(getElementValue('pointsToStarUnits'), 10) || 1);
+            const pointsNeeded = units * cfg.points_per_star;
+
+            const scoreboardRows = db.getMonthlyScoreboard(month) || [];
+            const row = scoreboardRows.find(r => r && r.student && parseInt(r.student.id, 10) === studentId);
+            const currentTotal = row ? (parseInt(row.total, 10) || 0) : 0;
+            if (currentTotal < cfg.min_points) {
+                showAlert(`Student has ${currentTotal} points in ${month}. Minimum required is ${cfg.min_points}.`, 'warning');
+                return;
+            }
+            if (currentTotal < pointsNeeded) {
+                showAlert(`Insufficient points. Need ${pointsNeeded}, available ${currentTotal} in ${month}.`, 'warning');
+                return;
+            }
+
+            const data = db.getData();
+            const student = (data.students || []).find(s => parseInt(s.id, 10) === studentId);
+            if (!student) {
+                showAlert('Student not found.', 'danger');
+                return;
+            }
+            const studentName = student.base_name || student.name || `ID ${studentId}`;
+            const ok = confirm(
+                `Convert ${pointsNeeded} points -> ${units} star(s) for ${studentName} (${formatRollDisplay(student.roll)}) on ${date}?\n` +
+                `Month total before conversion: ${currentTotal}`
+            );
+            if (!ok) return;
+
+            pushUndoSnapshot(`Convert ${pointsNeeded} points to ${units} star(s)`);
+            db.addScore({
+                studentId,
+                date,
+                month,
+                points: -pointsNeeded,
+                stars: units,
+                vetos: 0,
+                notes: `[Points->Star conversion] ${pointsNeeded} points -> ${units} star(s)`,
+                recordedBy: currentUserRole
+            });
+            updateStudentStarCounter(studentId, units);
+            db.saveData(db.getData(), currentUserRole === 'teacher' ? { allowTeacher: true } : {});
+            if (SERVER_SYNC.enabled) pushToServer(db.getData(), { silent: true }).catch(() => {});
+
+            setElementValue('pointsToStarUnits', '1');
+            loadScoreboard();
+            if (getActiveTabName() === 'add-score') {
+                updateScoreStudentOptions(true);
+                loadExistingScore();
+                loadRecordStudentTable();
+            }
+            showAlert(`Converted ${pointsNeeded} points to ${units} star(s) for ${studentName}.`, 'success');
+        }
+
         function renderRecordScoreDateStrip(monthKey, selectedDate) {
             const strip = document.getElementById('recordScoreDateStrip');
             if (!strip) return;
@@ -16551,6 +17649,9 @@
                 const starUndoBtn = (date && storedStars !== null && storedStars !== 0 && (currentUserRole === 'admin' || currentUserRole === 'teacher'))
                     ? `<button type="button" class="record-star-undo-btn" title="${storedStars > 0 ? 'Undo 1 awarded star' : 'Undo 1 star usage'}" onclick="undoStarAwardFromRecordRow(${student.id}, '${date}', event)">↺</button>`
                     : '';
+                const adminRepairBtn = (date && hasExisting && currentUserRole === 'admin')
+                    ? `<button type="button" class="record-star-undo-btn" title="Admin tally repair: edit/reset this saved score row" onclick="openAdminScoreRepair(${student.id}, '${date}', event)">✎</button>`
+                    : '';
                 const storedVetoBadge = storedVetos ? `<span class="stored-veto-badge" title="Stored: ${storedVetos} VETO(s)">${storedVetos}</span>` : '';
                 const rowClass = `${student.active === false ? 'inactive-row' : ''} ${hasExisting ? 'score-recorded-row' : ''}`.trim();
                 return `
@@ -16572,7 +17673,7 @@
                         </div>
                     </td>
                     <td>
-                        <div class="score-input-wrapper">${storedStarBadge}${starUndoBtn}
+                        <div class="score-input-wrapper">${storedStarBadge}${starUndoBtn}${adminRepairBtn}
                         <input type="text" class="score-input" placeholder="${hasExisting ? '+/- stars' : '* / -** or 2'}"
                             value="${starsValue}"
                             oninput="updateRecordScoreDraft(${student.id}, this, 1)"
@@ -16605,6 +17706,7 @@
                 </tr>
             `;
             }).join('');
+            animateTableRows(tbody);
 
             if (filtered.length === 0) {
                 tbody.innerHTML = `<tr><td colspan="14" class="text-center" style="padding: 30px;">No students match the filters</td></tr>`;
@@ -17084,7 +18186,7 @@
             }
 
             if (vetos !== 0) {
-                const vetoValidation = validateVetoAvailability(studentId, vetos);
+                const vetoValidation = validateVetoAvailability(studentId, vetos, month);
                 if (!vetoValidation.valid) {
                     showValidationModal('Insufficient VETOs', vetoValidation.message);
                     return;
@@ -17343,7 +18445,7 @@
 
             // Validate availability only when removing/using existing VETOs.
             if (vetos !== 0) {
-                const vetoValidation = validateVetoAvailability(studentId, vetos);
+                const vetoValidation = validateVetoAvailability(studentId, vetos, month);
                 if (!vetoValidation.valid) {
                     showValidationModal('Insufficient VETOs', vetoValidation.message);
                     return;
@@ -17688,6 +18790,121 @@
             if (SERVER_SYNC.enabled) pushToServer(db.getData(), { silent: true });
             showAlert(`Restored 1 VETO for ${escapeHtml(name)} on ${date}. Press Ctrl+Z to undo.`, 'success');
             loadScoreboard();
+        }
+
+        function refreshScoreRepairViews() {
+            loadScoreboard();
+            if (getActiveTabName() === 'add-score') {
+                loadRecordStudentTable();
+                loadExistingScore();
+            }
+            if (getActiveTabName() === 'appeals') {
+                loadAppealsTab();
+            } else {
+                updateAppealsTabNotification();
+            }
+        }
+
+        function openAdminScoreRepair(studentId, date, event = null) {
+            if (event) {
+                event.preventDefault();
+                event.stopPropagation();
+            }
+            if (currentUserRole !== 'admin') {
+                showAlert('Only Admin can use tally repair.', 'warning');
+                return;
+            }
+            const sid = parseInt(studentId, 10) || 0;
+            const score = db.getScore(sid, date);
+            const student = db.getStudents().find(s => s.id === sid);
+            if (!score || !student) {
+                showAlert('Saved score row not found.', 'danger');
+                return;
+            }
+            const label = `${student.base_name || student.name || 'Student'} (${formatRollDisplay(student.roll)})`;
+            const currentPoints = parseInt(score.points, 10) || 0;
+            const currentStars = parseInt(score.stars, 10) || 0;
+            const currentVetos = parseInt(score.vetos, 10) || 0;
+            const currentUsageNormal = Math.max(0, parseInt(score.star_usage_normal, 10) || 0);
+            const currentUsageDisc = Math.max(0, parseInt(score.star_usage_disciplinary, 10) || 0);
+            const currentTransferIn = Math.max(0, parseInt(score.star_transfer_in, 10) || 0);
+            const currentTransferOut = Math.max(0, parseInt(score.star_transfer_out, 10) || 0);
+            const summary = [
+                `${label}`,
+                `Date: ${date}`,
+                `Points=${currentPoints}, Stars=${currentStars}, VETOs=${currentVetos}`,
+                `Star usage: normal=${currentUsageNormal}, disciplinary=${currentUsageDisc}`,
+                `Transfer: in=${currentTransferIn}, out=${currentTransferOut}`,
+                '',
+                'Tip: set disciplinary usage to 0 to erase mistaken entries.'
+            ].join('\n');
+            const quickReset = confirm(`${summary}\n\nPress OK for quick repair prompts.\nPress Cancel to leave unchanged.`);
+            if (!quickReset) return;
+
+            const askInt = (labelText, currentValue, options = {}) => {
+                const raw = prompt(`${labelText}\nCurrent value: ${currentValue}`, String(currentValue));
+                if (raw === null) return { cancelled: true };
+                const parsed = parseInt(String(raw).trim(), 10);
+                if (Number.isNaN(parsed)) {
+                    showAlert(`Invalid number for ${labelText}.`, 'danger');
+                    return { invalid: true };
+                }
+                const min = options.min;
+                if (Number.isFinite(min) && parsed < min) {
+                    showAlert(`${labelText} cannot be less than ${min}.`, 'danger');
+                    return { invalid: true };
+                }
+                return { value: parsed };
+            };
+
+            const nextPoints = askInt(`Repair ${label}\nExact saved points`, currentPoints);
+            if (nextPoints.cancelled || nextPoints.invalid) return;
+            const nextStars = askInt(`Repair ${label}\nExact saved net stars`, currentStars);
+            if (nextStars.cancelled || nextStars.invalid) return;
+            const nextVetos = askInt(`Repair ${label}\nExact saved net VETOs`, currentVetos);
+            if (nextVetos.cancelled || nextVetos.invalid) return;
+            const nextUsageNormal = askInt(`Repair ${label}\nExact normal star usage`, currentUsageNormal, { min: 0 });
+            if (nextUsageNormal.cancelled || nextUsageNormal.invalid) return;
+            const nextUsageDisc = askInt(`Repair ${label}\nExact disciplinary star usage`, currentUsageDisc, { min: 0 });
+            if (nextUsageDisc.cancelled || nextUsageDisc.invalid) return;
+            const nextTransferIn = askInt(`Repair ${label}\nExact star transfer-in`, currentTransferIn, { min: 0 });
+            if (nextTransferIn.cancelled || nextTransferIn.invalid) return;
+            const nextTransferOut = askInt(`Repair ${label}\nExact star transfer-out`, currentTransferOut, { min: 0 });
+            if (nextTransferOut.cancelled || nextTransferOut.invalid) return;
+            const nextNotesRaw = prompt(`Repair ${label}\nNotes text`, String(score.notes || ''));
+            if (nextNotesRaw === null) return;
+
+            pushUndoSnapshot(`Repair score row — ${label} on ${date}`);
+            const data = db.getData();
+            const liveScore = (data.scores || []).find(s => parseInt(s.studentId, 10) === sid && String(s.date || '') === String(date));
+            const liveStudent = (data.students || []).find(s => parseInt(s.id, 10) === sid);
+            if (!liveScore || !liveStudent) {
+                showAlert('Live score row not found while saving repair.', 'danger');
+                return;
+            }
+
+            const oldStars = parseInt(liveScore.stars, 10) || 0;
+            const oldVetos = parseInt(liveScore.vetos, 10) || 0;
+            liveScore.points = nextPoints.value;
+            liveScore.stars = nextStars.value;
+            liveScore.vetos = nextVetos.value;
+            liveScore.star_usage_normal = nextUsageNormal.value;
+            liveScore.star_usage_disciplinary = nextUsageDisc.value;
+            liveScore.star_transfer_in = nextTransferIn.value;
+            liveScore.star_transfer_out = nextTransferOut.value;
+            liveScore.notes = String(nextNotesRaw || '').trim();
+            liveScore.updated_at = new Date().toISOString();
+            normalizeStudentMeta(liveStudent);
+            liveStudent.stars = Math.max(0, (parseInt(liveStudent.stars, 10) || 0) + (nextStars.value - oldStars));
+            liveStudent.veto_count = Math.max(0, (parseInt(liveStudent.veto_count, 10) || 0) + (nextVetos.value - oldVetos));
+
+            db.saveData(data);
+            const month = String(liveScore.month || date).substring(0, 7);
+            applyMonthlyRoleVetoGrants({ persist: true, month });
+            reconcileVetoCountersFromScores(month, { persist: true, allowCurrentMonth: true });
+            if (SERVER_SYNC.enabled) pushToServer(db.getData(), { silent: true });
+            refreshScoreRepairViews();
+            showAlert(`Score row repaired for ${escapeHtml(label)} on ${date}. Press Ctrl+Z to undo.`, 'success');
         }
 
         // ── Student position detection ──────────────────────────────────────────────
@@ -19250,6 +20467,7 @@
                     <td>${idx === 0 ? '1st' : idx === 1 ? '2nd' : idx === 2 ? '3rd' : `#${idx + 1}`}</td>
                 </tr>`;
             }).join('');
+            animateTableRows(tbody);
 
             if (scoreboard.length === 0) {
                 tbody.innerHTML = `<tr><td colspan="5" class="text-center" style="padding: 40px;">No data for this month</td></tr>`;
@@ -19328,6 +20546,7 @@
                     <td>${row.vetos}</td>
                 </tr>
             `).join('');
+            animateTableRows(tbody);
 
             if (!ranked.length) {
                 tbody.innerHTML = `<tr><td colspan="8" class="text-center" style="padding: 30px;">No data for selected month</td></tr>`;
@@ -19357,6 +20576,7 @@
                             <td>${coalesce(row.monthlyVetos, 0)}</td>
                         </tr>
                     `).join('');
+                animateTableRows(rosterBody);
 
                 if (!rosterBody.innerHTML) {
                     rosterBody.innerHTML = `<tr><td colspan="8" class="text-center" style="padding: 30px;">No students for selected filters</td></tr>`;
@@ -19442,6 +20662,7 @@
                         : '-'}</td>
                 </tr>
             `).join('');
+            animateTableRows(tbody);
 
             populateManualCRStudents();
             const manualDate = document.getElementById('crManualElectedOn');
@@ -19563,6 +20784,7 @@
             const data = db.getData();
             data.group_crs = data.group_crs || [];
             const existing = data.group_crs.find(item => String(item.group || '').trim().toUpperCase() === group);
+            const _manualNow = new Date().toISOString();
             if (existing) {
                 existing.post = post || `CR - Group ${group}`;
                 existing.studentId = studentId;
@@ -19570,6 +20792,7 @@
                 existing.status = 'active';
                 existing.tenure_extension_months = 0;
                 existing.tenure_extensions = [];
+                existing.updated_at = _manualNow;
             } else {
                 data.group_crs.push({
                     id: Date.now(),
@@ -19579,7 +20802,8 @@
                     elected_on: electedOn,
                     status: 'active',
                     tenure_extension_months: 0,
-                    tenure_extensions: []
+                    tenure_extensions: [],
+                    updated_at: _manualNow
                 });
             }
             savePostHolderData(data);
@@ -19637,6 +20861,7 @@
                     <td>${actions}</td>
                 </tr>`;
             }).join('');
+            animateTableRows(body);
         }
 
         /** Admin approves a pending CR request — applies it as an active group_cr entry. */
@@ -19737,6 +20962,7 @@
                     <td></td>
                 </tr>
             ` : '');
+            animateTableRows(tbody);
 
             if (parties.length === 0) {
                 tbody.innerHTML = `<tr><td colspan="4" class="text-center" style="padding: 40px;">No parties added yet</td></tr>`;
@@ -19931,6 +21157,7 @@
                     </tr>
                 `;
             }).filter(Boolean).join('');
+            animateTableRows(tbody);
 
             if (!tbody.innerHTML) {
                 tbody.innerHTML = `<tr><td colspan="6" class="text-center" style="padding: 30px;">No members added yet</td></tr>`;
@@ -20061,6 +21288,7 @@
                     </tr>
                 `;
             }).join('');
+            animateTableRows(tbody);
 
             if (posts.length === 0) {
                 tbody.innerHTML = `<tr><td colspan="5" class="text-center" style="padding: 40px;">No leadership posts added yet</td></tr>`;
@@ -20270,6 +21498,7 @@
                     </tr>
                 `;
             }).join('');
+            animateTableRows(tbody);
 
             if (posts.length === 0) {
                 tbody.innerHTML = `<tr><td colspan="7" class="text-center" style="padding: 36px; color: var(--text-muted);">No leadership posts added yet</td></tr>`;
@@ -20337,6 +21566,7 @@
             }).filter(Boolean);
 
             tbody.innerHTML = groupRows.join('');
+            animateTableRows(tbody);
 
             if (!tbody.innerHTML) {
                 tbody.innerHTML = `<tr><td colspan="7" class="text-center" style="padding: 30px;">No group CRs assigned yet. Use the CR Tab to assign.</td></tr>`;
@@ -20492,6 +21722,7 @@
                     </tr>
                 `;
             }).join('');
+            animateTableRows(tbody);
 
             if (parties.length === 0) {
                 tbody.innerHTML = `<tr><td colspan="7" class="text-center" style="padding: 30px;">No parties available</td></tr>`;
@@ -21178,26 +22409,77 @@
             return 'fas fa-info-circle';
         }
 
+        function _notifLevelLabel(level) {
+            if (level === 'danger') return 'Overdue';
+            if (level === 'warn') return 'Warning';
+            return 'Info';
+        }
+
         function openNotificationSpotlight(idx) {
             _notifSelectedIdx = idx;
-            const panel = document.getElementById('notifDetailPanel');
-            if (!panel) return;
             const item = notificationCache[idx];
-            if (!item) { panel.style.display = 'none'; return; }
-            panel.className = 'notif-detail-panel ' + (item.level || 'info');
-            panel.style.display = '';
-            panel.innerHTML = `
-                <div class="ndp-icon ${item.level === 'danger' ? 'style="color:#f87171"' : item.level === 'warn' ? 'style="color:#fbbf24"' : 'style="color:#38bdf8"'}">
-                    <i class="${_notifLevelIcon(item.level)}"></i>
-                </div>
-                <div class="ndp-title">${escapeHtml(item.title || 'Notification')}</div>
-                <div class="ndp-detail">${escapeHtml(item.detail || '-')}</div>
-                <div class="ndp-meta">${escapeHtml(item.meta || '')}</div>
-            `;
-            // Highlight selected card
+            if (!item) return;
+
+            const level      = item.level || 'info';
+            const iconColor  = level === 'danger' ? '#fca5a5' : level === 'warn' ? '#fcd34d' : '#7dd3fc';
+            const iconClass  = _notifLevelIcon(level);
+            const labelText  = _notifLevelLabel(level);
+
+            // ── Centered popup modal ─────────────────────────────────────
+            const overlay = document.getElementById('notifPopupOverlay');
+            const box     = document.getElementById('notifPopupBox');
+            const content = document.getElementById('notifPopupContent');
+            if (overlay && box && content) {
+                // Size the box dynamically based on the current viewport
+                const vw = window.innerWidth;
+                const vh = window.innerHeight;
+                box.style.width    = vw < 440 ? (vw - 28) + 'px' : 'min(92vw, 580px)';
+                box.style.maxHeight = Math.floor(vh * 0.82) + 'px';
+
+                box.className = 'notif-popup-box ' + level;
+                content.innerHTML = `
+                    <span class="notif-popup-level-badge ${level}">
+                        <i class="${iconClass}"></i>${escapeHtml(labelText)}
+                    </span>
+                    <i class="notif-popup-big-icon ${iconClass}" style="color:${iconColor}"></i>
+                    <div class="notif-popup-title">${escapeHtml(item.title || 'Notification')}</div>
+                    <div class="notif-popup-detail">${escapeHtml(item.detail || '-')}</div>
+                    ${item.meta ? `<div class="notif-popup-meta">${escapeHtml(item.meta)}</div>` : ''}
+                    <button class="notif-popup-dismiss" onclick="closeNotifPopup()">Dismiss</button>
+                `;
+                overlay.style.display = 'flex';
+                document.body.style.overflow = 'hidden';
+            }
+
+            // ── Also update the inline detail panel in the tab ───────────
+            const panel = document.getElementById('notifDetailPanel');
+            if (panel) {
+                panel.className    = 'notif-detail-panel ' + level;
+                panel.style.display = '';
+                panel.innerHTML = `
+                    <div class="ndp-icon" style="color:${iconColor}"><i class="${iconClass}"></i></div>
+                    <div class="ndp-title">${escapeHtml(item.title || 'Notification')}</div>
+                    <div class="ndp-detail">${escapeHtml(item.detail || '-')}</div>
+                    <div class="ndp-meta">${escapeHtml(item.meta || '')}</div>
+                `;
+            }
+
+            // Highlight the selected card in the list
             document.querySelectorAll('#notifLiveList .notif-card').forEach((el, i) => {
                 el.classList.toggle('selected', i === idx);
             });
+        }
+
+        function closeNotifPopup() {
+            const overlay = document.getElementById('notifPopupOverlay');
+            if (!overlay || overlay.style.display === 'none') return;
+            // Fade out
+            overlay.style.animation = 'npoOverlayIn 0.18s ease reverse both';
+            setTimeout(() => {
+                overlay.style.display    = 'none';
+                overlay.style.animation  = '';
+            }, 170);
+            document.body.style.overflow = '';
         }
 
         // Kept for backward compatibility (was called from old onclick inline HTML that may persist in cache)
@@ -21240,11 +22522,16 @@
 
             liveList.innerHTML = filtered.map((item, idx) => {
                 const realIdx = liveMsgs.indexOf(item);
+                const level = String(item.level || 'info');
+                const label = _notifLevelLabel(level);
                 return `<button class="notif-card ${escapeHtml(item.level || 'info')}${realIdx === _notifSelectedIdx ? ' selected' : ''}"
                     onclick="openNotificationSpotlight(${realIdx})" data-allow="true">
                     <i class="notif-card-icon ${_notifLevelIcon(item.level)}"></i>
                     <div class="notif-card-body">
-                        <div class="notif-card-title">${escapeHtml(item.title || 'Notification')}</div>
+                        <div class="notif-card-title-row">
+                            <div class="notif-card-title">${escapeHtml(item.title || 'Notification')}</div>
+                            <span class="notif-severity-pill ${escapeHtml(level)}">${escapeHtml(label)}</span>
+                        </div>
                         <div class="notif-card-detail">${escapeHtml(item.detail || '-')}</div>
                         <div class="notif-card-meta">${escapeHtml(item.meta || '')}</div>
                     </div>
@@ -21380,6 +22667,7 @@
                     <td><button class="secondary" onclick="openProposalDetail(${parseInt(p.id, 10) || 0})" data-allow="true">Open</button></td>
                 </tr>`;
             }).join('');
+            animateTableRows(tbody);
         }
 
         async function refreshProposalsFromServer() {
@@ -21646,6 +22934,7 @@
                     <td>${escapeHtml(String(item.detail || '-'))}</td>
                 </tr>`;
             }).join('');
+            animateTableRows(tbody);
         }
 
         function getPostHistoryStatus(record) {
@@ -21753,6 +23042,7 @@
                     </tr>
                 `;
             }).join('');
+            animateTableRows(tbody);
 
             if (!rows.length) {
                 tbody.innerHTML = '<tr><td colspan="7" class="text-center" style="padding: 30px;">No post holder history for selected filters.</td></tr>';
@@ -21785,6 +23075,7 @@
                     </tr>
                 `;
             }).join('');
+            animateTableRows(tbody);
 
             if (!rows.length) {
                 tbody.innerHTML = '<tr><td colspan="6" class="text-center" style="padding: 24px;">No post holder history.</td></tr>';
@@ -21943,9 +23234,174 @@
         }
 
         function loadTeacherVotingTab() {
+            const historyCard = document.getElementById('adminVotingHistoryCard');
+            if (historyCard) historyCard.style.display = currentUserRole === 'admin' ? '' : 'none';
             populateTeacherVoteSelects();
             updateTeacherVotePower();
             loadTeacherVotingCandidates();
+            updateStudentVotingSummary();
+            populateVoteHistoryPostFilter();
+            handleVoteHistoryPostChange(true);
+        }
+
+        function populateVoteHistoryPostFilter() {
+            const select = document.getElementById('voteHistoryPost');
+            if (!select) return;
+            const previous = String(select.value || '');
+            const posts = Array.from(new Set([
+                ...db.getIndividualVotes().map(v => String(v.post || '').trim()).filter(Boolean),
+                ...db.getTeacherVotes().map(v => String(v.post || '').trim()).filter(Boolean)
+            ])).sort((a, b) => a.localeCompare(b));
+            select.innerHTML = '<option value="">Select Post...</option>' + posts.map(post => `<option value="${escapeHtml(post)}">${escapeHtml(post)}</option>`).join('');
+            if (previous && Array.from(select.options).some(option => option.value === previous)) {
+                select.value = previous;
+            }
+        }
+
+        function handleVoteHistoryPostChange(resetMonth = false) {
+            const monthSelect = document.getElementById('voteHistoryMonth');
+            const post = String(getElementValue('voteHistoryPost') || '').trim();
+            const emptyEl = document.getElementById('voteHistoryEmpty');
+            const resultEl = document.getElementById('voteHistoryResult');
+            if (!monthSelect || !emptyEl || !resultEl) return;
+            if (!post) {
+                monthSelect.innerHTML = '<option value="">Select Month...</option>';
+                emptyEl.textContent = 'Select a post to load voting months.';
+                resultEl.innerHTML = '';
+                return;
+            }
+            const monthSet = new Set();
+            db.getIndividualVotes().forEach(vote => {
+                if (String(vote.post || '').trim() !== post) return;
+                const monthKey = String(vote.month_key || String(vote.timestamp || '').substring(0, 7) || '').trim();
+                if (/^\d{4}-\d{2}$/.test(monthKey)) monthSet.add(monthKey);
+            });
+            db.getTeacherVotes().forEach(vote => {
+                if (String(vote.post || '').trim() !== post) return;
+                const monthKey = String(vote.month_key || String(vote.timestamp || '').substring(0, 7) || '').trim();
+                if (/^\d{4}-\d{2}$/.test(monthKey)) monthSet.add(monthKey);
+            });
+            const months = Array.from(monthSet).sort().reverse();
+            monthSelect.innerHTML = '<option value="">Select Month...</option>' + months.map(month => {
+                const dt = new Date(`${month}-01T00:00:00`);
+                const label = dt.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+                return `<option value="${month}">${label}</option>`;
+            }).join('');
+            if (!resetMonth && months.includes(String(monthSelect.value || ''))) {
+                // keep selection
+            } else if (months.length === 1) {
+                monthSelect.value = months[0];
+            }
+            renderVotingHistoryResult();
+        }
+
+        function renderVotingHistoryResult() {
+            const card = document.getElementById('adminVotingHistoryCard');
+            const emptyEl = document.getElementById('voteHistoryEmpty');
+            const resultEl = document.getElementById('voteHistoryResult');
+            if (!card || !emptyEl || !resultEl) return;
+            if (currentUserRole !== 'admin') {
+                card.style.display = 'none';
+                return;
+            }
+            card.style.display = '';
+            const post = String(getElementValue('voteHistoryPost') || '').trim();
+            const month = String(getElementValue('voteHistoryMonth') || '').trim();
+            if (!post) {
+                emptyEl.textContent = 'Select a post to load voting months.';
+                resultEl.innerHTML = '';
+                return;
+            }
+            if (!month) {
+                emptyEl.textContent = 'Select a month to view the historical result.';
+                resultEl.innerHTML = '';
+                return;
+            }
+            emptyEl.textContent = '';
+            const candidates = getCandidatesForPost(post);
+            const students = new Map(db.getStudents().map(s => [parseInt(s.id, 10), s]));
+            const teacherVotes = db.getTeacherVotes().filter(v => String(v.post || '').trim() === post && String(v.month_key || String(v.timestamp || '').substring(0, 7) || '').trim() === month);
+            const studentVotes = db.getIndividualVotes().filter(v => String(v.post || '').trim() === post && String(v.month_key || String(v.timestamp || '').substring(0, 7) || '').trim() === month);
+            const teacherPower = getTeacherVotePower();
+            const totals = candidates.map(candidate => {
+                const candidateStudent = students.get(parseInt(candidate.studentId, 10));
+                const candidateStudentVotes = studentVotes.filter(v => parseInt(v.candidateId, 10) === parseInt(candidate.id, 10) && String(v.voteType || 'candidate') === 'candidate');
+                const studentVoteCount = candidateStudentVotes.length;
+                const weightedStudentVotes = candidateStudentVotes.reduce((sum, vote) => {
+                    const explicitWeight = parseFloat(vote.votePower);
+                    if (Number.isFinite(explicitWeight) && explicitWeight > 0) {
+                        return sum + explicitWeight;
+                    }
+                    const voter = students.get(parseInt(vote.voterStudentId, 10));
+                    return sum + getStudentVotePower(voter);
+                }, 0);
+                const teacherVoteCount = teacherVotes.filter(v => parseInt(v.candidateId, 10) === parseInt(candidate.id, 10)).length;
+                return {
+                    candidate,
+                    student: candidateStudent,
+                    studentVoteCount,
+                    weightedStudentVotes,
+                    teacherVoteCount,
+                    weightedTeacherVotes: teacherVoteCount * teacherPower,
+                    totalComposite: weightedStudentVotes + (teacherVoteCount * teacherPower)
+                };
+            }).sort((a, b) => b.totalComposite - a.totalComposite || b.weightedStudentVotes - a.weightedStudentVotes || b.teacherVoteCount - a.teacherVoteCount || b.studentVoteCount - a.studentVoteCount);
+            if (!totals.length) {
+                resultEl.innerHTML = `<div class="section-subtitle">No candidate history found for ${escapeHtml(post)} in ${escapeHtml(month)}.</div>`;
+                return;
+            }
+            const winner = totals[0];
+            const runnerUp = totals[1] || null;
+            const monthLabel = new Date(`${month}-01T00:00:00`).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+            const rowsHtml = totals.map((row, idx) => `
+                <tr class="${idx === 0 ? 'top-row' : ''}">
+                    <td>${idx + 1}</td>
+                    <td>${escapeHtml(row.student ? getStudentDisplayNamePlain(row.student) : `Candidate ${row.candidate.id}`)}</td>
+                    <td>${escapeHtml(row.student ? formatRollDisplay(row.student.roll) : '-')}</td>
+                    <td>${row.weightedStudentVotes}</td>
+                    <td>${row.teacherVoteCount}</td>
+                    <td>${row.weightedTeacherVotes}</td>
+                    <td>${row.totalComposite}</td>
+                </tr>
+            `).join('');
+            resultEl.innerHTML = `
+                <div class="vote-history-hero">
+                    <div class="vote-history-headline">
+                        <div>
+                            <div class="vote-history-title">Voting Result Archive</div>
+                            <div class="section-subtitle" style="margin:6px 0 0 0;">${escapeHtml(post)} • ${escapeHtml(monthLabel)}</div>
+                        </div>
+                        <span class="vote-history-chip">📚 Admin View Only</span>
+                    </div>
+                    <div class="vote-history-podium">
+                        <div class="vote-history-rank winner">
+                            <div class="vote-history-rank-title">🏆 Winner</div>
+                            <div class="vote-history-rank-name">${escapeHtml(winner.student ? getStudentDisplayNamePlain(winner.student) : `Candidate ${winner.candidate.id}`)}</div>
+                            <div class="vote-history-rank-meta">Composite score: <strong>${winner.totalComposite}</strong></div>
+                        </div>
+                        ${runnerUp ? `
+                        <div class="vote-history-rank runnerup">
+                            <div class="vote-history-rank-title">🥈 Runner-Up</div>
+                            <div class="vote-history-rank-name">${escapeHtml(runnerUp.student ? getStudentDisplayNamePlain(runnerUp.student) : `Candidate ${runnerUp.candidate.id}`)}</div>
+                            <div class="vote-history-rank-meta">Composite score: <strong>${runnerUp.totalComposite}</strong></div>
+                        </div>` : ''}
+                    </div>
+                    <table class="vote-history-candidate-table">
+                        <thead>
+                            <tr>
+                                <th>Rank</th>
+                                <th>Candidate</th>
+                                <th>Roll</th>
+                                <th>Student Weight</th>
+                                <th>Teacher Votes</th>
+                                <th>Teacher Weight</th>
+                                <th>Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>${rowsHtml}</tbody>
+                    </table>
+                </div>
+            `;
         }
 
         function loadTeacherVotingCandidates() {
@@ -21964,31 +23420,24 @@
             const studentMap = new Map(students.map(s => [s.id, s]));
             const votes = db.getTeacherVotes().filter(v => String(v.post || '') === String(post));
             const teacherVote = votes.find(v => String(v.teacherId) === String(teacherId));
-            const voteCounts = votes.reduce((acc, v) => {
-                acc[v.candidateId] = (acc[v.candidateId] || 0) + 1;
-                return acc;
-            }, {});
             const teacherPower = getTeacherVotePower();
             const canVote = !!teacherId && !!post;
-            statusEl.textContent = teacherVote
-                ? `This teacher has already voted for ${teacherVote.candidateId ? 'a candidate' : 'this post'}.`
-                : 'Ready to vote.';
-            tbody.innerHTML = candidates.map(candidate => {
+            statusEl.innerHTML = teacherVote
+                ? `✅ <span class="voted-badge">VOTED</span> This teacher has already cast their vote for <strong>${escapeHtml(post)}</strong>.`
+                : `🗳️ Ready to vote. Vote Power: <strong>${teacherPower}</strong>`;
+            tbody.innerHTML = candidates.map((candidate, idx) => {
                 const student = studentMap.get(candidate.studentId);
                 if (!student) return '';
-                const count = voteCounts[candidate.id] || 0;
-                const weight = count * teacherPower;
                 const votedThis = teacherVote && String(teacherVote.candidateId) === String(candidate.id);
-                const buttonLabel = votedThis ? 'Voted' : 'Vote';
                 const disabled = (!canVote || teacherVote) ? 'disabled' : '';
                 return `
-                    <tr>
+                    <tr class="vote-row-enter" style="animation-delay:${idx * 60}ms">
                         <td>${student ? renderStudentName(student) : 'Unknown'}</td>
                         <td>${student ? formatRollDisplay(student.roll) : ''}</td>
                         <td>${student ? student.class : '-'}</td>
-                        <td>${weight.toFixed(1)}</td>
+                        <td>${getStudentGroup(student) || '-'}</td>
                         <td>
-                            <button class="secondary" onclick="castTeacherVote(${candidate.id})" style="font-size: 12px;" ${disabled}>${buttonLabel}</button>
+                            ${votedThis ? '<span class="voted-badge">✅ Your Vote</span>' : `<button class="vote-btn-cast" onclick="castTeacherVote(${candidate.id})" style="font-size:12px;padding:5px 14px;" ${disabled}>🗳️ Vote</button>`}
                         </td>
                     </tr>
                 `;
@@ -22011,6 +23460,7 @@
                 teacherId: parseInt(teacherId, 10) || teacherId,
                 candidateId,
                 voteType: 'candidate',
+                votePower: teacherPower,
                 timestamp: new Date().toISOString()
             });
             showAlert('Teacher vote recorded.', 'success');
@@ -22151,16 +23601,36 @@
                 loadPendingElectionApprovals();
                 return;
             }
-            const applied = db.applyElectionOutcome(pending.post, pending.candidateId, new Date().toISOString().split('T')[0]);
+            let applied = false;
+            try {
+                applied = db.applyElectionOutcome(pending.post, pending.candidateId, new Date().toISOString().split('T')[0]);
+            } catch (err) {
+                showAlert('Error applying election outcome: ' + (err && err.message ? err.message : String(err)), 'danger');
+                return;
+            }
             if (!applied) {
-                showAlert('Approval failed: candidate or post mapping is invalid.', 'danger');
+                showAlert('Approval failed: candidate or post not found. Check election candidates data.', 'danger');
                 return;
             }
             db.decidePendingResult(pending.post, pending.source, 'approved');
+            // Refresh all relevant UI sections
             loadOfficeHolders();
             loadCRTab();
             loadPendingElectionApprovals();
-            showAlert('Approved and applied.', 'success');
+            // Refresh scoreboard so CR suffix/crown shows immediately
+            const activeMonth = localStorage.getItem(ACTIVE_SCOREBOARD_MONTH_KEY) || getCurrentMonthKey();
+            loadMonthScoreboard(activeMonth);
+            // Update any visible voting result text
+            const groupResultEl = document.getElementById('groupVoteResult');
+            if (groupResultEl && String(groupResultEl.textContent || '').includes('pending approval')) {
+                groupResultEl.textContent = '✅ CR approved and installed.';
+                groupResultEl.classList.remove('flash');
+            }
+            const teacherResultEl = document.getElementById('teacherVoteResult');
+            if (teacherResultEl && String(teacherResultEl.textContent || '').includes('pending approval')) {
+                teacherResultEl.textContent = '✅ CR approved and installed.';
+            }
+            showAlert('✅ CR election approved. ' + escapeHtml(String(post || '')) + ' has been switched successfully.', 'success');
         }
 
         function denyPendingResult(post, source) {
@@ -22460,17 +23930,20 @@
             const classEl = document.getElementById('groupVoteStudentClass');
             const groupEl = document.getElementById('groupVoteStudentGroup');
             const partyEl = document.getElementById('groupVoteStudentParty');
+            const vpEl = document.getElementById('groupVoteStudentVotePower');
             if (!classEl || !groupEl || !partyEl) return;
             if (!student) {
                 classEl.textContent = '-';
                 groupEl.textContent = '-';
                 partyEl.textContent = '-';
+                if (vpEl) vpEl.textContent = '-';
                 return;
             }
             const parties = getStudentPartyLabels(student.id);
             classEl.textContent = String(student.class || '-');
             groupEl.textContent = getStudentGroup(student) || '-';
             partyEl.textContent = parties.length ? parties.join(', ') : 'Independent';
+            if (vpEl) vpEl.textContent = String(getStudentVotePower(student));
             groupVoteSession.studentId = student.id;
         }
 
@@ -22682,6 +24155,349 @@
             renderVoteResults(post);
         }
 
+        /* ===== ANIMATED ROW HELPER ===== */
+        function animateTableRows(el, delayMs) {
+            if (!el) return;
+            const ms = (delayMs !== undefined) ? delayMs : 40;
+            Array.from(el.querySelectorAll('tr')).forEach((row, i) => {
+                row.classList.remove('row-enter');
+                void row.offsetWidth; // force reflow so animation restarts
+                row.classList.add('row-enter');
+                row.style.animationDelay = `${i * ms}ms`;
+            });
+        }
+
+        /* ===== INLINE VOTE SUBMISSION (no dialog) ===== */
+        function submitGroupVoteInline(voteType, candidateId) {
+            groupVoteSession.post = getGroupVoteSelectedPost();
+            groupVoteSession.studentId = parseInt(getElementValue('groupVoteStudent'), 10) || null;
+            submitGroupVoteChoice(voteType, candidateId);
+        }
+
+        /* ===== STUDENT VOTING SUMMARY for teacher tab ===== */
+        function updateStudentVotingSummary() {
+            const post = getElementValue('teacherVotePost');
+            const banner = document.getElementById('studentVotingSummaryBanner');
+            const textEl = document.getElementById('studentVotingSummaryText');
+            if (!banner || !textEl) return;
+            if (!post) { banner.style.display = 'none'; return; }
+            const eligible = getEligibleIndividualVoters(post);
+            const votes = getRoundScopedIndividualVotes(post);
+            const cast = new Set(votes.map(v => String(v.voterStudentId))).size;
+            const candidateCounts = {};
+            getCandidatesForPost(post).forEach(c => { candidateCounts[c.id] = 0; });
+            // just show participation, not weighted counts
+            banner.style.display = '';
+            textEl.textContent = `${cast} of ${eligible.length} eligible students have voted for ${post}. ${cast >= eligible.length ? '✅ Student voting complete — ready for teacher round!' : `⏳ Awaiting ${eligible.length - cast} more vote(s).`}`;
+        }
+
+        let winnerRevealDetailHtml = '';
+        let winnerRevealDetailTitle = 'Voting Details';
+
+        function openWinnerRevealDetails() {
+            if (!winnerRevealDetailHtml) {
+                showAlert('No detailed voting pattern available for this reveal.', 'info');
+                return;
+            }
+            openGroupVoteResultModal(winnerRevealDetailTitle, 'Detailed voting pattern', '', winnerRevealDetailHtml);
+        }
+
+        function buildTeacherVoteBreakdown(post) {
+            const teacherVotes = db.getTeacherVotes().filter(v => String(v.post || '') === String(post));
+            const teachers = new Map(db.getTeachers().map(t => [String(t.id), t]));
+            const students = new Map(db.getStudents().map(s => [parseInt(s.id, 10), s]));
+            const candidates = getCandidatesForPost(post);
+            const teacherPower = getTeacherVotePower();
+            const cards = candidates.map(candidate => {
+                const candidateVotes = teacherVotes.filter(v => parseInt(v.candidateId, 10) === parseInt(candidate.id, 10));
+                const candidateStudent = students.get(parseInt(candidate.studentId, 10));
+                const totalVotes = candidateVotes.length;
+                const weightedVotes = totalVotes * teacherPower;
+                const voterItems = candidateVotes.map(vote => {
+                    const teacher = teachers.get(String(vote.teacherId));
+                    const label = teacher ? `${teacher.name || 'Teacher'}${teacher.roll ? ` (${teacher.roll})` : ''}` : `Teacher ${vote.teacherId || '-'}`;
+                    return `<li>${escapeHtml(label)} - weight ${teacherPower}</li>`;
+                }).join('');
+                return `
+                    <div class="vote-detail-card">
+                        <h4>${escapeHtml(candidateStudent ? getStudentDisplayNamePlain(candidateStudent) : `Candidate ${candidate.id}`)}</h4>
+                        <div class="vote-detail-meta">Total teacher votes: <strong>${totalVotes}</strong> | Weighted total: <strong>${weightedVotes}</strong></div>
+                        ${voterItems ? `<ul class="vote-detail-list">${voterItems}</ul>` : '<div class="vote-detail-meta">No teacher voted for this candidate.</div>'}
+                    </div>
+                `;
+            }).join('');
+            const totalCast = new Set(teacherVotes.map(v => String(v.teacherId))).size;
+            return `
+                <div class="vote-detail-meta"><strong>Post:</strong> ${escapeHtml(post)} | <strong>Teacher votes cast:</strong> ${totalCast} | <strong>Teacher vote power:</strong> ${teacherPower}</div>
+                <div class="vote-detail-grid">${cards || '<div class="vote-detail-meta">No candidate vote records found.</div>'}</div>
+            `;
+        }
+
+        /* ===== WORLD CUP WINNER REVEAL ===== */
+        function showWinnerReveal(winnerName, post, isNullified, stats) {
+            const overlay = document.getElementById('winnerRevealOverlay');
+            const stage = document.getElementById('winnerStage');
+            const cupEmoji = document.getElementById('winnerCupEmoji');
+            const crown = document.getElementById('winnerCrown');
+            const nameEl = document.getElementById('winnerNameEl');
+            const tagline = document.getElementById('winnerTagline');
+            const statsEl = document.getElementById('winnerStatsEl');
+            const postLabel = document.getElementById('winnerPostLabel');
+            const cupZone = document.getElementById('winnerCupZone');
+            if (!overlay || !stage) return;
+
+            // Reset animation classes
+            stage.className = 'winner-stage' + (isNullified ? ' nullified' : '');
+            cupZone.className = 'winner-cup-zone';
+            overlay.classList.remove('hidden');
+
+            if (isNullified) {
+                cupEmoji.textContent = '⚖️';
+                crown.textContent = '❌';
+                if (nameEl) nameEl.textContent = 'Election Nullified';
+                if (nameEl) nameEl.style.fontSize = 'clamp(22px,4vw,38px)';
+                if (tagline) tagline.textContent = stats || 'No clear winner emerged.';
+                if (postLabel) postLabel.textContent = `Post: ${post}`;
+                if (statsEl) statsEl.innerHTML = winnerRevealDetailHtml
+                    ? `<button class="winner-detail-btn" onclick="openWinnerRevealDetails()">Detailed Voting Pattern</button>`
+                    : '';
+            } else {
+                cupEmoji.textContent = '🏆';
+                crown.textContent = '👑';
+                if (nameEl) { nameEl.textContent = winnerName; nameEl.style.fontSize = ''; }
+                if (tagline) tagline.textContent = `🎉 Winner of ${post}!`;
+                if (postLabel) postLabel.textContent = `Post: ${post}`;
+                if (statsEl) {
+                    const badges = (stats || []).map(s => `<span class="winner-stat-badge">${s}</span>`).join('');
+                    const detailBtn = winnerRevealDetailHtml
+                        ? `<button class="winner-detail-btn" onclick="openWinnerRevealDetails()">Detailed Voting Pattern</button>`
+                        : '';
+                    statsEl.innerHTML = `${badges}${detailBtn}`;
+                }
+                // Launch confetti/balloons after 1s (after cup appears)
+                setTimeout(() => launchParticles(overlay), 1000);
+                // Slide cup left after 1.8s
+                setTimeout(() => { cupZone.classList.add('slide-left'); }, 1800);
+            }
+        }
+
+        function launchParticles(container) {
+            const colors = ['#ffd700','#ff6b6b','#4ecdc4','#45b7d1','#96ceb4','#ffeaa7','#dda0dd','#98d8c8','#ff9a9e','#a18cd1'];
+            const balloons = ['🎈','🎊','🎉','🥳','🎆'];
+            const w = window.innerWidth;
+            // Confetti
+            for (let i = 0; i < 80; i++) {
+                const el = document.createElement('div');
+                el.className = 'confetti-particle';
+                el.style.cssText = `
+                    left:${Math.random()*100}%;
+                    top:${-10 - Math.random()*20}px;
+                    background:${colors[Math.floor(Math.random()*colors.length)]};
+                    width:${6+Math.random()*10}px;
+                    height:${6+Math.random()*10}px;
+                    border-radius:${Math.random()>.5?'50%':'2px'};
+                    animation-duration:${2.5+Math.random()*3}s;
+                    animation-delay:${Math.random()*2}s;
+                `;
+                container.appendChild(el);
+                setTimeout(() => el.remove(), 6000);
+            }
+            // Ribbons
+            for (let i = 0; i < 30; i++) {
+                const el = document.createElement('div');
+                el.className = 'ribbon';
+                el.style.cssText = `
+                    left:${Math.random()*100}%;
+                    height:${40+Math.random()*60}px;
+                    background:${colors[Math.floor(Math.random()*colors.length)]};
+                    animation-duration:${3+Math.random()*3}s;
+                    animation-delay:${Math.random()*2}s;
+                `;
+                container.appendChild(el);
+                setTimeout(() => el.remove(), 7000);
+            }
+            // Balloons
+            for (let i = 0; i < 12; i++) {
+                const el = document.createElement('div');
+                el.className = 'balloon';
+                el.textContent = balloons[Math.floor(Math.random()*balloons.length)];
+                el.style.cssText = `
+                    left:${Math.random()*100}%;
+                    bottom:${-60 - Math.random()*40}px;
+                    font-size:${24+Math.random()*20}px;
+                    animation-duration:${3+Math.random()*4}s;
+                    animation-delay:${Math.random()*2.5}s;
+                `;
+                container.appendChild(el);
+                setTimeout(() => el.remove(), 9000);
+            }
+        }
+
+        function closeWinnerReveal() {
+            const overlay = document.getElementById('winnerRevealOverlay');
+            if (overlay) {
+                overlay.style.animation = 'none';
+                overlay.style.opacity = '0';
+                overlay.style.transition = 'opacity .4s';
+                setTimeout(() => {
+                    overlay.classList.add('hidden');
+                    overlay.style.opacity = '';
+                    overlay.style.transition = '';
+                    // Clean up particles
+                    overlay.querySelectorAll('.confetti-particle,.ribbon,.balloon').forEach(el => el.remove());
+                }, 400);
+            }
+        }
+
+        /* ===== CONCLUDE & REVEAL (from either tab) ===== */
+        function concludeAndReveal(source) {
+            const post = source === 'teacher'
+                ? getElementValue('teacherVotePost')
+                : getGroupVoteSelectedPost();
+            if (!post) {
+                showAlert('Select a post first.', 'warning');
+                return;
+            }
+            if (source === 'teacher') {
+                _concludeTeacherAndReveal(post);
+            } else {
+                _concludeStudentAndReveal(post);
+            }
+        }
+
+        function _concludeStudentAndReveal(post) {
+            winnerRevealDetailHtml = '';
+            winnerRevealDetailTitle = 'Voting Details';
+            const eligibleVoters = getEligibleIndividualVoters(post);
+            const totalEligible = eligibleVoters.length;
+            const votes = getRoundScopedIndividualVotes(post);
+            const votesCast = new Set(votes.map(v => String(v.voterStudentId))).size;
+            const voterMap = new Map(db.getStudents().map(s => [s.id, s]));
+            const totalEligibleWeight = eligibleVoters.reduce((sum, v) => sum + getStudentVotePower(v), 0);
+            const avgEligibleWeight = totalEligible > 0 ? totalEligibleWeight / totalEligible : 0;
+            const majorityWeight = totalEligibleWeight / 2;
+
+            const weightByCandidate = votes.reduce((acc, vote) => {
+                if (String(vote.voteType || '') !== 'candidate') return acc;
+                if (!vote.candidateId) return acc;
+                const voter = voterMap.get(vote.voterStudentId);
+                acc[vote.candidateId] = (acc[vote.candidateId] || 0) + getStudentVotePower(voter);
+                return acc;
+            }, {});
+
+            const topEntry = Object.entries(weightByCandidate).sort((a,b)=>b[1]-a[1])[0] || [null,0];
+            const topCandidateId = topEntry[0] ? parseInt(topEntry[0],10) : null;
+            const topWeight = topEntry[1] || 0;
+            const secondWeight = Object.entries(weightByCandidate).sort((a,b)=>b[1]-a[1])[1]?.[1] || 0;
+            const abstainWeight = votes.filter(v=>v.voteType==='abstain').reduce((s,v)=>s+getStudentVotePower(voterMap.get(v.voterStudentId)),0);
+            const notaWeight = votes.filter(v=>v.voteType==='nota').reduce((s,v)=>s+getStudentVotePower(voterMap.get(v.voterStudentId)),0);
+
+            const winnerCandidate = getCandidatesForPost(post).find(c=>parseInt(c.id,10)===topCandidateId);
+            const winnerStudent = winnerCandidate ? db.getStudents().find(s=>s.id===winnerCandidate.studentId) : null;
+            const passesAvg = topWeight >= avgEligibleWeight;
+            const clearLead = topWeight > secondWeight;
+            const passesMajorityWeight = topWeight >= majorityWeight;
+            const won = winnerCandidate && passesAvg && clearLead && passesMajorityWeight;
+
+            if (won) {
+                if (!isElectionOutcomeApplied(post, winnerCandidate.studentId)) {
+                    const existing = getPendingResult(post,'student');
+                    if (!existing || existing.candidateId !== topCandidateId) {
+                        queuePendingElectionResult({ post, candidateId: topCandidateId, source:'student',
+                            summary:'Student voting winner awaiting admin approval.',
+                            detail:`Weighted ${topWeight.toFixed(1)} / Avg ${avgEligibleWeight.toFixed(1)} / Majority ${majorityWeight.toFixed(1)}`
+                        });
+                    }
+                }
+                const winnerName = winnerStudent ? (winnerStudent.base_name || winnerStudent.name) : 'Winner';
+                showWinnerReveal(winnerName, post, false, [
+                    `⚡ Weighted Votes: ${topWeight.toFixed(1)}`,
+                    `📊 Avg Threshold: ${avgEligibleWeight.toFixed(1)}`,
+                    `🗳️ Votes Cast: ${votesCast}/${totalEligible}`,
+                    ...(abstainWeight > 0 ? [`⏭️ Abstain: ${abstainWeight.toFixed(1)}`] : []),
+                    ...(notaWeight > 0 ? [`🚫 NOTA: ${notaWeight.toFixed(1)}`] : [])
+                ]);
+            } else {
+                const reason = !winnerCandidate ? 'No candidate votes' :
+                    !passesAvg ? 'Did not meet average threshold' :
+                    !clearLead ? 'Tie — no clear lead' :
+                    !passesMajorityWeight ? 'Majority not reached' : 'Election nullified';
+                showWinnerReveal(null, post, true, `${reason}. Votes: ${votesCast}/${totalEligible}.`);
+            }
+            // Update inline result text too
+            const resultEl = document.getElementById('groupVoteResult');
+            if (resultEl) {
+                resultEl.textContent = won
+                    ? `✅ Winner: ${winnerStudent ? (winnerStudent.base_name||winnerStudent.name) : ''} (pending approval)`
+                    : `❌ Election nullified`;
+            }
+        }
+
+        function _concludeTeacherAndReveal(post) {
+            winnerRevealDetailHtml = buildTeacherVoteBreakdown(post);
+            winnerRevealDetailTitle = `Teacher Voting Pattern - ${post}`;
+            const teachers = db.getTeachers().filter(t => t.active !== false);
+            const totalEligible = teachers.length;
+            const votes = db.getTeacherVotes().filter(v => String(v.post||'') === String(post));
+            const votesCast = new Set(votes.map(v=>String(v.teacherId))).size;
+            const teacherPower = getTeacherVotePower();
+            const totalEligibleWeight = totalEligible * teacherPower;
+            const majorityWeight = totalEligibleWeight / 2;
+            const rawVoteCountByCandidate = votes.reduce((acc, vote) => {
+                if (!vote.candidateId) return acc;
+                acc[vote.candidateId] = (acc[vote.candidateId] || 0) + 1;
+                return acc;
+            }, {});
+
+            const weightByCandidate = votes.reduce((acc,v) => {
+                if (!v.candidateId) return acc;
+                acc[v.candidateId] = (acc[v.candidateId]||0) + teacherPower;
+                return acc;
+            }, {});
+            const topEntry = Object.entries(weightByCandidate).sort((a,b)=>b[1]-a[1])[0]||[null,0];
+            const topCandidateId = topEntry[0] ? parseInt(topEntry[0],10) : null;
+            const topWeight = topEntry[1]||0;
+            const secondWeight = Object.entries(weightByCandidate).sort((a,b)=>b[1]-a[1])[1]?.[1]||0;
+
+            const winnerCandidate = db.getCandidates().find(c=>parseInt(c.id,10)===topCandidateId && String(c.post||'')===post);
+            const winnerStudent = winnerCandidate ? db.getStudents().find(s=>s.id===winnerCandidate.studentId) : null;
+            const avgW = teacherPower;
+            const passesAvg = topWeight >= avgW;
+            const clearLead = topWeight > secondWeight;
+            const passesMajorityWeight = topWeight >= majorityWeight;
+            const won = winnerCandidate && passesAvg && clearLead && passesMajorityWeight;
+
+            if (won) {
+                if (!isElectionOutcomeApplied(post, winnerCandidate.studentId)) {
+                    queuePendingElectionResult({ post, candidateId: topCandidateId, source:'teacher',
+                        summary:'Teacher voting winner awaiting admin approval.',
+                        detail:`Weighted ${topWeight.toFixed(1)} / Threshold ${avgW.toFixed(1)}`
+                    });
+                }
+                const winnerName = winnerStudent ? (winnerStudent.base_name||winnerStudent.name) : 'Winner';
+                const totalVotes = rawVoteCountByCandidate[topCandidateId] || 0;
+                showWinnerReveal(winnerName, post, false, [
+                    `🧮 Total Votes: ${totalVotes}`,
+                    `⚡ Weighted Votes: ${topWeight.toFixed(1)}`,
+                    `📊 Threshold: ${avgW.toFixed(1)}`,
+                    `🗳️ Votes Cast: ${votesCast}/${totalEligible}`,
+                    `👩‍🏫 Teacher Vote Power: ${teacherPower}`
+                ]);
+            } else {
+                const reason = !winnerCandidate ? 'No candidate votes' :
+                    !passesAvg ? 'Did not meet threshold' :
+                    !clearLead ? 'Tie' :
+                    !passesMajorityWeight ? 'Majority not reached' : 'Nullified';
+                showWinnerReveal(null, post, true, `${reason}. Votes: ${votesCast}/${totalEligible}.`);
+            }
+            const resultEl = document.getElementById('teacherVoteResult');
+            if (resultEl) {
+                resultEl.textContent = won
+                    ? `✅ Winner: ${winnerStudent ? (winnerStudent.base_name||winnerStudent.name) : ''} (pending approval)`
+                    : `❌ Election nullified`;
+            }
+        }
+
         function loadGroupVotingCandidates() {
             const post = getGroupVoteSelectedPost();
             const selectedStudent = getGroupVoteSelectedStudent();
@@ -22703,46 +24519,59 @@
             const students = db.getStudents();
             const studentMap = new Map(students.map(student => [parseInt(student.id, 10), student]));
             const votes = getRoundScopedIndividualVotes(post);
-            const voteCounts = votes.reduce((acc, vote) => {
-                if (String(vote.voteType || 'candidate') !== 'candidate') return acc;
-                acc[vote.candidateId] = (acc[vote.candidateId] || 0) + 1;
-                return acc;
-            }, {});
-
             const studentValid = !!selectedStudent;
             const eligible = isStudentEligibleForPost(selectedStudent, post);
             const alreadyVoted = studentValid ? hasIndividualVoteForPost(selectedStudent.id, post) : false;
             const groups = getCRGroupsFromPost(post);
+            const canVote = studentValid && eligible && !alreadyVoted;
+
+            // Update voter info grid visibility
+            const infoGrid = document.getElementById('groupVoterInfoGrid');
+            if (infoGrid) infoGrid.style.display = studentValid ? '' : 'none';
+
+            // Update inline action bar (NOTA / Abstain)
+            const actionBar = document.getElementById('groupVoteInlineActions');
+            const actionLabel = document.getElementById('groupVoteActionLabel');
+            if (actionBar) {
+                if (canVote) {
+                    actionBar.classList.remove('hidden');
+                    if (actionLabel) actionLabel.textContent = `🗳️ ${getStudentDisplayNamePlain(selectedStudent)}'s vote options:`;
+                } else {
+                    actionBar.classList.add('hidden');
+                }
+            }
 
             if (!studentValid) {
-                statusEl.textContent = 'Select a student voter to continue.';
+                statusEl.textContent = '👆 Select a student voter to continue.';
                 statusEl.classList.remove('flash');
             } else if (!eligible) {
                 statusEl.textContent = groups.length
-                    ? `Selected voter is not eligible. ${post} allows only Group ${groups.join(' & ')} students.`
-                    : 'Selected voter is not eligible for this post.';
+                    ? `⛔ Not eligible — ${post} allows only Group ${groups.join(' & ')} students.`
+                    : '⛔ Selected voter is not eligible for this post.';
                 statusEl.classList.add('flash');
             } else if (alreadyVoted) {
-                statusEl.textContent = `${getStudentDisplayNamePlain(selectedStudent)} has already voted for ${post}.`;
+                statusEl.innerHTML = `✅ <span class="voted-badge">VOTED</span> ${escapeHtml(getStudentDisplayNamePlain(selectedStudent))} has already voted for <strong>${escapeHtml(post)}</strong>.`;
                 statusEl.classList.remove('flash');
             } else {
-                statusEl.textContent = `${getStudentDisplayNamePlain(selectedStudent)} is eligible to vote for ${post}.`;
+                statusEl.textContent = `✅ ${getStudentDisplayNamePlain(selectedStudent)} is eligible — cast vote below.`;
                 statusEl.classList.remove('flash');
             }
 
-            tbody.innerHTML = candidates.map(candidate => {
+            tbody.innerHTML = candidates.map((candidate, idx) => {
                 const student = studentMap.get(parseInt(candidate.studentId, 10));
                 if (!student) return '';
-                const count = voteCounts[candidate.id] || 0;
-                const canOpenBooth = studentValid && eligible && !alreadyVoted;
+                const votedThis = alreadyVoted && (() => {
+                    const myVote = votes.find(v => String(v.voterStudentId) === String(selectedStudent?.id));
+                    return myVote && String(myVote.candidateId) === String(candidate.id);
+                })();
                 return `
-                    <tr>
+                    <tr class="vote-row-enter" style="animation-delay:${idx * 60}ms">
                         <td>${renderStudentName(student)}</td>
                         <td>${formatRollDisplay(student.roll)}</td>
                         <td>${student.class || '-'}</td>
-                        <td>${count}</td>
+                        <td>${getStudentGroup(student) || '-'}</td>
                         <td>
-                            <button class="secondary" style="font-size: 12px;" onclick="openGroupVoteDialog()" ${canOpenBooth ? '' : 'disabled'}>Cast Vote</button>
+                            ${votedThis ? '<span class="voted-badge">✅ Your Vote</span>' : `<button class="vote-btn-cast" style="font-size:12px;padding:5px 14px;" onclick="submitGroupVoteInline('candidate',${candidate.id})" ${canVote ? '' : 'disabled'}>🗳️ Cast Vote</button>`}
                         </td>
                     </tr>
                 `;
@@ -22800,7 +24629,7 @@
             const cardsEl = document.getElementById('groupVoteCandidateCards');
             if (!dialog || !titleEl || !metaEl || !cardsEl) return;
             titleEl.textContent = 'Cast Your Vote Now';
-            metaEl.textContent = `Voter: ${getStudentDisplayNamePlain(voter)} (${voter.roll}) | Post: ${post}`;
+            metaEl.textContent = `Voter: ${getStudentDisplayNamePlain(voter)} (${voter.roll}) | Vote Power: ${getStudentVotePower(voter)} | Post: ${post}`;
             cardsEl.innerHTML = cardsHtml;
             if (dialog.parentElement !== document.body) {
                 document.body.appendChild(dialog);
@@ -22902,12 +24731,23 @@
                 voterStudentId: voterId,
                 candidateId: finalCandidateId,
                 voteType: finalType,
+                votePower: getStudentVotePower(voter),
                 timestamp: new Date().toISOString()
             });
 
-            showAlert('Vote recorded successfully.', 'success');
+            // Hide inline action bar immediately
+            const ab = document.getElementById('groupVoteInlineActions');
+            if (ab) ab.classList.add('hidden');
+
+            const voteLabel = finalType === 'nota' ? '🚫 NOTA' : finalType === 'abstain' ? '⏭️ Abstain' : '🗳️ Candidate';
+            showAlert(`✅ Vote recorded! (${voteLabel})`, 'success');
+            // Flash the row
+            const tbody = document.getElementById('groupVotingBody');
+            if (tbody) tbody.classList.add('vote-registered-flash');
+            setTimeout(() => { if (tbody) tbody.classList.remove('vote-registered-flash'); }, 700);
             closeGroupVoteDialog();
             loadGroupVotingCandidates();
+            updateStudentVotingSummary();
         }
 
         function isElectionOutcomeApplied(post, winnerStudentId) {
@@ -29327,17 +31167,77 @@
         // ==========================================
         // GOOD CONDUCT BADGE
         // ==========================================
-        // Formula:
-        //   1. Attendance rate >= 75% across all months with data
-        //   2. Average monthly score >= 0 (net positive across all months)
-        //   3. No single month score below -100
-        //   4. Total VETO usage <= 1
-        //   5. Student must be active
-        //
-        // Attendance rate = (total present + late days) / (total recorded days) * 100
-        // Monthly score = sum of points + attendance penalties for each month
+        function getGoodConductFormulaConfig() {
+            const data = db.getData() || {};
+            const raw = (data.good_conduct_formula && typeof data.good_conduct_formula === 'object')
+                ? data.good_conduct_formula
+                : {};
+            return {
+                min_attendance: Math.max(0, Math.min(100, parseInt(raw.min_attendance, 10) || 75)),
+                min_avg_score: parseInt(raw.min_avg_score, 10) || 0,
+                min_lowest_month: parseInt(raw.min_lowest_month, 10) || -100,
+                max_veto_usage: Math.max(0, parseInt(raw.max_veto_usage, 10) || 1)
+            };
+        }
+
+        function _goodConductFormulaText(cfg) {
+            return `Attendance Rate >= ${cfg.min_attendance}% across all months | ` +
+                `Average Monthly Score >= ${cfg.min_avg_score} | ` +
+                `No month with score below ${cfg.min_lowest_month} | ` +
+                `VETO usage <= ${cfg.max_veto_usage} total | Must be Active student`;
+        }
+
+        function renderGoodConductFormulaUI() {
+            const cfg = getGoodConductFormulaConfig();
+            const box = document.getElementById('goodConductFormula');
+            const editor = document.getElementById('goodConductFormulaEditor');
+            const actions = document.getElementById('goodConductFormulaActions');
+            const isAdmin = currentUserRole === 'admin';
+            if (editor) editor.style.display = isAdmin ? '' : 'none';
+            if (actions) actions.style.display = isAdmin ? '' : 'none';
+            setElementValue('gcMinAttendance', cfg.min_attendance);
+            setElementValue('gcMinAvgScore', cfg.min_avg_score);
+            setElementValue('gcMinLowestMonth', cfg.min_lowest_month);
+            setElementValue('gcMaxVetoUsage', cfg.max_veto_usage);
+            if (box) {
+                box.innerHTML = `<strong style="color: #4ade80;">Formula:</strong> ${escapeHtml(_goodConductFormulaText(cfg))
+                    .replace(/\|/g, '&nbsp;|&nbsp;')}`;
+            }
+        }
+
+        function saveGoodConductFormula() {
+            if (currentUserRole !== 'admin') {
+                showAlert('Only Admin can edit Good Conduct formula.', 'warning');
+                return;
+            }
+            const minAttendance = Math.max(0, Math.min(100, parseInt(getElementValue('gcMinAttendance'), 10) || 0));
+            const minAvgScore = parseInt(getElementValue('gcMinAvgScore'), 10) || 0;
+            const minLowest = parseInt(getElementValue('gcMinLowestMonth'), 10);
+            const maxVeto = Math.max(0, parseInt(getElementValue('gcMaxVetoUsage'), 10) || 0);
+            const data = db.getData();
+            data.good_conduct_formula = {
+                min_attendance: minAttendance,
+                min_avg_score: minAvgScore,
+                min_lowest_month: Number.isFinite(minLowest) ? minLowest : -100,
+                max_veto_usage: maxVeto
+            };
+            db.saveData(data);
+            if (SERVER_SYNC.enabled) pushToServer(db.getData(), { silent: true }).catch(() => {});
+            renderGoodConductBadge();
+            showAlert('Good Conduct formula updated.', 'success');
+        }
+
+        function resetGoodConductFormula() {
+            if (currentUserRole !== 'admin') return;
+            setElementValue('gcMinAttendance', '75');
+            setElementValue('gcMinAvgScore', '0');
+            setElementValue('gcMinLowestMonth', '-100');
+            setElementValue('gcMaxVetoUsage', '1');
+            saveGoodConductFormula();
+        }
 
         function computeGoodConductData() {
+            const formula = getGoodConductFormulaConfig();
             const students = db.getStudents().filter(s => s.active !== false);
             const months = db.getMonths();
             if (!months.length) return [];
@@ -29419,19 +31319,19 @@
                 const vetoUsage = vetoUsageByStudent.get(sid) || 0;
 
                 // Eligibility checks
-                const attendanceOk = attendanceRate !== null && attendanceRate >= 75;
-                const avgScoreOk = avgScore >= 0;
-                const noDeepNegative = lowestMonth >= -100;
-                const vetoOk = vetoUsage <= 1;
+                const attendanceOk = attendanceRate !== null && attendanceRate >= formula.min_attendance;
+                const avgScoreOk = avgScore >= formula.min_avg_score;
+                const noDeepNegative = lowestMonth >= formula.min_lowest_month;
+                const vetoOk = vetoUsage <= formula.max_veto_usage;
                 const eligible = attendanceOk && avgScoreOk && noDeepNegative && vetoOk;
 
                 // Build failure reasons
                 const reasons = [];
                 if (attendanceRate === null) reasons.push('No attendance data');
-                else if (!attendanceOk) reasons.push(`Attendance ${attendanceRate}% < 75%`);
-                if (!avgScoreOk) reasons.push(`Avg score ${avgScore} < 0`);
-                if (!noDeepNegative) reasons.push(`Month low ${lowestMonth} < −100`);
-                if (!vetoOk) reasons.push(`VETOs used: ${vetoUsage} > 1`);
+                else if (!attendanceOk) reasons.push(`Attendance ${attendanceRate}% < ${formula.min_attendance}%`);
+                if (!avgScoreOk) reasons.push(`Avg score ${avgScore} < ${formula.min_avg_score}`);
+                if (!noDeepNegative) reasons.push(`Month low ${lowestMonth} < ${formula.min_lowest_month}`);
+                if (!vetoOk) reasons.push(`VETOs used: ${vetoUsage} > ${formula.max_veto_usage}`);
 
                 return {
                     student,
@@ -29454,6 +31354,7 @@
         function renderGoodConductBadge() {
             const tbody = document.getElementById('goodConductBody');
             if (!tbody) return;
+            renderGoodConductFormulaUI();
             const filter = String(getElementValue('goodConductFilter') || 'eligible').trim();
             const data = computeGoodConductData();
             const filtered = filter === 'eligible' ? data.filter(r => r.eligible) : data;
@@ -29466,6 +31367,7 @@
             }
 
             tbody.innerHTML = filtered.map((row, idx) => {
+                const formula = getGoodConductFormulaConfig();
                 const s = row.student;
                 const badgeClass = row.eligible ? 'star-used-green' : '';
                 const badgeLabel = row.eligible
@@ -29477,11 +31379,11 @@
                         <td>${formatRollDisplay(s.roll)}</td>
                         <td>${renderStudentName(s)}</td>
                         <td>${getStudentGroup(s) || '-'}</td>
-                        <td style="font-family: var(--number-font); ${row.attendanceRate !== null && row.attendanceRate < 75 ? 'color: #f87171;' : ''}">${row.attendanceRate !== null ? row.attendanceRate + '%' : '-'}</td>
-                        <td style="font-family: var(--number-font); ${row.avgScore < 0 ? 'color: #f87171;' : ''}">${row.avgScore}</td>
+                        <td style="font-family: var(--number-font); ${row.attendanceRate !== null && row.attendanceRate < formula.min_attendance ? 'color: #f87171;' : ''}">${row.attendanceRate !== null ? row.attendanceRate + '%' : '-'}</td>
+                        <td style="font-family: var(--number-font); ${row.avgScore < formula.min_avg_score ? 'color: #f87171;' : ''}">${row.avgScore}</td>
                         <td style="font-family: var(--number-font);">${row.monthCount}</td>
-                        <td style="font-family: var(--number-font); ${row.vetoUsage > 1 ? 'color: #f87171;' : ''}">${row.vetoUsage}</td>
-                        <td style="font-family: var(--number-font); ${row.lowestMonth < -100 ? 'color: #f87171;' : ''}">${row.lowestMonth}</td>
+                        <td style="font-family: var(--number-font); ${row.vetoUsage > formula.max_veto_usage ? 'color: #f87171;' : ''}">${row.vetoUsage}</td>
+                        <td style="font-family: var(--number-font); ${row.lowestMonth < formula.min_lowest_month ? 'color: #f87171;' : ''}">${row.lowestMonth}</td>
                         <td class="${badgeClass}">${badgeLabel}</td>
                     </tr>
                 `;
@@ -29917,6 +31819,8 @@
 
         // Ctrl+Z anywhere in the page (excluding text inputs) triggers undo.
         document.addEventListener('keydown', (e) => {
+            // ESC closes the notification popup
+            if (e.key === 'Escape') { closeNotifPopup(); return; }
             if (!(e.ctrlKey || e.metaKey) || e.key !== 'z' || e.shiftKey) return;
             const tag = (document.activeElement && document.activeElement.tagName || '').toLowerCase();
             if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
@@ -29949,21 +31853,27 @@
             };
         }
 
-        function showAlert(message, type = 'info') {
+        function showAlert(message, type = 'info', duration = 4000) {
             const container = document.getElementById('alertContainer');
             const alertId = 'alert-' + Date.now();
+            // duration=0 → sticky until user clicks ✕
+            const closeBtn = duration === 0
+                ? `<button onclick="document.getElementById('${alertId}').remove()" style="margin-left:10px;background:none;border:none;color:inherit;cursor:pointer;font-size:16px;line-height:1;opacity:0.75;" title="Dismiss">✕</button>`
+                : '';
+            const iconName = type === 'success' ? 'check-circle' : type === 'danger' ? 'exclamation-circle' : type === 'warning' ? 'exclamation-triangle' : 'info-circle';
             const html = `
                 <div class="alert alert-${type}" id="${alertId}">
-                    <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'danger' ? 'exclamation-circle' : 'info-circle'}"></i>
-                    <span>${message}</span>
+                    <i class="fas fa-${iconName}"></i>
+                    <span>${message}</span>${closeBtn}
                 </div>
             `;
             container.insertAdjacentHTML('beforeend', html);
-            
-            setTimeout(() => {
-                const element = document.getElementById(alertId);
-                if (element) element.remove();
-            }, 4000);
+            if (duration > 0) {
+                setTimeout(() => {
+                    const el = document.getElementById(alertId);
+                    if (el) el.remove();
+                }, duration);
+            }
         }
 
         /* VALIDATION MODAL FUNCTIONS */
@@ -30122,10 +32032,10 @@
             return { valid: true };
         }
 
-        function validateVetoAvailability(studentId, requestedVetos) {
+        function validateVetoAvailability(studentId, requestedVetos, monthKey = '') {
             const student = db.getStudents().find(s => s.id === studentId);
             if (!student) return { valid: false, message: 'Student not found.' };
-            const availableVetos = parseInt(safeProp(student, 'veto_count'), 10) || 0;
+            const availableVetos = getAvailableVetosForMonth(studentId, monthKey);
             if (requestedVetos < 0 && availableVetos < Math.abs(requestedVetos)) {
                 return {
                     valid: false,
@@ -30289,9 +32199,15 @@
             updateRoleBadge();
             applyRolePermissions();
             if (currentUserRole === 'admin') {
+                const prunedVotingHistory = pruneVotingHistoryToCurrentMonth({ persist: true });
+                const repairedMonthCarries = repairMonthRosterProfileVetoCarries({ persist: true });
                 reconcileApprovedElectionOutcomes();
                 reconcilePendingElectionApprovals();
                 syncPostHolderHistory({ persist: false });
+                const refreshedRoleGrants = applyMonthlyRoleVetoGrants({ persist: true });
+                if ((prunedVotingHistory || repairedMonthCarries || refreshedRoleGrants) && SERVER_SYNC.enabled) {
+                    pushToServer(db.getData(), { silent: true }).catch(() => {});
+                }
             }
             if (currentUserRole === 'admin' || currentUserRole === 'teacher') {
                 applyMonthlyRoleVetoGrants({ persist: false });
@@ -30439,6 +32355,15 @@
         });
 
     </script>
+
+    <!-- Notification click popup modal -->
+    <div id="notifPopupOverlay" class="notif-popup-overlay" style="display:none"
+         onclick="if(event.target===this)closeNotifPopup()" role="dialog" aria-modal="true">
+        <div id="notifPopupBox" class="notif-popup-box info">
+            <button class="notif-popup-close" onclick="closeNotifPopup()" title="Close" aria-label="Close">&#x2715;</button>
+            <div id="notifPopupContent"></div>
+        </div>
+    </div>
 </body>
 </html>
 

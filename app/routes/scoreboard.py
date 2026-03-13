@@ -222,7 +222,15 @@ def _forward_offline_data_to_peers(payload, extra_peers=None):
     peers = list(dict.fromkeys(peers))
     if not peers:
         return
-    current_origin = (request.host_url or '').rstrip('/')
+    # request.host_url is only available inside a Flask request context.
+    # This function is also called from background daemon threads (spawned
+    # during route handlers) where the request proxy is no longer valid.
+    # Swallow the RuntimeError and default to '' so the origin-skip check
+    # simply never matches any peer URL.
+    try:
+        current_origin = (request.host_url or '').rstrip('/')
+    except RuntimeError:
+        current_origin = ''
     is_master = str(os.getenv('EA_MASTER_MODE', '')).strip() == '1'
     body_payload = {'data': _payload_for_external_replication(payload)}
     if is_master:
@@ -1332,13 +1340,13 @@ def _compute_active_role_veto_quotas(data, date_key=None):
             _add_quota(sid, quota)
 
     # CR quota (+2) once per student if either class CR or group CR is active.
+    # class_reps and group_crs are explicitly managed by admins via status field
+    # (active/ended), so we trust status alone — no tenure-expiry gate applied.
+    # This ensures vetoes are granted instantly on election win, direct appointment,
+    # or post resume (the reconciliation runs immediately after each data sync).
     cr_students = set()
     for rep in data.get('class_reps', []) or []:
         if _normalize_holder_status(rep.get('status') or 'active') != 'active':
-            continue
-        tenure_months = _tenure_months_for_assignment('class_rep', rep.get('post') or 'CR')
-        extension_months = _parse_int_safe(rep.get('tenure_extension_months'), 0)
-        if not _is_assignment_active_by_tenure(rep.get('elected_on'), tenure_months, extension_months, check_date):
             continue
         sid = _parse_int_safe(rep.get('studentId'), 0)
         if sid in by_id:
@@ -1346,10 +1354,6 @@ def _compute_active_role_veto_quotas(data, date_key=None):
 
     for rep in data.get('group_crs', []) or []:
         if _normalize_holder_status(rep.get('status') or 'active') != 'active':
-            continue
-        tenure_months = _tenure_months_for_assignment('group_cr', rep.get('post') or 'CR')
-        extension_months = _parse_int_safe(rep.get('tenure_extension_months'), 0)
-        if not _is_assignment_active_by_tenure(rep.get('elected_on'), tenure_months, extension_months, check_date):
             continue
         sid = _parse_int_safe(rep.get('studentId'), 0)
         if sid in by_id:
@@ -3019,8 +3023,8 @@ def _merge_leadership_superset(existing_posts, incoming_posts):
 
 def _merge_group_crs_superset(existing_crs, incoming_crs):
     """Merge group CRs by id; prefer entries with studentId assigned.
-    An 'ended' status is preserved unless the incoming entry assigns a *different* student
-    (which indicates an intentional re-assignment, not a stale push)."""
+    When both entries have a student, the one with the newer updated_at/elected_on wins
+    so that an admin-approved CR switch is never overwritten by a stale peer sync."""
     merged = {}
     for arr in [existing_crs or [], incoming_crs or []]:
         for cr in arr:
@@ -3031,8 +3035,24 @@ def _merge_group_crs_superset(existing_crs, incoming_crs):
             if not prev:
                 merged[cid] = dict(cr)
                 continue
+            # Never overwrite a populated entry with an empty one
             if prev.get('studentId') and not cr.get('studentId'):
                 continue
+            # When both have a student, prefer the newer entry by updated_at / elected_on
+            if prev.get('studentId') and cr.get('studentId'):
+                prev_stamp = max(
+                    _parse_sync_stamp(prev.get('updated_at')),
+                    _parse_sync_stamp(prev.get('elected_on'))
+                )
+                cr_stamp = max(
+                    _parse_sync_stamp(cr.get('updated_at')),
+                    _parse_sync_stamp(cr.get('elected_on'))
+                )
+                if prev_stamp > cr_stamp:
+                    # prev is newer — keep it, only fill any missing fields from cr
+                    new_entry = {**cr, **prev}
+                    merged[cid] = new_entry
+                    continue
             new_entry = {**prev, **cr}
             # Preserve 'ended' against stale clients that still have 'active' for the same student.
             prev_status = str(prev.get('status') or '').strip().lower()
