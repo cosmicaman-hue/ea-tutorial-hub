@@ -471,9 +471,10 @@
             const isHist   = month < '2026-02';
             const histTotals = new Map();
             const histHas    = new Set();
-            // Per-student, per-date score sums and normal star usage counts (for +100 bonus)
+            // Per-student, per-date score sums and star usage counts (for score erasure / +100 bonus)
             const perDateScore     = new Map(); // sid -> { date -> pts }
             const perDateStarNorm  = new Map(); // sid -> { date -> normalUses }
+            const perDateStarDisc  = new Map(); // sid -> { date -> disciplinaryUses }
             const applyStarBonus   = month >= '2026-02';
 
             (latest.scores || []).forEach(sc => {
@@ -517,8 +518,25 @@
                             if (!perDateStarNorm.has(sid)) perDateStarNorm.set(sid, {});
                             perDateStarNorm.get(sid)[date] = (perDateStarNorm.get(sid)[date] || 0) + normal;
                         }
+                        if (disciplinary > 0) {
+                            if (!perDateStarDisc.has(sid)) perDateStarDisc.set(sid, {});
+                            perDateStarDisc.get(sid)[date] = (perDateStarDisc.get(sid)[date] || 0) + disciplinary;
+                        }
                     }
                 }
+            });
+
+            // Disciplinary star usage erases that day's awarded score from totals.
+            perDateStarDisc.forEach((dateMap, sid) => {
+                if (!totals.has(sid)) return;
+                const dateScores = perDateScore.get(sid) || {};
+                Object.keys(dateMap).forEach(date => {
+                    const erasedScore = parseInt(dateScores[date], 10) || 0;
+                    if (erasedScore !== 0) {
+                        totals.set(sid, (totals.get(sid) || 0) - erasedScore);
+                        dateScores[date] = 0;
+                    }
+                });
             });
 
             // Apply star +100 bonus per normal star use where that day's score >= -50
@@ -527,7 +545,8 @@
                     if (!totals.has(sid)) return;
                     const dateScores = perDateScore.get(sid) || {};
                     Object.entries(dateMap).forEach(([date, normalUses]) => {
-                        if ((dateScores[date] || 0) >= -50 && normalUses > 0)
+                        const discUses = Math.max(0, parseInt((perDateStarDisc.get(sid) || {})[date], 10) || 0);
+                        if (discUses <= 0 && (dateScores[date] || 0) >= -50 && normalUses > 0)
                             totals.set(sid, (totals.get(sid) || 0) + (100 * normalUses));
                     });
                 });
