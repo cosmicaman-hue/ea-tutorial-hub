@@ -104,13 +104,18 @@
         const refreshBtn = document.getElementById('refreshBtn');
         const syncMeta = document.getElementById('syncMeta');
         const body = document.getElementById('body');
-        let latest = {};
+        let latest = { months: [], scoreboard: {}, top_full_count: 15 };
 
-        function rollKey(v) { return String(v || '').trim().toUpperCase(); }
+        function esc(s) {
+            return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        }
+
         function parseStamp(v) {
             const n = Date.parse(String(v || ''));
             return Number.isFinite(n) ? n : 0;
         }
+
+        function rollKey(v) { return String(v || '').trim().toUpperCase(); }
         function normStatus(v) {
             const s = String(v || '').toLowerCase();
             return ['present', 'absent', 'late', 'leave'].includes(s) ? s : 'present';
@@ -120,10 +125,6 @@
             if (status === 'late') return -5;
             return 0;
         }
-        function esc(s) {
-            return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-        }
-
         function monthKeys(data) {
             const set = new Set();
             (data.months || []).forEach(m => set.add(String(m || '').trim()));
@@ -134,7 +135,6 @@
             });
             return Array.from(set).filter(v => /^\d{4}-\d{2}$/.test(v)).sort((a, b) => b.localeCompare(a));
         }
-
         function getMonthRosterRolls(data, month) {
             const rolls = new Set();
             const ms = data && data.month_students && data.month_students[month];
@@ -143,8 +143,7 @@
             (Array.isArray(mp) ? mp : []).forEach(p => { const r = rollKey(p && p.roll); if (r) rolls.add(r); });
             return rolls;
         }
-
-        function rowsForMonth(data, month) {
+        function legacyRowsForMonth(data, month) {
             const rosterRolls = getMonthRosterRolls(data, month);
             const baseStudents = (data.students || []).filter(s => s && s.active !== false);
             const visible = rosterRolls.size
@@ -191,17 +190,49 @@
             return Array.from(totals.entries()).map(([sid, total]) => {
                 const s = byId.get(sid) || {};
                 return {
+                    rank: 0,
                     roll: rollKey(s.roll || ''),
                     name: String(s.base_name || s.name || '').trim() || '-',
-                    classVal: s.class || '-',
-                    total: total || 0
+                    class: s.class || '-',
+                    total: total || 0,
+                    masked: false
                 };
-            }).sort((a, b) => b.total !== a.total ? b.total - a.total : a.roll.localeCompare(b.roll));
+            }).sort((a, b) => b.total !== a.total ? b.total - a.total : a.roll.localeCompare(b.roll)).map((row, i) => ({
+                ...row,
+                rank: i + 1,
+                masked: i + 1 > 15,
+                name: i + 1 > 15 ? '' : row.name,
+                class: i + 1 > 15 ? '' : row.class
+            }));
         }
 
-        function render(data) {
-            latest = data || {};
-            const months = monthKeys(latest);
+        function normalizePayload(payload) {
+            if (payload && payload.scoreboard && !payload.data) {
+                return {
+                    updated_at: payload.updated_at || '',
+                    top_full_count: Number(payload.top_full_count) || 15,
+                    months: Array.isArray(payload.months) ? payload.months : [],
+                    scoreboard: payload.scoreboard || {}
+                };
+            }
+
+            const raw = payload && payload.data ? payload.data : {};
+            const months = monthKeys(raw);
+            const scoreboard = {};
+            months.forEach(month => {
+                scoreboard[month] = legacyRowsForMonth(raw, month);
+            });
+            return {
+                updated_at: payload && payload.updated_at ? payload.updated_at : '',
+                top_full_count: 15,
+                months,
+                scoreboard
+            };
+        }
+
+        function render(snapshot) {
+            latest = snapshot || { months: [], scoreboard: {}, top_full_count: 15 };
+            const months = Array.isArray(latest.months) ? latest.months : [];
             const preferred = localStorage.getItem('ea_pub_month') || '';
             monthSel.innerHTML = months.map(m => `<option value="${m}">${m}</option>`).join('');
             const selected = months.includes(preferred) ? preferred : (months[0] || '');
@@ -212,21 +243,23 @@
                 return;
             }
 
-            const rows = rowsForMonth(latest, selected);
+            const rows = Array.isArray((latest.scoreboard || {})[selected]) ? latest.scoreboard[selected] : [];
             if (!rows.length) {
                 body.innerHTML = '<tr><td class="empty" colspan="5">No data for this month</td></tr>';
                 return;
             }
 
             body.innerHTML = rows.map((r, i) => {
-                const rank = i + 1;
-                const cls = r.total > 0 ? 'pos' : (r.total < 0 ? 'neg' : '');
+                const rank = Number(r.rank) || (i + 1);
+                const cls = Number(r.total) > 0 ? 'pos' : (Number(r.total) < 0 ? 'neg' : '');
+                const name = r.masked ? '&mdash;' : esc(r.name || '-');
+                const classVal = r.masked ? '&mdash;' : esc(r.class || '-');
                 return `<tr>
                     <td class="rank">${rank}</td>
                     <td>${esc(r.roll || '-')}</td>
-                    <td>${esc(r.name)}</td>
-                    <td>${esc(r.classVal)}</td>
-                    <td class="${cls}">${r.total}</td>
+                    <td>${name}</td>
+                    <td>${classVal}</td>
+                    <td class="${cls}">${Number(r.total) || 0}</td>
                 </tr>`;
             }).join('');
         }
@@ -236,8 +269,7 @@
                 const resp = await fetch(`./scores.json?_=${Date.now()}`, { cache: 'no-store' });
                 if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
                 const payload = await resp.json();
-                const data = payload && payload.data ? payload.data : payload;
-                render(data || {});
+                render(normalizePayload(payload));
                 const stamp = payload && payload.updated_at ? payload.updated_at : '';
                 syncMeta.textContent = stamp
                     ? `Last updated: ${new Date(stamp).toLocaleString()}`

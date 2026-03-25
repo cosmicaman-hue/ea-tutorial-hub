@@ -6,23 +6,23 @@ This folder contains only public files for static hosting.
 - `index.html` - public read-only scoreboard UI
 - `scores.json` - exported scoreboard snapshot
 
-## Publish (from project root)
+## Publish flow (Cloudflare Pages)
 
-Export latest LAN data into `public_site/scores.json`:
+Primary path:
+- In LAN admin app, use `Force Publish`.
+- Server writes `public_site/scores.json` (Top 15 full details, remaining masked) and auto-pushes if enabled.
 
-```powershell
-pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\publish_public_scoreboard.ps1 -PublicRepoPath .\public_site
-```
-
-Export + push (when `public_site` is a Git repo with remote configured):
+Manual fallback (from project root):
 
 ```powershell
-pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\publish_public_scoreboard.ps1 -PublicRepoPath .\public_site -Push
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\publish_public_scoreboard.ps1 -Push
 ```
+
+This fallback only commits/pushes existing `public_site` files. It does not regenerate `scores.json`.
 
 ## Cloudflare Pages settings
 - Framework preset: `None`
 - Build command: *(empty)*
-- Build output directory: `/`
+- Build output directory: `public_site`
 
 Keep admin/LAN app private; host only this folder publicly.
