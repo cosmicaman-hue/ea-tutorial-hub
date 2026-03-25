@@ -24,6 +24,7 @@ import re
 import tempfile
 import shutil
 import glob
+import subprocess
 import urllib.request
 import urllib.error
 import urllib.parse
@@ -158,6 +159,380 @@ def _server_now_iso():
         if tz_name.lower() == 'asia/kolkata':
             return datetime.now(timezone(timedelta(hours=5, minutes=30))).isoformat()
         return datetime.utcnow().isoformat()
+
+
+def _roll_key(value):
+    return str(value or '').strip().upper()
+
+
+def _safe_int(value, default=0):
+    try:
+        if value in (None, ''):
+            return default
+        return int(value)
+    except Exception:
+        return default
+
+
+def _parse_stamp(value):
+    raw = str(value or '').strip()
+    if not raw:
+        return 0.0
+    try:
+        return datetime.fromisoformat(raw.replace('Z', '+00:00')).timestamp()
+    except Exception:
+        return 0.0
+
+
+def _norm_attendance_status(value):
+    status = str(value or '').strip().lower()
+    return status if status in {'present', 'absent', 'late', 'leave'} else 'present'
+
+
+def _attendance_penalty(status):
+    if status == 'absent':
+        return -20
+    if status == 'late':
+        return -5
+    return 0
+
+
+def _public_month_keys(payload):
+    months = set()
+    for month in payload.get('months', []) or []:
+        item = str(month or '').strip()
+        if re.match(r'^\d{4}-\d{2}$', item):
+            months.add(item)
+    for score in payload.get('scores', []) or []:
+        item = str((score or {}).get('month') or '').strip()
+        if re.match(r'^\d{4}-\d{2}$', item):
+            months.add(item)
+    for attendance in payload.get('attendance', []) or []:
+        item = str((attendance or {}).get('date') or '').strip()
+        if len(item) >= 7:
+            month = item[:7]
+            if re.match(r'^\d{4}-\d{2}$', month):
+                months.add(month)
+    return sorted(months, reverse=True)
+
+
+def _get_month_roster_rolls(payload, month):
+    rolls = set()
+    for value in payload.get('month_students', {}).get(month, []) or []:
+        roll = _roll_key(value)
+        if roll:
+            rolls.add(roll)
+    for profile in payload.get('month_roster_profiles', {}).get(month, []) or []:
+        roll = _roll_key((profile or {}).get('roll'))
+        if roll:
+            rolls.add(roll)
+    return rolls
+
+
+def _build_public_month_rows(payload, month):
+    roster_rolls = _get_month_roster_rolls(payload, month)
+    base_students = [
+        student for student in (payload.get('students', []) or [])
+        if isinstance(student, dict) and student.get('active', True) is not False
+    ]
+    if roster_rolls:
+        visible_students = [
+            student for student in base_students
+            if _roll_key(student.get('roll')) in roster_rolls
+        ]
+    else:
+        visible_students = base_students
+
+    dedup_by_roll = {}
+    for student in visible_students:
+        roll = _roll_key(student.get('roll'))
+        if roll and roll not in dedup_by_roll:
+            dedup_by_roll[roll] = student
+
+    students = list(dedup_by_roll.values())
+    by_id = {}
+    totals = {}
+    for student in students:
+        sid = _safe_int(student.get('id'))
+        if sid <= 0:
+            continue
+        by_id[sid] = student
+        totals[sid] = 0
+
+    month_scores = []
+    for score in payload.get('scores', []) or []:
+        if not isinstance(score, dict):
+            continue
+        if str(score.get('month') or '').strip() != month:
+            continue
+        month_scores.append(score)
+
+    # Historical imports can contain canonical total-column rows. When present,
+    # use those totals directly to avoid day-wise re-summing mismatches.
+    excel_total_by_sid = {}
+    for score in month_scores:
+        note = str(score.get('notes') or '').strip().lower()
+        if note.startswith('excel_total_score') or note.startswith('excel_total_from_dates'):
+            sid = _safe_int(score.get('studentId'))
+            if sid > 0 and sid in totals:
+                excel_total_by_sid[sid] = excel_total_by_sid.get(sid, 0) + _safe_int(score.get('points'))
+    if excel_total_by_sid:
+        for sid in totals.keys():
+            totals[sid] = excel_total_by_sid.get(sid, 0)
+        rows = []
+        for sid, total in totals.items():
+            student = by_id.get(sid, {})
+            rows.append({
+                'roll': _roll_key(student.get('roll')),
+                'name': str(student.get('base_name') or student.get('name') or '').strip() or '-',
+                'classVal': student.get('class') or '-',
+                'total': total or 0,
+            })
+        return sorted(rows, key=lambda item: (-item['total'], item['roll']))
+
+    is_historical = month < '2026-02'
+    hist_totals = {}
+    hist_has = set()
+    per_date_score = {}
+    per_date_star_normal = {}
+    per_date_star_disciplinary = {}
+    apply_star_bonus = month >= '2026-02'
+
+    for score in month_scores:
+        sid = _safe_int(score.get('studentId'))
+        if sid <= 0 or sid not in totals:
+            continue
+
+        note = str(score.get('notes') or '').strip().lower()
+        points = _safe_int(score.get('points'))
+        if is_historical:
+            is_excel_total = note.startswith('excel_total_score') or note.startswith('excel_total_from_dates')
+            is_excel_daily = note.startswith('excel_daily_score')
+            is_excel_star = note.startswith('excel_star_usage')
+            if not (is_excel_total or is_excel_daily or is_excel_star):
+                continue
+            if is_excel_total:
+                hist_totals[sid] = hist_totals.get(sid, 0) + points
+                hist_has.add(sid)
+                continue
+
+        score_date = str(score.get('date') or '').strip()
+        totals[sid] = totals.get(sid, 0) + points
+
+        if apply_star_bonus and score_date:
+            date_scores = per_date_score.setdefault(sid, {})
+            date_scores[score_date] = date_scores.get(score_date, 0) + points
+
+            star_delta = _safe_int(score.get('stars'))
+            if star_delta < 0:
+                usage_abs = abs(star_delta)
+                normal = max(0, _safe_int(score.get('star_usage_normal')))
+                disciplinary = max(0, _safe_int(score.get('star_usage_disciplinary')))
+                if normal + disciplinary <= 0:
+                    is_transfer = bool(score.get('star_transfer_out') or score.get('star_transfer_in') or '[star transfer' in note)
+                    if is_transfer:
+                        normal = 0
+                        disciplinary = 0
+                    elif 'disciplinary' in note:
+                        disciplinary = usage_abs
+                        normal = 0
+                    else:
+                        normal = usage_abs
+                        disciplinary = 0
+                if normal > 0:
+                    date_norm = per_date_star_normal.setdefault(sid, {})
+                    date_norm[score_date] = date_norm.get(score_date, 0) + normal
+                if disciplinary > 0:
+                    date_disc = per_date_star_disciplinary.setdefault(sid, {})
+                    date_disc[score_date] = date_disc.get(score_date, 0) + disciplinary
+
+    for sid, date_map in per_date_star_disciplinary.items():
+        if sid not in totals:
+            continue
+        date_scores = per_date_score.get(sid, {})
+        for score_date in date_map.keys():
+            erased_score = _safe_int(date_scores.get(score_date))
+            if erased_score != 0:
+                totals[sid] = totals.get(sid, 0) - erased_score
+                date_scores[score_date] = 0
+
+    if apply_star_bonus:
+        for sid, date_map in per_date_star_normal.items():
+            if sid not in totals:
+                continue
+            date_scores = per_date_score.get(sid, {})
+            disciplinary_map = per_date_star_disciplinary.get(sid, {})
+            for score_date, normal_uses in date_map.items():
+                disc_uses = max(0, _safe_int(disciplinary_map.get(score_date)))
+                if disc_uses <= 0 and _safe_int(date_scores.get(score_date)) >= -50 and normal_uses > 0:
+                    totals[sid] = totals.get(sid, 0) + (100 * normal_uses)
+
+    attendance_latest = {}
+    for attendance in payload.get('attendance', []) or []:
+        if not isinstance(attendance, dict):
+            continue
+        sid = _safe_int(attendance.get('studentId'))
+        day = str(attendance.get('date') or '').strip()
+        if sid <= 0 or not day.startswith(month):
+            continue
+        key = f'{sid}|{day}'
+        prev = attendance_latest.get(key)
+        prev_ts = _parse_stamp((prev or {}).get('updated_at') or (prev or {}).get('created_at'))
+        next_ts = _parse_stamp(attendance.get('updated_at') or attendance.get('created_at'))
+        if prev is None or next_ts >= prev_ts:
+            attendance_latest[key] = attendance
+
+    for attendance in attendance_latest.values():
+        sid = _safe_int(attendance.get('studentId'))
+        if sid in totals:
+            totals[sid] = totals.get(sid, 0) + _attendance_penalty(_norm_attendance_status(attendance.get('status')))
+
+    if is_historical:
+        for sid in hist_has:
+            if sid in totals:
+                totals[sid] = hist_totals.get(sid, 0)
+
+    rows = []
+    for sid, total in totals.items():
+        student = by_id.get(sid, {})
+        rows.append({
+            'roll': _roll_key(student.get('roll')),
+            'name': str(student.get('base_name') or student.get('name') or '').strip() or '-',
+            'classVal': student.get('class') or '-',
+            'total': total or 0,
+        })
+    return sorted(rows, key=lambda item: (-item['total'], item['roll']))
+
+
+def _build_public_site_payload(payload):
+    months = _public_month_keys(payload)
+    scoreboard = {}
+    top_full = 15
+    for month in months:
+        rows = _build_public_month_rows(payload, month)
+        public_rows = []
+        for idx, row in enumerate(rows):
+            rank = idx + 1
+            masked = rank > top_full
+            public_rows.append({
+                'rank': rank,
+                'roll': row.get('roll') or '-',
+                'name': row.get('name') if not masked else '',
+                'class': row.get('classVal') if not masked else '',
+                'total': row.get('total') or 0,
+                'masked': masked,
+            })
+        scoreboard[month] = public_rows
+    return {
+        'updated_at': str(payload.get('server_updated_at') or _server_now_iso()),
+        'top_full_count': top_full,
+        'months': months,
+        'scoreboard': scoreboard,
+    }
+
+
+def _project_root_path():
+    return os.path.abspath(os.path.join(current_app.root_path, os.pardir))
+
+
+def _public_site_dir():
+    explicit = str(os.getenv('EA_PUBLIC_SITE_DIR', '') or '').strip()
+    if explicit:
+        return os.path.abspath(explicit)
+    return os.path.join(_project_root_path(), 'public_site')
+
+
+def _public_site_scores_path():
+    return os.path.join(_public_site_dir(), 'scores.json')
+
+
+def _auto_push_public_site_enabled():
+    flag = str(os.getenv('EA_PUBLIC_SITE_AUTO_PUSH', '1') or '').strip().lower()
+    return flag not in {'0', 'false', 'no', 'off'}
+
+
+def _run_git(repo_root, args):
+    completed = subprocess.run(
+        ['git', '-C', repo_root, *args],
+        check=False,
+        capture_output=True,
+        text=True,
+        encoding='utf-8',
+        errors='replace'
+    )
+    if completed.returncode != 0:
+        detail = (completed.stderr or completed.stdout or '').strip()
+        raise RuntimeError(detail or f"git {' '.join(args)} failed")
+    return completed
+
+
+def _safe_commit_stamp():
+    try:
+        return datetime.now(ZoneInfo(_get_server_timezone())).strftime('%Y-%m-%d %H:%M:%S')
+    except Exception:
+        return datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+
+def _publish_public_site_snapshot(payload, push=None):
+    site_dir = _public_site_dir()
+    scores_path = _public_site_scores_path()
+    public_payload = _build_public_site_payload(payload if isinstance(payload, dict) else {})
+
+    os.makedirs(site_dir, exist_ok=True)
+    _atomic_write_json(scores_path, public_payload)
+
+    result = {
+        'status': 'ok',
+        'site_dir': site_dir,
+        'scores_path': scores_path,
+        'updated_at': public_payload.get('updated_at'),
+        'pushed': False,
+    }
+
+    should_push = _auto_push_public_site_enabled() if push is None else bool(push)
+    if not should_push:
+        result['status'] = 'written'
+        return result
+
+    repo_root = _project_root_path()
+    git_dir = os.path.join(repo_root, '.git')
+    if not os.path.isdir(git_dir):
+        result.update({
+            'status': 'write_only',
+            'error': f'Git repository not found at {repo_root}',
+        })
+        return result
+
+    rel_scores = os.path.relpath(scores_path, repo_root)
+    rel_index = os.path.relpath(os.path.join(site_dir, 'index.html'), repo_root)
+    rel_readme = os.path.relpath(os.path.join(site_dir, 'README.md'), repo_root)
+    rel_headers = os.path.relpath(os.path.join(site_dir, '_headers'), repo_root)
+    tracked_paths = [path for path in [rel_index, rel_readme, rel_headers, rel_scores] if os.path.exists(os.path.join(repo_root, path))]
+    commit_stamp = _safe_commit_stamp()
+
+    try:
+        _run_git(repo_root, ['add', '--', *tracked_paths])
+        diff = subprocess.run(
+            ['git', '-C', repo_root, 'diff', '--cached', '--quiet', '--', *tracked_paths],
+            check=False,
+            capture_output=True
+        )
+        if diff.returncode == 0:
+            result['status'] = 'up_to_date'
+            return result
+        _run_git(repo_root, ['commit', '-m', f'Publish public scoreboard ({commit_stamp})', '--', *tracked_paths])
+        push_output = _run_git(repo_root, ['push', 'origin', 'HEAD'])
+        result.update({
+            'status': 'pushed',
+            'pushed': True,
+            'push_output': (push_output.stdout or '').strip(),
+        })
+    except Exception as exc:
+        result.update({
+            'status': 'write_only',
+            'error': str(exc),
+        })
+    return result
 
 
 def _get_sync_peers():
@@ -1254,6 +1629,9 @@ def _leadership_veto_quota(post_name):
     if role_type == 'co_leader':
         return 3
     if role_type == 'lop':
+        return 2
+    text = str(post_name or '').strip().lower()
+    if 'discipline' in text and 'welfare' in text:
         return 1
     return 0
 
@@ -2504,6 +2882,65 @@ def _query_activity_log_rows(payload, user_filter='', class_filter='', student_f
     return filtered[:safe_limit]
 
 
+def _calculate_election_results(election_data, student_votes, teacher_votes):
+    """Calculates the winner of an election.
+
+    Args:
+        election_data (dict): The election data.
+        student_votes (list): A list of student votes.
+        teacher_votes (list): A list of teacher votes.
+
+    Returns:
+        dict: A dictionary containing the winner and other election results.
+              Returns a null result if there is a tie or thresholds are not met.
+    """
+    # Get the highest student vote power.
+    highest_student_vote_power = 0
+    for student in election_data.get('students', []):
+        if student.get('vote_power', 0) > highest_student_vote_power:
+            highest_student_vote_power = student.get('vote_power', 0)
+
+    # Calculate teacher vote power.
+    teacher_vote_power = highest_student_vote_power + 1
+
+    # Calculate the total votes for each candidate.
+    candidate_votes = {}
+    for vote in student_votes:
+        candidate_id = vote.get('candidateId')
+        if candidate_id:
+            if candidate_id not in candidate_votes:
+                candidate_votes[candidate_id] = 0
+            candidate_votes[candidate_id] += 1
+
+    for vote in teacher_votes:
+        candidate_id = vote.get('candidateId')
+        if candidate_id:
+            if candidate_id not in candidate_votes:
+                candidate_votes[candidate_id] = 0
+            candidate_votes[candidate_id] += teacher_vote_power
+
+    # Find the winner.
+    winner = None
+    max_votes = 0
+    for candidate_id, votes in candidate_votes.items():
+        if votes > max_votes:
+            max_votes = votes
+            winner = candidate_id
+
+    # Check for ties.
+    tie = False
+    for candidate_id, votes in candidate_votes.items():
+        if votes == max_votes and candidate_id != winner:
+            tie = True
+            break
+
+    # If there is a tie, the election is nullified.
+    if tie:
+        return {'winner': None, 'tie': True}
+
+    return {'winner': winner, 'tie': False, 'candidate_votes': candidate_votes}
+
+
 def _merge_election_votes_superset(existing_votes, incoming_votes, mode='party'):
     """Merge election votes by voter key and keep latest timestamped entry."""
     merged = {}
@@ -2529,6 +2966,9 @@ def _merge_election_votes_superset(existing_votes, incoming_votes, mode='party')
         elif mode == 'teacher':
             teacher_id = _parse_int_safe(item.get('teacherId'), 0)
             if teacher_id <= 0:
+                return None, None
+            # Do not allow admin to vote
+            if teacher_id == 1:
                 return None, None
             normalized['teacherId'] = teacher_id
             candidate_id = _parse_int_safe(item.get('candidateId'), 0)
@@ -2557,6 +2997,9 @@ def _merge_election_votes_superset(existing_votes, incoming_votes, mode='party')
 
     for source in (existing_votes or []), (incoming_votes or []):
         for item in source:
+            # Skip admin votes.
+            if item.get('teacherId') == 1:
+                continue
             key, normalized = _normalize_vote(item)
             if key is None:
                 continue
@@ -2568,6 +3011,7 @@ def _merge_election_votes_superset(existing_votes, incoming_votes, mode='party')
             next_stamp = _parse_sync_stamp(normalized.get('timestamp') or normalized.get('updated_at') or normalized.get('created_at'))
             if next_stamp >= prev_stamp:
                 merged[key] = normalized
+
 
     return list(merged.values())
 
@@ -4712,6 +5156,7 @@ def offline_force_publish():
     data = payload.get('data') if isinstance(payload, dict) else None
     request_peers = payload.get('peers', []) if isinstance(payload, dict) else []
     wait_for_results = bool(payload.get('wait_for_results')) if isinstance(payload, dict) else False
+    cloudflare_only = bool(payload.get('cloudflare_only')) if isinstance(payload, dict) else False
     used_fallback_snapshot = False
     if not isinstance(data, dict):
         data = _load_offline_data() or {}
@@ -4722,10 +5167,48 @@ def offline_force_publish():
     data['server_updated_at'] = _server_now_iso()
     _save_offline_data(data)
     _broadcast_sync_event(data['server_updated_at'], source='force-publish')
+    auto_push_public_site = _auto_push_public_site_enabled()
+
+    if cloudflare_only:
+        try:
+            public_site_result = _publish_public_site_snapshot(data, push=auto_push_public_site)
+        except Exception as exc:
+            current_app.logger.exception("Force publish cloudflare-only failed")
+            return jsonify({
+                'success': False,
+                'replication_ok': False,
+                'mode': 'cloudflare_only',
+                'used_fallback_snapshot': used_fallback_snapshot,
+                'updated_at': data.get('server_updated_at'),
+                'gist': {'status': 'skipped'},
+                'peers': [],
+                'public_site': {'status': 'failed', 'error': str(exc)},
+                'error': f'Public site publish failed: {exc}'
+            })
+        public_site_ok = str(public_site_result.get('status') or '').lower() in {'pushed', 'up_to_date', 'written'}
+        return jsonify({
+            'success': True,
+            'replication_ok': public_site_ok,
+            'mode': 'cloudflare_only',
+            'used_fallback_snapshot': used_fallback_snapshot,
+            'updated_at': data.get('server_updated_at'),
+            'gist': {'status': 'skipped'},
+            'peers': [],
+            'public_site': public_site_result
+        })
 
     # Default mode: queue remote replication in background and return fast.
     # This avoids user-visible publish failures caused by WAN/Supabase timeouts.
     if not wait_for_results:
+        public_site_result = _publish_public_site_snapshot(data, push=False)
+        if auto_push_public_site:
+            threading.Thread(
+                target=_publish_public_site_snapshot,
+                args=(dict(data), True),
+                daemon=True,
+                name='ea-public-site-push'
+            ).start()
+            public_site_result['status'] = 'queued'
         _gist_push_snapshot_async(data, reason='force_publish')
         _forward_offline_data_to_peers_async(data, request_peers)
         return jsonify({
@@ -4735,10 +5218,12 @@ def offline_force_publish():
             'used_fallback_snapshot': used_fallback_snapshot,
             'updated_at': data.get('server_updated_at'),
             'gist': {'status': 'queued'},
-            'peers': []
+            'peers': [],
+            'public_site': public_site_result
         })
 
     gist_result = {'status': 'skipped'}
+    public_site_result = _publish_public_site_snapshot(data, push=auto_push_public_site)
 
     peers = _get_sync_peers() + _normalize_peer_list(request_peers)
     peers = list(dict.fromkeys(peers))
@@ -4841,14 +5326,16 @@ def offline_force_publish():
             peer_results.append({'base_url': base, 'status': 'timeout', 'error': 'Timed out', 'latency_ms': 16000})
 
     peer_ok = any(item.get('status') == 'ok' for item in peer_results) if peer_targets else False
-    replication_ok = bool(peer_ok or gist_result.get('status') == 'ok')
+    public_site_ok = str(public_site_result.get('status') or '').lower() in {'pushed', 'up_to_date', 'written'}
+    replication_ok = bool(peer_ok or gist_result.get('status') == 'ok' or public_site_ok)
     return jsonify({
         'success': True,
         'replication_ok': replication_ok,
         'used_fallback_snapshot': used_fallback_snapshot,
         'updated_at': data.get('server_updated_at'),
         'gist': gist_result,
-        'peers': peer_results
+        'peers': peer_results,
+        'public_site': public_site_result
     })
 
 
@@ -5235,6 +5722,23 @@ def leadership_data():
         saved = _save_politics_data(data)
         return jsonify({'success': True, 'leadership': saved['leadership']})
     return jsonify({'success': True, 'leadership': data['leadership']})
+
+
+@points_bp.route('/election-results/<post>')
+@login_required
+def election_results(post):
+    """Get election results for a specific post."""
+    data = _load_offline_data() or {}
+    student_votes = data.get('election_individual_votes', [])
+    teacher_votes = data.get('election_teacher_votes', [])
+
+    # Filter votes for the specific post
+    student_votes = [v for v in student_votes if v.get('post') == post]
+    teacher_votes = [v for v in teacher_votes if v.get('post') == post]
+
+    results = _calculate_election_results(data, student_votes, teacher_votes)
+    return jsonify({'success': True, 'results': results})
+
 
 
 @points_bp.route('/data')

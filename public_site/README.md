@@ -5,6 +5,7 @@ This folder contains only public files for static hosting.
 ## Files
 - `index.html` - public read-only scoreboard UI
 - `scores.json` - exported scoreboard snapshot
+- `_headers` - cache-control rules (keeps `scores.json` fresh on Cloudflare)
 
 ## Publish flow (Cloudflare Pages)
 
@@ -21,6 +22,7 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\publish_public_scoreboar
 This fallback only commits/pushes existing `public_site` files. It does not regenerate `scores.json`.
 
 ## Cloudflare Pages settings
+- Production branch: `main`
 - Framework preset: `None`
 - Build command: *(empty)*
 - Build output directory: `public_site`
