@@ -197,6 +197,85 @@ def _attendance_penalty(status):
     return 0
 
 
+def _clean_public_name(value):
+    raw = str(value or '').strip()
+    if not raw:
+        return '-'
+    # Remove bracketed annotations like "Name (CR)" for a cleaner public name.
+    cleaned = re.sub(r'\s*\([^)]*\)', '', raw)
+    cleaned = re.sub(r'\s+', ' ', cleaned).strip()
+    return cleaned or '-'
+
+
+def _recent_public_month_window():
+    try:
+        now = datetime.now(ZoneInfo(_get_server_timezone()))
+    except Exception:
+        now = datetime.now()
+    out = []
+    year = now.year
+    month = now.month
+    for _ in range(3):
+        out.append(f'{year:04d}-{month:02d}')
+        month -= 1
+        if month <= 0:
+            month = 12
+            year -= 1
+    return out
+
+
+def _public_information_payload(payload):
+    rows = payload.get('public_information', []) or []
+    if not isinstance(rows, list):
+        rows = []
+    normalized = []
+    for item in rows:
+        if not isinstance(item, dict):
+            continue
+        layout = str(item.get('layout') or 'cards').strip().lower()
+        if layout not in {'cards', 'table'}:
+            layout = 'cards'
+        title = str(item.get('title') or '').strip()
+        content = str(item.get('content') or '').strip()
+        if not title and not content and not item.get('table_rows'):
+            continue
+        entry = {
+            'id': _safe_int(item.get('id'), int(time.time() * 1000)),
+            'title': title or 'Information',
+            'layout': layout,
+            'content': content,
+            'updated_at': str(item.get('updated_at') or item.get('created_at') or ''),
+        }
+        if layout == 'table':
+            cols = item.get('table_columns', []) or []
+            rows_data = item.get('table_rows', []) or []
+            cols = [str(col or '').strip() for col in cols if str(col or '').strip()]
+            safe_rows = []
+            if isinstance(rows_data, list):
+                for row in rows_data:
+                    if not isinstance(row, list):
+                        continue
+                    safe_row = [str(cell or '').strip() for cell in row]
+                    if any(cell for cell in safe_row):
+                        safe_rows.append(safe_row)
+            entry['table_columns'] = cols
+            entry['table_rows'] = safe_rows
+        attachment = item.get('attachment')
+        if isinstance(attachment, dict):
+            data_url = str(attachment.get('data_url') or '').strip()
+            mime = str(attachment.get('mime') or '').strip().lower()
+            name = str(attachment.get('name') or '').strip()
+            if data_url.startswith('data:') and mime in {'application/pdf', 'image/jpeg', 'image/jpg', 'image/png'}:
+                entry['attachment'] = {
+                    'name': name or 'attachment',
+                    'mime': mime,
+                    'data_url': data_url,
+                }
+        normalized.append(entry)
+    normalized.sort(key=lambda x: str(x.get('updated_at') or ''), reverse=True)
+    return normalized
+
+
 def _public_month_keys(payload):
     months = set()
     for month in payload.get('months', []) or []:
@@ -397,7 +476,7 @@ def _build_public_month_rows(payload, month):
         student = by_id.get(sid, {})
         rows.append({
             'roll': _roll_key(student.get('roll')),
-            'name': str(student.get('base_name') or student.get('name') or '').strip() or '-',
+            'name': _clean_public_name(student.get('base_name') or student.get('name') or ''),
             'classVal': student.get('class') or '-',
             'total': total or 0,
         })
@@ -406,6 +485,10 @@ def _build_public_month_rows(payload, month):
 
 def _build_public_site_payload(payload):
     months = _public_month_keys(payload)
+    recent_window = _recent_public_month_window()
+    allowed = set(recent_window)
+    months = [month for month in months if month in allowed]
+    months = sorted(months, reverse=True)[:3]
     scoreboard = {}
     top_full = 15
     for month in months:
@@ -428,6 +511,7 @@ def _build_public_site_payload(payload):
         'top_full_count': top_full,
         'months': months,
         'scoreboard': scoreboard,
+        'public_information': _public_information_payload(payload),
     }
 
 

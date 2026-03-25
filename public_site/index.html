@@ -13,15 +13,16 @@
             --muted: #94a3b8;
             --good: #22c55e;
             --bad: #f87171;
+            --chip: #172036;
         }
         * { box-sizing: border-box; }
         body {
             margin: 0;
             font-family: "Segoe UI", Tahoma, sans-serif;
-            background: radial-gradient(circle at top, #111b34 0%, var(--bg) 40%);
+            background: radial-gradient(circle at top, #111b34 0%, var(--bg) 42%);
             color: var(--text);
         }
-        .wrap { max-width: 1050px; margin: 0 auto; padding: 16px; }
+        .wrap { max-width: 1080px; margin: 0 auto; padding: 16px; }
         .header {
             text-align: center;
             padding: 18px 12px;
@@ -46,6 +47,7 @@
             font-size: 14px;
         }
         button { cursor: pointer; }
+        .tab-btn.active { border-color: #38bdf8; box-shadow: 0 0 0 1px rgba(56,189,248,.2) inset; }
         .meta { margin-left: auto; color: var(--muted); font-size: 12px; }
         .card {
             background: var(--card);
@@ -53,6 +55,7 @@
             border-radius: 10px;
             overflow: hidden;
         }
+        .panel.hidden { display: none; }
         .scroll { overflow-x: auto; }
         table { width: 100%; min-width: 580px; border-collapse: collapse; }
         th, td { padding: 10px 12px; border-bottom: 1px solid var(--line); }
@@ -62,6 +65,57 @@
         .pos { color: var(--good); font-weight: 700; }
         .neg { color: var(--bad); font-weight: 700; }
         .empty { text-align: center; color: var(--muted); padding: 30px; }
+        .info-wrap { padding: 12px; display: grid; gap: 12px; }
+        .info-item {
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            padding: 12px;
+            background: rgba(15,23,42,.55);
+        }
+        .info-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 8px;
+        }
+        .chip {
+            background: var(--chip);
+            border: 1px solid var(--line);
+            border-radius: 999px;
+            color: var(--muted);
+            font-size: 11px;
+            padding: 3px 8px;
+        }
+        .info-boxes {
+            display: grid;
+            gap: 8px;
+            margin-top: 8px;
+        }
+        .info-box {
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            padding: 8px 10px;
+            background: rgba(2,6,23,.35);
+        }
+        .info-attachment {
+            margin-top: 10px;
+        }
+        .info-attachment img {
+            max-width: 100%;
+            height: auto;
+            border: 1px solid var(--line);
+            border-radius: 8px;
+        }
+        .info-attachment a {
+            color: #7dd3fc;
+            text-decoration: none;
+            border-bottom: 1px dashed rgba(125,211,252,.5);
+        }
+        .info-table th, .info-table td {
+            font-size: 13px;
+            text-align: left;
+        }
         @media (max-width: 640px) {
             .meta { margin-left: 0; width: 100%; }
         }
@@ -74,12 +128,14 @@
     </div>
     <div class="wrap">
         <div class="controls">
+            <button id="tabScoreboard" class="tab-btn active" type="button">Scoreboard</button>
+            <button id="tabInfo" class="tab-btn" type="button">Public Information</button>
             <label for="monthSel">Month</label>
             <select id="monthSel"></select>
             <button id="refreshBtn" type="button">Refresh</button>
             <span id="syncMeta" class="meta">Syncing...</span>
         </div>
-        <div class="card">
+        <div id="scoreboardPanel" class="panel card">
             <div class="scroll">
                 <table>
                     <thead>
@@ -97,6 +153,11 @@
                 </table>
             </div>
         </div>
+        <div id="infoPanel" class="panel card hidden">
+            <div id="publicInfoList" class="info-wrap">
+                <div class="empty">Loading information...</div>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -104,10 +165,19 @@
         const refreshBtn = document.getElementById('refreshBtn');
         const syncMeta = document.getElementById('syncMeta');
         const body = document.getElementById('body');
-        let latest = { months: [], scoreboard: {}, top_full_count: 15 };
+        const infoList = document.getElementById('publicInfoList');
+        const tabScoreboard = document.getElementById('tabScoreboard');
+        const tabInfo = document.getElementById('tabInfo');
+        const scoreboardPanel = document.getElementById('scoreboardPanel');
+        const infoPanel = document.getElementById('infoPanel');
+        let latest = { months: [], scoreboard: {}, top_full_count: 15, public_information: [] };
 
         function esc(s) {
             return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        }
+
+        function cleanName(value) {
+            return String(value || '').replace(/\s*\([^)]*\)/g, '').replace(/\s+/g, ' ').trim() || '-';
         }
 
         function parseStamp(v) {
@@ -133,7 +203,16 @@
                 const d = String(a && a.date || '').trim();
                 if (d.length >= 7) set.add(d.slice(0, 7));
             });
-            return Array.from(set).filter(v => /^\d{4}-\d{2}$/.test(v)).sort((a, b) => b.localeCompare(a));
+            const all = Array.from(set).filter(v => /^\d{4}-\d{2}$/.test(v)).sort((a, b) => b.localeCompare(a));
+            const now = new Date();
+            const keep = new Set();
+            const y = now.getFullYear();
+            const m = now.getMonth() + 1;
+            for (let i = 0; i < 3; i++) {
+                const dt = new Date(y, m - 1 - i, 1);
+                keep.add(`${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}`);
+            }
+            return all.filter(month => keep.has(month)).slice(0, 3);
         }
         function getMonthRosterRolls(data, month) {
             const rolls = new Set();
@@ -192,7 +271,7 @@
                 return {
                     rank: 0,
                     roll: rollKey(s.roll || ''),
-                    name: String(s.base_name || s.name || '').trim() || '-',
+                    name: cleanName(s.base_name || s.name || ''),
                     class: s.class || '-',
                     total: total || 0,
                     masked: false
@@ -212,7 +291,8 @@
                     updated_at: payload.updated_at || '',
                     top_full_count: Number(payload.top_full_count) || 15,
                     months: Array.isArray(payload.months) ? payload.months : [],
-                    scoreboard: payload.scoreboard || {}
+                    scoreboard: payload.scoreboard || {},
+                    public_information: Array.isArray(payload.public_information) ? payload.public_information : []
                 };
             }
 
@@ -226,12 +306,13 @@
                 updated_at: payload && payload.updated_at ? payload.updated_at : '',
                 top_full_count: 15,
                 months,
-                scoreboard
+                scoreboard,
+                public_information: []
             };
         }
 
-        function render(snapshot) {
-            latest = snapshot || { months: [], scoreboard: {}, top_full_count: 15 };
+        function renderScoreboard(snapshot) {
+            latest = snapshot || { months: [], scoreboard: {}, top_full_count: 15, public_information: [] };
             const months = Array.isArray(latest.months) ? latest.months : [];
             const preferred = localStorage.getItem('ea_pub_month') || '';
             monthSel.innerHTML = months.map(m => `<option value="${m}">${m}</option>`).join('');
@@ -252,7 +333,7 @@
             body.innerHTML = rows.map((r, i) => {
                 const rank = Number(r.rank) || (i + 1);
                 const cls = Number(r.total) > 0 ? 'pos' : (Number(r.total) < 0 ? 'neg' : '');
-                const name = r.masked ? '&mdash;' : esc(r.name || '-');
+                const name = r.masked ? '&mdash;' : esc(cleanName(r.name || '-'));
                 const classVal = r.masked ? '&mdash;' : esc(r.class || '-');
                 return `<tr>
                     <td class="rank">${rank}</td>
@@ -264,28 +345,96 @@
             }).join('');
         }
 
+        function renderPublicInformation(snapshot) {
+            const items = Array.isArray(snapshot && snapshot.public_information) ? snapshot.public_information : [];
+            if (!items.length) {
+                infoList.innerHTML = '<div class="empty">No public information posted yet.</div>';
+                return;
+            }
+            infoList.innerHTML = items.map(item => {
+                const title = esc(item.title || 'Information');
+                const layout = esc(String(item.layout || 'cards').toUpperCase());
+                const lines = String(item.content || '').split(/\r?\n/).map(v => v.trim()).filter(Boolean);
+                let bodyHtml = '';
+                if (String(item.layout || '') === 'table') {
+                    const cols = Array.isArray(item.table_columns) ? item.table_columns : [];
+                    const rows = Array.isArray(item.table_rows) ? item.table_rows : [];
+                    const th = cols.map(c => `<th>${esc(c)}</th>`).join('');
+                    const tr = rows.map(row => `<tr>${(Array.isArray(row) ? row : []).map(cell => `<td>${esc(cell)}</td>`).join('')}</tr>`).join('');
+                    bodyHtml = `
+                        <div class="scroll">
+                            <table class="info-table">
+                                <thead><tr>${th}</tr></thead>
+                                <tbody>${tr || '<tr><td class="empty">No table rows</td></tr>'}</tbody>
+                            </table>
+                        </div>
+                    `;
+                } else {
+                    bodyHtml = `<div class="info-boxes">${lines.length ? lines.map(line => `<div class="info-box">${esc(line)}</div>`).join('') : '<div class="info-box">No details</div>'}</div>`;
+                }
+
+                let attachmentHtml = '';
+                const attachment = item.attachment || null;
+                if (attachment && attachment.data_url) {
+                    const mime = String(attachment.mime || '').toLowerCase();
+                    const name = esc(attachment.name || 'attachment');
+                    if (mime.startsWith('image/')) {
+                        attachmentHtml = `<div class="info-attachment"><img src="${attachment.data_url}" alt="${name}"></div>`;
+                    } else if (mime === 'application/pdf') {
+                        attachmentHtml = `<div class="info-attachment"><a href="${attachment.data_url}" target="_blank" rel="noopener noreferrer">Open PDF: ${name}</a></div>`;
+                    }
+                }
+
+                const updated = esc(item.updated_at || '');
+                return `
+                    <article class="info-item">
+                        <div class="info-head">
+                            <h3 style="margin:0;font-size:16px;">${title}</h3>
+                            <span class="chip">${layout}</span>
+                        </div>
+                        ${bodyHtml}
+                        ${attachmentHtml}
+                        ${updated ? `<div class="meta" style="margin-top:8px;">Updated: ${updated}</div>` : ''}
+                    </article>
+                `;
+            }).join('');
+        }
+
+        function setActiveTab(tabKey) {
+            const scoreboard = tabKey === 'scoreboard';
+            tabScoreboard.classList.toggle('active', scoreboard);
+            tabInfo.classList.toggle('active', !scoreboard);
+            scoreboardPanel.classList.toggle('hidden', !scoreboard);
+            infoPanel.classList.toggle('hidden', scoreboard);
+            monthSel.disabled = !scoreboard;
+        }
+
         async function fetchAndRender() {
             try {
                 const resp = await fetch(`./scores.json?_=${Date.now()}`, { cache: 'no-store' });
                 if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
                 const payload = await resp.json();
-                render(normalizePayload(payload));
+                const snap = normalizePayload(payload);
+                renderScoreboard(snap);
+                renderPublicInformation(snap);
                 const stamp = payload && payload.updated_at ? payload.updated_at : '';
-                syncMeta.textContent = stamp
-                    ? `Last updated: ${new Date(stamp).toLocaleString()}`
-                    : 'Updated';
+                syncMeta.textContent = stamp ? `Last updated: ${new Date(stamp).toLocaleString()}` : 'Updated';
             } catch (err) {
                 syncMeta.textContent = 'Unable to load latest scores';
                 body.innerHTML = '<tr><td class="empty" colspan="5">Failed to load scores.json</td></tr>';
+                infoList.innerHTML = '<div class="empty">Failed to load public information.</div>';
             }
         }
 
         monthSel.addEventListener('change', () => {
             localStorage.setItem('ea_pub_month', monthSel.value);
-            render(latest || {});
+            renderScoreboard(latest || {});
         });
         refreshBtn.addEventListener('click', fetchAndRender);
+        tabScoreboard.addEventListener('click', () => setActiveTab('scoreboard'));
+        tabInfo.addEventListener('click', () => setActiveTab('info'));
 
+        setActiveTab('scoreboard');
         fetchAndRender();
         setInterval(fetchAndRender, 30000);
     </script>

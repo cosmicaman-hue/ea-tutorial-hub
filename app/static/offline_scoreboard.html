@@ -5881,6 +5881,9 @@
             <button class="tab-button" onclick="switchTab('rules')" style="--tab-icon: #22d3ee;">
                 <i class="fas fa-scroll"></i> Rules
             </button>
+            <button class="tab-button" onclick="switchTab('information')" style="--tab-icon: #67e8f9;">
+                <i class="fas fa-circle-info"></i> Information
+            </button>
             <button class="tab-button" onclick="switchTab('ranking')" style="--tab-icon: #eab308;">
                 <i class="fas fa-trophy"></i> Rankings
             </button>
@@ -7040,6 +7043,44 @@
                         </div>
                     </div>
                 </div>
+            </div>
+        </div>
+
+        <div id="information-tab" class="tab-content hidden">
+            <div class="form-card">
+                <h3 style="margin:0 0 8px;"><i class="fas fa-circle-info"></i> Information Manager</h3>
+                <p class="section-subtitle" style="margin-bottom:12px;">
+                    Publish cards/tables to the public site. Supports PDF and JPG/JPEG/PNG attachments.
+                </p>
+                <div id="infoEditorRow" class="controls">
+                    <div class="control-group" style="min-width:220px;">
+                        <label>Title</label>
+                        <input id="infoTitleInput" type="text" placeholder="e.g., Exam Schedule">
+                    </div>
+                    <div class="control-group" style="min-width:180px;">
+                        <label>Layout</label>
+                        <select id="infoLayoutSelect">
+                            <option value="cards">Row Boxes</option>
+                            <option value="table">Table</option>
+                        </select>
+                    </div>
+                    <div class="control-group" style="min-width:260px;">
+                        <label>Attachment (optional)</label>
+                        <input id="infoAttachmentInput" type="file" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png">
+                    </div>
+                </div>
+                <div class="control-group" style="margin-top:8px;">
+                    <label>Content</label>
+                    <textarea id="infoContentInput" rows="4" placeholder="For Row Boxes: one line per box.&#10;For Table: paste rows in CSV/pipe format. First row is header."></textarea>
+                </div>
+                <div id="infoEditorActions" class="controls" style="margin-top:10px;">
+                    <button class="secondary" onclick="saveInformationItem()"><i class="fas fa-save"></i> Save Information</button>
+                    <button class="secondary" onclick="clearInformationEditor()"><i class="fas fa-eraser"></i> Clear</button>
+                </div>
+            </div>
+            <div class="form-card" style="margin-top:12px;">
+                <h3 style="margin:0 0 8px;"><i class="fas fa-list"></i> Current Information Items</h3>
+                <div id="infoItemsList"></div>
             </div>
         </div>
 
@@ -11632,6 +11673,7 @@
                     rule_sections: [],
                     rule_feedback: [],
                     rule_votes: [],
+                    public_information: [],
                     score_adjustment_actions: [],
                     updated_at: null
                 };
@@ -11694,6 +11736,7 @@
                 if (!Array.isArray(data.rule_sections)) data.rule_sections = [];
                 if (!Array.isArray(data.rule_feedback)) data.rule_feedback = [];
                 if (!Array.isArray(data.rule_votes)) data.rule_votes = [];
+                if (!Array.isArray(data.public_information)) data.public_information = [];
                 if (!data.score_adjustment_actions) data.score_adjustment_actions = [];
                 data.students = (data.students || [])
                     .map(student => normalizeStudentMeta(student))
@@ -11817,6 +11860,26 @@
                     created_at: String(d && d.created_at || '').trim(),
                     reversed: Boolean(d && d.reversed)
                 })).filter(d => d.id && d.studentId && d.month);
+                data.public_information = (Array.isArray(data.public_information) ? data.public_information : []).map(item => {
+                    const attachment = (item && typeof item === 'object' && item.attachment && typeof item.attachment === 'object')
+                        ? {
+                            name: String(item.attachment.name || '').trim(),
+                            mime: String(item.attachment.mime || '').trim().toLowerCase(),
+                            data_url: String(item.attachment.data_url || '').trim()
+                        }
+                        : null;
+                    return {
+                        id: parseInt(item && item.id, 10) || (Date.now() + Math.floor(Math.random() * 10000)),
+                        title: String(item && item.title || '').trim(),
+                        layout: String(item && item.layout || 'cards').trim().toLowerCase() === 'table' ? 'table' : 'cards',
+                        content: String(item && item.content || '').trim(),
+                        table_columns: Array.isArray(item && item.table_columns) ? item.table_columns.map(v => String(v || '').trim()).filter(Boolean) : [],
+                        table_rows: Array.isArray(item && item.table_rows) ? item.table_rows.filter(Array.isArray).map(r => r.map(v => String(v || '').trim())) : [],
+                        attachment: attachment,
+                        created_at: String(item && item.created_at || '').trim(),
+                        updated_at: String(item && item.updated_at || '').trim()
+                    };
+                }).filter(item => item.title || item.content || (item.table_rows && item.table_rows.length > 0));
                 data.syllabus_catalog = normalizeSyllabusCatalogShape(data.syllabus_catalog || {});
                 data.syllabus_tracking = normalizeSyllabusTrackingRows(data.syllabus_tracking || []);
                 if (String(data.syllabus_seed_version || '') !== SYLLABUS_SEED_VERSION) {
@@ -13435,6 +13498,7 @@
             else if (tabName === 'resources')        _safeRender(loadResourcesTab, 'resources');
             else if (tabName === 'syllabus')         _safeRender(loadSyllabusTab, 'syllabus');
             else if (tabName === 'rules')            _safeRender(loadRulesTab, 'rules');
+            else if (tabName === 'information')      _safeRender(loadInformationTab, 'information');
             else if (tabName === 'attendance')       _safeRender(loadAttendanceTab, 'attendance');
             else if (tabName === 'cr')               _safeRender(loadCRTab, 'cr');
             else if (tabName === 'leadership')       _safeRender(loadLeadership, 'leadership');
@@ -14229,6 +14293,7 @@
             if (tabName === 'attendance') return true;
             if (tabName === 'syllabus') return true;
             if (tabName === 'rules') return true;
+            if (tabName === 'information') return true;
             if (tabName === 'good-conduct') return true;
             if (tabName === 'profile') return true;
             if (tabName === 'homework') return isAdmin || isTeacher;
@@ -14271,6 +14336,7 @@
             setTabVisibility('resources', true);
             setTabVisibility('syllabus', true);
             setTabVisibility('rules', true);
+            setTabVisibility('information', true);
             setTabVisibility('party', isAdmin);
             setTabVisibility('office', isAdmin || isTeacher);
             setTabVisibility('voting', isAdmin);
@@ -34802,6 +34868,210 @@
                     </div>
                 </div>
             `).join('');
+        }
+
+        const informationEditorState = { editingId: null, attachment: null };
+
+        function getPublicInformationStore() {
+            const data = db.getData();
+            if (!Array.isArray(data.public_information)) data.public_information = [];
+            return data.public_information;
+        }
+
+        function parseInformationTable(rawText) {
+            const lines = String(rawText || '').split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+            if (!lines.length) return { columns: [], rows: [] };
+            const splitLine = (line) => {
+                const byPipe = line.split('|').map(v => String(v || '').trim());
+                if (byPipe.length > 1) return byPipe;
+                return line.split(',').map(v => String(v || '').trim());
+            };
+            const columns = splitLine(lines[0]).filter(Boolean);
+            const rows = lines.slice(1).map(splitLine).filter(row => row.some(cell => String(cell || '').trim()));
+            return { columns, rows };
+        }
+
+        function clearInformationEditor() {
+            informationEditorState.editingId = null;
+            informationEditorState.attachment = null;
+            const titleEl = document.getElementById('infoTitleInput');
+            const layoutEl = document.getElementById('infoLayoutSelect');
+            const contentEl = document.getElementById('infoContentInput');
+            const fileEl = document.getElementById('infoAttachmentInput');
+            if (titleEl) titleEl.value = '';
+            if (layoutEl) layoutEl.value = 'cards';
+            if (contentEl) contentEl.value = '';
+            if (fileEl) fileEl.value = '';
+        }
+
+        function _readFileAsDataUrl(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(String(reader.result || ''));
+                reader.onerror = () => reject(new Error('Failed to read file'));
+                reader.readAsDataURL(file);
+            });
+        }
+
+        async function saveInformationItem() {
+            const isAdmin = currentUserRole === 'admin';
+            const isTeacher = currentUserRole === 'teacher';
+            if (!(isAdmin || isTeacher)) {
+                showAlert('Only Admin/Teacher can update information items.', 'warning');
+                return;
+            }
+            const title = String(getElementValue('infoTitleInput') || '').trim();
+            const layout = String(getElementValue('infoLayoutSelect') || 'cards').trim().toLowerCase() === 'table' ? 'table' : 'cards';
+            const content = String(getElementValue('infoContentInput') || '').trim();
+            const fileEl = document.getElementById('infoAttachmentInput');
+            let attachment = informationEditorState.attachment;
+            const file = fileEl && fileEl.files && fileEl.files[0] ? fileEl.files[0] : null;
+
+            if (!title && !content && !file && !attachment) {
+                showAlert('Please add title/content or an attachment.', 'warning');
+                return;
+            }
+
+            if (file) {
+                const allowedTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'];
+                const maxBytes = 4 * 1024 * 1024;
+                if (!allowedTypes.includes(String(file.type || '').toLowerCase())) {
+                    showAlert('Only PDF, JPG/JPEG, and PNG files are allowed.', 'warning');
+                    return;
+                }
+                if (file.size > maxBytes) {
+                    showAlert('Attachment too large. Max 4 MB allowed.', 'warning');
+                    return;
+                }
+                try {
+                    const dataUrl = await _readFileAsDataUrl(file);
+                    attachment = {
+                        name: String(file.name || '').trim() || 'attachment',
+                        mime: String(file.type || '').trim().toLowerCase(),
+                        data_url: dataUrl
+                    };
+                } catch (err) {
+                    showAlert('Attachment read failed.', 'danger');
+                    return;
+                }
+            }
+
+            const table = layout === 'table' ? parseInformationTable(content) : { columns: [], rows: [] };
+            const data = db.getData();
+            const rows = getPublicInformationStore();
+            const nowIso = new Date().toISOString();
+            const id = informationEditorState.editingId || (Date.now() + Math.floor(Math.random() * 1000));
+            const nextItem = {
+                id,
+                title,
+                layout,
+                content,
+                table_columns: table.columns,
+                table_rows: table.rows,
+                attachment: attachment || null,
+                created_at: informationEditorState.editingId ? (rows.find(r => parseInt(r.id, 10) === parseInt(id, 10))?.created_at || nowIso) : nowIso,
+                updated_at: nowIso
+            };
+            const idx = rows.findIndex(item => parseInt(item && item.id, 10) === parseInt(id, 10));
+            if (idx >= 0) rows[idx] = nextItem;
+            else rows.push(nextItem);
+            data.public_information = rows;
+            db.saveData(data);
+            if (SERVER_SYNC.enabled) pushToServer(db.getData(), { silent: true }).catch(() => {});
+            showAlert('Information item saved.', 'success');
+            clearInformationEditor();
+            renderInformationItems();
+        }
+
+        function editInformationItem(itemId) {
+            const rows = getPublicInformationStore();
+            const item = rows.find(row => parseInt(row && row.id, 10) === parseInt(itemId, 10));
+            if (!item) return;
+            informationEditorState.editingId = parseInt(item.id, 10);
+            informationEditorState.attachment = item.attachment || null;
+            const titleEl = document.getElementById('infoTitleInput');
+            const layoutEl = document.getElementById('infoLayoutSelect');
+            const contentEl = document.getElementById('infoContentInput');
+            const fileEl = document.getElementById('infoAttachmentInput');
+            if (titleEl) titleEl.value = String(item.title || '');
+            if (layoutEl) layoutEl.value = String(item.layout || 'cards') === 'table' ? 'table' : 'cards';
+            if (contentEl) {
+                if (String(item.layout || '') === 'table' && Array.isArray(item.table_columns) && item.table_columns.length) {
+                    const header = item.table_columns.join(' | ');
+                    const rowsText = (Array.isArray(item.table_rows) ? item.table_rows : []).map(r => (Array.isArray(r) ? r : []).join(' | ')).join('\n');
+                    contentEl.value = rowsText ? `${header}\n${rowsText}` : header;
+                } else {
+                    contentEl.value = String(item.content || '');
+                }
+            }
+            if (fileEl) fileEl.value = '';
+            showAlert('Information item loaded for edit.', 'info');
+        }
+
+        function deleteInformationItem(itemId) {
+            const isAdmin = currentUserRole === 'admin';
+            const isTeacher = currentUserRole === 'teacher';
+            if (!(isAdmin || isTeacher)) {
+                showAlert('Only Admin/Teacher can delete information items.', 'warning');
+                return;
+            }
+            if (!confirm('Delete this information item?')) return;
+            const data = db.getData();
+            data.public_information = getPublicInformationStore().filter(row => parseInt(row && row.id, 10) !== parseInt(itemId, 10));
+            db.saveData(data);
+            if (SERVER_SYNC.enabled) pushToServer(db.getData(), { silent: true }).catch(() => {});
+            if (parseInt(informationEditorState.editingId, 10) === parseInt(itemId, 10)) clearInformationEditor();
+            renderInformationItems();
+            showAlert('Information item deleted.', 'success');
+        }
+
+        function renderInformationItems() {
+            const host = document.getElementById('infoItemsList');
+            if (!host) return;
+            const rows = [...getPublicInformationStore()].sort((a, b) => parseSyncStamp(b.updated_at || '') - parseSyncStamp(a.updated_at || ''));
+            const canEdit = currentUserRole === 'admin' || currentUserRole === 'teacher';
+            if (!rows.length) {
+                host.innerHTML = '<div class="sync-meta">No information items yet.</div>';
+                return;
+            }
+            host.innerHTML = rows.map(item => {
+                const isTable = String(item.layout || '') === 'table';
+                const body = isTable
+                    ? `<div class="sync-meta">Table: ${(item.table_rows || []).length} row(s), ${(item.table_columns || []).length} column(s)</div>`
+                    : `<div style="margin-top:6px;line-height:1.45;">${escapeHtml(String(item.content || '')).replace(/\n/g, '<br>')}</div>`;
+                const attach = item.attachment && item.attachment.name
+                    ? `<div class="sync-meta" style="margin-top:6px;">Attachment: ${escapeHtml(item.attachment.name)} (${escapeHtml(item.attachment.mime || '')})</div>`
+                    : '';
+                return `
+                    <div class="form-card" style="margin:8px 0;padding:10px 12px;">
+                        <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;">
+                            <strong>${escapeHtml(item.title || 'Information')}</strong>
+                            <span class="sync-meta">${escapeHtml(String(item.layout || 'cards').toUpperCase())}</span>
+                        </div>
+                        ${body}
+                        ${attach}
+                        <div class="sync-meta" style="margin-top:6px;">Updated: ${escapeHtml(item.updated_at || item.created_at || '-')}</div>
+                        ${canEdit ? `<div style="margin-top:8px;display:flex;gap:8px;"><button class="secondary" onclick="editInformationItem('${escapeHtml(String(item.id))}')"><i class="fas fa-pen"></i> Edit</button><button class="secondary" onclick="deleteInformationItem('${escapeHtml(String(item.id))}')"><i class="fas fa-trash"></i> Delete</button></div>` : ''}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function loadInformationTab() {
+            const canEdit = currentUserRole === 'admin' || currentUserRole === 'teacher';
+            const editorRow = document.getElementById('infoEditorRow');
+            const editorActions = document.getElementById('infoEditorActions');
+            if (editorRow) editorRow.style.display = canEdit ? '' : 'none';
+            if (editorActions) editorActions.style.display = canEdit ? '' : 'none';
+            const titleEl = document.getElementById('infoTitleInput');
+            const layoutEl = document.getElementById('infoLayoutSelect');
+            const contentEl = document.getElementById('infoContentInput');
+            const fileEl = document.getElementById('infoAttachmentInput');
+            if (titleEl) titleEl.disabled = !canEdit;
+            if (layoutEl) layoutEl.disabled = !canEdit;
+            if (contentEl) contentEl.disabled = !canEdit;
+            if (fileEl) fileEl.disabled = !canEdit;
+            renderInformationItems();
         }
 
         function getFeesExportRows() {
