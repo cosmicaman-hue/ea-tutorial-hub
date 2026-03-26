@@ -214,6 +214,18 @@
             }
             return all.filter(month => keep.has(month)).slice(0, 3);
         }
+        function latestThreeMonths(rawMonths) {
+            const now = new Date();
+            const keep = new Set();
+            const y = now.getFullYear();
+            const m = now.getMonth() + 1;
+            for (let i = 0; i < 3; i++) {
+                const dt = new Date(y, m - 1 - i, 1);
+                keep.add(`${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}`);
+            }
+            const months = Array.isArray(rawMonths) ? rawMonths.map(v => String(v || '').trim()) : [];
+            return months.filter(month => keep.has(month)).sort((a, b) => b.localeCompare(a)).slice(0, 3);
+        }
         function getMonthRosterRolls(data, month) {
             const rolls = new Set();
             const ms = data && data.month_students && data.month_students[month];
@@ -287,11 +299,13 @@
 
         function normalizePayload(payload) {
             if (payload && payload.scoreboard && !payload.data) {
+                const months = latestThreeMonths(payload.months);
+                const scoreboard = payload.scoreboard || {};
                 return {
                     updated_at: payload.updated_at || '',
                     top_full_count: Number(payload.top_full_count) || 15,
-                    months: Array.isArray(payload.months) ? payload.months : [],
-                    scoreboard: payload.scoreboard || {},
+                    months,
+                    scoreboard: Object.fromEntries(months.map(month => [month, Array.isArray(scoreboard[month]) ? scoreboard[month] : []])),
                     public_information: Array.isArray(payload.public_information) ? payload.public_information : []
                 };
             }
@@ -354,6 +368,11 @@
             infoList.innerHTML = items.map(item => {
                 const title = esc(item.title || 'Information');
                 const layout = esc(String(item.layout || 'cards').toUpperCase());
+                const category = String(item.category || '').toLowerCase();
+                const audience = String(item.audience || '').trim();
+                const periodType = String(item.period_type || '').trim();
+                const periodLabel = String(item.period_label || '').trim();
+                const isSchedule = category === 'schedule_class' || category === 'schedule_group';
                 const lines = String(item.content || '').split(/\r?\n/).map(v => v.trim()).filter(Boolean);
                 let bodyHtml = '';
                 if (String(item.layout || '') === 'table') {
@@ -386,12 +405,20 @@
                 }
 
                 const updated = esc(item.updated_at || '');
+                const scheduleBadge = isSchedule
+                    ? `<div style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0;">
+                        <span class="chip" style="background:#1e3a8a;color:#dbeafe;border-color:#3b82f6;">${esc(category === 'schedule_class' ? 'CLASS SCHEDULE' : 'GROUP SCHEDULE')}</span>
+                        ${audience ? `<span class="chip" style="background:#14532d;color:#dcfce7;border-color:#22c55e;">${esc(audience)}</span>` : ''}
+                        ${(periodType || periodLabel) ? `<span class="chip" style="background:#7c2d12;color:#ffedd5;border-color:#fb923c;">${esc((periodType ? periodType.toUpperCase() : '') + (periodLabel ? ' - ' + periodLabel : ''))}</span>` : ''}
+                    </div>`
+                    : '';
                 return `
                     <article class="info-item">
                         <div class="info-head">
                             <h3 style="margin:0;font-size:16px;">${title}</h3>
                             <span class="chip">${layout}</span>
                         </div>
+                        ${scheduleBadge}
                         ${bodyHtml}
                         ${attachmentHtml}
                         ${updated ? `<div class="meta" style="margin-top:8px;">Updated: ${updated}</div>` : ''}

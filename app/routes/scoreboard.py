@@ -224,8 +224,7 @@ def _recent_public_month_window():
     return out
 
 
-def _public_information_payload(payload):
-    rows = payload.get('public_information', []) or []
+def _public_information_payload_from_rows(rows):
     if not isinstance(rows, list):
         rows = []
     normalized = []
@@ -244,6 +243,10 @@ def _public_information_payload(payload):
             'title': title or 'Information',
             'layout': layout,
             'content': content,
+            'category': str(item.get('category') or 'general').strip().lower() or 'general',
+            'audience': str(item.get('audience') or '').strip(),
+            'period_type': str(item.get('period_type') or '').strip().lower(),
+            'period_label': str(item.get('period_label') or '').strip(),
             'updated_at': str(item.get('updated_at') or item.get('created_at') or ''),
         }
         if layout == 'table':
@@ -274,6 +277,47 @@ def _public_information_payload(payload):
         normalized.append(entry)
     normalized.sort(key=lambda x: str(x.get('updated_at') or ''), reverse=True)
     return normalized
+
+
+def _public_information_payload(payload):
+    rows = payload.get('public_information', []) or []
+    return _public_information_payload_from_rows(rows)
+
+
+def _sanitize_client_public_snapshot(snapshot, payload):
+    recent_window = _recent_public_month_window()
+    allowed_months = set(recent_window)
+    months = [str(m or '').strip() for m in (snapshot.get('months') or []) if re.match(r'^\d{4}-\d{2}$', str(m or '').strip())]
+    months = [m for m in months if m in allowed_months]
+    months = sorted(dict.fromkeys(months), reverse=True)[:3]
+    scoreboard_src = snapshot.get('scoreboard') if isinstance(snapshot.get('scoreboard'), dict) else {}
+    scoreboard = {}
+    top_full = 15
+    for month in months:
+        rows = scoreboard_src.get(month) if isinstance(scoreboard_src.get(month), list) else []
+        safe_rows = []
+        for idx, row in enumerate(rows):
+            if not isinstance(row, dict):
+                continue
+            rank = _safe_int(row.get('rank'), idx + 1)
+            masked = rank > top_full
+            safe_rows.append({
+                'rank': rank,
+                'roll': _roll_key(row.get('roll') or '-'),
+                'name': _clean_public_name(row.get('name') or '') if not masked else '',
+                'class': str(row.get('class') or '').strip() if not masked else '',
+                'total': _safe_int(row.get('total')),
+                'masked': masked,
+            })
+        safe_rows.sort(key=lambda item: _safe_int(item.get('rank'), 0))
+        scoreboard[month] = safe_rows
+    return {
+        'updated_at': str(snapshot.get('updated_at') or payload.get('server_updated_at') or _server_now_iso()),
+        'top_full_count': top_full,
+        'months': months,
+        'scoreboard': scoreboard,
+        'public_information': _public_information_payload_from_rows(snapshot.get('public_information') if isinstance(snapshot.get('public_information'), list) else (payload.get('public_information') or [])),
+    }
 
 
 def _public_month_keys(payload):
@@ -557,10 +601,13 @@ def _safe_commit_stamp():
         return datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
 
-def _publish_public_site_snapshot(payload, push=None):
+def _publish_public_site_snapshot(payload, push=None, public_snapshot=None):
     site_dir = _public_site_dir()
     scores_path = _public_site_scores_path()
-    public_payload = _build_public_site_payload(payload if isinstance(payload, dict) else {})
+    if isinstance(public_snapshot, dict) and isinstance(public_snapshot.get('scoreboard'), dict):
+        public_payload = _sanitize_client_public_snapshot(public_snapshot, payload if isinstance(payload, dict) else {})
+    else:
+        public_payload = _build_public_site_payload(payload if isinstance(payload, dict) else {})
 
     os.makedirs(site_dir, exist_ok=True)
     _atomic_write_json(scores_path, public_payload)
@@ -5238,6 +5285,7 @@ def offline_force_publish():
 
     payload = request.get_json(silent=True) or {}
     data = payload.get('data') if isinstance(payload, dict) else None
+    public_snapshot = payload.get('public_snapshot') if isinstance(payload, dict) else None
     request_peers = payload.get('peers', []) if isinstance(payload, dict) else []
     wait_for_results = bool(payload.get('wait_for_results')) if isinstance(payload, dict) else False
     cloudflare_only = bool(payload.get('cloudflare_only')) if isinstance(payload, dict) else False
@@ -5255,7 +5303,7 @@ def offline_force_publish():
 
     if cloudflare_only:
         try:
-            public_site_result = _publish_public_site_snapshot(data, push=auto_push_public_site)
+            public_site_result = _publish_public_site_snapshot(data, push=auto_push_public_site, public_snapshot=public_snapshot)
         except Exception as exc:
             current_app.logger.exception("Force publish cloudflare-only failed")
             return jsonify({

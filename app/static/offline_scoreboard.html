@@ -7057,6 +7057,30 @@
                         <label>Title</label>
                         <input id="infoTitleInput" type="text" placeholder="e.g., Exam Schedule">
                     </div>
+                    <div class="control-group" style="min-width:190px;">
+                        <label>Category</label>
+                        <select id="infoCategorySelect">
+                            <option value="general">General</option>
+                            <option value="schedule_class">Classwise Schedule</option>
+                            <option value="schedule_group">Groupwise Schedule</option>
+                        </select>
+                    </div>
+                    <div class="control-group" style="min-width:220px;">
+                        <label>Audience (class/group)</label>
+                        <input id="infoAudienceInput" type="text" placeholder="e.g., Class 6 / Group A">
+                    </div>
+                    <div class="control-group" style="min-width:170px;">
+                        <label>Period</label>
+                        <select id="infoPeriodTypeSelect">
+                            <option value="">None</option>
+                            <option value="monthly">Monthly</option>
+                            <option value="weekly">Weekly</option>
+                        </select>
+                    </div>
+                    <div class="control-group" style="min-width:180px;">
+                        <label>Period Label</label>
+                        <input id="infoPeriodLabelInput" type="text" placeholder="e.g., March 2026 / Week 2">
+                    </div>
                     <div class="control-group" style="min-width:180px;">
                         <label>Layout</label>
                         <select id="infoLayoutSelect">
@@ -11871,6 +11895,10 @@
                     return {
                         id: parseInt(item && item.id, 10) || (Date.now() + Math.floor(Math.random() * 10000)),
                         title: String(item && item.title || '').trim(),
+                        category: String(item && item.category || 'general').trim().toLowerCase(),
+                        audience: String(item && item.audience || '').trim(),
+                        period_type: String(item && item.period_type || '').trim().toLowerCase(),
+                        period_label: String(item && item.period_label || '').trim(),
                         layout: String(item && item.layout || 'cards').trim().toLowerCase() === 'table' ? 'table' : 'cards',
                         content: String(item && item.content || '').trim(),
                         table_columns: Array.isArray(item && item.table_columns) ? item.table_columns.map(v => String(v || '').trim()).filter(Boolean) : [],
@@ -16129,6 +16157,85 @@
             };
         }
 
+        function _publicRecentMonths() {
+            const out = [];
+            const now = new Date();
+            for (let i = 0; i < 3; i++) {
+                const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+                out.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+            }
+            return out;
+        }
+
+        function _cleanPublicName(raw) {
+            const value = String(raw || '').replace(/\s*\([^)]*\)/g, '').replace(/\s+/g, ' ').trim();
+            return value || '-';
+        }
+
+        function _sanitizePublicInformationForExport(rows) {
+            if (!Array.isArray(rows)) return [];
+            return rows.map(item => {
+                if (!item || typeof item !== 'object') return null;
+                const attachment = item.attachment && typeof item.attachment === 'object' ? item.attachment : null;
+                let safeAttachment = null;
+                if (attachment) {
+                    const mime = String(attachment.mime || '').trim().toLowerCase();
+                    const dataUrl = String(attachment.data_url || '').trim();
+                    if (dataUrl.startsWith('data:') && ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'].includes(mime)) {
+                        safeAttachment = {
+                            name: String(attachment.name || '').trim(),
+                            mime,
+                            data_url: dataUrl
+                        };
+                    }
+                }
+                return {
+                    id: parseInt(item.id, 10) || (Date.now() + Math.floor(Math.random() * 10000)),
+                    title: String(item.title || '').trim(),
+                    layout: String(item.layout || 'cards').trim().toLowerCase() === 'table' ? 'table' : 'cards',
+                    content: String(item.content || '').trim(),
+                    table_columns: Array.isArray(item.table_columns) ? item.table_columns.map(v => String(v || '').trim()).filter(Boolean) : [],
+                    table_rows: Array.isArray(item.table_rows) ? item.table_rows.filter(Array.isArray).map(r => r.map(v => String(v || '').trim())) : [],
+                    category: String(item.category || 'general').trim().toLowerCase(),
+                    audience: String(item.audience || '').trim(),
+                    period_type: String(item.period_type || '').trim().toLowerCase(),
+                    period_label: String(item.period_label || '').trim(),
+                    attachment: safeAttachment,
+                    created_at: String(item.created_at || '').trim(),
+                    updated_at: String(item.updated_at || '').trim()
+                };
+            }).filter(Boolean);
+        }
+
+        function buildPublicSnapshotFromLAN() {
+            const months = _publicRecentMonths();
+            const scoreboard = {};
+            months.forEach(month => {
+                const rows = Array.isArray(db.getMonthlyScoreboard(month)) ? db.getMonthlyScoreboard(month) : [];
+                scoreboard[month] = rows.filter(Boolean).map((row, idx) => {
+                    const student = row.student || {};
+                    const rank = parseInt(row.rank, 10) || (idx + 1);
+                    const masked = rank > 15;
+                    return {
+                        rank,
+                        roll: String(student.roll || '').trim().toUpperCase() || '-',
+                        name: masked ? '' : _cleanPublicName(student.base_name || student.name || ''),
+                        class: masked ? '' : String(student.class || '').trim(),
+                        total: parseInt(row.total, 10) || 0,
+                        masked
+                    };
+                }).sort((a, b) => a.rank - b.rank);
+            });
+            const data = db.getData();
+            return {
+                updated_at: new Date().toISOString(),
+                top_full_count: 15,
+                months,
+                scoreboard,
+                public_information: _sanitizePublicInformationForExport(data.public_information || [])
+            };
+        }
+
         async function forcePublishNow() {
             if (forcePublishRunning) return;
             if (!SERVER_SYNC.enabled) {
@@ -16152,7 +16259,13 @@
                     method: 'POST',
                     credentials: 'include',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ data: db.getData(), peers: baseUrls, wait_for_results: true, cloudflare_only: true })
+                    body: JSON.stringify({
+                        data: db.getData(),
+                        public_snapshot: buildPublicSnapshotFromLAN(),
+                        peers: baseUrls,
+                        wait_for_results: true,
+                        cloudflare_only: true
+                    })
                 }), 120000);
                 const contentType = String(resp.headers.get('content-type') || '').toLowerCase();
                 if (resp.status === 401 || resp.status === 403 || contentType.includes('text/html')) {
@@ -34895,10 +35008,18 @@
             informationEditorState.editingId = null;
             informationEditorState.attachment = null;
             const titleEl = document.getElementById('infoTitleInput');
+            const categoryEl = document.getElementById('infoCategorySelect');
+            const audienceEl = document.getElementById('infoAudienceInput');
+            const periodTypeEl = document.getElementById('infoPeriodTypeSelect');
+            const periodLabelEl = document.getElementById('infoPeriodLabelInput');
             const layoutEl = document.getElementById('infoLayoutSelect');
             const contentEl = document.getElementById('infoContentInput');
             const fileEl = document.getElementById('infoAttachmentInput');
             if (titleEl) titleEl.value = '';
+            if (categoryEl) categoryEl.value = 'general';
+            if (audienceEl) audienceEl.value = '';
+            if (periodTypeEl) periodTypeEl.value = '';
+            if (periodLabelEl) periodLabelEl.value = '';
             if (layoutEl) layoutEl.value = 'cards';
             if (contentEl) contentEl.value = '';
             if (fileEl) fileEl.value = '';
@@ -34921,6 +35042,10 @@
                 return;
             }
             const title = String(getElementValue('infoTitleInput') || '').trim();
+            const category = String(getElementValue('infoCategorySelect') || 'general').trim().toLowerCase();
+            const audience = String(getElementValue('infoAudienceInput') || '').trim();
+            const periodType = String(getElementValue('infoPeriodTypeSelect') || '').trim().toLowerCase();
+            const periodLabel = String(getElementValue('infoPeriodLabelInput') || '').trim();
             const layout = String(getElementValue('infoLayoutSelect') || 'cards').trim().toLowerCase() === 'table' ? 'table' : 'cards';
             const content = String(getElementValue('infoContentInput') || '').trim();
             const fileEl = document.getElementById('infoAttachmentInput');
@@ -34964,6 +35089,10 @@
             const nextItem = {
                 id,
                 title,
+                category: category || 'general',
+                audience,
+                period_type: periodType,
+                period_label: periodLabel,
                 layout,
                 content,
                 table_columns: table.columns,
@@ -34990,10 +35119,18 @@
             informationEditorState.editingId = parseInt(item.id, 10);
             informationEditorState.attachment = item.attachment || null;
             const titleEl = document.getElementById('infoTitleInput');
+            const categoryEl = document.getElementById('infoCategorySelect');
+            const audienceEl = document.getElementById('infoAudienceInput');
+            const periodTypeEl = document.getElementById('infoPeriodTypeSelect');
+            const periodLabelEl = document.getElementById('infoPeriodLabelInput');
             const layoutEl = document.getElementById('infoLayoutSelect');
             const contentEl = document.getElementById('infoContentInput');
             const fileEl = document.getElementById('infoAttachmentInput');
             if (titleEl) titleEl.value = String(item.title || '');
+            if (categoryEl) categoryEl.value = String(item.category || 'general');
+            if (audienceEl) audienceEl.value = String(item.audience || '');
+            if (periodTypeEl) periodTypeEl.value = String(item.period_type || '');
+            if (periodLabelEl) periodLabelEl.value = String(item.period_label || '');
             if (layoutEl) layoutEl.value = String(item.layout || 'cards') === 'table' ? 'table' : 'cards';
             if (contentEl) {
                 if (String(item.layout || '') === 'table' && Array.isArray(item.table_columns) && item.table_columns.length) {
@@ -35036,6 +35173,10 @@
             }
             host.innerHTML = rows.map(item => {
                 const isTable = String(item.layout || '') === 'table';
+                const metaParts = [];
+                if (item.category) metaParts.push(String(item.category).replace(/_/g, ' ').toUpperCase());
+                if (item.audience) metaParts.push(`Audience: ${String(item.audience)}`);
+                if (item.period_type || item.period_label) metaParts.push(`Period: ${String(item.period_type || '').toUpperCase()} ${String(item.period_label || '').trim()}`.trim());
                 const body = isTable
                     ? `<div class="sync-meta">Table: ${(item.table_rows || []).length} row(s), ${(item.table_columns || []).length} column(s)</div>`
                     : `<div style="margin-top:6px;line-height:1.45;">${escapeHtml(String(item.content || '')).replace(/\n/g, '<br>')}</div>`;
@@ -35048,6 +35189,7 @@
                             <strong>${escapeHtml(item.title || 'Information')}</strong>
                             <span class="sync-meta">${escapeHtml(String(item.layout || 'cards').toUpperCase())}</span>
                         </div>
+                        ${metaParts.length ? `<div class="sync-meta" style="margin-top:6px;">${escapeHtml(metaParts.join(' | '))}</div>` : ''}
                         ${body}
                         ${attach}
                         <div class="sync-meta" style="margin-top:6px;">Updated: ${escapeHtml(item.updated_at || item.created_at || '-')}</div>
@@ -35064,10 +35206,18 @@
             if (editorRow) editorRow.style.display = canEdit ? '' : 'none';
             if (editorActions) editorActions.style.display = canEdit ? '' : 'none';
             const titleEl = document.getElementById('infoTitleInput');
+            const categoryEl = document.getElementById('infoCategorySelect');
+            const audienceEl = document.getElementById('infoAudienceInput');
+            const periodTypeEl = document.getElementById('infoPeriodTypeSelect');
+            const periodLabelEl = document.getElementById('infoPeriodLabelInput');
             const layoutEl = document.getElementById('infoLayoutSelect');
             const contentEl = document.getElementById('infoContentInput');
             const fileEl = document.getElementById('infoAttachmentInput');
             if (titleEl) titleEl.disabled = !canEdit;
+            if (categoryEl) categoryEl.disabled = !canEdit;
+            if (audienceEl) audienceEl.disabled = !canEdit;
+            if (periodTypeEl) periodTypeEl.disabled = !canEdit;
+            if (periodLabelEl) periodLabelEl.disabled = !canEdit;
             if (layoutEl) layoutEl.disabled = !canEdit;
             if (contentEl) contentEl.disabled = !canEdit;
             if (fileEl) fileEl.disabled = !canEdit;
