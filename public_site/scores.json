@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-03-30T15:29:59.126Z",
+  "updated_at": "2026-03-30T16:28:44.235Z",
   "top_full_count": 15,
   "months": [
     "2026-03",
@@ -356,362 +356,362 @@
     "2026-02": [
       {
         "rank": 1,
-        "roll": "EA26D27",
-        "name": "Riya Singh",
-        "class": "9",
-        "total": 0,
+        "roll": "EA25B13",
+        "name": "Rehmetun Khatun",
+        "class": "6",
+        "total": 383,
         "masked": false
       },
       {
         "rank": 2,
-        "roll": "EA24A05",
-        "name": "Rashi",
-        "class": "3",
-        "total": -75,
+        "roll": "EA24B01",
+        "name": "Pari Gupta",
+        "class": "6",
+        "total": 374,
         "masked": false
       },
       {
         "rank": 3,
-        "roll": "EA24B09",
-        "name": "Abdul Arman",
-        "class": "5",
-        "total": -75,
+        "roll": "EA24A01",
+        "name": "Ayush Gupta",
+        "class": "4",
+        "total": 367,
         "masked": false
       },
       {
         "rank": 4,
-        "roll": "EA24B01",
-        "name": "Pari Gupta",
-        "class": "6",
-        "total": -75,
+        "roll": "EA26D27",
+        "name": "Riya Singh",
+        "class": "9",
+        "total": 366,
         "masked": false
       },
       {
         "rank": 5,
-        "roll": "EA24D25",
-        "name": "Nandani Gupta",
-        "class": "9",
-        "total": -75,
+        "roll": "EA24D01",
+        "name": "Jay Kumar Yadav",
+        "class": "10",
+        "total": 346,
         "masked": false
       },
       {
         "rank": 6,
-        "roll": "EA24C02",
-        "name": "Sahil Yadav",
-        "class": "8",
-        "total": -75,
+        "roll": "EA25D17",
+        "name": "Aditya Singh",
+        "class": "10",
+        "total": 332,
         "masked": false
       },
       {
         "rank": 7,
-        "roll": "EA24D01",
-        "name": "Jay Kumar Yadav",
-        "class": "10",
-        "total": -75,
+        "roll": "EA24A05",
+        "name": "Rashi",
+        "class": "3",
+        "total": 321,
         "masked": false
       },
       {
         "rank": 8,
-        "roll": "EA24D06",
-        "name": "Tanmay Biswas",
-        "class": "10",
-        "total": -75,
+        "roll": "EA24C02",
+        "name": "Sahil Yadav",
+        "class": "8",
+        "total": 250,
         "masked": false
       },
       {
         "rank": 9,
-        "roll": "EA24D08",
-        "name": "Sanjana Sutradhar",
-        "class": "9",
-        "total": -75,
+        "roll": "EA24B09",
+        "name": "Abdul Arman",
+        "class": "5",
+        "total": 245,
         "masked": false
       },
       {
         "rank": 10,
-        "roll": "EA25C07",
-        "name": "Khushi Paswan",
-        "class": "8",
-        "total": -75,
+        "roll": "EA25B06",
+        "name": "Jay Arya",
+        "class": "5",
+        "total": 222,
         "masked": false
       },
       {
         "rank": 11,
-        "roll": "EA25D12",
-        "name": "Roshan Paswan",
-        "class": "10",
-        "total": -75,
+        "roll": "EA24B03",
+        "name": "Deep Das",
+        "class": "6",
+        "total": 197,
         "masked": false
       },
       {
         "rank": 12,
-        "roll": "EA25D13",
-        "name": "Aamna Khatoon",
-        "class": "10",
-        "total": -75,
+        "roll": "EA24C06",
+        "name": "Sakshi",
+        "class": "8",
+        "total": 185,
         "masked": false
       },
       {
         "rank": 13,
-        "roll": "EA25D26",
-        "name": "Shankar Pradhan",
-        "class": "9",
-        "total": -75,
+        "roll": "EA24A04",
+        "name": "Tanu Sinha",
+        "class": "4",
+        "total": 182,
         "masked": false
       },
       {
         "rank": 14,
-        "roll": "EA25C09",
-        "name": "Shomiya Xalxo",
-        "class": "7",
-        "total": -75,
+        "roll": "EA25C07",
+        "name": "Khushi Paswan",
+        "class": "8",
+        "total": 167,
         "masked": false
       },
       {
         "rank": 15,
-        "roll": "EA25B06",
-        "name": "Jay Arya",
-        "class": "5",
-        "total": -75,
+        "roll": "EA24D15",
+        "name": "Reeyansh Lama",
+        "class": "9",
+        "total": 158,
         "masked": false
       },
       {
         "rank": 16,
-        "roll": "EA25C10",
+        "roll": "EA25D12",
         "name": "",
         "class": "",
-        "total": -75,
+        "total": 155,
         "masked": true
       },
       {
         "rank": 17,
-        "roll": "EA25D17",
+        "roll": "EA25C09",
         "name": "",
         "class": "",
-        "total": -75,
+        "total": 142,
         "masked": true
       },
       {
         "rank": 18,
-        "roll": "EA25C15",
+        "roll": "EA25C19",
         "name": "",
         "class": "",
-        "total": -75,
+        "total": 142,
         "masked": true
       },
       {
         "rank": 19,
-        "roll": "EA25D22",
+        "roll": "EA24D06",
         "name": "",
         "class": "",
-        "total": -75,
+        "total": 137,
         "masked": true
       },
       {
         "rank": 20,
-        "roll": "EA25D24",
+        "roll": "EA25C10",
         "name": "",
         "class": "",
-        "total": -75,
+        "total": 137,
         "masked": true
       },
       {
         "rank": 21,
-        "roll": "EA25C17",
+        "roll": "EA25D24",
         "name": "",
         "class": "",
-        "total": -75,
+        "total": 82,
         "masked": true
       },
       {
         "rank": 22,
-        "roll": "EA25C18",
+        "roll": "EA25D26",
         "name": "",
         "class": "",
-        "total": -75,
+        "total": 72,
         "masked": true
       },
       {
         "rank": 23,
-        "roll": "EA25C19",
+        "roll": "EA24D25",
         "name": "",
         "class": "",
-        "total": -75,
+        "total": 70,
         "masked": true
       },
       {
         "rank": 24,
-        "roll": "EA25B13",
+        "roll": "EA25C22",
         "name": "",
         "class": "",
-        "total": -75,
+        "total": 61,
         "masked": true
       },
       {
         "rank": 25,
-        "roll": "EA25C20",
+        "roll": "EA25C18",
         "name": "",
         "class": "",
-        "total": -75,
+        "total": 60,
         "masked": true
       },
       {
         "rank": 26,
-        "roll": "EA25C21",
+        "roll": "EA25D13",
         "name": "",
         "class": "",
-        "total": -75,
+        "total": 58,
         "masked": true
       },
       {
         "rank": 27,
-        "roll": "EA25C22",
+        "roll": "EA25A07",
         "name": "",
         "class": "",
-        "total": -75,
+        "total": 54,
         "masked": true
       },
       {
         "rank": 28,
-        "roll": "EA25C23",
+        "roll": "EA25D20",
         "name": "",
         "class": "",
-        "total": -75,
+        "total": 28,
         "masked": true
       },
       {
         "rank": 29,
-        "roll": "EA25A15",
+        "roll": "EA24A03",
         "name": "",
         "class": "",
-        "total": -75,
+        "total": 26,
         "masked": true
       },
       {
         "rank": 30,
-        "roll": "EA26C24",
+        "roll": "EA25C21",
         "name": "",
         "class": "",
-        "total": -75,
+        "total": 13,
         "masked": true
       },
       {
         "rank": 31,
-        "roll": "EA24A04",
+        "roll": "EA25C15",
         "name": "",
         "class": "",
-        "total": -75,
+        "total": 12,
         "masked": true
       },
       {
         "rank": 32,
-        "roll": "EA24A01",
+        "roll": "EA25A15",
         "name": "",
         "class": "",
-        "total": -75,
+        "total": 9,
         "masked": true
       },
       {
         "rank": 33,
-        "roll": "EA25D20",
+        "roll": "EA25C12",
         "name": "",
         "class": "",
-        "total": -80,
+        "total": 7,
         "masked": true
       },
       {
         "rank": 34,
-        "roll": "EA25A13",
+        "roll": "EA25B05",
         "name": "",
         "class": "",
-        "total": -80,
+        "total": -1,
         "masked": true
       },
       {
         "rank": 35,
-        "roll": "EA24C06",
+        "roll": "EA25D22",
         "name": "",
         "class": "",
-        "total": -95,
+        "total": -8,
         "masked": true
       },
       {
         "rank": 36,
-        "roll": "EA25C12",
+        "roll": "EA25C17",
         "name": "",
         "class": "",
-        "total": -100,
+        "total": -8,
         "masked": true
       },
       {
         "rank": 37,
-        "roll": "EA25D21",
+        "roll": "EA26C24",
         "name": "",
         "class": "",
-        "total": -100,
+        "total": -26,
         "masked": true
       },
       {
         "rank": 38,
-        "roll": "EA24A03",
+        "roll": "EA25C20",
         "name": "",
         "class": "",
-        "total": -115,
+        "total": -34,
         "masked": true
       },
       {
         "rank": 39,
-        "roll": "EA24D15",
+        "roll": "EA25B14",
         "name": "",
         "class": "",
-        "total": -115,
+        "total": -61,
         "masked": true
       },
       {
         "rank": 40,
-        "roll": "EA25A07",
+        "roll": "EA24C03",
         "name": "",
         "class": "",
-        "total": -115,
+        "total": -81,
         "masked": true
       },
       {
         "rank": 41,
-        "roll": "EA25C11",
+        "roll": "EA25A13",
         "name": "",
         "class": "",
-        "total": -115,
+        "total": -81,
         "masked": true
       },
       {
         "rank": 42,
-        "roll": "EA24C03",
+        "roll": "EA24D08",
         "name": "",
         "class": "",
-        "total": -135,
+        "total": -103,
         "masked": true
       },
       {
         "rank": 43,
-        "roll": "EA24B03",
+        "roll": "EA25C23",
         "name": "",
         "class": "",
-        "total": -135,
+        "total": -125,
         "masked": true
       },
       {
         "rank": 44,
-        "roll": "EA25B14",
+        "roll": "EA25C11",
         "name": "",
         "class": "",
-        "total": -135,
+        "total": -130,
         "masked": true
       },
       {
         "rank": 45,
-        "roll": "EA25B05",
+        "roll": "EA25D21",
         "name": "",
         "class": "",
-        "total": -155,
+        "total": -130,
         "masked": true
       },
       {
@@ -719,57 +719,57 @@
         "roll": "EA25B10",
         "name": "",
         "class": "",
-        "total": -275,
+        "total": -184,
         "masked": true
       }
     ],
     "2026-01": [
       {
         "rank": 1,
-        "roll": "EA24A03",
-        "name": "Ayat Parveen",
-        "class": "4",
-        "total": 0,
+        "roll": "EA24B01",
+        "name": "Pari Gupta",
+        "class": "6",
+        "total": 864,
         "masked": false
       },
       {
         "rank": 2,
-        "roll": "EA24A05",
-        "name": "Rashi",
-        "class": "3",
-        "total": 0,
+        "roll": "EA24D15",
+        "name": "Reeyansh Lama",
+        "class": "9",
+        "total": 853,
         "masked": false
       },
       {
         "rank": 3,
-        "roll": "EA24B09",
-        "name": "Abdul Arman",
-        "class": "5",
-        "total": 0,
+        "roll": "EA25D17",
+        "name": "Aditya Singh",
+        "class": "10",
+        "total": 852,
         "masked": false
       },
       {
         "rank": 4,
-        "roll": "EA24C03",
-        "name": "Abhik Mallik",
-        "class": "8",
-        "total": 0,
+        "roll": "EA24D01",
+        "name": "Jay Kumar Yadav",
+        "class": "10",
+        "total": 654,
         "masked": false
       },
       {
         "rank": 5,
-        "roll": "EA24B01",
-        "name": "Pari Gupta",
-        "class": "6",
-        "total": 0,
+        "roll": "EA24A01",
+        "name": "Ayush Gupta",
+        "class": "4",
+        "total": 605,
         "masked": false
       },
       {
         "rank": 6,
-        "roll": "EA24B03",
-        "name": "Deep Das",
-        "class": "6",
-        "total": 0,
+        "roll": "EA24B09",
+        "name": "Abdul Arman",
+        "class": "5",
+        "total": 587,
         "masked": false
       },
       {
@@ -777,7 +777,7 @@
         "roll": "EA24D25",
         "name": "Nandani Gupta",
         "class": "9",
-        "total": 0,
+        "total": 565,
         "masked": false
       },
       {
@@ -785,247 +785,247 @@
         "roll": "EA24C02",
         "name": "Sahil Yadav",
         "class": "8",
-        "total": 0,
+        "total": 540,
         "masked": false
       },
       {
         "rank": 9,
-        "roll": "EA24C04",
-        "name": "Divya Mallik",
-        "class": "7",
-        "total": 0,
+        "roll": "EA25D24",
+        "name": "Aansh Mandal",
+        "class": "10",
+        "total": 525,
         "masked": false
       },
       {
         "rank": 10,
-        "roll": "EA24D01",
-        "name": "Jay Kumar Yadav",
-        "class": "10",
-        "total": 0,
+        "roll": "EA24A04",
+        "name": "Tanu Sinha",
+        "class": "4",
+        "total": 509,
         "masked": false
       },
       {
         "rank": 11,
-        "roll": "EA24D06",
-        "name": "Tanmay Biswas",
-        "class": "10",
-        "total": 0,
+        "roll": "EA25B06",
+        "name": "Jay Arya",
+        "class": "5",
+        "total": 476,
         "masked": false
       },
       {
         "rank": 12,
-        "roll": "EA24D08",
-        "name": "Sanjana Sutradhar",
+        "roll": "EA25D20",
+        "name": "Harsh Mallik",
         "class": "9",
-        "total": 0,
+        "total": 457,
         "masked": false
       },
       {
         "rank": 13,
-        "roll": "EA24D15",
-        "name": "Reeyansh Lama",
-        "class": "9",
-        "total": 0,
+        "roll": "EA25B13",
+        "name": "Rehmetun Khatun",
+        "class": "6",
+        "total": 457,
         "masked": false
       },
       {
         "rank": 14,
-        "roll": "EA24C06",
-        "name": "Sakshi",
-        "class": "8",
-        "total": 0,
+        "roll": "EA24B03",
+        "name": "Deep Das",
+        "class": "6",
+        "total": 444,
         "masked": false
       },
       {
         "rank": 15,
-        "roll": "EA25A07",
-        "name": "Vishes Xalxo",
-        "class": "3",
-        "total": 0,
+        "roll": "EA25C09",
+        "name": "Shomiya Xalxo",
+        "class": "7",
+        "total": 434,
         "masked": false
       },
       {
         "rank": 16,
-        "roll": "EA25B05",
+        "roll": "EA25A07",
         "name": "",
         "class": "",
-        "total": 0,
+        "total": 422,
         "masked": true
       },
       {
         "rank": 17,
-        "roll": "EA25C07",
+        "roll": "EA25D12",
         "name": "",
         "class": "",
-        "total": 0,
+        "total": 374,
         "masked": true
       },
       {
         "rank": 18,
-        "roll": "EA25D12",
+        "roll": "EA26D28",
         "name": "",
         "class": "",
-        "total": 0,
+        "total": 327,
         "masked": true
       },
       {
         "rank": 19,
-        "roll": "EA25D13",
+        "roll": "EA25D26",
         "name": "",
         "class": "",
-        "total": 0,
+        "total": 274,
         "masked": true
       },
       {
         "rank": 20,
-        "roll": "EA25D26",
+        "roll": "EA25C18",
         "name": "",
         "class": "",
-        "total": 0,
+        "total": 261,
         "masked": true
       },
       {
         "rank": 21,
-        "roll": "EA25C09",
+        "roll": "EA24D06",
         "name": "",
         "class": "",
-        "total": 0,
+        "total": 254,
         "masked": true
       },
       {
         "rank": 22,
-        "roll": "EA25B06",
+        "roll": "EA24A05",
         "name": "",
         "class": "",
-        "total": 0,
+        "total": 247,
         "masked": true
       },
       {
         "rank": 23,
-        "roll": "EA25C10",
+        "roll": "EA25A15",
         "name": "",
         "class": "",
-        "total": 0,
+        "total": 244,
         "masked": true
       },
       {
         "rank": 24,
-        "roll": "EA25C11",
+        "roll": "EA24D08",
         "name": "",
         "class": "",
-        "total": 0,
+        "total": 230,
         "masked": true
       },
       {
         "rank": 25,
-        "roll": "EA25C12",
+        "roll": "EA25D22",
         "name": "",
         "class": "",
-        "total": 0,
+        "total": 209,
         "masked": true
       },
       {
         "rank": 26,
-        "roll": "EA25D17",
+        "roll": "EA26C24",
         "name": "",
         "class": "",
-        "total": 0,
+        "total": 195,
         "masked": true
       },
       {
         "rank": 27,
-        "roll": "EA25D20",
+        "roll": "EA25C07",
         "name": "",
         "class": "",
-        "total": 0,
+        "total": 191,
         "masked": true
       },
       {
         "rank": 28,
-        "roll": "EA25B10",
+        "roll": "EA25D13",
         "name": "",
         "class": "",
-        "total": 0,
+        "total": 188,
         "masked": true
       },
       {
         "rank": 29,
-        "roll": "EA25C15",
+        "roll": "EA25C22",
         "name": "",
         "class": "",
-        "total": 0,
+        "total": 177,
         "masked": true
       },
       {
         "rank": 30,
-        "roll": "EA25D22",
+        "roll": "EA25B14",
         "name": "",
         "class": "",
-        "total": 0,
+        "total": 169,
         "masked": true
       },
       {
         "rank": 31,
-        "roll": "EA25D24",
+        "roll": "EA24C06",
         "name": "",
         "class": "",
-        "total": 0,
+        "total": 156,
         "masked": true
       },
       {
         "rank": 32,
-        "roll": "EA25C17",
+        "roll": "EA25B05",
         "name": "",
         "class": "",
-        "total": 0,
+        "total": 141,
         "masked": true
       },
       {
         "rank": 33,
-        "roll": "EA25C18",
+        "roll": "EA25D19",
         "name": "",
         "class": "",
-        "total": 0,
+        "total": 111,
         "masked": true
       },
       {
         "rank": 34,
-        "roll": "EA25C19",
+        "roll": "EA25D21",
         "name": "",
         "class": "",
-        "total": 0,
+        "total": 109,
         "masked": true
       },
       {
         "rank": 35,
-        "roll": "EA25A13",
+        "roll": "EA24C04",
         "name": "",
         "class": "",
-        "total": 0,
+        "total": 100,
         "masked": true
       },
       {
         "rank": 36,
-        "roll": "EA25B13",
+        "roll": "EA25C12",
         "name": "",
         "class": "",
-        "total": 0,
+        "total": 97,
         "masked": true
       },
       {
         "rank": 37,
-        "roll": "EA25C20",
+        "roll": "EA25C11",
         "name": "",
         "class": "",
-        "total": 0,
+        "total": 87,
         "masked": true
       },
       {
         "rank": 38,
-        "roll": "EA25B14",
+        "roll": "EA25C10",
         "name": "",
         "class": "",
-        "total": 0,
+        "total": 86,
         "masked": true
       },
       {
@@ -1033,79 +1033,79 @@
         "roll": "EA25C21",
         "name": "",
         "class": "",
-        "total": 0,
+        "total": 80,
         "masked": true
       },
       {
         "rank": 40,
-        "roll": "EA25C22",
+        "roll": "EA25C19",
         "name": "",
         "class": "",
-        "total": 0,
+        "total": 71,
         "masked": true
       },
       {
         "rank": 41,
-        "roll": "EA25C23",
+        "roll": "EA24A03",
         "name": "",
         "class": "",
-        "total": 0,
+        "total": 40,
         "masked": true
       },
       {
         "rank": 42,
-        "roll": "EA25A15",
+        "roll": "EA25C17",
         "name": "",
         "class": "",
-        "total": 0,
+        "total": 40,
         "masked": true
       },
       {
         "rank": 43,
-        "roll": "EA26C24",
+        "roll": "EA24C03",
         "name": "",
         "class": "",
-        "total": 0,
+        "total": 33,
         "masked": true
       },
       {
         "rank": 44,
-        "roll": "EA25D19",
+        "roll": "EA25C23",
         "name": "",
         "class": "",
-        "total": 0,
+        "total": 9,
         "masked": true
       },
       {
         "rank": 45,
-        "roll": "EA25D21",
+        "roll": "EA25C15",
         "name": "",
         "class": "",
-        "total": 0,
+        "total": 5,
         "masked": true
       },
       {
         "rank": 46,
-        "roll": "EA26D28",
+        "roll": "EA25A13",
         "name": "",
         "class": "",
-        "total": 0,
+        "total": -3,
         "masked": true
       },
       {
         "rank": 47,
-        "roll": "EA24A04",
+        "roll": "EA25B10",
         "name": "",
         "class": "",
-        "total": 0,
+        "total": -5,
         "masked": true
       },
       {
         "rank": 48,
-        "roll": "EA24A01",
+        "roll": "EA25C20",
         "name": "",
         "class": "",
-        "total": 0,
+        "total": -106,
         "masked": true
       }
     ]
