@@ -3189,18 +3189,18 @@
         .card-name.leader-name-color {
             color: #fbbf24;
             text-shadow:
-                0 0 10px rgba(251, 191, 36, 0.8),
-                0 0 20px rgba(217, 119, 6, 0.9),
-                0 0 30px rgba(251, 146, 60, 0.6);
+                1px 1px 2px rgba(0, 0, 0, 0.8),
+                -1px -1px 2px rgba(255, 255, 255, 0.3),
+                0 0 4px rgba(217, 119, 6, 0.4);
             animation: goldShimmer 4s ease-in-out infinite;
         }
 
         .card-name.top-scorer-name-color {
             color: #ef4444;
             text-shadow:
-                0 0 10px rgba(239, 68, 68, 0.8),
-                0 0 20px rgba(220, 38, 38, 0.9),
-                0 0 30px rgba(239, 68, 68, 0.7);
+                1px 1px 2px rgba(0, 0, 0, 0.8),
+                -1px -1px 2px rgba(255, 255, 255, 0.3),
+                0 0 4px rgba(220, 38, 38, 0.4);
             animation: redVelvetShimmer 4s ease-in-out infinite;
         }
 
@@ -3865,17 +3865,17 @@
         body.light-mode .card-name.leader-name-color {
             color: #fbbf24 !important;
             text-shadow:
-                0 0 8px rgba(251, 191, 36, 0.7),
-                0 0 16px rgba(217, 119, 6, 0.8),
-                0 0 24px rgba(251, 146, 60, 0.5) !important;
+                1px 1px 2px rgba(0, 0, 0, 0.6),
+                -1px -1px 2px rgba(255, 255, 255, 0.4),
+                0 0 3px rgba(217, 119, 6, 0.3) !important;
         }
 
         body.light-mode .card-name.top-scorer-name-color {
             color: #dc2626 !important;
             text-shadow:
-                0 0 8px rgba(220, 38, 38, 0.7),
-                0 0 16px rgba(190, 24, 24, 0.8),
-                0 0 24px rgba(239, 68, 68, 0.5) !important;
+                1px 1px 2px rgba(0, 0, 0, 0.6),
+                -1px -1px 2px rgba(255, 255, 255, 0.4),
+                0 0 3px rgba(190, 24, 24, 0.3) !important;
         }
 
         body.light-mode .student-badges {
@@ -20109,8 +20109,11 @@
                 );
                 const leaderStudent = leaderEntry ? resolveLeadershipStudent(leaderEntry) : null;
                 if (leaderStudent) {
-                    // Get clean base name ONLY (no suffixes)
-                    const baseName = String(leaderStudent.base_name || leaderStudent.name || '-').trim();
+                    // Get clean base name from the students array (fresh, not from leadership entry)
+                    const studentId = leaderStudent.id;
+                    const cleanStudent = (db.getStudents() || []).find(s => parseInt(s.id, 10) === parseInt(studentId, 10));
+                    const baseName = String(cleanStudent ? (cleanStudent.base_name || cleanStudent.name) : (leaderStudent.base_name || leaderStudent.name) || '-').trim();
+
                     // Get rendered HTML with badges for extraction
                     const fullHtml = renderStudentName(leaderStudent, getCurrentMonthKey());
 
@@ -20132,8 +20135,11 @@
                 const topNameHtml = renderStudentName(scoreboard[0].student, month);
                 const topEl = document.getElementById('topScorer');
                 if (topEl) {
-                    // Get clean base name ONLY (no suffixes from renderStudentName)
-                    const baseName = String(scoreboard[0].student.base_name || scoreboard[0].student.name || '-').trim();
+                    // Get clean base name from the students array (fresh, not from scoreboard object)
+                    const studentId = scoreboard[0].student.id;
+                    const cleanStudent = (db.getStudents() || []).find(s => parseInt(s.id, 10) === parseInt(studentId, 10));
+                    const baseName = String(cleanStudent ? (cleanStudent.base_name || cleanStudent.name) : (scoreboard[0].student.base_name || scoreboard[0].student.name) || '-').trim();
+
                     // Extract badges from HTML: look for <span class="student-meta">...</span>
                     const metaRegex = /<span class="student-meta">(.*?)<\/span>/.exec(topNameHtml);
                     const badgesHtml = metaRegex ? metaRegex[1] : '';
