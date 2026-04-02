@@ -166,6 +166,13 @@ def _roll_key(value):
     return str(value or '').strip().upper()
 
 
+def _name_key(value):
+    text = str(value or '').strip().lower()
+    text = re.sub(r'\s*\([^)]*\)', ' ', text)
+    text = re.sub(r'[^a-z0-9]+', '', text)
+    return text
+
+
 def _safe_int(value, default=0):
     try:
         if value in (None, ''):
@@ -605,10 +612,17 @@ def _safe_commit_stamp():
 def _publish_public_site_snapshot(payload, push=None, public_snapshot=None):
     site_dir = _public_site_dir()
     scores_path = _public_site_scores_path()
+    # Always rebuild the public scoreboard from the authoritative server payload.
+    # Client-generated public snapshots are useful for UI previews, but they can
+    # drift from the server copy after browser-cache/state issues or partial
+    # historical restores. If we sanitize those snapshots here, stale zero totals
+    # can overwrite correct historical data in scores.json.
     if isinstance(public_snapshot, dict) and isinstance(public_snapshot.get('scoreboard'), dict):
-        public_payload = _sanitize_client_public_snapshot(public_snapshot, payload if isinstance(payload, dict) else {})
-    else:
-        public_payload = _build_public_site_payload(payload if isinstance(payload, dict) else {})
+        current_app.logger.warning(
+            "Ignoring client-provided public_snapshot while publishing public site; "
+            "rebuilding from server payload instead"
+        )
+    public_payload = _build_public_site_payload(payload if isinstance(payload, dict) else {})
 
     os.makedirs(site_dir, exist_ok=True)
     _atomic_write_json(scores_path, public_payload)
@@ -7808,9 +7822,10 @@ def import_historical_data():
                     pass
             return jsonify({'success': False, 'error': f'Cannot read Excel file: {e}'}), 400
 
-        # ── Load live snapshot and build roll → studentId map ─────────────
+        # ── Load live snapshot and build student lookups ────────────────
         snapshot = _load_offline_data() or {}
         roll_to_sid = {}
+        name_to_sid = {}
         for s in (snapshot.get('students') or []):
             if not isinstance(s, dict):
                 continue
@@ -7818,8 +7833,11 @@ def import_historical_data():
             sid = s.get('id')
             if roll and sid is not None and roll not in roll_to_sid:
                 roll_to_sid[roll] = sid
+            name = _name_key(s.get('base_name') or s.get('name') or s.get('raw_name') or '')
+            if name and sid is not None and name not in name_to_sid:
+                name_to_sid[name] = sid
 
-        if not roll_to_sid:
+        if not roll_to_sid and not name_to_sid:
             if temp_path and os.path.exists(temp_path):
                 try:
                     os.unlink(temp_path)
@@ -7975,6 +7993,7 @@ def import_historical_data():
 
             # Find roll column from the header row
             roll_col = None
+            name_col = None
             total_col = None
             final_score_col = None
             for idx, val in enumerate(header_row, start=1):
@@ -7983,6 +8002,8 @@ def import_historical_data():
                 s = val.strip().lower()
                 if roll_col is None and ('roll' in s):
                     roll_col = idx
+                if name_col is None and (('student' in s and 'name' in s) or s in {'name', 'candidate'}):
+                    name_col = idx
                 if total_col is None and 'total score' in s:
                     total_col = idx
                 if final_score_col is None and 'final score' in s:
@@ -8041,7 +8062,10 @@ def import_historical_data():
                 roll = str(raw_roll).strip().upper()
                 if not roll or roll.startswith('ROLL'):
                     continue
-                sid = roll_to_sid.get(roll)
+                full_name = ws.cell(row_idx, name_col).value if name_col else None
+                sid = name_to_sid.get(_name_key(full_name)) if full_name else None
+                if sid is None:
+                    sid = roll_to_sid.get(roll)
                 if sid is None:
                     unknown_roll_rows += 1
                     continue

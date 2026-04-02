@@ -472,7 +472,6 @@
             const students = Array.from(dedupByRoll.values());
             const byId     = new Map(students.map(s => [parseInt(s.id, 10), s]));
             const totals   = new Map(students.map(s => [parseInt(s.id, 10), 0]));
-            const isHist   = month < '2026-02';
             const histTotals = new Map();
             const histHas    = new Set();
             // Per-student, per-date score sums and star usage counts (for score erasure / +100 bonus)
@@ -486,16 +485,10 @@
                 if (!sid || !totals.has(sid)) return;
                 if (String(sc && sc.month || '').trim() !== month) return;
                 const note = String(sc && sc.notes || '').trim().toLowerCase();
-                if (isHist) {
-                    const isExcelTotal = note.startsWith('excel_total_score') || note.startsWith('excel_total_from_dates');
-                    const isExcelDaily = note.startsWith('excel_daily_score');
-                    const isExcelStar  = note.startsWith('excel_star_usage');
-                    if (!isExcelTotal && !isExcelDaily && !isExcelStar) return;
-                    if (isExcelTotal) {
-                        histTotals.set(sid, (histTotals.get(sid) || 0) + (parseInt(sc && sc.points, 10) || 0));
-                        histHas.add(sid);
-                        return;
-                    }
+                if (note.startsWith('excel_total_score') || note.startsWith('excel_total_from_dates')) {
+                    histTotals.set(sid, (histTotals.get(sid) || 0) + (parseInt(sc && sc.points, 10) || 0));
+                    histHas.add(sid);
+                    return;
                 }
                 const pts  = parseInt(sc && sc.points, 10) || 0;
                 const date = String(sc && sc.date || '').trim();
@@ -573,7 +566,7 @@
                     totals.set(sid, (totals.get(sid) || 0) + penaltyOf(normStatus(a && a.status)));
             });
 
-            if (isHist) histHas.forEach(sid => totals.set(sid, histTotals.get(sid) || 0));
+            histHas.forEach(sid => totals.set(sid, histTotals.get(sid) || 0));
 
             const rows = Array.from(totals.entries()).map(([sid, total]) => {
                 const s = byId.get(sid) || {};
