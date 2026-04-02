@@ -109,9 +109,20 @@ def create_app():
     limiter.init_app(app)
     
     # Setup global error handlers and logging
-    from app.utils.error_handler import register_error_handlers, setup_logging
-    setup_logging(app)
+    from app.utils.logger import setup_logging, log_request_info, log_response_info
+    from app.utils.error_handler import register_error_handlers
+    try:
+        setup_logging(app)
+    except Exception as e:
+        # Fallback if new logging fails
+        print(f"Warning: New logging system failed to initialize: {e}")
+        import logging
+        logging.basicConfig(level=logging.INFO)
     register_error_handlers(app)
+    
+    # Add request/response logging middleware
+    app.before_request(log_request_info)
+    app.after_request(log_response_info)
     
     # Trust Railway / Render / any single reverse-proxy hop so Flask sees
     # the real HTTPS scheme and host (fixes Secure cookie + redirect URLs).
@@ -123,9 +134,15 @@ def create_app():
     # Register blueprints
     from app.routes.auth import auth_bp
     from app.routes.scoreboard import points_bp
-    
+    from app.routes.veto_api import veto_bp
+    from app.routes.star_validation import star_bp
+    from app.routes.favicon import favicon_bp
+
     app.register_blueprint(auth_bp)
     app.register_blueprint(points_bp)
+    app.register_blueprint(veto_bp)
+    app.register_blueprint(star_bp)
+    app.register_blueprint(favicon_bp)
 
     @app.route('/')
     def home():

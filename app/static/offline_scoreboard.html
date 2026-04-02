@@ -3219,6 +3219,17 @@
             font-weight: 700;
         }
 
+        .card-name .student-suffixes {
+            display: block;
+            font-size: 14px;
+            margin-top: 5px;
+            color: #94a3b8;
+            font-weight: 800;
+            letter-spacing: 0.2px;
+            text-shadow: none;
+            line-height: 1.15;
+        }
+
         .card-name .badge-item {
             display: inline-block;
             margin-right: 8px;
@@ -3880,6 +3891,10 @@
 
         body.light-mode .student-badges {
             color: #cbd5e1 !important;
+        }
+
+        body.light-mode .card-name .student-suffixes {
+            color: #64748b !important;
         }
         body.light-mode #topScorer {
             display: inline-block !important;
@@ -14679,28 +14694,26 @@
                     let monthlyImportedTotal = 0;
                     let hasHistoricalMonthlyTotal = false;
                     const isHistoricalMonth = isHistoricalMonthKey(month);
+                    // Excel-only filtering uses a FIXED cutoff matching Python HISTORY_CUTOFF.
+                    // isHistoricalMonthKey() is time-dependent: it would wrongly filter
+                    // live-recorded months (e.g. Mar 2026) the moment they age past current.
+                    const isExcelImportedMonth = String(month || '').trim() < '2026-02';
                     studentScores.forEach(s => {
                         const noteText = String(coalesce(safeProp(s, 'notes'), '')).trim();
-                        if (isHistoricalMonth) {
-                            // Feb 2026 contains regular scores (not Excel imports), so skip strict filtering
-                            if (String(month || '').trim() === '2026-02') {
-                                // Allow all scores for Feb 2026
-                            } else {
-                                // For other historical months, enforce Excel-only filtering
-                                const noteLow = noteText.toLowerCase();
-                                const isExcelTotal = noteLow.startsWith('excel_total_score') || noteLow.startsWith('excel_total_from_dates');
-                                const isExcelDaily = noteLow.startsWith('excel_daily_score');
-                                const isExcelStar = noteLow.startsWith('excel_star_usage');
-                                // Historical months should render strictly from Excel-imported rows only.
-                                // This prevents old legacy rows from inflating totals.
-                                if (!isExcelTotal && !isExcelDaily && !isExcelStar) {
-                                    return;
-                                }
+                        if (isExcelImportedMonth) {
+                            // Months before Feb 2026 were imported from Excel workbooks.
+                            // Enforce Excel-only filtering to prevent legacy rows from inflating totals.
+                            const noteLow = noteText.toLowerCase();
+                            const isExcelTotal = noteLow.startsWith('excel_total_score') || noteLow.startsWith('excel_total_from_dates');
+                            const isExcelDaily = noteLow.startsWith('excel_daily_score');
+                            const isExcelStar = noteLow.startsWith('excel_star_usage');
+                            if (!isExcelTotal && !isExcelDaily && !isExcelStar) {
+                                return;
                             }
                         }
                         // Historical import stores workbook monthly totals as synthetic rows.
                         // Keep them in total/rank, but never render as a daily day-15 cell.
-                        if (isHistoricalMonth && (
+                        if (isExcelImportedMonth && (
                             noteText.toLowerCase().startsWith('excel_total_score') ||
                             noteText.toLowerCase().startsWith('excel_total_from_dates')
                         )) {
@@ -15002,8 +15015,8 @@
                     if (String(month || '').trim() >= '2026-02' && awfActive) {
                         total -= 75;
                     }
-                    // For historical months, workbook total is authoritative for ranking/total.
-                    if (isHistoricalMonthKey(month) && row.hasHistoricalMonthlyTotal) {
+                    // For Excel-imported months (before Feb 2026), workbook total is authoritative for ranking/total.
+                    if (String(month || '').trim() < '2026-02' && row.hasHistoricalMonthlyTotal) {
                         total = parseInt(row.monthlyImportedTotal, 10) || 0;
                     }
                     row.rawStudent.computed_total_score = total;
@@ -15775,12 +15788,22 @@
             const previousScores = Array.isArray(previousData.scores) ? previousData.scores : [];
             const nextScores = Array.isArray(nextData.scores) ? nextData.scores : [];
             if (previousScores.length || nextScores.length) {
-                const preservedHistorical = previousScores
-                    .filter(row => {
-                        const monthKey = getScoreMonthKey(row);
-                        return !!monthKey && (monthKey < currentMonth || isExplicitlyLockedMonthKey(monthKey, previousData));
-                    })
-                    .map(row => JSON.parse(JSON.stringify(row)));
+                const isHistoricalRow = (row) => {
+                    const monthKey = getScoreMonthKey(row);
+                    return !!monthKey && (monthKey < currentMonth || isExplicitlyLockedMonthKey(monthKey, previousData));
+                };
+                const prevHistorical = previousScores.filter(isHistoricalRow);
+                const nextHistorical = nextScores.filter(isHistoricalRow);
+                // Take the SUPERSET of historical scores from both localStorage (previousData)
+                // and the incoming data (nextData). This prevents locked-month scores that are
+                // held in _cacheData (e.g. after a server sync) from being silently discarded
+                // when a subsequent saveData() call reads a stripped localStorage snapshot as
+                // previousData and overwrites nextData.scores with only what localStorage had.
+                const preservedHistorical = mergeScoreRowsSuperset(
+                    prevHistorical,
+                    nextHistorical,
+                    { preferIncomingOnTie: true }
+                ).map(row => JSON.parse(JSON.stringify(row)));
                 if (preservedHistorical.length > 0) {
                     const liveScores = nextScores.filter(row => {
                         const monthKey = getScoreMonthKey(row);
@@ -18536,6 +18559,16 @@
                 showAlert('Only Admin can use Force Publish.', 'warning');
                 return;
             }
+            // Guard: if locked months exist but have zero score rows, the startup server
+            // sync hasn't completed yet and _cacheData is still the stripped localStorage
+            // snapshot.  Publishing in this state would overwrite the server with missing
+            // historical scores.  Block and let the user retry after sync finishes.
+            const _fpData = db.getData();
+            const _fpLockedMonths = Array.isArray(_fpData.locked_months) ? _fpData.locked_months : [];
+            if (_fpLockedMonths.length > 0 && getLockedHistoricalScoreRowCount(_fpData) === 0) {
+                showAlert('Historical scores not yet loaded — server sync still in progress. Wait a moment and try Force Publish again.', 'warning');
+                return;
+            }
             forcePublishRunning = true;
             const btn = document.getElementById('globalPublishBtn');
             const prevHtml = btn ? btn.innerHTML : '';
@@ -20112,20 +20145,37 @@
                     // Get clean base name from the students array (fresh, not from leadership entry)
                     const studentId = leaderStudent.id;
                     const cleanStudent = (db.getStudents() || []).find(s => parseInt(s.id, 10) === parseInt(studentId, 10));
+                    const monthKey = getCurrentMonthKey();
+                    const dateKey = `${monthKey}-15`;
                     const baseName = String(cleanStudent ? (cleanStudent.base_name || cleanStudent.name) : (leaderStudent.base_name || leaderStudent.name) || '-').trim();
+                    const coreName = stripPostHolderSuffixes(baseName);
 
                     // Get rendered HTML with badges for extraction
-                    const fullHtml = renderStudentName(leaderStudent, getCurrentMonthKey());
+                    const fullHtml = renderStudentName(leaderStudent, monthKey);
 
                     // Extract badges from HTML: look for <span class="student-meta">...</span>
                     const metaRegex = /<span class="student-meta">(.*?)<\/span>/.exec(fullHtml);
-                    const badgesHtml = metaRegex ? metaRegex[1] : '';
-
-                    // Render: name on first line, badges on second line
+                    let badgesHtml = metaRegex ? metaRegex[1] : '';
                     if (badgesHtml) {
-                        leaderSummaryEl.innerHTML = `${escapeHtml(baseName)}<div class="student-badges">${badgesHtml}</div>`;
+                        badgesHtml = badgesHtml.replace(/\*(\d+)/g, '<i class="fas fa-star" style="margin-right:4px;"></i>$1')
+                                               .replace(/V(\d+)/g, '<i class="fas fa-shield-alt" style="margin-right:4px;"></i>$1');
+                    }
+
+                    // Render: name core (line 1), suffixes (line 2), badges (last line)
+                    const suspended = isStudentPostHolderSuspended(leaderStudent, dateKey);
+                    const suffixes = (!suspended && monthKey === getCurrentMonthKey())
+                        ? getActivePostSuffixesForStudent(leaderStudent, dateKey)
+                        : [];
+                    const suffixLine = suffixes && suffixes.length
+                        ? suffixes.map(s => `(${s})`).join(' ')
+                        : '';
+                    const suffixHtml = suffixLine ? `<div class="student-suffixes">${escapeHtml(suffixLine)}</div>` : '';
+                    const badgesDiv = badgesHtml ? `<div class="student-badges">${badgesHtml}</div>` : '';
+
+                    if (suffixHtml || badgesDiv) {
+                        leaderSummaryEl.innerHTML = `${escapeHtml(coreName)}${suffixHtml}${badgesDiv}`;
                     } else {
-                        leaderSummaryEl.textContent = baseName;
+                        leaderSummaryEl.textContent = coreName;
                     }
                 } else {
                     leaderSummaryEl.textContent = 'No Active Leader';
@@ -20138,17 +20188,52 @@
                     // Get clean base name from the students array (fresh, not from scoreboard object)
                     const studentId = scoreboard[0].student.id;
                     const cleanStudent = (db.getStudents() || []).find(s => parseInt(s.id, 10) === parseInt(studentId, 10));
+                    const monthKey = String(month || '').trim();
+                    const dateKey = monthKey ? `${monthKey}-15` : formatDateKey(new Date());
                     const baseName = String(cleanStudent ? (cleanStudent.base_name || cleanStudent.name) : (scoreboard[0].student.base_name || scoreboard[0].student.name) || '-').trim();
+                    const coreName = stripPostHolderSuffixes(baseName);
 
-                    // Extract badges from HTML: look for <span class="student-meta">...</span>
-                    const metaRegex = /<span class="student-meta">(.*?)<\/span>/.exec(topNameHtml);
-                    const badgesHtml = metaRegex ? metaRegex[1] : '';
-
-                    // Render: name on first line, badges on second line
+                    // Extract badges from HTML: grab everything inside student-meta using greedy match to the end
+                    const metaRegex = /<span class="student-meta">([\s\S]*)<\/span><\/span>/i.exec(topNameHtml);
+                    let badgesHtml = metaRegex ? metaRegex[1] : '';
                     if (badgesHtml) {
-                        topEl.innerHTML = `${escapeHtml(baseName)}<div class="student-badges">${badgesHtml}</div>`;
+                        badgesHtml = badgesHtml
+                            .replace(/<span class="meta-star">\*(\d+)<\/span>/gi, '<span class="premium-badge pb-gold-border"><span class="metallic-text pb-gold"><i class="fas fa-star"></i> $1</span></span>')
+                            .replace(/<span class="meta-veto">V(\d+)<\/span>/gi, '<span class="premium-badge pb-red-border"><span class="metallic-text pb-red"><i class="fas fa-shield-alt"></i> $1</span></span>')
+                            .replace(/<span class="designation-chip">(.*?)<\/span>/gi, '<span class="premium-badge pb-blue-border"><span class="metallic-text pb-blue"><i class="fas fa-award"></i> $1</span></span>');
+                    }
+
+                    // Render: name core (line 1), suffixes (line 2), badges (last line)
+                    const isCurrentMonth = monthKey === getCurrentMonthKey();
+                    const suspended = isStudentPostHolderSuspended(scoreboard[0].student, dateKey);
+                    let suffixes = [];
+                    if (!suspended) {
+                        const allowDynamicSuffix = (!monthKey || isCurrentMonth);
+                        if (allowDynamicSuffix) {
+                            suffixes = getActivePostSuffixesForStudent(scoreboard[0].student, dateKey);
+                        } else {
+                            const monthDesignations = (!isCurrentMonth && Array.isArray(safeProp(scoreboard[0].student, '__month_designations')))
+                                ? safeProp(scoreboard[0].student, '__month_designations')
+                                : [];
+                            if (monthDesignations && monthDesignations.length) {
+                                suffixes = Array.from(new Set(
+                                    monthDesignations
+                                        .map(d => normalizePostSuffix(String(d || '').trim()))
+                                        .filter(Boolean)
+                                ));
+                            }
+                        }
+                    }
+                    const suffixLine = suffixes && suffixes.length
+                        ? suffixes.map(s => `(${s})`).join(' ')
+                        : '';
+                    const suffixHtml = suffixLine ? `<div class="student-suffixes">${escapeHtml(suffixLine)}</div>` : '';
+                    const badgesDiv = badgesHtml ? `<div class="student-badges">${badgesHtml}</div>` : '';
+
+                    if (suffixHtml || badgesDiv) {
+                        topEl.innerHTML = `${escapeHtml(coreName)}${suffixHtml}${badgesDiv}`;
                     } else {
-                        topEl.textContent = baseName;
+                        topEl.textContent = coreName;
                     }
                 }
                 // Inject cracker spark particles into the top scorer card
@@ -40558,6 +40643,168 @@
       requestAnimationFrame(() => { requestAnimationFrame(queueRun); });
     }
   }, true);
+})();
+</script>
+
+<!-- ================================================================
+  SERVER-AUTHORITY LAYER
+  Wires up the new server-side balance APIs (Steps 2-3 of overhaul).
+  These functions run AFTER the main script so they can safely
+  override getAvailableStarsForMonth / getAvailableVetosForMonth.
+  Falls back silently to local calculation when offline.
+================================================================ -->
+<script>
+(function installServerAuthorityLayer() {
+    'use strict';
+
+    // ── Balance cache ─────────────────────────────────────────────────
+    // Populated by fetchServerBalances(). Keyed by month then student id.
+    window._eaServerBalances = null;   // { month, byId: {id -> balance}, fetched_at }
+
+    /**
+     * Fetch authoritative star/VETO balances from the server for a month.
+     * Stores result in window._eaServerBalances.
+     */
+    window.fetchServerBalances = async function fetchServerBalances(month) {
+        if (typeof SERVER_SYNC === 'undefined' || !SERVER_SYNC.enabled) return;
+        try {
+            const resp = await fetch(
+                '/scoreboard/balances?month=' + encodeURIComponent(month),
+                { cache: 'no-store', credentials: 'include' }
+            );
+            if (!resp.ok) return;
+            const json = await resp.json();
+            if (!json.success || !Array.isArray(json.balances)) return;
+            const byId = {};
+            json.balances.forEach(function(b) { byId[b.id] = b; });
+            window._eaServerBalances = { month: month, byId: byId, fetched_at: new Date().toISOString() };
+        } catch (_) {
+            // Ignore — offline or server unavailable; local calculation used instead.
+        }
+    };
+
+    /** Refresh balances for the current month. Call after any star/VETO action. */
+    window.refreshServerBalances = async function refreshServerBalances() {
+        var month = (typeof getCurrentMonthKey === 'function') ? getCurrentMonthKey() : '';
+        if (month) await window.fetchServerBalances(month);
+    };
+
+    // ── Override balance functions to prefer server data ──────────────
+    // Preserve originals so the fallback still works offline.
+    var _origGetStars = (typeof getAvailableStarsForMonth === 'function')
+        ? getAvailableStarsForMonth : null;
+    var _origGetVetos = (typeof getAvailableVetosForMonth === 'function')
+        ? getAvailableVetosForMonth : null;
+
+    if (_origGetStars) {
+        window.getAvailableStarsForMonth = function getAvailableStarsForMonth(studentId, monthKey) {
+            var sid = parseInt(studentId, 10) || 0;
+            var month = String(monthKey || (typeof getCurrentMonthKey === 'function' ? getCurrentMonthKey() : '')).trim();
+            var cache = window._eaServerBalances;
+            if (cache && cache.month === month && cache.byId && cache.byId[sid] !== undefined) {
+                return cache.byId[sid].available_stars;
+            }
+            return _origGetStars(studentId, monthKey);
+        };
+    }
+
+    if (_origGetVetos) {
+        window.getAvailableVetosForMonth = function getAvailableVetosForMonth(studentId, monthKey) {
+            var sid = parseInt(studentId, 10) || 0;
+            var month = String(monthKey || (typeof getCurrentMonthKey === 'function' ? getCurrentMonthKey() : '')).trim();
+            var cache = window._eaServerBalances;
+            if (cache && cache.month === month && cache.byId && cache.byId[sid] !== undefined) {
+                return cache.byId[sid].available_vetos;
+            }
+            return _origGetVetos(studentId, monthKey);
+        };
+    }
+
+    // ── Roll-number change API ────────────────────────────────────────
+    /**
+     * Record a student roll-number change on the server.
+     * Admin only. Writes to roll_history, updates the student record,
+     * and copies month roster profiles from old→new roll for affected months.
+     *
+     * @param {number} studentId
+     * @param {string} newRoll       e.g. "EA25A01"
+     * @param {string} effectiveMonth YYYY-MM from which new roll applies
+     * @param {string} [reason]      optional description
+     * @returns {Promise<boolean>}   true on success
+     */
+    window.adminRecordRollChange = async function adminRecordRollChange(studentId, newRoll, effectiveMonth, reason) {
+        if (typeof SERVER_SYNC === 'undefined' || !SERVER_SYNC.enabled) {
+            if (typeof showAlert === 'function') showAlert('Server connection required to record roll changes.', 'warning');
+            return false;
+        }
+        try {
+            var resp = await fetch('/scoreboard/record-roll-change', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({
+                    student_id: studentId,
+                    new_roll: newRoll,
+                    effective_month: effectiveMonth,
+                    reason: reason || 'admin_update'
+                })
+            });
+            var json = await resp.json();
+            if (!json.success) {
+                if (typeof showAlert === 'function') showAlert('Roll change failed: ' + (json.error || 'Unknown error'), 'danger');
+                return false;
+            }
+            var msg = 'Roll changed: ' + json.old_roll + ' \u2192 ' + json.new_roll +
+                      ' from ' + json.effective_month + '. Updated ' +
+                      (json.profiles_updated || []).length + ' month profile(s).';
+            if (typeof showAlert === 'function') showAlert(msg, 'success');
+            // Pull fresh data from server so local state reflects the change.
+            if (typeof pullFromServer === 'function') {
+                try { await pullFromServer(); } catch (_) {}
+            }
+            return true;
+        } catch (e) {
+            if (typeof showAlert === 'function') showAlert('Failed to record roll change: ' + e.message, 'danger');
+            return false;
+        }
+    };
+
+    // ── Server-side pre-validation for star/VETO actions ─────────────
+    /**
+     * Ask the server whether a proposed star or VETO delta is valid.
+     * Returns the server's response object (or null when offline).
+     * The client should BLOCK the action if overall_valid === false.
+     */
+    window.serverValidateAction = async function serverValidateAction(studentId, month, deltaStars, deltaVetos) {
+        if (typeof SERVER_SYNC === 'undefined' || !SERVER_SYNC.enabled) return null;
+        try {
+            var resp = await fetch('/scoreboard/validate-action', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({
+                    student_id: studentId,
+                    month: month,
+                    delta_stars: deltaStars || 0,
+                    delta_vetos: deltaVetos || 0
+                })
+            });
+            if (!resp.ok) return null;
+            return await resp.json();
+        } catch (_) {
+            return null;
+        }
+    };
+
+    // ── Auto-fetch on load ────────────────────────────────────────────
+    // Populate balance cache as soon as the page is ready.
+    window.addEventListener('load', function() {
+        var month = (typeof getCurrentMonthKey === 'function') ? getCurrentMonthKey() : '';
+        if (month && typeof SERVER_SYNC !== 'undefined' && SERVER_SYNC.enabled) {
+            window.fetchServerBalances(month).catch(function() {});
+        }
+    });
+
 })();
 </script>
 </body>

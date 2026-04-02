@@ -14,6 +14,7 @@ from app.models import (
     StudentTransfer,
 )
 from app.utils.syllabus_helpers import merge_syllabus_catalog_superset, merge_syllabus_tracking_superset
+import app.utils.score_balance as _score_balance
 from datetime import datetime, date, timedelta, timezone
 from dateutil.relativedelta import relativedelta
 import calendar
@@ -1720,6 +1721,11 @@ def _normalize_roll_value(value):
     return str(value or '').strip().upper()
 
 
+def _get_roll_for_month(data, student_id, month_key):
+    """Thin wrapper — logic lives in app.utils.score_balance (Step 5 module split)."""
+    return _score_balance.get_roll_for_month(data, student_id, month_key)
+
+
 def _parse_int_safe(value, default=0):
     try:
         return int(value)
@@ -1964,6 +1970,16 @@ def _reconcile_veto_counters_from_scores(data, month_key=None):
         if sid > 0 and sid not in grant_sids:
             if student.get('role_veto_count', 0) != 0:
                 student['role_veto_count'] = 0
+
+
+def _compute_student_star_balance(data, student_id, month_key):
+    """Thin wrapper — logic lives in app.utils.score_balance (Step 5 module split)."""
+    return _score_balance.compute_star_balance(data, student_id, month_key)
+
+
+def _compute_student_veto_balance(data, student_id, month_key):
+    """Thin wrapper — logic lives in app.utils.score_balance (Step 5 module split)."""
+    return _score_balance.compute_veto_balance(data, student_id, month_key, _server_now_iso()[:7])
 
 
 def _merge_teacher_scores(existing_data, incoming_data):
@@ -2295,6 +2311,88 @@ def _merge_month_roster_profiles_superset(existing_rp, incoming_rp):
                 by_roll[roll] = {**(by_roll.get(roll) or {}), **p}
         merged[month] = list(by_roll.values())
     return merged
+
+
+def _clone_jsonish(value):
+    return json.loads(json.dumps(value))
+
+
+def _locked_month_keys(payload):
+    if not isinstance(payload, dict):
+        return set()
+    months = set()
+    for month in payload.get('locked_months', []) or []:
+        mk = str(month or '').strip()
+        if re.match(r'^\d{4}-\d{2}$', mk):
+            months.add(mk)
+    frozen = payload.get('frozen_months', {}) or {}
+    if isinstance(frozen, dict):
+        for month, info in frozen.items():
+            mk = str(month or '').strip()
+            if not re.match(r'^\d{4}-\d{2}$', mk):
+                continue
+            if isinstance(info, dict) and info.get('hardened') is True and info.get('allow_modifications') is False:
+                months.add(mk)
+    return months
+
+
+def _preserve_locked_historical_window(existing_payload, incoming_payload):
+    """Never let sync/publish overwrite locked historical months.
+
+    Once months are locked/frozen, the live server copy is authoritative for:
+    - locked_months / frozen_months metadata
+    - month_students / month_roster_profiles / month_extra_columns / month_student_extras / role_veto_monthly
+    - score rows inside the locked month window
+
+    Historical rebuilds/restores should use dedicated admin/import endpoints, not generic sync/publish.
+    """
+    existing = existing_payload if isinstance(existing_payload, dict) else {}
+    incoming = incoming_payload if isinstance(incoming_payload, dict) else {}
+    locked_months = sorted(_locked_month_keys(existing) | _locked_month_keys(incoming))
+    if not locked_months:
+        return incoming
+
+    incoming['locked_months'] = locked_months
+
+    existing_frozen = existing.get('frozen_months', {}) if isinstance(existing.get('frozen_months'), dict) else {}
+    incoming_frozen = incoming.get('frozen_months', {}) if isinstance(incoming.get('frozen_months'), dict) else {}
+    merged_frozen = dict(incoming_frozen)
+    for month in locked_months:
+        if month in existing_frozen:
+            merged_frozen[month] = _clone_jsonish(existing_frozen[month])
+    incoming['frozen_months'] = merged_frozen
+
+    month_scoped_keys = [
+        'month_students',
+        'month_roster_profiles',
+        'month_extra_columns',
+        'month_student_extras',
+        'role_veto_monthly',
+    ]
+    for key in month_scoped_keys:
+        existing_map = existing.get(key, {}) if isinstance(existing.get(key), dict) else {}
+        incoming_map = incoming.get(key, {}) if isinstance(incoming.get(key), dict) else {}
+        merged_map = dict(incoming_map)
+        for month in locked_months:
+            if month in existing_map:
+                merged_map[month] = _clone_jsonish(existing_map[month])
+        incoming[key] = merged_map
+
+    existing_scores = existing.get('scores', []) if isinstance(existing.get('scores'), list) else []
+    incoming_scores = incoming.get('scores', []) if isinstance(incoming.get('scores'), list) else []
+    preserved_scores = []
+    for row in existing_scores:
+        month_key = str(row.get('month') or str(row.get('date') or '')[:7]).strip()
+        if month_key in locked_months:
+            preserved_scores.append(_clone_jsonish(row))
+    live_scores = []
+    for row in incoming_scores:
+        month_key = str(row.get('month') or str(row.get('date') or '')[:7]).strip()
+        if month_key in locked_months:
+            continue
+        live_scores.append(row)
+    incoming['scores'] = preserved_scores + live_scores
+    return incoming
 
 
 def _merge_students_preserve_active(existing_students, incoming_students):
@@ -4507,6 +4605,243 @@ FEB26_SEED = json.loads(r'''
 
 # ============== ROUTES ==============
 
+@points_bp.route('/balances', methods=['GET'])
+@login_required
+def get_student_balances():
+    """Return authoritative star and VETO balances for all students for a month.
+
+    This is the single source of truth that the client should use to confirm
+    available counts before applying star/VETO actions. Uses the same data
+    store and the same formula as the server-side reconciliation functions so
+    the numbers are always consistent with what the server persists.
+
+    Query params:
+        month  YYYY-MM (defaults to current month)
+    """
+    month_key = str(request.args.get('month') or '').strip()
+    if not re.match(r'^\d{4}-\d{2}$', month_key):
+        month_key = _server_now_iso()[:7]
+
+    data = _load_offline_data() or {}
+    students = data.get('students', []) or []
+
+    balances = []
+    for student in students:
+        sid = _parse_int_safe(student.get('id'), 0)
+        if sid <= 0:
+            continue
+        balances.append({
+            'id': sid,
+            'roll': student.get('roll', ''),
+            'name': student.get('name', ''),
+            'available_stars': _compute_student_star_balance(data, sid, month_key),
+            'available_vetos': _compute_student_veto_balance(data, sid, month_key),
+            'individual_veto_count': max(0, _parse_int_safe(student.get('veto_count'), 0)),
+            'role_veto_count': max(0, _parse_int_safe(student.get('role_veto_count'), 0)),
+            'global_stars': max(0, _parse_int_safe(student.get('stars'), 0)),
+        })
+
+    resp = jsonify({'success': True, 'month': month_key, 'balances': balances})
+    resp.headers['Cache-Control'] = 'no-store'
+    return resp
+
+
+@points_bp.route('/validate-action', methods=['POST'])
+@login_required
+def validate_action():
+    """Server-side validation of a proposed star/VETO action.
+
+    The client should call this before applying any star or VETO delta so the
+    server can confirm the action is valid given the authoritative balance.
+    Returns the available counts and whether the proposed delta is allowed.
+
+    Body JSON:
+        student_id   int
+        month        YYYY-MM
+        delta_stars  int  (negative = spending, positive = awarding)
+        delta_vetos  int  (negative = spending, positive = awarding)
+    """
+    payload = request.get_json(silent=True) or {}
+    student_id = _parse_int_safe(payload.get('student_id'), 0)
+    month_key = str(payload.get('month') or '').strip()
+    delta_stars = _parse_int_safe(payload.get('delta_stars'), 0)
+    delta_vetos = _parse_int_safe(payload.get('delta_vetos'), 0)
+
+    if student_id <= 0:
+        return jsonify({'success': False, 'error': 'student_id required'}), 400
+    if not re.match(r'^\d{4}-\d{2}$', month_key):
+        month_key = _server_now_iso()[:7]
+
+    data = _load_offline_data() or {}
+    available_stars = _compute_student_star_balance(data, student_id, month_key)
+    available_vetos = _compute_student_veto_balance(data, student_id, month_key)
+
+    star_valid = not (delta_stars < 0 and available_stars < abs(delta_stars))
+    veto_valid = not (delta_vetos < 0 and available_vetos < abs(delta_vetos))
+
+    resp = jsonify({
+        'success': True,
+        'student_id': student_id,
+        'month': month_key,
+        'available_stars': available_stars,
+        'available_vetos': available_vetos,
+        'star_action': {
+            'valid': star_valid,
+            'delta': delta_stars,
+            'error': None if star_valid else (
+                f'Insufficient stars: {available_stars} available, {abs(delta_stars)} requested'
+            ),
+        },
+        'veto_action': {
+            'valid': veto_valid,
+            'delta': delta_vetos,
+            'error': None if veto_valid else (
+                f'Insufficient VETOs: {available_vetos} available, {abs(delta_vetos)} requested'
+            ),
+        },
+        'overall_valid': star_valid and veto_valid,
+    })
+    resp.headers['Cache-Control'] = 'no-store'
+    return resp
+
+
+@points_bp.route('/record-roll-change', methods=['POST'])
+@login_required
+def record_roll_change():
+    """Record a student roll-number change and propagate it forward through history.
+
+    When a student is promoted (e.g. EA24A01 → EA25A01 from September 2025),
+    admin calls this endpoint. It:
+      1. Appends an entry to data['roll_history'] with old/new roll and effective month
+      2. Updates the student's current roll in data['students']
+      3. Copies the month_roster_profile from old_roll to new_roll for every
+         month >= effective_month (so carry-forward still works)
+      4. Returns the new roll history for this student
+
+    Body JSON:
+        student_id      int
+        new_roll        str    e.g. "EA25A01"
+        effective_month str    YYYY-MM — month from which new_roll applies
+        reason          str    optional, e.g. "annual_promotion"
+    """
+    if current_user.role != 'admin':
+        return jsonify({'success': False, 'error': 'Admin access required'}), 403
+
+    payload = request.get_json(silent=True) or {}
+    student_id = _parse_int_safe(payload.get('student_id'), 0)
+    new_roll = _normalize_roll_value(payload.get('new_roll') or '')
+    effective_month = str(payload.get('effective_month') or '').strip()
+    reason = str(payload.get('reason') or 'manual_update')[:200]
+
+    if student_id <= 0:
+        return jsonify({'success': False, 'error': 'student_id required'}), 400
+    if not new_roll:
+        return jsonify({'success': False, 'error': 'new_roll required'}), 400
+    if not re.match(r'^\d{4}-\d{2}$', effective_month):
+        return jsonify({'success': False, 'error': 'effective_month must be YYYY-MM'}), 400
+
+    data = _load_offline_data() or {}
+    students = data.get('students', []) or []
+
+    student = next((s for s in students if _parse_int_safe(s.get('id'), 0) == student_id), None)
+    if not student:
+        return jsonify({'success': False, 'error': 'Student not found'}), 404
+
+    old_roll = _normalize_roll_value(student.get('roll'))
+    if old_roll == new_roll:
+        return jsonify({'success': False, 'error': 'new_roll is the same as current roll'}), 400
+
+    # 1. Record in roll_history
+    if not isinstance(data.get('roll_history'), list):
+        data['roll_history'] = []
+
+    now_iso = _server_now_iso()
+    history_entry = {
+        'id': int(time.time() * 1000),
+        'student_id': student_id,
+        'old_roll': old_roll,
+        'new_roll': new_roll,
+        'effective_month': effective_month,
+        'changed_by': str(current_user.login_id or '').strip(),
+        'changed_at': now_iso,
+        'reason': reason,
+    }
+    data['roll_history'].append(history_entry)
+
+    # 2. Update the student's current roll
+    student['roll'] = new_roll
+
+    # 3. Copy month_roster_profiles from old_roll to new_roll for months >= effective_month
+    month_profiles = data.get('month_roster_profiles', {}) or {}
+    copied_months = []
+    for month_key, profiles in month_profiles.items():
+        if not isinstance(profiles, dict):
+            continue
+        if month_key < effective_month:
+            continue  # historical months keep the old_roll key
+        if old_roll in profiles and new_roll not in profiles:
+            profiles[new_roll] = dict(profiles[old_roll])
+            profiles[new_roll]['roll'] = new_roll
+            copied_months.append(month_key)
+    data['month_roster_profiles'] = month_profiles
+
+    data['server_updated_at'] = now_iso
+    _save_offline_data(data)
+    _broadcast_sync_event(now_iso, source='roll-change')
+
+    student_history = [
+        e for e in data['roll_history']
+        if _parse_int_safe(e.get('student_id'), 0) == student_id
+    ]
+
+    resp = jsonify({
+        'success': True,
+        'student_id': student_id,
+        'old_roll': old_roll,
+        'new_roll': new_roll,
+        'effective_month': effective_month,
+        'profiles_updated': copied_months,
+        'history': student_history,
+    })
+    resp.headers['Cache-Control'] = 'no-store'
+    return resp
+
+
+@points_bp.route('/roll-history', methods=['GET'])
+@login_required
+def get_roll_history():
+    """Return roll number change history.
+
+    Query params:
+        student_id   int  optional — filter to one student
+    """
+    if current_user.role not in ('admin', 'teacher'):
+        return jsonify({'success': False, 'error': 'Admin or teacher access required'}), 403
+
+    sid_filter = _parse_int_safe(request.args.get('student_id'), 0)
+    data = _load_offline_data() or {}
+    history = data.get('roll_history', []) or []
+
+    if sid_filter > 0:
+        history = [e for e in history if _parse_int_safe(e.get('student_id'), 0) == sid_filter]
+
+    # Enrich with current student name for readability
+    students = {_parse_int_safe(s.get('id'), 0): s for s in (data.get('students', []) or [])}
+    enriched = []
+    for entry in sorted(history, key=lambda e: str(e.get('changed_at') or ''), reverse=True):
+        sid = _parse_int_safe(entry.get('student_id'), 0)
+        s = students.get(sid, {})
+        enriched.append({
+            **entry,
+            'student_name': s.get('name', ''),
+            'current_roll': _normalize_roll_value(s.get('roll')),
+        })
+
+    resp = jsonify({'success': True, 'count': len(enriched), 'history': enriched})
+    resp.headers['Cache-Control'] = 'no-store'
+    return resp
+
+
 @points_bp.route('/offline')
 def offline_scoreboard():
     """Serve offline scoreboard HTML"""
@@ -4520,7 +4855,11 @@ def offline_scoreboard():
 @points_bp.route('/public')
 def public_scoreboard():
     """Public live scoreboard (read-only, no login required)."""
-    return render_template('scoreboard/public_live.html')
+    response = current_app.make_response(render_template('scoreboard/public_live.html'))
+    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
 
 
 @points_bp.route('/seed-data', methods=['GET'])
@@ -5065,6 +5404,8 @@ def offline_data():
             _parse_sync_stamp
         )
 
+    data = _preserve_locked_historical_window(existing, data)
+
     data = _enforce_current_month_roster_integrity(data, existing)
     _reconcile_role_veto_monthly(data)
     _reconcile_veto_counters_from_scores(data)
@@ -5295,6 +5636,8 @@ def offline_force_publish():
         used_fallback_snapshot = True
     if not isinstance(data, dict):
         data = {}
+    existing = _load_offline_data() or {}
+    data = _preserve_locked_historical_window(existing, data)
 
     data['server_updated_at'] = _server_now_iso()
     _save_offline_data(data)
@@ -5659,9 +6002,37 @@ def offline_manifest():
 
 
 @points_bp.route('/sw.js')
-@login_required
 def offline_sw():
-    return send_file('static/offline_sw.js', mimetype='application/javascript')
+    """Serve the service worker with a dynamically injected cache version.
+
+    The cache name is derived from offline_scoreboard.html's mtime so it
+    auto-bumps on every deployment — no manual version bump required.
+    The SW file itself is served with no-store so browsers always re-fetch it
+    and pick up updates immediately (within the SW 24-hour update window).
+    """
+    sw_path = os.path.join(current_app.root_path, 'static', 'offline_sw.js')
+    html_path = os.path.join(current_app.root_path, 'static', 'offline_scoreboard.html')
+
+    try:
+        version = int(os.path.getmtime(html_path))
+    except OSError:
+        version = 0
+
+    with open(sw_path, 'r', encoding='utf-8') as f:
+        sw_content = f.read()
+
+    # Replace the placeholder cache name with the mtime-derived version.
+    sw_content = re.sub(
+        r"const CACHE_NAME = 'ea-offline-v\d+';.*",
+        f"const CACHE_NAME = 'ea-offline-v{version}';",
+        sw_content
+    )
+
+    response = Response(sw_content, mimetype='application/javascript')
+    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
 
 
 @points_bp.route('/session')
