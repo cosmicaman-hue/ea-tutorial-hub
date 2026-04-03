@@ -344,6 +344,58 @@
             0%, 100% { transform: translateY(0); }
             50% { transform: translateY(-5px); }
         }
+        @media (max-width: 900px) {
+            .scoreboard-table th, .scoreboard-table td {
+                padding: 8px 10px;
+                font-size: 13px;
+            }
+            .rank { width: 56px; }
+            .col-roll { width: 20%; }
+            .col-name { width: 32%; }
+            .col-class { width: 16%; }
+            .col-total { width: 14%; }
+        }
+        @media (max-width: 640px) {
+            .controls {
+                gap: 8px;
+                padding: 12px;
+            }
+            select, button {
+                padding: 8px 10px;
+                font-size: 13px;
+                border-radius: 9px;
+            }
+            .meta {
+                width: 100%;
+                margin-left: 0;
+                order: 10;
+            }
+            .scoreboard-table th, .scoreboard-table td {
+                padding: 7px 8px;
+                font-size: 12px;
+                letter-spacing: 0;
+            }
+            .rank { width: 46px; }
+            .col-roll { width: 18%; }
+            .col-name { width: 30%; }
+            .col-class { width: 14%; }
+            .col-total { width: 14%; }
+            .scoreboard-table th {
+                font-size: 11px;
+            }
+        }
+        @media (max-width: 420px) {
+            .page { padding-left: 10px; padding-right: 10px; }
+            .scoreboard-table th, .scoreboard-table td {
+                padding: 6px 6px;
+                font-size: 11px;
+            }
+            .rank { width: 40px; }
+            .col-roll { width: 17%; }
+            .col-name { width: 29%; }
+            .col-class { width: 13%; }
+            .col-total { width: 13%; }
+        }
         .appear {
             opacity: 0;
             transform: translateY(20px);
