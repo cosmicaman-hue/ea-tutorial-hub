@@ -3,74 +3,269 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>EA Public Scoreboard</title>
+    <title>Excel Academy</title>
     <style>
         :root {
-            --bg: #0b1020;
-            --card: #111827;
-            --line: rgba(148,163,184,.2);
-            --text: #e5e7eb;
-            --muted: #94a3b8;
-            --good: #22c55e;
-            --bad: #f87171;
-            --chip: #172036;
+            --bg: #faf8f3;
+            --surface: #ffffff;
+            --surface-2: #f4f0e8;
+            --text: #243447;
+            --muted: #5f6b7a;
+            --primary: #1a4d2e;
+            --secondary: #f7931e;
+            --accent: #c4314b;
+            --gold: #d4af37;
+            --line: rgba(36,52,71,.12);
+            --shadow: 0 14px 34px rgba(26, 77, 46, .10);
         }
         * { box-sizing: border-box; }
+        html { scroll-behavior: smooth; }
         body {
             margin: 0;
-            font-family: "Segoe UI", Tahoma, sans-serif;
-            background: radial-gradient(circle at top, #111b34 0%, var(--bg) 42%);
+            font-family: "Lora", Georgia, serif;
+            background:
+                radial-gradient(circle at top, rgba(26,77,46,.10), transparent 35%),
+                linear-gradient(180deg, #fdfbf7 0%, var(--bg) 100%);
             color: var(--text);
+            overflow-x: hidden;
         }
-        .wrap { max-width: 1080px; margin: 0 auto; padding: 16px; }
-        .header {
-            text-align: center;
-            padding: 18px 12px;
-            background: linear-gradient(135deg, #0f172a, #1e293b);
+        a { color: inherit; }
+        .site-header {
+            position: sticky;
+            top: 0;
+            z-index: 50;
+            backdrop-filter: blur(10px);
+            background: rgba(250,248,243,.88);
             border-bottom: 1px solid var(--line);
         }
-        .header h1 { margin: 0; letter-spacing: 2px; font-size: clamp(20px, 3vw, 34px); }
-        .header p { margin: 8px 0 0; color: var(--muted); font-size: 13px; }
+        .topbar {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 14px 16px;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            justify-content: space-between;
+        }
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            text-decoration: none;
+        }
+        .brand-mark {
+            width: 42px;
+            height: 42px;
+            border-radius: 12px;
+            display: grid;
+            place-items: center;
+            color: white;
+            background: linear-gradient(135deg, var(--primary), #0d2818);
+            box-shadow: var(--shadow);
+            font-size: 20px;
+        }
+        .brand-text strong {
+            display: block;
+            letter-spacing: 1px;
+            font-family: "Poppins", "Segoe UI", sans-serif;
+        }
+        .brand-text span { display: block; color: var(--muted); font-size: 12px; }
+        .tabs {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .tab-btn {
+            border: 1px solid var(--line);
+            background: white;
+            color: var(--text);
+            border-radius: 999px;
+            padding: 10px 16px;
+            font-size: 14px;
+            cursor: pointer;
+            position: relative;
+            transition: transform .2s ease, box-shadow .2s ease, background .2s ease, color .2s ease;
+        }
+        .tab-btn::after {
+            content: '';
+            position: absolute;
+            left: 14px;
+            right: 14px;
+            bottom: 7px;
+            height: 2px;
+            border-radius: 999px;
+            background: rgba(255,255,255,.75);
+            transform: scaleX(0);
+            transform-origin: center;
+            transition: transform .22s ease;
+        }
+        .tab-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 8px 18px rgba(36,52,71,.08);
+        }
+        .tab-btn.active::after { transform: scaleX(1); }
+        .tab-btn.active {
+            background: linear-gradient(135deg, var(--primary), #245d3a);
+            color: white;
+            border-color: transparent;
+        }
+        .page {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 22px 16px 40px;
+        }
+        .panel { display: none; }
+        .panel.active { display: block; }
+        .hero {
+            background: linear-gradient(135deg, var(--primary) 0%, #0d2818 100%);
+            color: white;
+            padding: 76px 22px;
+            text-align: center;
+            border-radius: 28px;
+            overflow: hidden;
+            position: relative;
+            box-shadow: var(--shadow);
+        }
+        .hero::before {
+            content: '';
+            position: absolute;
+            inset: -20%;
+            background:
+                radial-gradient(circle at 20% 50%, rgba(247,147,30,.12) 0%, transparent 40%),
+                radial-gradient(circle at 80% 80%, rgba(212,175,55,.12) 0%, transparent 40%);
+            pointer-events: none;
+        }
+        .hero-content { position: relative; z-index: 1; }
+        .logo {
+            margin: 0 0 12px;
+            font-size: clamp(2.2rem, 5vw, 4rem);
+            letter-spacing: 2px;
+            font-family: "Playfair Display", Georgia, serif;
+        }
+        .tagline {
+            margin: 0;
+            font-size: clamp(1rem, 2vw, 1.3rem);
+            color: rgba(255,255,255,.90);
+            font-family: "Poppins", "Segoe UI", sans-serif;
+        }
+        .section {
+            margin-top: 26px;
+            background: rgba(255,255,255,.82);
+            border: 1px solid var(--line);
+            border-radius: 24px;
+            padding: 28px;
+            box-shadow: var(--shadow);
+        }
+        .intro { text-align: center; }
+        .intro h2 {
+            margin: 0 0 14px;
+            color: var(--primary);
+            font-size: clamp(1.7rem, 4vw, 2.5rem);
+            font-family: "Playfair Display", Georgia, serif;
+        }
+        .intro p {
+            margin: 0 auto;
+            max-width: 860px;
+            line-height: 1.9;
+            color: var(--text);
+            font-size: 1.05rem;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 18px;
+        }
+        .card {
+            background: white;
+            border-radius: 18px;
+            padding: 22px;
+            border: 1px solid var(--line);
+            box-shadow: 0 8px 24px rgba(36,52,71,.06);
+            transition: transform .3s ease, box-shadow .3s ease, border-color .3s ease;
+        }
+        .card:hover {
+            transform: translateY(-6px);
+            box-shadow: 0 16px 34px rgba(36,52,71,.10);
+            border-color: rgba(247,147,30,.35);
+        }
+        .card h3, .card h4 { margin: 0 0 10px; color: var(--primary); }
+        .card p { margin: 0; color: var(--muted); line-height: 1.8; }
+        .feature-icon {
+            font-size: 2rem;
+            margin-bottom: 14px;
+            display: inline-block;
+            animation: floaty 4s ease-in-out infinite;
+        }
+        .highlight {
+            background: linear-gradient(135deg, var(--secondary) 0%, #e67e00 100%);
+            color: white;
+        }
+        .highlight h3, .highlight p { color: white; }
+        .values {
+            background: linear-gradient(135deg, rgba(26,77,46,.05), rgba(247,147,30,.06));
+        }
+        .cta {
+            text-align: center;
+            background: linear-gradient(135deg, var(--primary), #0d2818);
+            color: white;
+        }
+        .cta-button {
+            display: inline-block;
+            margin-top: 14px;
+            padding: 14px 26px;
+            border-radius: 999px;
+            text-decoration: none;
+            color: white;
+            background: var(--secondary);
+            box-shadow: 0 10px 24px rgba(247,147,30,.3);
+            transition: transform .2s ease, box-shadow .2s ease, background .2s ease;
+        }
+        .cta-button:hover {
+            transform: translateY(-2px);
+            background: var(--gold);
+            box-shadow: 0 14px 28px rgba(212,175,55,.35);
+        }
+        .panel-shell {
+            background: rgba(255,255,255,.80);
+            border: 1px solid var(--line);
+            border-radius: 24px;
+            box-shadow: var(--shadow);
+            overflow: hidden;
+        }
         .controls {
             display: flex;
             gap: 10px;
             align-items: center;
             flex-wrap: wrap;
-            margin: 14px 0;
+            padding: 16px;
+            background: rgba(244,240,232,.85);
+            border-bottom: 1px solid var(--line);
         }
         select, button {
-            background: var(--card);
+            background: white;
             color: var(--text);
             border: 1px solid var(--line);
-            border-radius: 8px;
-            padding: 8px 12px;
+            border-radius: 10px;
+            padding: 9px 12px;
             font-size: 14px;
         }
         button { cursor: pointer; }
-        .tab-btn.active { border-color: #38bdf8; box-shadow: 0 0 0 1px rgba(56,189,248,.2) inset; }
         .meta { margin-left: auto; color: var(--muted); font-size: 12px; }
-        .card {
-            background: var(--card);
-            border: 1px solid var(--line);
-            border-radius: 10px;
-            overflow: hidden;
-        }
-        .panel.hidden { display: none; }
         .scroll { overflow-x: auto; }
-        table { width: 100%; min-width: 580px; border-collapse: collapse; }
+        table { width: 100%; min-width: 580px; border-collapse: collapse; background: white; }
         th, td { padding: 10px 12px; border-bottom: 1px solid var(--line); }
         th { text-align: left; color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .5px; }
         td:last-child, th:last-child { text-align: right; }
         .rank { width: 72px; text-align: center; }
-        .pos { color: var(--good); font-weight: 700; }
-        .neg { color: var(--bad); font-weight: 700; }
+        .pos { color: #15803d; font-weight: 700; }
+        .neg { color: #b91c1c; font-weight: 700; }
         .empty { text-align: center; color: var(--muted); padding: 30px; }
-        .info-wrap { padding: 12px; display: grid; gap: 12px; }
+        .info-wrap { padding: 16px; display: grid; gap: 12px; }
         .info-item {
             border: 1px solid var(--line);
-            border-radius: 10px;
-            padding: 12px;
-            background: rgba(15,23,42,.55);
+            border-radius: 14px;
+            padding: 14px;
+            background: white;
         }
         .info-head {
             display: flex;
@@ -80,27 +275,21 @@
             margin-bottom: 8px;
         }
         .chip {
-            background: var(--chip);
+            background: var(--surface-2);
             border: 1px solid var(--line);
             border-radius: 999px;
             color: var(--muted);
             font-size: 11px;
-            padding: 3px 8px;
+            padding: 4px 9px;
         }
-        .info-boxes {
-            display: grid;
-            gap: 8px;
-            margin-top: 8px;
-        }
+        .info-boxes { display: grid; gap: 8px; margin-top: 8px; }
         .info-box {
             border: 1px solid var(--line);
-            border-radius: 8px;
-            padding: 8px 10px;
-            background: rgba(2,6,23,.35);
+            border-radius: 10px;
+            padding: 10px 12px;
+            background: #fbfaf7;
         }
-        .info-attachment {
-            margin-top: 10px;
-        }
+        .info-attachment { margin-top: 10px; }
         .info-attachment img {
             max-width: 100%;
             height: auto;
@@ -108,34 +297,167 @@
             border-radius: 8px;
         }
         .info-attachment a {
-            color: #7dd3fc;
+            color: #0f766e;
             text-decoration: none;
-            border-bottom: 1px dashed rgba(125,211,252,.5);
+            border-bottom: 1px dashed rgba(15,118,110,.45);
         }
-        .info-table th, .info-table td {
-            font-size: 13px;
-            text-align: left;
+        .info-table th, .info-table td { font-size: 13px; text-align: left; }
+        footer {
+            text-align: center;
+            color: var(--muted);
+            padding: 18px 16px 28px;
         }
-        @media (max-width: 640px) {
+        .panel {
+            opacity: 0;
+            transform: translateY(12px);
+            pointer-events: none;
+            transition: opacity .22s ease, transform .22s ease;
+        }
+        .panel.active {
+            opacity: 1;
+            transform: translateY(0);
+            pointer-events: auto;
+        }
+        .home-enter {
+            animation: homeRise .6s ease both;
+        }
+        @keyframes homeRise {
+            from { opacity: 0; transform: translateY(18px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes floaty {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-5px); }
+        }
+        .appear {
+            opacity: 0;
+            transform: translateY(20px);
+            transition: opacity .7s ease, transform .7s ease;
+        }
+        .appear.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        @media (max-width: 768px) {
+            .topbar { align-items: flex-start; flex-direction: column; }
             .meta { margin-left: 0; width: 100%; }
+            .section, .hero { border-radius: 18px; }
         }
     </style>
 </head>
 <body>
-    <div class="header">
-        <h1>EXCEL ACADEMY SCOREBOARD</h1>
-        <p>Public view (read-only)</p>
-    </div>
-    <div class="wrap">
-        <div class="controls">
-            <button id="tabScoreboard" class="tab-btn active" type="button">Scoreboard</button>
-            <button id="tabInfo" class="tab-btn" type="button">Public Information</button>
-            <label for="monthSel">Month</label>
-            <select id="monthSel"></select>
-            <button id="refreshBtn" type="button">Refresh</button>
-            <span id="syncMeta" class="meta">Syncing...</span>
+    <header class="site-header">
+        <div class="topbar">
+            <a class="brand" href="#home">
+                <div class="brand-mark">EA</div>
+                <div class="brand-text">
+                    <strong>EXCEL ACADEMY</strong>
+                    <span>Public site with home, scoreboard, and information</span>
+                </div>
+            </a>
+            <nav class="tabs" aria-label="Primary">
+                <button id="tabHome" class="tab-btn active" type="button">Home</button>
+                <button id="tabScoreboard" class="tab-btn" type="button">Scoreboard</button>
+                <button id="tabInfo" class="tab-btn" type="button">Information</button>
+            </nav>
         </div>
-        <div id="scoreboardPanel" class="panel card">
+    </header>
+
+    <main class="page">
+        <section id="homePanel" class="panel active">
+            <div class="hero">
+                <div class="hero-content">
+                    <h1 class="logo">EXCEL ACADEMY</h1>
+                    <p class="tagline">Nurturing Tomorrow's Leaders Through Holistic Education</p>
+                </div>
+            </div>
+
+            <div class="section intro appear">
+                <h2>Beyond Academics</h2>
+                <p>
+                    At Excel Academy, we believe that true education transcends textbooks and examinations.
+                    Our holistic approach cultivates well-rounded individuals who excel not just academically,
+                    but also in character, leadership, critical thinking, and social responsibility.
+                </p>
+            </div>
+
+            <div class="section appear">
+                <div class="grid">
+                    <article class="card">
+                        <div class="feature-icon">🏆</div>
+                        <h3>Leadership Development</h3>
+                        <p>Students take on meaningful responsibilities that build accountability, teamwork, and decision-making skills.</p>
+                    </article>
+                    <article class="card">
+                        <div class="feature-icon">📚</div>
+                        <h3>Multi-Board Curriculum</h3>
+                        <p>We support CBSE, ICSE, and State Board learners with application-based learning and board exam preparation.</p>
+                    </article>
+                    <article class="card">
+                        <div class="feature-icon">💻</div>
+                        <h3>Technology-Powered Learning</h3>
+                        <p>From digital assessments to student database systems, we use technology to personalize education.</p>
+                    </article>
+                    <article class="card">
+                        <div class="feature-icon">⚽</div>
+                        <h3>Sports & Wellness</h3>
+                        <p>Weekly activities promote physical fitness, teamwork, discipline, and overall well-being.</p>
+                    </article>
+                    <article class="card">
+                        <div class="feature-icon">🗣️</div>
+                        <h3>Communication & Debate</h3>
+                        <p>Structured speaking activities help students develop confidence, clarity, and persuasive expression.</p>
+                    </article>
+                    <article class="card">
+                        <div class="feature-icon">📊</div>
+                        <h3>Progress Tracking</h3>
+                        <p>Our scoring framework supports regular evaluation, feedback, and healthy academic competition.</p>
+                    </article>
+                </div>
+            </div>
+
+            <div class="section highlight appear">
+                <h3>Our Educational Philosophy</h3>
+                <p>
+                    We go beyond rote memorization to cultivate critical thinkers and problem solvers.
+                    Students learn to understand concepts deeply, question intelligently, and apply knowledge creatively.
+                </p>
+            </div>
+
+            <div class="section values appear">
+                <h2 style="text-align:center; margin-top:0; color:var(--primary);">Our Core Values</h2>
+                <div class="grid">
+                    <div class="card"><div class="feature-icon">💡</div><h4>Innovation</h4><p>Creative teaching methods and technology.</p></div>
+                    <div class="card"><div class="feature-icon">🤝</div><h4>Integrity</h4><p>Honesty, ethics, and strong character.</p></div>
+                    <div class="card"><div class="feature-icon">🌍</div><h4>Responsibility</h4><p>Eco-consciousness and social awareness.</p></div>
+                    <div class="card"><div class="feature-icon">⭐</div><h4>Excellence</h4><p>High standards in everything we do.</p></div>
+                    <div class="card"><div class="feature-icon">❤️</div><h4>Compassion</h4><p>Empathy, kindness, and inclusivity.</p></div>
+                    <div class="card"><div class="feature-icon">🚀</div><h4>Growth Mindset</h4><p>Curiosity and lifelong learning.</p></div>
+                </div>
+            </div>
+
+            <div class="section card appear">
+                <div class="feature-icon">♻️</div>
+                <h3>Commitment to Sustainability</h3>
+                <p>
+                    Excel Academy is committed to environmental responsibility and eco-conscious practices that prepare students to be responsible global citizens.
+                </p>
+            </div>
+
+            <div class="section cta appear">
+                <h2 style="margin-top:0;">Join the Excel Academy Family</h2>
+                <p>Where Every Child's Potential Becomes Reality</p>
+                <a href="#scoreboardPanel" class="cta-button" id="goScoreboard">View Scoreboard</a>
+            </div>
+        </section>
+
+        <section id="scoreboardPanel" class="panel panel-shell">
+            <div class="controls">
+                <button id="refreshBtn" type="button">Refresh</button>
+                <label for="monthSel">Month</label>
+                <select id="monthSel"></select>
+                <span id="syncMeta" class="meta">Syncing...</span>
+            </div>
             <div class="scroll">
                 <table>
                     <thead>
@@ -152,13 +474,19 @@
                     </tbody>
                 </table>
             </div>
-        </div>
-        <div id="infoPanel" class="panel card hidden">
+        </section>
+
+        <section id="infoPanel" class="panel panel-shell">
             <div id="publicInfoList" class="info-wrap">
                 <div class="empty">Loading information...</div>
             </div>
-        </div>
-    </div>
+        </section>
+    </main>
+
+    <footer>
+        <div>© 2026 Excel Academy</div>
+        <div style="margin-top:6px;">Public site hosted on Cloudflare</div>
+    </footer>
 
     <script>
         const monthSel = document.getElementById('monthSel');
@@ -166,8 +494,10 @@
         const syncMeta = document.getElementById('syncMeta');
         const body = document.getElementById('body');
         const infoList = document.getElementById('publicInfoList');
+        const tabHome = document.getElementById('tabHome');
         const tabScoreboard = document.getElementById('tabScoreboard');
         const tabInfo = document.getElementById('tabInfo');
+        const homePanel = document.getElementById('homePanel');
         const scoreboardPanel = document.getElementById('scoreboardPanel');
         const infoPanel = document.getElementById('infoPanel');
         let latest = { months: [], scoreboard: {}, top_full_count: 15, public_information: [] };
@@ -175,16 +505,13 @@
         function esc(s) {
             return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
         }
-
         function cleanName(value) {
             return String(value || '').replace(/\s*\([^)]*\)/g, '').replace(/\s+/g, ' ').trim() || '-';
         }
-
         function parseStamp(v) {
             const n = Date.parse(String(v || ''));
             return Number.isFinite(n) ? n : 0;
         }
-
         function rollKey(v) { return String(v || '').trim().toUpperCase(); }
         function normStatus(v) {
             const s = String(v || '').toLowerCase();
@@ -203,16 +530,7 @@
                 const d = String(a && a.date || '').trim();
                 if (d.length >= 7) set.add(d.slice(0, 7));
             });
-            const all = Array.from(set).filter(v => /^\d{4}-\d{2}$/.test(v)).sort((a, b) => b.localeCompare(a));
-            const now = new Date();
-            const keep = new Set();
-            const y = now.getFullYear();
-            const m = now.getMonth() + 1;
-            for (let i = 0; i < 3; i++) {
-                const dt = new Date(y, m - 1 - i, 1);
-                keep.add(`${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}`);
-            }
-            return all.filter(month => keep.has(month)).slice(0, 3);
+            return Array.from(set).filter(v => /^\d{4}-\d{2}$/.test(v)).sort((a, b) => b.localeCompare(a)).slice(0, 3);
         }
         function latestThreeMonths(rawMonths) {
             const now = new Date();
@@ -237,20 +555,15 @@
         function legacyRowsForMonth(data, month) {
             const rosterRolls = getMonthRosterRolls(data, month);
             const baseStudents = (data.students || []).filter(s => s && s.active !== false);
-            const visible = rosterRolls.size
-                ? baseStudents.filter(s => rosterRolls.has(rollKey(s && s.roll)))
-                : baseStudents;
-
+            const visible = rosterRolls.size ? baseStudents.filter(s => rosterRolls.has(rollKey(s && s.roll))) : baseStudents;
             const dedupByRoll = new Map();
             visible.forEach(s => {
                 const r = rollKey(s && s.roll);
                 if (r && !dedupByRoll.has(r)) dedupByRoll.set(r, s);
             });
-
             const students = Array.from(dedupByRoll.values());
             const byId = new Map(students.map(s => [parseInt(s.id, 10), s]));
             const totals = new Map(students.map(s => [parseInt(s.id, 10), 0]));
-
             (data.scores || []).forEach(sc => {
                 const sid = parseInt(sc && sc.studentId, 10);
                 if (!sid || !totals.has(sid)) return;
@@ -258,7 +571,6 @@
                 const pts = parseInt(sc && sc.points, 10) || 0;
                 totals.set(sid, (totals.get(sid) || 0) + pts);
             });
-
             const attLatest = new Map();
             (data.attendance || []).forEach(a => {
                 const sid = parseInt(a && a.studentId, 10);
@@ -270,33 +582,17 @@
                 const nts = parseStamp((a && (a.updated_at || a.created_at)) || '');
                 if (!prev || nts >= pts) attLatest.set(key, a);
             });
-
             attLatest.forEach(a => {
                 const sid = parseInt(a && a.studentId, 10);
-                if (sid && totals.has(sid)) {
-                    totals.set(sid, (totals.get(sid) || 0) + penaltyOf(normStatus(a && a.status)));
-                }
+                if (sid && totals.has(sid)) totals.set(sid, (totals.get(sid) || 0) + penaltyOf(normStatus(a && a.status)));
             });
-
             return Array.from(totals.entries()).map(([sid, total]) => {
                 const s = byId.get(sid) || {};
-                return {
-                    rank: 0,
-                    roll: rollKey(s.roll || ''),
-                    name: cleanName(s.base_name || s.name || ''),
-                    class: s.class || '-',
-                    total: total || 0,
-                    masked: false
-                };
+                return { rank: 0, roll: rollKey(s.roll || ''), name: cleanName(s.base_name || s.name || ''), class: s.class || '-', total: total || 0, masked: false };
             }).sort((a, b) => b.total !== a.total ? b.total - a.total : a.roll.localeCompare(b.roll)).map((row, i) => ({
-                ...row,
-                rank: i + 1,
-                masked: i + 1 > 15,
-                name: i + 1 > 15 ? '' : row.name,
-                class: i + 1 > 15 ? '' : row.class
+                ...row, rank: i + 1, masked: i + 1 > 15, name: i + 1 > 15 ? '' : row.name, class: i + 1 > 15 ? '' : row.class
             }));
         }
-
         function normalizePayload(payload) {
             if (payload && payload.scoreboard && !payload.data) {
                 const months = latestThreeMonths(payload.months);
@@ -309,13 +605,10 @@
                     public_information: Array.isArray(payload.public_information) ? payload.public_information : []
                 };
             }
-
             const raw = payload && payload.data ? payload.data : {};
             const months = monthKeys(raw);
             const scoreboard = {};
-            months.forEach(month => {
-                scoreboard[month] = legacyRowsForMonth(raw, month);
-            });
+            months.forEach(month => { scoreboard[month] = legacyRowsForMonth(raw, month); });
             return {
                 updated_at: payload && payload.updated_at ? payload.updated_at : '',
                 top_full_count: 15,
@@ -324,7 +617,6 @@
                 public_information: []
             };
         }
-
         function renderScoreboard(snapshot) {
             latest = snapshot || { months: [], scoreboard: {}, top_full_count: 15, public_information: [] };
             const months = Array.isArray(latest.months) ? latest.months : [];
@@ -332,33 +624,23 @@
             monthSel.innerHTML = months.map(m => `<option value="${m}">${m}</option>`).join('');
             const selected = months.includes(preferred) ? preferred : (months[0] || '');
             monthSel.value = selected;
-
             if (!selected) {
                 body.innerHTML = '<tr><td class="empty" colspan="5">No month data available</td></tr>';
                 return;
             }
-
             const rows = Array.isArray((latest.scoreboard || {})[selected]) ? latest.scoreboard[selected] : [];
             if (!rows.length) {
                 body.innerHTML = '<tr><td class="empty" colspan="5">No data for this month</td></tr>';
                 return;
             }
-
             body.innerHTML = rows.map((r, i) => {
                 const rank = Number(r.rank) || (i + 1);
                 const cls = Number(r.total) > 0 ? 'pos' : (Number(r.total) < 0 ? 'neg' : '');
                 const name = r.masked ? '&mdash;' : esc(cleanName(r.name || '-'));
                 const classVal = r.masked ? '&mdash;' : esc(r.class || '-');
-                return `<tr>
-                    <td class="rank">${rank}</td>
-                    <td>${esc(r.roll || '-')}</td>
-                    <td>${name}</td>
-                    <td>${classVal}</td>
-                    <td class="${cls}">${Number(r.total) || 0}</td>
-                </tr>`;
+                return `<tr><td class="rank">${rank}</td><td>${esc(r.roll || '-')}</td><td>${name}</td><td>${classVal}</td><td class="${cls}">${Number(r.total) || 0}</td></tr>`;
             }).join('');
         }
-
         function renderPublicInformation(snapshot) {
             const items = Array.isArray(snapshot && snapshot.public_information) ? snapshot.public_information : [];
             if (!items.length) {
@@ -380,62 +662,39 @@
                     const rows = Array.isArray(item.table_rows) ? item.table_rows : [];
                     const th = cols.map(c => `<th>${esc(c)}</th>`).join('');
                     const tr = rows.map(row => `<tr>${(Array.isArray(row) ? row : []).map(cell => `<td>${esc(cell)}</td>`).join('')}</tr>`).join('');
-                    bodyHtml = `
-                        <div class="scroll">
-                            <table class="info-table">
-                                <thead><tr>${th}</tr></thead>
-                                <tbody>${tr || '<tr><td class="empty">No table rows</td></tr>'}</tbody>
-                            </table>
-                        </div>
-                    `;
+                    bodyHtml = `<div class="scroll"><table class="info-table"><thead><tr>${th}</tr></thead><tbody>${tr || '<tr><td class="empty">No table rows</td></tr>'}</tbody></table></div>`;
                 } else {
                     bodyHtml = `<div class="info-boxes">${lines.length ? lines.map(line => `<div class="info-box">${esc(line)}</div>`).join('') : '<div class="info-box">No details</div>'}</div>`;
                 }
-
                 let attachmentHtml = '';
                 const attachment = item.attachment || null;
                 if (attachment && attachment.data_url) {
                     const mime = String(attachment.mime || '').toLowerCase();
                     const name = esc(attachment.name || 'attachment');
-                    if (mime.startsWith('image/')) {
-                        attachmentHtml = `<div class="info-attachment"><img src="${attachment.data_url}" alt="${name}"></div>`;
-                    } else if (mime === 'application/pdf') {
-                        attachmentHtml = `<div class="info-attachment"><a href="${attachment.data_url}" target="_blank" rel="noopener noreferrer">Open PDF: ${name}</a></div>`;
-                    }
+                    if (mime.startsWith('image/')) attachmentHtml = `<div class="info-attachment"><img src="${attachment.data_url}" alt="${name}"></div>`;
+                    else if (mime === 'application/pdf') attachmentHtml = `<div class="info-attachment"><a href="${attachment.data_url}" target="_blank" rel="noopener noreferrer">Open PDF: ${name}</a></div>`;
                 }
-
                 const updated = esc(item.updated_at || '');
-                const scheduleBadge = isSchedule
-                    ? `<div style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0;">
-                        <span class="chip" style="background:#1e3a8a;color:#dbeafe;border-color:#3b82f6;">${esc(category === 'schedule_class' ? 'CLASS SCHEDULE' : 'GROUP SCHEDULE')}</span>
-                        ${audience ? `<span class="chip" style="background:#14532d;color:#dcfce7;border-color:#22c55e;">${esc(audience)}</span>` : ''}
-                        ${(periodType || periodLabel) ? `<span class="chip" style="background:#7c2d12;color:#ffedd5;border-color:#fb923c;">${esc((periodType ? periodType.toUpperCase() : '') + (periodLabel ? ' - ' + periodLabel : ''))}</span>` : ''}
-                    </div>`
-                    : '';
-                return `
-                    <article class="info-item">
-                        <div class="info-head">
-                            <h3 style="margin:0;font-size:16px;">${title}</h3>
-                            <span class="chip">${layout}</span>
-                        </div>
-                        ${scheduleBadge}
-                        ${bodyHtml}
-                        ${attachmentHtml}
-                        ${updated ? `<div class="meta" style="margin-top:8px;">Updated: ${updated}</div>` : ''}
-                    </article>
-                `;
+                const scheduleBadge = isSchedule ? `<div style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0;"><span class="chip">${esc(category === 'schedule_class' ? 'CLASS SCHEDULE' : 'GROUP SCHEDULE')}</span>${audience ? `<span class="chip">${esc(audience)}</span>` : ''}${(periodType || periodLabel) ? `<span class="chip">${esc((periodType ? periodType.toUpperCase() : '') + (periodLabel ? ' - ' + periodLabel : ''))}</span>` : ''}</div>` : '';
+                return `<article class="info-item"><div class="info-head"><h3 style="margin:0;font-size:16px;">${title}</h3><span class="chip">${layout}</span></div>${scheduleBadge}${bodyHtml}${attachmentHtml}${updated ? `<div class="meta" style="margin-top:8px;">Updated: ${updated}</div>` : ''}</article>`;
             }).join('');
         }
-
         function setActiveTab(tabKey) {
-            const scoreboard = tabKey === 'scoreboard';
-            tabScoreboard.classList.toggle('active', scoreboard);
-            tabInfo.classList.toggle('active', !scoreboard);
-            scoreboardPanel.classList.toggle('hidden', !scoreboard);
-            infoPanel.classList.toggle('hidden', scoreboard);
-            monthSel.disabled = !scoreboard;
+            const isHome = tabKey === 'home';
+            const isScoreboard = tabKey === 'scoreboard';
+            tabHome.classList.toggle('active', isHome);
+            tabScoreboard.classList.toggle('active', isScoreboard);
+            tabInfo.classList.toggle('active', tabKey === 'info');
+            homePanel.classList.toggle('active', isHome);
+            scoreboardPanel.classList.toggle('active', isScoreboard);
+            infoPanel.classList.toggle('active', tabKey === 'info');
+            if (isHome) {
+                document.querySelectorAll('.appear').forEach((el, idx) => {
+                    el.classList.remove('visible');
+                    requestAnimationFrame(() => setTimeout(() => el.classList.add('visible'), 60 + idx * 70));
+                });
+            }
         }
-
         async function fetchAndRender() {
             try {
                 const resp = await fetch(`./scores.json?_=${Date.now()}`, { cache: 'no-store' });
@@ -452,16 +711,25 @@
                 infoList.innerHTML = '<div class="empty">Failed to load public information.</div>';
             }
         }
-
+        tabHome.addEventListener('click', () => setActiveTab('home'));
+        tabScoreboard.addEventListener('click', () => setActiveTab('scoreboard'));
+        tabInfo.addEventListener('click', () => setActiveTab('info'));
+        refreshBtn.addEventListener('click', fetchAndRender);
         monthSel.addEventListener('change', () => {
             localStorage.setItem('ea_pub_month', monthSel.value);
             renderScoreboard(latest || {});
         });
-        refreshBtn.addEventListener('click', fetchAndRender);
-        tabScoreboard.addEventListener('click', () => setActiveTab('scoreboard'));
-        tabInfo.addEventListener('click', () => setActiveTab('info'));
-
-        setActiveTab('scoreboard');
+        document.getElementById('goScoreboard').addEventListener('click', (e) => {
+            e.preventDefault();
+            setActiveTab('scoreboard');
+            document.getElementById('scoreboardPanel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
+        setActiveTab('home');
+        requestAnimationFrame(() => {
+            document.querySelectorAll('.appear').forEach((el, idx) => {
+                setTimeout(() => el.classList.add('visible'), 120 + idx * 75);
+            });
+        });
         fetchAndRender();
         setInterval(fetchAndRender, 30000);
     </script>
