@@ -251,12 +251,27 @@
         }
         button { cursor: pointer; }
         .meta { margin-left: auto; color: var(--muted); font-size: 12px; }
-        .scroll { overflow-x: auto; }
-        table { width: 100%; min-width: 580px; border-collapse: collapse; background: white; }
-        th, td { padding: 10px 12px; border-bottom: 1px solid var(--line); }
+        .scroll { overflow-x: visible; }
+        .scoreboard-table {
+            width: 100%;
+            table-layout: fixed;
+            border-collapse: collapse;
+            background: white;
+        }
+        .scoreboard-table th, .scoreboard-table td {
+            padding: 10px 12px;
+            border-bottom: 1px solid var(--line);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
         th { text-align: left; color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .5px; }
         td:last-child, th:last-child { text-align: right; }
-        .rank { width: 72px; text-align: center; }
+        .rank { width: 70px; text-align: center; }
+        .col-roll { width: 18%; }
+        .col-name { width: 36%; }
+        .col-class { width: 14%; }
+        .col-total { width: 16%; }
         .pos { color: #15803d; font-weight: 700; }
         .neg { color: #b91c1c; font-weight: 700; }
         .empty { text-align: center; color: var(--muted); padding: 30px; }
@@ -459,14 +474,14 @@
                 <span id="syncMeta" class="meta">Syncing...</span>
             </div>
             <div class="scroll">
-                <table>
+                <table class="scoreboard-table">
                     <thead>
                         <tr>
                             <th class="rank">Rank</th>
-                            <th>Roll</th>
-                            <th>Name</th>
-                            <th>Class</th>
-                            <th>Total</th>
+                            <th class="col-roll">Roll</th>
+                            <th class="col-name">Name</th>
+                            <th class="col-class">Class</th>
+                            <th class="col-total">Total</th>
                         </tr>
                     </thead>
                     <tbody id="body">
@@ -638,7 +653,7 @@
                 const cls = Number(r.total) > 0 ? 'pos' : (Number(r.total) < 0 ? 'neg' : '');
                 const name = r.masked ? '&mdash;' : esc(cleanName(r.name || '-'));
                 const classVal = r.masked ? '&mdash;' : esc(r.class || '-');
-                return `<tr><td class="rank">${rank}</td><td>${esc(r.roll || '-')}</td><td>${name}</td><td>${classVal}</td><td class="${cls}">${Number(r.total) || 0}</td></tr>`;
+                return `<tr><td class="rank">${rank}</td><td class="col-roll">${esc(r.roll || '-')}</td><td class="col-name">${name}</td><td class="col-class">${classVal}</td><td class="col-total ${cls}">${Number(r.total) || 0}</td></tr>`;
             }).join('');
         }
         function renderPublicInformation(snapshot) {
