@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-04-03T16:20:31.926Z",
+  "updated_at": "2026-04-04T08:50:35.786Z",
   "top_full_count": 15,
   "months": [
     "2026-04",
@@ -13,11 +13,19 @@
         "roll": "EA24D01",
         "name": "Jay Kumar Yadav",
         "class": "10",
-        "total": 20,
+        "total": 70,
         "masked": false
       },
       {
         "rank": 2,
+        "roll": "EA24D06",
+        "name": "Tanmay Biswas",
+        "class": "10",
+        "total": 60,
+        "masked": false
+      },
+      {
+        "rank": 3,
         "roll": "EA25D12",
         "name": "Roshan Paswan",
         "class": "10",
@@ -25,19 +33,11 @@
         "masked": false
       },
       {
-        "rank": 3,
+        "rank": 4,
         "roll": "EA25D13",
         "name": "Aamna Khatoon",
         "class": "10",
         "total": 20,
-        "masked": false
-      },
-      {
-        "rank": 4,
-        "roll": "EA24D06",
-        "name": "Tanmay Biswas",
-        "class": "10",
-        "total": 10,
         "masked": false
       },
       {

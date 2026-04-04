@@ -405,10 +405,36 @@
             opacity: 1;
             transform: translateY(0);
         }
+        /* ── PLANNER VIEW STYLES ── */
+        .planner-container { margin: 16px 0; background: #fff; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; font-family: "Poppins", "Segoe UI", sans-serif; }
+        .planner-grid { width: 100%; border-collapse: collapse; table-layout: fixed; background: #fff; }
+        .planner-grid th, .planner-grid td { border: 1px solid var(--line); vertical-align: top; padding: 6px; position: relative; }
+        .planner-grid th { background: var(--surface-2); color: var(--primary); font-size: 11px; font-weight: 700; text-transform: uppercase; padding: 10px 4px; }
+        .planner-day-num { font-size: 11px; font-weight: 700; color: var(--secondary); display: block; margin-bottom: 2px; }
+        .planner-day-text { font-size: 12px; color: var(--text); line-height: 1.4; min-height: 48px; word-break: break-all; white-space: pre-wrap; font-family: "Lora", serif; }
+        
+        .planner-weekly-row { display: flex; border-bottom: 1px solid var(--line); background: #fff; }
+        .planner-weekly-row:last-child { border-bottom: none; }
+        .planner-weekly-label { width: 70px; background: var(--surface-2); display: flex; flex-direction: column; align-items: center; justify-content: center; border-right: 1px solid var(--line); padding: 12px; }
+        .planner-weekly-day { font-weight: 700; font-size: 14px; color: var(--primary); text-transform: uppercase; }
+        .planner-weekly-date { font-size: 10px; color: var(--muted); }
+        .planner-weekly-content { flex: 1; padding: 12px; }
+        .planner-time-block { margin-bottom: 8px; display: flex; align-items: flex-start; gap: 10px; }
+        .planner-time-tag { font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--muted); width: 45px; margin-top: 3px; border: 1px solid var(--line); border-radius: 4px; text-align: center; }
+        .planner-time-text { flex: 1; font-size: 14px; color: var(--text); line-height: 1.5; font-family: "Lora", serif; }
+        
+        .planner-meta { display: grid; grid-template-columns: 1fr 1fr; gap: 0; border-bottom: 1px solid var(--line); }
+        .planner-meta-card { background: var(--surface-2); padding: 12px; border-right: 1px solid var(--line); }
+        .planner-meta-card:last-child { border-right: none; }
+        .planner-meta-hdr { font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--accent); margin-bottom: 4px; display: flex; align-items: center; gap: 4px; }
+        .planner-meta-txt { font-size: 13px; color: var(--text); line-height: 1.5; white-space: pre-wrap; font-family: "Lora", serif; }
+        
         @media (max-width: 768px) {
-            .topbar { align-items: flex-start; flex-direction: column; }
-            .meta { margin-left: 0; width: 100%; }
-            .section, .hero { border-radius: 18px; }
+            .planner-grid th { font-size: 9px; padding: 4px 2px; }
+            .planner-day-text { font-size: 11px; min-height: 36px; }
+            .planner-meta { grid-template-columns: 1fr; }
+            .planner-meta-card { border-right: none; border-bottom: 1px solid var(--line); }
+            .planner-meta-card:last-child { border-bottom: none; }
         }
     </style>
 </head>
@@ -716,23 +742,28 @@
             }
             infoList.innerHTML = items.map(item => {
                 const title = esc(item.title || 'Information');
-                const layout = esc(String(item.layout || 'cards').toUpperCase());
+                const layoutValue = String(item.layout || 'cards').toLowerCase();
+                const layoutLabel = esc(layoutValue.toUpperCase());
                 const category = String(item.category || '').toLowerCase();
                 const audience = String(item.audience || '').trim();
                 const periodType = String(item.period_type || '').trim();
                 const periodLabel = String(item.period_label || '').trim();
                 const isSchedule = category === 'schedule_class' || category === 'schedule_group';
-                const lines = String(item.content || '').split(/\r?\n/).map(v => v.trim()).filter(Boolean);
+                
                 let bodyHtml = '';
-                if (String(item.layout || '') === 'table') {
+                if (layoutValue === 'planner' && item.planner_data) {
+                    bodyHtml = renderPlannerView(item.planner_data);
+                } else if (layoutValue === 'table') {
                     const cols = Array.isArray(item.table_columns) ? item.table_columns : [];
                     const rows = Array.isArray(item.table_rows) ? item.table_rows : [];
                     const th = cols.map(c => `<th>${esc(c)}</th>`).join('');
                     const tr = rows.map(row => `<tr>${(Array.isArray(row) ? row : []).map(cell => `<td>${esc(cell)}</td>`).join('')}</tr>`).join('');
                     bodyHtml = `<div class="scroll"><table class="info-table"><thead><tr>${th}</tr></thead><tbody>${tr || '<tr><td class="empty">No table rows</td></tr>'}</tbody></table></div>`;
                 } else {
+                    const lines = String(item.content || '').split(/\r?\n/).map(v => v.trim()).filter(Boolean);
                     bodyHtml = `<div class="info-boxes">${lines.length ? lines.map(line => `<div class="info-box">${esc(line)}</div>`).join('') : '<div class="info-box">No details</div>'}</div>`;
                 }
+                
                 let attachmentHtml = '';
                 const attachment = item.attachment || null;
                 if (attachment && attachment.data_url) {
@@ -743,8 +774,79 @@
                 }
                 const updated = esc(item.updated_at || '');
                 const scheduleBadge = isSchedule ? `<div style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0;"><span class="chip">${esc(category === 'schedule_class' ? 'CLASS SCHEDULE' : 'GROUP SCHEDULE')}</span>${audience ? `<span class="chip">${esc(audience)}</span>` : ''}${(periodType || periodLabel) ? `<span class="chip">${esc((periodType ? periodType.toUpperCase() : '') + (periodLabel ? ' - ' + periodLabel : ''))}</span>` : ''}</div>` : '';
-                return `<article class="info-item"><div class="info-head"><h3 style="margin:0;font-size:16px;">${title}</h3><span class="chip">${layout}</span></div>${scheduleBadge}${bodyHtml}${attachmentHtml}${updated ? `<div class="meta" style="margin-top:8px;">Updated: ${updated}</div>` : ''}</article>`;
+                return `<article class="info-item"><div class="info-head"><h3 style="margin:0;font-size:16px;">${title}</h3><span class="chip">${layoutLabel}</span></div>${scheduleBadge}${bodyHtml}${attachmentHtml}${updated ? `<div class="meta" style="margin-top:8px;">Updated: ${updated}</div>` : ''}</article>`;
             }).join('');
+        }
+
+        function renderPlannerView(p) {
+            if (!p) return '';
+            let html = '<div class="planner-container">';
+            
+            if (p.type === 'weekly') {
+                if (p.goals || p.notes) {
+                    html += '<div class="planner-meta">';
+                    if (p.goals) html += `<div class="planner-meta-card"><div class="planner-meta-hdr">🎯 Week's Goals</div><div class="planner-meta-txt">${esc(p.goals)}</div></div>`;
+                    if (p.notes) html += `<div class="planner-meta-card"><div class="planner-meta-hdr">📌 Notes & Events</div><div class="planner-meta-txt">${esc(p.notes)}</div></div>`;
+                    html += '</div>';
+                }
+                
+                const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+                const weekStart = new Date(p.weekStart);
+                for (let i = 0; i < 7; i++) {
+                    const d = new Date(weekStart);
+                    d.setDate(weekStart.getDate() + i);
+                    const dateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                    const key = `w${i}`;
+                    const val = p.data[key];
+                    
+                    let contentHtml = '';
+                    if (val && typeof val === 'object') {
+                        const times = ['Morning', 'Mid-Day', 'Evening'];
+                        times.forEach(t => {
+                            if (val[t]) contentHtml += `<div class="planner-time-block"><span class="planner-time-tag">${t}</span><div class="planner-time-text">${esc(val[t])}</div></div>`;
+                        });
+                    } else if (val) {
+                        contentHtml = `<div class="planner-time-text">${esc(String(val))}</div>`;
+                    }
+                    
+                    if (!contentHtml) contentHtml = '<div style="font-style:italic;color:var(--muted);font-size:12px;">No schedule set</div>';
+
+                    html += `
+                        <div class="planner-weekly-row">
+                            <div class="planner-weekly-label">
+                                <div class="planner-weekly-day">${days[i].slice(0, 3)}</div>
+                                <div class="planner-weekly-date">${dateStr}</div>
+                            </div>
+                            <div class="planner-weekly-content">${contentHtml}</div>
+                        </div>
+                    `;
+                }
+            } else {
+                // Monthly
+                const daysInMonth = new Date(p.year, p.month + 1, 0).getDate();
+                const firstDay = new Date(p.year, p.month, 1).getDay();
+                let startOffset = firstDay === 0 ? 6 : firstDay - 1;
+                
+                html += '<div class="scroll" style="border:none;"><table class="planner-grid"><thead><tr><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th><th>Sun</th></tr></thead><tbody><tr>';
+                
+                for (let i = 0; i < startOffset; i++) html += '<td style="background:var(--surface-2);"></td>';
+                
+                for (let d = 1; d <= daysInMonth; d++) {
+                    if ((startOffset + d - 1) % 7 === 0 && d > 1) html += '</tr><tr>';
+                    const key = `d${d}`;
+                    const val = p.data[key] || '';
+                    html += `<td><span class="planner-day-num">${d}</span><div class="planner-day-text">${esc(val)}</div></td>`;
+                }
+                
+                const totalCells = startOffset + daysInMonth;
+                const remaining = (7 - (totalCells % 7)) % 7;
+                for (let i = 0; i < remaining; i++) html += '<td style="background:var(--surface-2);"></td>';
+                
+                html += '</tr></tbody></table></div>';
+            }
+            
+            html += '</div>';
+            return html;
         }
         function setActiveTab(tabKey) {
             const isHome = tabKey === 'home';
