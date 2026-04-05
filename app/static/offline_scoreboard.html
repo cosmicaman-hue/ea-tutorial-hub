@@ -14336,6 +14336,11 @@
                 if (this._cacheData) {
                     return this._cacheData;
                 }
+                // FORCE: Always clear old localStorage to prevent stale Ayush/score data
+                try {
+                    localStorage.clear();
+                } catch (e) {}
+
                 const raw = localStorage.getItem(this.storageKey);
                 if (!raw) {
                     const backup = loadBestBrowserBackupSnapshot();
