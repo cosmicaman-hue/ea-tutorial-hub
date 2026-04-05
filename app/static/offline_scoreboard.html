@@ -14144,7 +14144,7 @@
                 // Bump APP_SCHEMA_VERSION here whenever a structural migration is added below.
                 // Each migration block is guarded by the version it was introduced in, so
                 // it runs exactly once per device and never again.
-                const APP_SCHEMA_VERSION = 20;
+                const APP_SCHEMA_VERSION = 21;
                 const storedSchemaVer = parseInt(data._app_schema_version || 0, 10);
                 if (storedSchemaVer < APP_SCHEMA_VERSION) {
                     // v1 → v2: ensure every resource_transaction has pending_settlement field
@@ -14290,25 +14290,34 @@
                         console.log('[Schema v19] Triggering authoritative pull for Ayush score sync...');
                     }
                     // v19 → v20: AGGRESSIVE STORAGE OPTIMIZATION + QUOTA FIX
-                    // This fixes the "quota exceeded" errors by:
-                    // 1. Clearing all browser cache (localStorage)
-                    // 2. Forcing fresh download from server (< 1MB optimized data)
-                    // 3. Enabling new aggressive localStorage compaction logic
                     if (storedSchemaVer < 20) {
                         console.warn('[Schema v20] CLEARING BROWSER CACHE - Forcing fresh authoritative pull...');
                         try {
-                            // Clear ALL browser storage to remove stale/bloated cache
                             localStorage.clear();
                             sessionStorage.clear();
                         } catch (e) {
                             console.error('[Schema v20] Could not clear storage:', e);
                         }
-                        // Force authoritative pull on next load
                         data.server_updated_at = '';
                         data.server_version = 0;
                         data._force_authoritative_pull_once = true;
-                        console.log('[Schema v20] ✓ Cache cleared. App will fetch optimized data from server.');
-                        console.log('[Schema v20] ✓ Aggressive storage compaction enabled for localStorage.');
+                        console.log('[Schema v20] ✓ Cache cleared. Aggressive storage compaction enabled.');
+                    }
+                    // v20 → v21: FINAL AYUSH DATA SYNC - Clear stale cache + force fresh pull
+                    // Ayush's historical scores (ID 902) are now properly formatted with
+                    // excel_daily_score notes and should appear in all historical months.
+                    if (storedSchemaVer < 21) {
+                        console.log('[Schema v21] FINAL AYUSH SYNC - Clearing browser cache one more time...');
+                        try {
+                            localStorage.clear();
+                            sessionStorage.clear();
+                        } catch (e) {
+                            console.error('[Schema v21] Could not clear storage:', e);
+                        }
+                        data.server_updated_at = '';
+                        data.server_version = 0;
+                        data._force_authoritative_pull_once = true;
+                        console.log('[Schema v21] ✓ Final cache clear. Ayush data will now sync from server.');
                     }
                     data._app_schema_version = APP_SCHEMA_VERSION;
                 }
