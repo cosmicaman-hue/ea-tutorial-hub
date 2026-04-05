@@ -11102,30 +11102,49 @@
             const src = data && typeof data === 'object' ? data : {};
             // Clone for browser storage compaction only; do not mutate in-memory/source payload.
             const snapshot = JSON.parse(JSON.stringify(src));
-            // NOTE: We previously stripped locked-month scores to save localStorage space,
-            // but this caused historical scores to disappear on page reload (before sync).
-            // Now we keep ALL scores in localStorage to ensure correct display immediately.
-            // The month_* maps can still be compacted since they're supplementary metadata.
-            if (Array.isArray(snapshot.activity_log) && snapshot.activity_log.length > LOCAL_ACTIVITY_LOG_MAX) {
-                snapshot.activity_log = snapshot.activity_log.slice(-LOCAL_ACTIVITY_LOG_MAX);
+            // NOTE: We keep ALL scores in localStorage to ensure correct historical display.
+            // However, we aggressively compact logging/history to stay well under the 5MB quota.
+
+            // CRITICAL: Keep scores intact (never strip for space)
+            // snapshot.scores remains as-is
+
+            // Aggressive logging trimming for quota safety
+            if (Array.isArray(snapshot.activity_log)) {
+                snapshot.activity_log = snapshot.activity_log.slice(-200);  // Keep only last 200
             }
-            if (Array.isArray(snapshot.notification_history) && snapshot.notification_history.length > LOCAL_NOTIFICATION_HISTORY_MAX) {
-                snapshot.notification_history = snapshot.notification_history.slice(-LOCAL_NOTIFICATION_HISTORY_MAX);
+            if (Array.isArray(snapshot.notification_history)) {
+                snapshot.notification_history = snapshot.notification_history.slice(-100);  // Keep only last 100
             }
+            if (Array.isArray(snapshot.attendance)) {
+                snapshot.attendance = snapshot.attendance.slice(-400);  // Keep only last 400
+            }
+            if (Array.isArray(snapshot.proposal_messages)) {
+                snapshot.proposal_messages = snapshot.proposal_messages.slice(-50);  // Keep only last 50
+            }
+            // Keep month_roster_profiles only for recent months (last 6)
+            if (snapshot.month_roster_profiles && typeof snapshot.month_roster_profiles === 'object') {
+                const months = Object.keys(snapshot.month_roster_profiles).sort();
+                const recent = months.slice(-6);
+                const compacted = {};
+                recent.forEach(m => { compacted[m] = snapshot.month_roster_profiles[m]; });
+                snapshot.month_roster_profiles = compacted;
+            }
+            // Clear sync operations in local storage
+            snapshot._sync_ops = [];
+
             return snapshot;
         }
 
         function buildEmergencyLocalStorageSnapshot(data) {
             const snapshot = buildLocalStorageSnapshot(data);
             // Last-resort browser cache compaction for quota pressure.
+            // PRESERVE: scores (absolutely critical)
+            // DISCARD: non-essential logging
             snapshot.activity_log = [];
             snapshot.notification_history = [];
-            if (Array.isArray(snapshot.proposal_messages) && snapshot.proposal_messages.length > 250) {
-                snapshot.proposal_messages = snapshot.proposal_messages.slice(-250);
-            }
-            if (Array.isArray(snapshot.attendance) && snapshot.attendance.length > 1200) {
-                snapshot.attendance = snapshot.attendance.slice(-1200);
-            }
+            snapshot.proposal_messages = (snapshot.proposal_messages || []).slice(-30);
+            snapshot.attendance = (snapshot.attendance || []).slice(-200);
+            snapshot._sync_ops = [];
             return snapshot;
         }
 
@@ -14125,7 +14144,7 @@
                 // Bump APP_SCHEMA_VERSION here whenever a structural migration is added below.
                 // Each migration block is guarded by the version it was introduced in, so
                 // it runs exactly once per device and never again.
-                const APP_SCHEMA_VERSION = 19;
+                const APP_SCHEMA_VERSION = 20;
                 const storedSchemaVer = parseInt(data._app_schema_version || 0, 10);
                 if (storedSchemaVer < APP_SCHEMA_VERSION) {
                     // v1 → v2: ensure every resource_transaction has pending_settlement field
@@ -14264,25 +14283,32 @@
                         console.warn('[Schema v18] Atomic ID migration + Storage Clear triggered for clean state.');
                     }
                     // v18 → v19: Ayush (EA24A01) score injection + Storage Safety
-                    // Ensures newly injected historical scores are properly loaded and
-                    // storage quota is managed to prevent browser quota errors.
                     if (storedSchemaVer < 19) {
                         data.server_updated_at = '';
                         data.server_version = 0;
                         data._force_authoritative_pull_once = true;
-
-                        // Verify Ayush data is present (ID 902 or EA24A01 roll)
-                        const hasAyush902 = (data.students || []).some(s => s.id === 902 && s.roll === 'EA24A01');
-                        const ayushScoreCount = (data.scores || []).filter(s => s.studentId === 902).length;
-
-                        if (hasAyush902 && ayushScoreCount > 0) {
-                            console.info(`[Schema v19] ✓ Ayush (ID 902) detected with ${ayushScoreCount} historical scores`);
-                        } else if (hasAyush902) {
-                            console.warn('[Schema v19] ⚠️  Ayush (ID 902) found but missing scores - pulling from server');
-                        }
-
-                        // Trigger fresh pull to get latest data
                         console.log('[Schema v19] Triggering authoritative pull for Ayush score sync...');
+                    }
+                    // v19 → v20: AGGRESSIVE STORAGE OPTIMIZATION + QUOTA FIX
+                    // This fixes the "quota exceeded" errors by:
+                    // 1. Clearing all browser cache (localStorage)
+                    // 2. Forcing fresh download from server (< 1MB optimized data)
+                    // 3. Enabling new aggressive localStorage compaction logic
+                    if (storedSchemaVer < 20) {
+                        console.warn('[Schema v20] CLEARING BROWSER CACHE - Forcing fresh authoritative pull...');
+                        try {
+                            // Clear ALL browser storage to remove stale/bloated cache
+                            localStorage.clear();
+                            sessionStorage.clear();
+                        } catch (e) {
+                            console.error('[Schema v20] Could not clear storage:', e);
+                        }
+                        // Force authoritative pull on next load
+                        data.server_updated_at = '';
+                        data.server_version = 0;
+                        data._force_authoritative_pull_once = true;
+                        console.log('[Schema v20] ✓ Cache cleared. App will fetch optimized data from server.');
+                        console.log('[Schema v20] ✓ Aggressive storage compaction enabled for localStorage.');
                     }
                     data._app_schema_version = APP_SCHEMA_VERSION;
                 }
