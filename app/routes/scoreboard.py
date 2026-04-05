@@ -5428,8 +5428,14 @@ def offline_data():
         data_out['notification_history'] = (data_out.get('notification_history') or [])[-50:]  # Keep only recent
         data_out['proposal_messages'] = (data_out.get('proposal_messages') or [])[-30:]  # Keep only recent
         data_out['_sync_ops'] = []  # Clear pending sync ops
+
+        # DIAGNOSTIC: Log Ayush data in server response for debugging
+        ayush_scores = [s for s in data.get('scores', []) if s.get('studentId') == 902]
+        current_app.logger.info(f"GET /offline-data: Ayush (ID 902) has {len(ayush_scores)} scores")
+
         resp = jsonify({'data': data_out, 'updated_at': updated_at})
         resp.headers['Cache-Control'] = 'no-store'
+        resp.headers['X-Ayush-Score-Count'] = str(len(ayush_scores))
         return resp
 
     payload = request.get_json(silent=True) or {}
