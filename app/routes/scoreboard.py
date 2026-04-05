@@ -25,6 +25,7 @@ import re
 import tempfile
 import shutil
 import glob
+import ipaddress
 import subprocess
 import urllib.request
 import urllib.error
@@ -328,9 +329,33 @@ def _sanitize_client_public_snapshot(snapshot, payload):
     }
 
 
+def _public_snapshot_has_useful_rows(snapshot):
+    if not isinstance(snapshot, dict):
+        return False
+    months = snapshot.get('months') if isinstance(snapshot.get('months'), list) else []
+    scoreboard = snapshot.get('scoreboard') if isinstance(snapshot.get('scoreboard'), dict) else {}
+    if not months or not scoreboard:
+        return False
+    for month in months:
+        rows = scoreboard.get(month)
+        if isinstance(rows, list) and any(isinstance(row, dict) for row in rows):
+            return True
+    return False
+
+
 def _public_month_keys(payload):
     months = set()
     for month in payload.get('months', []) or []:
+        item = str(month or '').strip()
+        if re.match(r'^\d{4}-\d{2}$', item):
+            months.add(item)
+    month_students = payload.get('month_students', {}) if isinstance(payload.get('month_students'), dict) else {}
+    for month in month_students.keys():
+        item = str(month or '').strip()
+        if re.match(r'^\d{4}-\d{2}$', item):
+            months.add(item)
+    month_profiles = payload.get('month_roster_profiles', {}) if isinstance(payload.get('month_roster_profiles'), dict) else {}
+    for month in month_profiles.keys():
         item = str(month or '').strip()
         if re.match(r'^\d{4}-\d{2}$', item):
             months.add(item)
@@ -361,34 +386,66 @@ def _get_month_roster_rolls(payload, month):
 
 
 def _build_public_month_rows(payload, month):
-    roster_rolls = _get_month_roster_rolls(payload, month)
-    base_students = [
-        student for student in (payload.get('students', []) or [])
-        if isinstance(student, dict) and student.get('active', True) is not False
-    ]
-    if roster_rolls:
-        visible_students = [
-            student for student in base_students
-            if _roll_key(student.get('roll')) in roster_rolls
+    # month_roster_profiles is the authoritative historical snapshot:
+    # it records which student ID held which roll in each specific month.
+    # Using it (rather than the current students list) ensures that months
+    # before a roll reassignment show the original holder with their correct
+    # name and scores, not the current holder of that roll number.
+    hist_profiles = (payload.get('month_roster_profiles', {}) or {}).get(month, []) or []
+
+    hist_profiles_have_ids = False
+    if hist_profiles:
+        by_id = {}
+        for profile in hist_profiles:
+            if not isinstance(profile, dict):
+                continue
+            sid = _safe_int(profile.get('studentId'))
+            if sid > 0 and sid not in by_id:
+                by_id[sid] = profile
+                hist_profiles_have_ids = True
+        totals = {sid: 0 for sid in by_id}
+    if not hist_profiles or not hist_profiles_have_ids:
+        # Fallback for months with no roster snapshot: use current student list.
+        roster_rolls = _get_month_roster_rolls(payload, month)
+        base_students = [
+            student for student in (payload.get('students', []) or [])
+            if isinstance(student, dict) and student.get('active', True) is not False
         ]
-    else:
-        visible_students = base_students
+        if roster_rolls:
+            visible_students = [
+                student for student in base_students
+                if _roll_key(student.get('roll')) in roster_rolls
+            ]
+        else:
+            visible_students = base_students
 
-    dedup_by_roll = {}
-    for student in visible_students:
-        roll = _roll_key(student.get('roll'))
-        if roll and roll not in dedup_by_roll:
-            dedup_by_roll[roll] = student
+        dedup_by_roll = {}
+        for student in visible_students:
+            roll = _roll_key(student.get('roll'))
+            if roll and roll not in dedup_by_roll:
+                dedup_by_roll[roll] = student
 
-    students = list(dedup_by_roll.values())
-    by_id = {}
-    totals = {}
-    for student in students:
-        sid = _safe_int(student.get('id'))
-        if sid <= 0:
-            continue
-        by_id[sid] = student
-        totals[sid] = 0
+        by_id = {}
+        totals = {}
+        for student in dedup_by_roll.values():
+            sid = _safe_int(student.get('id'))
+            if sid <= 0:
+                continue
+            row_student = dict(student)
+            if hist_profiles:
+                profile_by_roll = {
+                    _roll_key((profile or {}).get('roll')): profile
+                    for profile in hist_profiles
+                    if isinstance(profile, dict) and _roll_key((profile or {}).get('roll'))
+                }
+                matched_profile = profile_by_roll.get(_roll_key(student.get('roll')))
+                if isinstance(matched_profile, dict):
+                    row_student['roll'] = matched_profile.get('roll') or row_student.get('roll')
+                    row_student['base_name'] = matched_profile.get('base_name') or matched_profile.get('name') or row_student.get('base_name') or row_student.get('name')
+                    row_student['name'] = matched_profile.get('name') or matched_profile.get('base_name') or row_student.get('name') or row_student.get('base_name')
+                    row_student['class'] = matched_profile.get('class') or row_student.get('class')
+            by_id[sid] = row_student
+            totals[sid] = 0
 
     month_scores = []
     for score in payload.get('scores', []) or []:
@@ -536,11 +593,8 @@ def _build_public_month_rows(payload, month):
 
 
 def _build_public_site_payload(payload):
-    months = _public_month_keys(payload)
     recent_window = _recent_public_month_window()
-    allowed = set(recent_window)
-    months = [month for month in months if month in allowed]
-    months = sorted(months, reverse=True)[:3]
+    months = list(recent_window)
     scoreboard = {}
     top_full = 15
     for month in months:
@@ -612,17 +666,22 @@ def _safe_commit_stamp():
 def _publish_public_site_snapshot(payload, push=None, public_snapshot=None):
     site_dir = _public_site_dir()
     scores_path = _public_site_scores_path()
-    # Always rebuild the public scoreboard from the authoritative server payload.
-    # Client-generated public snapshots are useful for UI previews, but they can
-    # drift from the server copy after browser-cache/state issues or partial
-    # historical restores. If we sanitize those snapshots here, stale zero totals
-    # can overwrite correct historical data in scores.json.
+    # Prefer the browser-generated public snapshot when it is structurally sane.
+    # The LAN UI already computes month-aware totals and historical identity
+    # resolution, so this keeps the public site aligned with what admins see
+    # locally. Fall back to the server-side rebuild if the client snapshot is
+    # missing or looks incomplete.
+    public_payload = None
     if isinstance(public_snapshot, dict) and isinstance(public_snapshot.get('scoreboard'), dict):
-        current_app.logger.warning(
-            "Ignoring client-provided public_snapshot while publishing public site; "
-            "rebuilding from server payload instead"
-        )
-    public_payload = _build_public_site_payload(payload if isinstance(payload, dict) else {})
+        sanitized = _sanitize_client_public_snapshot(public_snapshot, payload if isinstance(payload, dict) else {})
+        if _public_snapshot_has_useful_rows(sanitized):
+            public_payload = sanitized
+        else:
+            current_app.logger.warning(
+                "Client-provided public_snapshot was empty or incomplete; rebuilding public site from server payload instead"
+            )
+    if public_payload is None:
+        public_payload = _build_public_site_payload(payload if isinstance(payload, dict) else {})
 
     os.makedirs(site_dir, exist_ok=True)
     _atomic_write_json(scores_path, public_payload)
@@ -730,12 +789,31 @@ def _resolve_sync_shared_key():
 
 
 def _payload_for_external_replication(payload):
-    """Strip local-only modules before mirroring to WAN/peer systems."""
+    """Strip local-only modules before mirroring to WAN/cloud systems."""
     if not isinstance(payload, dict):
         return {}
     external = dict(payload)
     external.pop('fee_records', None)
     return external
+
+
+def _is_private_sync_peer(peer_url):
+    if not peer_url:
+        return False
+    try:
+        hostname = urllib.parse.urlparse(str(peer_url)).hostname or ''
+    except Exception:
+        hostname = ''
+    host = str(hostname or '').strip().lower()
+    if not host:
+        return False
+    if host in ('localhost', '127.0.0.1', '::1'):
+        return True
+    try:
+        addr = ipaddress.ip_address(host)
+        return addr.is_private or addr.is_loopback
+    except ValueError:
+        return host.endswith('.local') or host.endswith('.lan')
 
 
 def _forward_offline_data_to_peers(payload, extra_peers=None):
@@ -753,17 +831,23 @@ def _forward_offline_data_to_peers(payload, extra_peers=None):
     except RuntimeError:
         current_origin = ''
     is_master = str(os.getenv('EA_MASTER_MODE', '')).strip() == '1'
-    body_payload = {'data': _payload_for_external_replication(payload)}
     if is_master:
         # Master publishes authoritative snapshots to peers (Render/backup),
         # so receivers can accept them even when peer timestamps drift ahead.
-        body_payload['authoritative_master_push'] = True
-        body_payload['force_replace'] = True
-    body = json.dumps(body_payload).encode('utf-8')
+        base_flags = {
+            'authoritative_master_push': True,
+            'force_replace': True,
+        }
+    else:
+        base_flags = {}
     shared_key = _resolve_sync_shared_key()
     for peer in peers:
         if peer.rstrip('/') == current_origin:
             continue
+        # Preserve the fees module on LAN peers so offline/backup nodes stay
+        # consistent; only strip it for non-private WAN/cloud mirrors.
+        peer_payload = payload if _is_private_sync_peer(peer) else _payload_for_external_replication(payload)
+        body = json.dumps({'data': peer_payload, **base_flags}).encode('utf-8')
         target_url = f'{peer}/scoreboard/offline-data'
         req = urllib.request.Request(
             target_url,
@@ -1118,14 +1202,48 @@ def _do_peer_sync_cycle(app):
                 # Margin of 30 s avoids flip-flopping on tiny clock skew.
                 if peer_stamp > local_stamp + 30 and peer_count >= min_students:
                     if not _is_suspicious_student_shrink(local_data, peer_data):
-                        _save_offline_data(peer_data)
+                        # CRITICAL FIX: Merge instead of overwrite to preserve locally-added students
+                        merged = dict(local_data)
+
+                        # Superset merge key tables (never shrink)
+                        merged['students'] = _merge_students_preserve_active(
+                            local_data.get('students', []),
+                            peer_data.get('students', [])
+                        )
+                        merged['scores'] = _merge_scores_superset(
+                            local_data.get('scores', []),
+                            peer_data.get('scores', [])
+                        )
+                        merged['attendance'] = _merge_attendance_superset(local_data, peer_data)
+                        merged['appeals'] = _merge_appeals_superset(
+                            local_data.get('appeals', []),
+                            peer_data.get('appeals', [])
+                        )
+
+                        # Update timestamp only if peer is genuinely newer
+                        if peer_stamp > local_stamp:
+                            merged['server_updated_at'] = peer_data.get('server_updated_at', local_data.get('server_updated_at'))
+
+                        merged_count = _student_count(merged)
+                        _save_offline_data(merged)
                         _broadcast_sync_event(
-                            peer_data.get('server_updated_at', ''),
+                            merged.get('server_updated_at', ''),
                             source='bg-peer-pull'
                         )
+
+                        # Alert if merge detected students not in peer (locally added)
+                        local_only = local_count - peer_count
+                        preserved = merged_count - peer_count
+                        if preserved > 0:
+                            app.logger.warning(
+                                "[BgSync] PRESERVED %d locally-added students during peer pull from %s "
+                                "(local: %s, peer: %s, merged: %s)",
+                                preserved, peer, local_count, peer_count, merged_count
+                            )
+
                         app.logger.info(
-                            "[BgSync] Pulled newer snapshot from %s (%s students, stamp=%s)",
-                            peer, peer_count, peer_data.get('server_updated_at', '')
+                            "[BgSync] Merged & pulled newer snapshot from %s (local: %s students, peer: %s students, result: %s students, stamp=%s)",
+                            peer, local_count, peer_count, merged_count, merged.get('server_updated_at', '')
                         )
 
                 elif local_stamp > peer_stamp + 30 and local_count >= min_students:
@@ -1285,6 +1403,7 @@ def _load_offline_data():
             if isinstance(gist_data, dict):
                 data = gist_data
         if data:
+            data = _merge_fee_records_from_local_sources(data)
             try:
                 _atomic_write_json(path, data)
             except Exception:
@@ -1307,7 +1426,7 @@ def _load_offline_data():
             data = json.load(f)
             if _student_count(data) == 0:
                 raise ValueError('Empty offline snapshot')
-            return data
+            return _merge_fee_records_from_local_sources(data)
     except Exception:
         data = _load_latest_offline_backup()
         if not data:
@@ -1315,6 +1434,7 @@ def _load_offline_data():
             if isinstance(gist_data, dict):
                 data = gist_data
         if data:
+            data = _merge_fee_records_from_local_sources(data)
             try:
                 _atomic_write_json(path, data)
             except Exception:
@@ -1497,6 +1617,53 @@ def _load_json_file(path):
         return None
 
 
+def _merge_fee_records_from_local_sources(payload):
+    if not isinstance(payload, dict):
+        return payload
+
+    current_fee_records = payload.get('fee_records', [])
+    if isinstance(current_fee_records, list) and current_fee_records:
+        return payload
+
+    merged_fee_records = []
+    candidate_paths = []
+    live_path = _offline_data_path()
+    legacy_path = _legacy_instance_file('offline_scoreboard_data.json')
+    for path in [live_path, legacy_path]:
+        if path:
+            candidate_paths.append(path)
+    latest_backup = _load_latest_offline_backup()
+    if isinstance(latest_backup, dict):
+        merged_fee_records = _merge_fee_records_superset(
+            merged_fee_records,
+            latest_backup.get('fee_records', []),
+        )
+
+    seen_paths = set()
+    for path in candidate_paths:
+        if not path or path in seen_paths:
+            continue
+        seen_paths.add(path)
+        candidate = _load_json_file(path)
+        if not isinstance(candidate, dict):
+            continue
+        merged_fee_records = _merge_fee_records_superset(
+            merged_fee_records,
+            candidate.get('fee_records', []),
+        )
+
+    merged_fee_records = _merge_fee_records_superset(
+        merged_fee_records,
+        payload.get('fee_records', []),
+    )
+    if not merged_fee_records:
+        return payload
+
+    next_payload = dict(payload)
+    next_payload['fee_records'] = merged_fee_records
+    return next_payload
+
+
 def _iter_offline_recovery_candidate_paths():
     """
     Yield local snapshot files that can be used to recover from a corrupt/tiny roster.
@@ -1626,6 +1793,11 @@ def _recover_tiny_roster_if_needed(payload, min_students=25):
         recovered, src = _best_local_snapshot(min_students=min_students)
 
     if recovered and not _is_tiny_roster(recovered, min_students):
+        recovered = dict(recovered)
+        recovered['fee_records'] = _merge_fee_records_superset(
+            payload.get('fee_records', []),
+            recovered.get('fee_records', []),
+        )
         try:
             _save_offline_data(recovered)
         except Exception:
@@ -1688,6 +1860,11 @@ def _recover_stale_snapshot_if_needed(payload, min_students=25, min_newer_second
             best_stamp = local_best_stamp
 
     if best_payload and best_stamp >= (local_stamp + float(min_newer_seconds or 0)):
+        best_payload = dict(best_payload)
+        best_payload['fee_records'] = _merge_fee_records_superset(
+            payload.get('fee_records', []),
+            best_payload.get('fee_records', []),
+        )
         try:
             _save_offline_data(best_payload)
         except Exception:
@@ -2309,6 +2486,15 @@ def _merge_month_roster_profiles_superset(existing_rp, incoming_rp):
     if not isinstance(incoming_rp, dict):
         incoming_rp = {}
     merged = {}
+
+    def _class_stamp(profile):
+        if not isinstance(profile, dict):
+            return 0.0
+        class_stamp = _parse_sync_stamp(profile.get('class_updated_at') or '')
+        if class_stamp > 0:
+            return class_stamp
+        return _parse_sync_stamp(profile.get('updated_at') or profile.get('created_at') or '')
+
     for month in set(list(existing_rp.keys()) + list(incoming_rp.keys())):
         by_roll = {}
         for p in (existing_rp.get(month) or []):
@@ -2322,7 +2508,14 @@ def _merge_month_roster_profiles_superset(existing_rp, incoming_rp):
                 continue
             roll = str(p.get('roll') or '').strip().upper()
             if roll:
-                by_roll[roll] = {**(by_roll.get(roll) or {}), **p}
+                existing_profile = by_roll.get(roll) or {}
+                merged_profile = {**existing_profile, **p}
+                if _class_stamp(existing_profile) >= _class_stamp(p):
+                    if 'class' in existing_profile:
+                        merged_profile['class'] = existing_profile.get('class')
+                    if existing_profile.get('class_updated_at'):
+                        merged_profile['class_updated_at'] = existing_profile.get('class_updated_at')
+                by_roll[roll] = merged_profile
         merged[month] = list(by_roll.values())
     return merged
 
@@ -2416,35 +2609,185 @@ def _merge_students_preserve_active(existing_students, incoming_students):
         existing_students = []
     if not isinstance(incoming_students, list):
         incoming_students = []
-    by_roll = {}
-    for s in existing_students:
-        if not isinstance(s, dict):
-            continue
-        roll = str(s.get('roll') or '').strip().upper()
-        if roll:
-            by_roll[roll] = dict(s)
-    for s in incoming_students:
-        if not isinstance(s, dict):
-            continue
-        roll = str(s.get('roll') or '').strip().upper()
-        if not roll:
-            continue
-        existing = by_roll.get(roll)
-        if not existing:
-            by_roll[roll] = dict(s)
-            continue
+    merged = {}
+    id_index = {}
+    roll_index = {}
+    max_id = 0
+
+    def _class_stamp(student_row):
+        if not isinstance(student_row, dict):
+            return 0.0
+        class_stamp = _parse_sync_stamp(student_row.get('class_updated_at') or '')
+        if class_stamp > 0:
+            return class_stamp
+        return _parse_sync_stamp(student_row.get('updated_at') or student_row.get('created_at') or '')
+
+    def _derive_group_from_roll(roll_value):
+        match = re.search(r'^EA\d{2}([A-Z])', _normalize_roll_value(roll_value))
+        return match.group(1) if match else ''
+
+    def _normalize_student_record(student):
+        normalized = dict(student or {})
+        normalized['roll'] = _normalize_roll_value(normalized.get('roll'))
+        normalized['base_name'] = str(
+            normalized.get('base_name') or normalized.get('name') or normalized.get('raw_name') or ''
+        ).strip()
+        normalized['name'] = str(
+            normalized.get('name') or normalized.get('base_name') or normalized.get('raw_name') or normalized.get('roll') or ''
+        ).strip()
+        normalized['raw_name'] = str(
+            normalized.get('raw_name') or normalized.get('name') or normalized.get('base_name') or ''
+        ).strip()
+        class_raw = normalized.get('class')
+        try:
+            class_val = int(class_raw)
+        except (TypeError, ValueError):
+            class_val = None
+        normalized['class'] = class_val
+        if not normalized.get('group'):
+            normalized['group'] = _derive_group_from_roll(normalized['roll'])
+        if normalized.get('active') is None:
+            normalized['active'] = True
+        return normalized
+
+    def _merge_pair(existing, incoming):
         existing_stamp = _parse_sync_stamp(existing.get('updated_at') or existing.get('created_at') or '')
-        incoming_stamp = _parse_sync_stamp(s.get('updated_at') or s.get('created_at') or '')
+        incoming_stamp = _parse_sync_stamp(incoming.get('updated_at') or incoming.get('created_at') or '')
         if incoming_stamp > existing_stamp:
-            # Incoming record is genuinely newer — accept it as-is.
-            by_roll[roll] = {**existing, **s}
+            merged_s = {**existing, **incoming}
+        elif incoming_stamp < existing_stamp:
+            merged_s = {**incoming, **existing}
         else:
-            # Tie or existing is newer: merge but never downgrade active true→false.
-            merged_s = {**existing, **s}
+            merged_s = {**existing, **incoming}
             if existing.get('active') is not False and merged_s.get('active') is False:
                 merged_s['active'] = existing.get('active', True)
-            by_roll[roll] = merged_s
-    return list(by_roll.values())
+
+        stable_id = _parse_int_safe(existing.get('id'), 0) or _parse_int_safe(incoming.get('id'), 0)
+        if stable_id > 0:
+            merged_s['id'] = stable_id
+
+        if _class_stamp(existing) >= _class_stamp(incoming) and 'class' in existing:
+            merged_s['class'] = existing.get('class')
+            if existing.get('class_updated_at'):
+                merged_s['class_updated_at'] = existing.get('class_updated_at')
+
+        if existing.get('active') is not False and merged_s.get('active') is False:
+            merged_s['active'] = existing.get('active', True)
+
+        roll_value = _normalize_roll_value(merged_s.get('roll'))
+        if roll_value:
+            merged_s['roll'] = roll_value
+            group_value = _derive_group_from_roll(roll_value)
+            if group_value:
+                merged_s['group'] = group_value
+
+        return merged_s
+
+    def _remember_student(student):
+        nonlocal max_id
+        if not isinstance(student, dict):
+            return
+        sid = _parse_int_safe(student.get('id'), 0)
+        roll = _normalize_roll_value(student.get('roll'))
+        if sid > 0 and sid > max_id:
+            max_id = sid
+        if sid > 0:
+            id_index[sid] = None  # populated by caller
+        if roll:
+            roll_index[roll] = None  # populated by caller
+
+    def _store_student(key, student):
+        merged[key] = student
+        sid = _parse_int_safe(student.get('id'), 0)
+        roll = _normalize_roll_value(student.get('roll'))
+        if sid > 0:
+            id_index[sid] = key
+            if sid > max_id:
+                nonlocal_max_id[0] = sid
+        if roll:
+            roll_index[roll] = key
+
+    nonlocal_max_id = [0]
+    for student in existing_students:
+        if not isinstance(student, dict):
+            continue
+        _remember_student(student)
+        sid = _parse_int_safe(student.get('id'), 0)
+        roll = _normalize_roll_value(student.get('roll'))
+        name = str(student.get('base_name') or student.get('name') or student.get('raw_name') or '').strip()
+        key = ''
+        if sid > 0:
+            key = f'id:{sid}'
+        elif roll:
+            key = f'roll:{roll}'
+        elif name:
+            key = f'name:{name}'
+        if not key:
+            continue
+        _store_student(key, dict(student))
+
+    max_id = max(max_id, nonlocal_max_id[0])
+
+    for student in incoming_students:
+        if not isinstance(student, dict):
+            continue
+        normalized = _normalize_student_record(student)
+        sid = _parse_int_safe(normalized.get('id'), 0)
+        roll = _normalize_roll_value(normalized.get('roll'))
+        name = _name_key(normalized.get('base_name') or normalized.get('name') or normalized.get('raw_name') or '')
+
+        target_key = None
+        if sid > 0 and sid in id_index and id_index[sid]:
+            target_key = id_index[sid]
+        elif roll and roll in roll_index and roll_index[roll]:
+            target_key = roll_index[roll]
+        elif sid > 0:
+            target_key = f'id:{sid}'
+        elif roll:
+            target_key = f'roll:{roll}'
+        elif name:
+            target_key = f'name:{name}'
+        if not target_key:
+            continue
+
+        existing = merged.get(target_key)
+        if existing:
+            merged_student = _merge_pair(existing, normalized)
+        else:
+            merged_student = normalized
+
+        if sid > 0 and _parse_int_safe(merged_student.get('id'), 0) <= 0:
+            merged_student['id'] = sid
+        elif _parse_int_safe(merged_student.get('id'), 0) <= 0 and target_key.startswith('id:'):
+            merged_student['id'] = _parse_int_safe(target_key.split(':', 1)[1], 0)
+
+        sid_final = _parse_int_safe(merged_student.get('id'), 0)
+        roll_final = _normalize_roll_value(merged_student.get('roll'))
+        if sid_final > 0 and sid_final > max_id:
+            max_id = sid_final
+        if sid > 0:
+            id_index[sid] = target_key
+        if sid_final > 0:
+            id_index[sid_final] = target_key
+        if roll_final:
+            roll_index[roll_final] = target_key
+
+        merged[target_key] = merged_student
+
+    result = list(merged.values())
+    used_ids = set()
+    deduped = []
+    for student in result:
+        if not isinstance(student, dict):
+            continue
+        sid = _parse_int_safe(student.get('id'), 0)
+        if sid <= 0 or sid in used_ids:
+            max_id += 1
+            student = {**student, 'id': max_id}
+            sid = max_id
+        used_ids.add(sid)
+        deduped.append(_normalize_student_record(student))
+    return deduped
 
 
 def _merge_scores_superset(existing_scores, incoming_scores):
@@ -2757,8 +3100,13 @@ def _allowed_months_for_user(data, user):
         return None  # unrestricted
     if role == 'teacher':
         months = _teacher_allowed_months_from_windows(getattr(user, 'id', 0))
+        # Ensure teachers can always at least see the current active month
+        # so they are not locked out when a new calendar month begins.
+        if months:
+            months.add(_server_now_iso()[:7])
+            return months
         # Backward compatibility: until admin configures windows, keep current behaviour.
-        return months if months else None
+        return None
     if role == 'student':
         months = _student_allowed_months_from_roster(data, getattr(user, 'login_id', ''))
         return months or {(_server_now_iso()[:7])}
@@ -4720,6 +5068,7 @@ def validate_action():
 
 
 @points_bp.route('/record-roll-change', methods=['POST'])
+@csrf.exempt  # Admin-only; CSRF exempt to allow in-app fetch with credentials
 @login_required
 def record_roll_change():
     """Record a student roll-number change and propagate it forward through history.
@@ -4784,20 +5133,118 @@ def record_roll_change():
 
     # 2. Update the student's current roll
     student['roll'] = new_roll
+    student['updated_at'] = now_iso
+    student['roll_updated_at'] = now_iso
+    group_match = re.match(r'^EA\d{2}([A-Z])', new_roll)
+    if group_match:
+        student['group'] = group_match.group(1)
 
-    # 3. Copy month_roster_profiles from old_roll to new_roll for months >= effective_month
+    # Retire any leftover active records that still carry the old roll or
+    # already collide with the new roll. These are stale duplicates from
+    # previous syncs/imports and should not stay visible once the roll has
+    # been reassigned.
+    retired_duplicate_ids = []
+    for other in students:
+        if not isinstance(other, dict):
+            continue
+        other_id = _parse_int_safe(other.get('id'), 0)
+        if other is student:
+            continue
+        other_roll = _normalize_roll_value(other.get('roll'))
+        if other_id != student_id and other_roll not in {old_roll, new_roll}:
+            continue
+        other['active'] = False
+        other['retired_at'] = now_iso
+        other['retired_reason'] = f'roll_changed_to:{new_roll}'
+        if other_id == student_id:
+            other['roll'] = new_roll
+        retired_duplicate_ids.append(other_id or other_roll)
+
+    # 3. Update month_roster_profiles for months >= effective_month:
+    #    rename the old_roll entry to new_roll so carry-forward still works.
+    #    month_roster_profiles[month] is a LIST of profile dicts (not a dict keyed by roll).
     month_profiles = data.get('month_roster_profiles', {}) or {}
+    month_students = data.get('month_students', {}) or {}
     copied_months = []
     for month_key, profiles in month_profiles.items():
-        if not isinstance(profiles, dict):
+        if not isinstance(profiles, list):
             continue
         if month_key < effective_month:
-            continue  # historical months keep the old_roll key
-        if old_roll in profiles and new_roll not in profiles:
-            profiles[new_roll] = dict(profiles[old_roll])
-            profiles[new_roll]['roll'] = new_roll
+            continue  # historical months keep the old roll — correct by design
+        changed_profiles = False
+        next_by_roll = {}
+        for profile in profiles:
+            if not isinstance(profile, dict):
+                continue
+            roll_val = _normalize_roll_value(profile.get('roll'))
+            # remove any lingering old roll; replace with new unless new already exists
+            if roll_val == old_roll:
+                roll_val = new_roll
+                profile['roll'] = new_roll
+                changed_profiles = True
+            if not roll_val:
+                continue
+            # keep only one entry per roll (last one wins)
+            next_by_roll[roll_val] = profile
+        # if new roll already existed, the old one is simply dropped
+        if changed_profiles:
             copied_months.append(month_key)
+        month_profiles[month_key] = list(next_by_roll.values())
     data['month_roster_profiles'] = month_profiles
+
+    # 3b. Update month_students for months >= effective_month (roster list of rolls)
+    for month_key, rolls in list(month_students.items()):
+        if month_key < effective_month:
+            continue
+        if not isinstance(rolls, list):
+            continue
+        changed_rolls = False
+        next_rolls = []
+        seen = set()
+        for value in rolls:
+            roll_val = _normalize_roll_value(value)
+            if roll_val == old_roll:
+                roll_val = new_roll
+                changed_rolls = True
+            if roll_val and roll_val not in seen:
+                seen.add(roll_val)
+                next_rolls.append(roll_val)
+        # also remove any lingering old_roll even if new_roll not added
+        if old_roll in seen:
+            changed_rolls = True
+            next_rolls = [r for r in next_rolls if r != old_roll]
+            seen.discard(old_roll)
+        if changed_rolls:
+            month_students[month_key] = next_rolls
+    data['month_students'] = month_students
+
+    # 3c. Update roll fields in leadership / CR tables to keep labels in sync
+    def _swap_roll_field(items, field):
+        if not isinstance(items, list):
+            return
+        for item in items:
+            try:
+                if _normalize_roll_value(item.get(field)) == old_roll:
+                    item[field] = new_roll
+            except Exception:
+                continue
+
+    _swap_roll_field(data.get('leadership', []), 'roll')
+    _swap_roll_field(data.get('class_reps', []), 'roll')
+    _swap_roll_field(data.get('group_crs', []), 'roll')
+
+    # 3d. Update party member rolls (if present)
+    if isinstance(data.get('parties'), list):
+        for party in data['parties']:
+            members = party.get('members') if isinstance(party, dict) else None
+            if not isinstance(members, list):
+                continue
+            for member in members:
+                try:
+                    if _normalize_roll_value(member.get('roll')) == old_roll:
+                        member['roll'] = new_roll
+                except Exception:
+                    continue
 
     data['server_updated_at'] = now_iso
     _save_offline_data(data)
@@ -4815,6 +5262,7 @@ def record_roll_change():
         'new_roll': new_roll,
         'effective_month': effective_month,
         'profiles_updated': copied_months,
+        'retired_duplicate_ids': retired_duplicate_ids,
         'history': student_history,
     })
     resp.headers['Cache-Control'] = 'no-store'
@@ -7115,6 +7563,17 @@ def leader_adjust_score():
         + (f" | reason: {reason}" if reason else '')
     )
     score_row['notes'] = f"{note} | {suffix}" if note else suffix
+    # Append to inline score history for audit trail
+    if not isinstance(score_row.get('history'), list):
+        score_row['history'] = []
+    score_row['history'].append({
+        'delta': delta,
+        'total': new_points,
+        'actor': actor_login,
+        'role': role_type,
+        'timestamp': now_iso,
+        'note': f"[{mode}] {reason}" if reason else f"[{mode}]"
+    })
 
     action_row = {
         'id': int(time.time() * 1000),

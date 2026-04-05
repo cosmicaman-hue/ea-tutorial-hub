@@ -1,0 +1,214 @@
+╔════════════════════════════════════════════════════════════════════════════════════╗
+║              STUDENT DISAPPEARING BUG - BEFORE & AFTER COMPARISON                   ║
+╚════════════════════════════════════════════════════════════════════════════════════╝
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+BEFORE: BUGGY BEHAVIOR
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+User Action:                         Device State:                Server State:
+─────────────────────────────────────────────────────────────────────────────────
+
+[0s] Click "Add Student"
+     → "EA24C99: Charlie"
+                                     Scoreboard: ✓ 3 students    2 students
+                                     UI shows: ✓ Charlie visible
+
+
+[5s] Auto-sync to server
+                                     Scoreboard: ✓ 3 students    ✓ 3 students
+                                     UI shows: ✓ Charlie visible
+
+
+[15s] Waiting...
+                                     Scoreboard: ✓ 3 students    ✓ 3 students
+                                     UI shows: ✓ Charlie visible
+
+
+[30s] Background peer sync fires!
+     Fetches from peer...
+                                     Peer has: 2 students (old data)
+                                     Code runs:
+                                       _save_offline_data(peer_data)
+
+                                     Scoreboard: ❌ 2 students!  ✓ 3 students
+                                     UI shows: ❌ Charlie GONE!
+
+
+[35s] User refreshes page
+                                     Scoreboard: ❌ 2 students    ✓ 3 students
+                                     UI shows: ❌ Charlie GONE
+
+
+[40s] Hard refresh (F5)
+      Server pulls latest...
+                                     Scoreboard: ✓ 3 students    ✓ 3 students
+                                     UI shows: ✓ Charlie back!
+
+
+EXPERIENCE:
+User sees student disappear mysteriously after 30 seconds → BAD! 😞
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+AFTER: FIXED BEHAVIOR
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+User Action:                         Device State:                Server State:
+─────────────────────────────────────────────────────────────────────────────────
+
+[0s] Click "Add Student"
+     → "EA24C99: Charlie"
+                                     Scoreboard: ✓ 3 students    2 students
+                                     UI shows: ✓ Charlie visible
+
+
+[5s] Auto-sync to server
+                                     Scoreboard: ✓ 3 students    ✓ 3 students
+                                     UI shows: ✓ Charlie visible
+
+
+[15s] Waiting...
+                                     Scoreboard: ✓ 3 students    ✓ 3 students
+                                     UI shows: ✓ Charlie visible
+
+
+[30s] Background peer sync fires!
+     Fetches from peer...
+                                     Peer has: 2 students (old data)
+                                     Code runs (FIXED):
+                                       merged['students'] = merge(local, peer)
+                                       _save_offline_data(merged)
+
+                                     Scoreboard: ✓ 3 students!  ✓ 3 students
+                                     UI shows: ✓ Charlie PRESERVED!
+                                     Log: "PRESERVED 1 locally-added students"
+
+
+[35s] User refreshes page
+                                     Scoreboard: ✓ 3 students    ✓ 3 students
+                                     UI shows: ✓ Charlie still here
+
+
+[40s] Another check
+      No action needed
+                                     Scoreboard: ✓ 3 students    ✓ 3 students
+                                     UI shows: ✓ Charlie still there
+
+
+EXPERIENCE:
+Student stays visible permanently → GOOD! 😊
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+DATA FLOW COMPARISON
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+BEFORE (BUG):                          AFTER (FIXED):
+─────────────────────────────────────────────────────────────
+
+Local: [A, B, C]                      Local: [A, B, C]
+  ↓                                      ↓
+Peer has: [A, B]                      Peer has: [A, B]
+  ↓                                      ↓
+_save_offline_data(peer)              merged = merge(local, peer)
+  ↓                                      ↓
+[A, B] ❌ C lost!                      [A, B, C] ✓ All preserved!
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CODE COMPARISON
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+BEFORE (LINE 1205):                   AFTER (LINES 1205-1247):
+───────────────────────────────────────────────────────────────
+
+if peer_newer:                        if peer_newer:
+    _save_offline_data(
+        peer_data                         merged = dict(local_data)
+    )                                     merged['students'] =
+    ← OVERWRITES!                        _merge_students_preserve_active(
+                                             local_data['students'],
+                                             peer_data['students']
+                                         )
+                                         merged['scores'] =
+                                             _merge_scores_superset(...)
+                                         merged['attendance'] =
+                                             _merge_attendance_superset(...)
+                                         merged['appeals'] =
+                                             _merge_appeals_superset(...)
+
+                                         _save_offline_data(merged)
+                                         ← MERGES SAFELY!
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+IMPACT SUMMARY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+WHAT THE BUG AFFECTED:
+├─ ❌ Newly added students
+├─ ❌ Recently added scores
+├─ ❌ Recent attendance records
+├─ ❌ Recent appeals
+└─ ✓ Data on server (was safe)
+
+WHAT THE FIX PROTECTS:
+├─ ✓ Newly added students (preserved)
+├─ ✓ Recently added scores (preserved)
+├─ ✓ Recent attendance records (preserved)
+├─ ✓ Recent appeals (preserved)
+├─ ✓ Timestamps preserved
+├─ ✓ Audit trail maintained
+└─ ✓ No breaking changes
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+TIMELINE: HOW THE BUG HAPPENED
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Background Thread:
+    ┌─────────────────────┐
+    │ Runs every 30 secs  │
+    └──────────┬──────────┘
+               │
+       [Sync Cycle 1 - 0s]
+       [Sync Cycle 2 - 30s] ← STUDENT ADDED IN THIS WINDOW
+       [Sync Cycle 3 - 60s]
+               │
+    ┌──────────▼──────────┐
+    │ At 30s mark:        │
+    │ - User added student│
+    │ - Peer still stale  │
+    │ - BUG triggers:     │
+    │   Overwrites data!  │
+    └─────────────────────┘
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+TEST VERIFICATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+TEST: Add student, wait 30+ seconds
+
+BEFORE FIX:
+  ✓ T=0s:   Student added, visible
+  ✓ T=5s:   Student synced, visible
+  ✓ T=15s:  Student visible
+  ❌ T=30s:  Student visible → ❌ DISAPPEARS (30s sync)
+  ❌ T=35s:  Student gone
+  ✓ T=40s:  Hard refresh shows student again
+
+AFTER FIX:
+  ✓ T=0s:   Student added, visible
+  ✓ T=5s:   Student synced, visible
+  ✓ T=15s:  Student visible
+  ✓ T=30s:  Student visible (merge preserves it)
+  ✓ T=35s:  Student visible
+  ✓ T=40s:  Student visible
+  ✓ T=N:    Student always visible
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+CONCLUSION: Bug fixed by replacing overwrite with safe merge ✓

@@ -13,6 +13,10 @@ app = create_app()
 _SERVER_LOCK_FD = None
 
 
+def _env_flag(name, default='0'):
+    return str(os.getenv(name, default)).strip().lower() in ('1', 'true', 'yes', 'on')
+
+
 def create_startup_restore_point(flask_app, keep=200):
     """Write a startup restore snapshot of offline scoreboard data."""
     instance_dir = Path(flask_app.instance_path)
@@ -206,14 +210,18 @@ def initialize_runtime(flask_app):
     """Idempotent runtime bootstrap for both dev and production servers."""
     if flask_app.config.get('_EA_RUNTIME_INIT_DONE'):
         return
+    skip_startup_restore = flask_app.config.get('EA_DEV_RELOAD_ACTIVE') or _env_flag('EA_SKIP_STARTUP_RESTORE', '0')
     with flask_app.app_context():
         db.create_all()
         maybe_bootstrap_backup_from_master(flask_app)
-        create_startup_restore_point(flask_app)
+        if not skip_startup_restore:
+            create_startup_restore_point(flask_app)
         # Ensure default Admin and Teacher accounts exist
-        # Passwords are read from environment variables for security
-        admin_password = os.getenv('ADMIN_PASSWORD', 'ChangeAdminPass123!')
-        teacher_password = os.getenv('TEACHER_PASSWORD', 'ChangeTeacherPass123!')
+        # Use secure credential provider for passwords
+        from app.utils.secrets_manager import get_credential_provider
+        provider = get_credential_provider()
+        admin_password = provider.get_admin_password()
+        teacher_password = provider.get_teacher_password()
         defaults = [
             {'login_id': 'Admin', 'role': 'admin', 'password': admin_password},
             {'login_id': 'Teacher', 'role': 'teacher', 'password': teacher_password}
@@ -239,25 +247,41 @@ def initialize_runtime(flask_app):
         pass
 
 if __name__ == '__main__':
-    if not acquire_single_instance_lock(app):
-        raise SystemExit(0)
-    initialize_runtime(app)
     port_value = os.getenv('PORT') or os.getenv('BACKUP_PORT') or '5000'
     try:
         port = int(port_value)
     except (TypeError, ValueError):
         port = 5000
-    debug = str(os.getenv('FLASK_DEBUG', '0')).strip().lower() in ('1', 'true', 'yes', 'on')
+    debug = _env_flag('FLASK_DEBUG', '0')
     # Integrity safety: avoid Flask reloader double-process mode on server PCs,
     # which can create duplicate writers and race-prone startup side effects.
-    use_reloader = str(os.getenv('FLASK_USE_RELOADER', '0')).strip().lower() in ('1', 'true', 'yes', 'on')
-    prefer_waitress = str(os.getenv('EA_USE_WAITRESS', '1')).strip().lower() in ('1', 'true', 'yes', 'on')
+    use_reloader = _env_flag('FLASK_USE_RELOADER', '0')
+    prefer_waitress = _env_flag('EA_USE_WAITRESS', '1')
+    is_reloader_child = str(os.getenv('WERKZEUG_RUN_MAIN', '')).strip().lower() == 'true'
+    dev_reload_mode = debug and use_reloader and not prefer_waitress
+
+    app.config['EA_DEV_RELOAD_ACTIVE'] = dev_reload_mode
+
+    if dev_reload_mode:
+        if is_reloader_child:
+            initialize_runtime(app)
+            print(f'Development auto-reload enabled on http://0.0.0.0:{port} (Waitress disabled).')
+        else:
+            print(f'Watching for code changes on http://0.0.0.0:{port} (development auto-reload).')
+    else:
+        if not acquire_single_instance_lock(app):
+            raise SystemExit(0)
+        initialize_runtime(app)
+
     if prefer_waitress:
         try:
             from waitress import serve
             threads = int(os.getenv('WAITRESS_THREADS', '16'))
+            print(f'Starting Waitress on http://0.0.0.0:{port}. Python/HTML changes require a restart.')
             serve(app, host='0.0.0.0', port=port, threads=max(4, threads))
             raise SystemExit(0)
         except Exception:
             pass
+    if not dev_reload_mode:
+        print(f'Starting Flask server on http://0.0.0.0:{port}.')
     app.run(debug=debug, use_reloader=use_reloader, host='0.0.0.0', port=port)

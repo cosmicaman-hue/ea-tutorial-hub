@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Clear Offline Scoreboard Cache</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 50px auto; padding: 20px; }
+        .container { border: 2px solid #4CAF50; padding: 20px; border-radius: 8px; background: #f9fff9; }
+        button { background: #4CAF50; color: white; padding: 12px 24px; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; margin: 10px 5px; }
+        button:hover { background: #45a049; }
+        .warning { color: #d32f2f; font-weight: bold; margin: 10px 0; }
+        .success { color: #388E3C; font-weight: bold; margin: 10px 0; }
+        .log { background: #f5f5f5; padding: 10px; border-radius: 4px; margin-top: 10px; max-height: 300px; overflow-y: auto; font-family: monospace; }
+        .info { background: #e3f2fd; padding: 10px; border-radius: 4px; margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧹 Clear Offline Scoreboard Cache</h1>
+        
+        <div class="info">
+            <strong>⚠️ Issue:</strong> After system updates, the offline scoreboard may display stale VETO values from browser cache instead of fresh server data.
+        </div>
+
+        <h3>Step 1: Clear Browser Cache & Storage</h3>
+        <button onclick="clearAllCaches()">Clear All Caches</button>
+        <button onclick="clearLocalStorage()">Clear localStorage Only</button>
+        <button onclick="clearIndexedDB()">Clear IndexedDB Only</button>
+
+        <h3>Step 2: Refresh Offline Scoreboard</h3>
+        <button onclick="refreshScoreboard()">Open Fresh Scoreboard</button>
+
+        <h3>Step 3: Verify Data</h3>
+        <button onclick="verifyData()">Check Current Data</button>
+
+        <div id="log" class="log"></div>
+    </div>
+
+    <script>
+        const log = (msg, type = 'info') => {
+            const logDiv = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            const marker = type === 'error' ? '❌' : type === 'success' ? '✅' : 'ℹ️';
+            logDiv.innerHTML += `<div class="${type}">${marker} [${timestamp}] ${msg}</div>`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        };
+
+        const clearLocalStorage = () => {
+            try {
+                const keys = Object.keys(localStorage);
+                const scoreBoardKeys = keys.filter(k => k.includes('offline') || k.includes('scoreboard') || k.includes('sync'));
+                log(`Found ${scoreBoardKeys.length} scoreboard-related localStorage entries to clear`, 'info');
+                
+                scoreBoardKeys.forEach(key => {
+                    localStorage.removeItem(key);
+                    log(`Cleared: ${key}`, 'success');
+                });
+                
+                if (scoreBoardKeys.length === 0) {
+                    log('No scoreboard entries found in localStorage', 'info');
+                } else {
+                    log(`✅ Cleared ${scoreBoardKeys.length} localStorage entries`, 'success');
+                }
+            } catch (err) {
+                log(`Error clearing localStorage: ${err.message}`, 'error');
+            }
+        };
+
+        const clearIndexedDB = async () => {
+            try {
+                const dbs = await indexedDB.databases();
+                log(`Found ${dbs.length} IndexedDB databases`, 'info');
+                
+                for (const db of dbs) {
+                    if (db.name && (db.name.includes('offline') || db.name.includes('scoreboard'))) {
+                        indexedDB.deleteDatabase(db.name);
+                        log(`Deleted IndexedDB: ${db.name}`, 'success');
+                    }
+                }
+                log('✅ IndexedDB cleared', 'success');
+            } catch (err) {
+                log(`Error clearing IndexedDB: ${err.message}`, 'error');
+            }
+        };
+
+        const clearAllCaches = async () => {
+            log('Starting cache clear...', 'info');
+            
+            clearLocalStorage();
+            await clearIndexedDB();
+            
+            // Clear service worker cache
+            if ('caches' in window) {
+                const cacheNames = await caches.keys();
+                const scoreBoardCaches = cacheNames.filter(name => name.includes('offline') || name.includes('scoreboard') || name.includes('sync'));
+                
+                for (const cacheName of scoreBoardCaches) {
+                    await caches.delete(cacheName);
+                    log(`Cleared Service Worker cache: ${cacheName}`, 'success');
+                }
+            }
+            
+            log('✅ All caches cleared! You can now refresh the scoreboard.', 'success');
+        };
+
+        const refreshScoreboard = () => {
+            log('Opening fresh offline scoreboard...', 'info');
+            // Open in new tab with cache-buster
+            const timestamp = Date.now();
+            window.open(`/scoreboard/offline-server-health?nocache=${timestamp}`, '_blank');
+            log('✅ Opened scoreboard in new tab', 'success');
+        };
+
+        const verifyData = async () => {
+            try {
+                log('Checking current offline scoreboard data...', 'info');
+                
+                // Try to get data from localStorage
+                const localStorageData = localStorage.getItem('offline_scoreboard_data');
+                if (localStorageData) {
+                    const data = JSON.parse(localStorageData);
+                    const studentCount = (data.students || []).length;
+                    log(`localStorage has ${studentCount} students`, 'info');
+                    
+                    // Check VETO values
+                    const leader = data.students?.find(s => s.post === 'LEADER');
+                    const coLeader = data.students?.find(s => s.post === 'CO-LEADER');
+                    if (leader) {
+                        const totalVeto = (leader.veto_count || 0) + (leader.role_veto_count || 0);
+                        log(`Leader VETO: ${totalVeto}V (individual: ${leader.veto_count || 0}, role: ${leader.role_veto_count || 0})`, 'info');
+                    }
+                    if (coLeader) {
+                        const totalVeto = (coLeader.veto_count || 0) + (coLeader.role_veto_count || 0);
+                        log(`Co-Leader VETO: ${totalVeto}V (individual: ${coLeader.veto_count || 0}, role: ${coLeader.role_veto_count || 0})`, 'info');
+                    }
+                }
+                
+                // Try to fetch fresh data from server
+                log('Fetching fresh data from server...', 'info');
+                const response = await fetch('/scoreboard/data?nocache=' + Date.now(), {
+                    cache: 'no-store',
+                    credentials: 'include'
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    const payload = data.data || data;
+                    const studentCount = (payload.students || []).length;
+                    log(`Server has ${studentCount} students`, 'success');
+                    
+                    // Check VETO values
+                    const leader = payload.students?.find(s => s.post === 'LEADER');
+                    const coLeader = payload.students?.find(s => s.post === 'CO-LEADER');
+                    if (leader) {
+                        const totalVeto = (leader.veto_count || 0) + (leader.role_veto_count || 0);
+                        log(`Server Leader VETO: ${totalVeto}V (individual: ${leader.veto_count || 0}, role: ${leader.role_veto_count || 0})`, 'success');
+                    }
+                    if (coLeader) {
+                        const totalVeto = (coLeader.veto_count || 0) + (coLeader.role_veto_count || 0);
+                        log(`Server Co-Leader VETO: ${totalVeto}V (individual: ${coLeader.veto_count || 0}, role: ${coLeader.role_veto_count || 0})`, 'success');
+                    }
+                } else {
+                    log(`Server returned ${response.status}: ${response.statusText}`, 'error');
+                }
+                
+            } catch (err) {
+                log(`Error verifying data: ${err.message}`, 'error');
+            }
+        };
+    </script>
+</body>
+</html>

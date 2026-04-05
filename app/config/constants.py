@@ -18,6 +18,9 @@ VETO_QUOTAS = {
     'DEFAULT': 0
 }
 
+# The minimum power a party must have to exercise a veto.
+VETO_POWER_THRESHOLD = 5
+
 # Leadership role tenure (in months)
 ROLE_TENURE = {
     'DEFAULT': 1,

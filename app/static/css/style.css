@@ -746,3 +746,119 @@ footer {
     .hidden {
         display: none;
     }
+
+/* ── Mobile-first responsive improvements ── */
+
+/* Tablets and below (≤768px) */
+@media (max-width: 768px) {
+    .navbar-brand {
+        font-size: 1.1rem;
+    }
+
+    .month-tabs {
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+    }
+    .month-tabs::-webkit-scrollbar { display: none; }
+
+    .scoreboard-table th,
+    .scoreboard-table td {
+        padding: 8px 6px;
+        font-size: 0.82rem;
+    }
+
+    .filter-group {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .side-tabs {
+        flex-wrap: wrap;
+    }
+
+    .form-row {
+        grid-template-columns: 1fr;
+    }
+
+    /* Make all table wrappers horizontally scrollable */
+    .table-wrapper,
+    .table-responsive-auto {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+}
+
+/* Small phones (≤576px) */
+@media (max-width: 576px) {
+    .container-fluid {
+        padding-left: 8px;
+        padding-right: 8px;
+    }
+
+    .actions-bar {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 8px;
+    }
+
+    .search-box {
+        min-width: unset;
+        width: 100%;
+    }
+
+    .admin-actions {
+        flex-wrap: wrap;
+        justify-content: stretch;
+    }
+
+    .admin-actions .btn-action {
+        flex: 1;
+        text-align: center;
+        min-width: 80px;
+    }
+
+    .side-actions {
+        flex-direction: column;
+    }
+
+    .modal-content {
+        padding: 16px;
+        width: 97%;
+        max-height: 95vh;
+    }
+
+    .form-actions {
+        flex-direction: column-reverse;
+        gap: 8px;
+    }
+
+    .form-actions .btn-primary,
+    .form-actions .btn-secondary {
+        width: 100%;
+        text-align: center;
+    }
+
+    /* Larger tap targets */
+    .btn {
+        min-height: 44px;
+    }
+
+    .nav-link {
+        padding-top: 10px;
+        padding-bottom: 10px;
+    }
+
+    footer .container p,
+    footer .container small {
+        font-size: 0.80rem;
+    }
+
+    .scoreboard-container {
+        padding: 10px;
+        gap: 12px;
+    }
+
+    .side-card {
+        padding: 10px;
+    }
+}

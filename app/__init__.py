@@ -155,7 +155,19 @@ def create_app():
     @app.route('/login')
     def login_shortlink():
         return redirect(url_for('auth.login'))
-    
+
+    @app.context_processor
+    def _inject_static_v():
+        """Append file mtime as ?v= to bust browser caches when assets change."""
+        def static_v(filename):
+            filepath = os.path.join(app.static_folder, filename)
+            try:
+                mtime = str(int(os.path.getmtime(filepath)))
+            except OSError:
+                mtime = '0'
+            return url_for('static', filename=filename) + '?v=' + mtime
+        return dict(static_v=static_v)
+
     @app.before_request
     def check_default_password():
         if current_user.is_authenticated and current_user.login_id == 'Admin':

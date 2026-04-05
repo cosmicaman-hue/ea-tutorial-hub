@@ -3,6 +3,8 @@ from flask_login import login_user, logout_user, current_user, login_required
 from app import db, limiter, make_ephemeral_user
 from app.models import User, JoinCode, DeviceSession, AccountAction
 from app.models.user import ActivityLog
+from app.utils.secrets_manager import get_credential_provider
+from app.utils.logger import get_security_logger, get_audit_logger
 from datetime import datetime
 import json
 import os
@@ -13,22 +15,24 @@ from werkzeug.security import generate_password_hash, check_password_hash
 auth_bp = Blueprint('auth', __name__, url_prefix='/auth')
 
 
-def _env_password_for_role(login_id):
+def _secure_password_for_role(login_id):
+    """Get password from secure storage with fallback to environment"""
+    provider = get_credential_provider()
     lid = str(login_id or '').strip()
     if lid == 'Admin':
-        return str(os.getenv('ADMIN_PASSWORD', '') or '').strip()
+        return provider.get_admin_password()
     if lid == 'Teacher':
-        return str(os.getenv('TEACHER_PASSWORD', '') or '').strip()
+        return provider.get_teacher_password()
     return ''
 
 
-def _try_env_fallback_login(login_id, password):
+def _try_secure_fallback_login(login_id, password):
     """
-    Emergency login path for Admin/Teacher when DB auth is unavailable.
+    Emergency login path using secure credential storage.
     """
     if str(os.getenv('EA_AUTH_ENV_FALLBACK', '1')).strip().lower() not in ('1', 'true', 'yes', 'on'):
         return False
-    expected = _env_password_for_role(login_id)
+    expected = _secure_password_for_role(login_id)
     if not expected:
         return False
     provided = str(password or '').strip()
@@ -127,10 +131,13 @@ def _ensure_auth_schema_and_defaults():
             ):
                 conn.execute(text(stmt))
 
-            for login_id, role, password in (
-                ('Admin', 'admin', os.getenv('ADMIN_PASSWORD', 'ChangeAdminPass123!')),
-                ('Teacher', 'teacher', os.getenv('TEACHER_PASSWORD', 'ChangeTeacherPass123!')),
+            # Use secure credential provider for default accounts (PostgreSQL)
+            provider = get_credential_provider()
+            for login_id, role in (
+                ('Admin', 'admin'),
+                ('Teacher', 'teacher'),
             ):
+                password = provider.get_admin_password() if role == 'admin' else provider.get_teacher_password()
                 pw_hash = generate_password_hash(password)
                 row = conn.execute(
                     text("SELECT id FROM users WHERE login_id = :login_id LIMIT 1"),
@@ -227,10 +234,13 @@ def _ensure_auth_schema_and_defaults():
             ):
                 if col not in cols:
                     conn.execute(text(ddl))
-            for login_id, role, password in (
-                ('Admin', 'admin', os.getenv('ADMIN_PASSWORD', 'ChangeAdminPass123!')),
-                ('Teacher', 'teacher', os.getenv('TEACHER_PASSWORD', 'ChangeTeacherPass123!')),
+            # Use secure credential provider for default accounts (SQLite)
+            provider = get_credential_provider()
+            for login_id, role in (
+                ('Admin', 'admin'),
+                ('Teacher', 'teacher'),
             ):
+                password = provider.get_admin_password() if role == 'admin' else provider.get_teacher_password()
                 pw_hash = generate_password_hash(password)
                 conn.execute(
                     text("""
@@ -280,7 +290,9 @@ def _validate_join_code_or_fallback(provided_code):
     except Exception:
         db.session.rollback()
 
-    expected_code = str(os.getenv('EA_JOIN_CODE', '') or '').strip()
+    # Use secure credential provider for join code
+    provider = get_credential_provider()
+    expected_code = provider.get_join_code()
     if expected_code:
         return bool(token) and token.lower() == expected_code.lower()
     return True
@@ -460,7 +472,7 @@ def login():
                 user = User.query.filter_by(login_id=login_id).first()
             except Exception:
                 db.session.rollback()
-                if _try_env_fallback_login(login_id, password):
+                if _try_secure_fallback_login(login_id, password):
                     flash('Logged in using fallback mode. Database recovery is still in progress.', 'warning')
                     return redirect(url_for('points.offline_scoreboard'))
                 flash('Login service temporarily unavailable. Please retry in 30 seconds.', 'error')
@@ -499,6 +511,13 @@ def login():
             if _is_user_blocked(user):
                 flash('Your account is disabled. Contact admin.', 'error')
                 log_activity(0, f'Login blocked for {login_id} - account inactive', 'login_failed', 'Account inactive', request.remote_addr)
+                # Log security event
+                security_logger = get_security_logger()
+                security_logger.log_login_attempt(
+                    login_id, False, request.remote_addr, 
+                    request.headers.get('User-Agent', ''), 
+                    'Account inactive'
+                )
                 return redirect(url_for('auth.login'))
             
             # Keep auth stable across server restarts/browser reopen unless explicitly logged out.
@@ -522,6 +541,13 @@ def login():
             
             # Log successful login
             log_activity(user.id, f'{user.role.capitalize()} login successful', 'login', f'IP: {request.remote_addr}', request.remote_addr)
+            
+            # Log security event for successful login
+            security_logger = get_security_logger()
+            security_logger.log_login_attempt(
+                login_id, True, request.remote_addr,
+                request.headers.get('User-Agent', '')
+            )
 
             next_url = request.form.get('next') or request.args.get('next')
             if next_url:
@@ -537,6 +563,15 @@ def login():
             return redirect(url_for('points.offline_scoreboard'))
         else:
             log_activity(0, f'Failed login attempt for {login_id}', 'login_failed', 'Invalid credentials', request.remote_addr)
+            
+            # Log security event for failed login
+            security_logger = get_security_logger()
+            security_logger.log_login_attempt(
+                login_id, False, request.remote_addr,
+                request.headers.get('User-Agent', ''),
+                'Invalid credentials'
+            )
+            
             flash('Invalid login ID or password', 'error')
     
     return render_template('auth/login.html')
@@ -634,11 +669,18 @@ def change_password():
 def logout():
     log_activity(current_user.id, f'{current_user.role.capitalize()} logout', 'logout', f'IP: {request.remote_addr}', request.remote_addr)
     _mark_user_sessions_offline(current_user)
-    logout_user()
-    # Clear server-side session data
+    # Clear session BEFORE logout_user() so the '_remember=clear' marker set by
+    # logout_user() isn't wiped out, allowing Flask-Login to properly delete the
+    # remember-me cookie via its after_request handler.
     session.clear()
+    logout_user()
     next_target = str(request.args.get('next', 'login') or 'login').strip().lower()
     flash('You have been logged out. Please log-in again to use features.', 'success')
     if next_target == 'public':
-        return redirect(url_for('points.public_scoreboard'))
-    return redirect(url_for('auth.login'))
+        response = redirect(url_for('points.public_scoreboard'))
+    else:
+        response = redirect(url_for('auth.login'))
+
+    # Belt-and-suspenders: also explicitly delete the remember-me cookie
+    response.delete_cookie(key='remember_token', path='/')
+    return response
