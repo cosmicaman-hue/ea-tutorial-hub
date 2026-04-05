@@ -14370,40 +14370,69 @@
                 this._cacheData = data;
                 this._monthScoresCache.clear();
                 const serializedFull = JSON.stringify(data);
+
+                let savedLocally = false;
+
+                // Try 1: Build normal snapshot
                 const storageSnapshot = buildLocalStorageSnapshot(data);
                 const serialized = JSON.stringify(storageSnapshot);
-                let savedLocally = false;
+
                 try {
                     localStorage.setItem(this.storageKey, serialized);
                     savedLocally = true;
-                    this._idbWrite(serializedFull); // keep full local snapshot in IndexedDB
+                    this._idbWrite(serializedFull);
+                    return savedLocally;
                 } catch (err) {
-                    if (reclaimLocalStorageSpace()) {
-                        try {
-                            localStorage.setItem(this.storageKey, serialized);
-                            savedLocally = true;
-                            this._idbWrite(serializedFull);
-                        } catch (retryErr) {
-                            // fall through to emergency fallback
-                        }
-                    }
-                    if (!savedLocally) {
-                        try {
-                            const emergency = JSON.stringify(buildEmergencyLocalStorageSnapshot(data));
-                            localStorage.setItem(this.storageKey, emergency);
-                            savedLocally = true;
-                            this._idbWrite(serializedFull);
-                        } catch (emergencyErr) {
-                            // fall through to warning below
-                        }
-                    }
-                    if (!savedLocally && !options.system) {
-                        showAlert('Browser storage is full. Data is kept in-memory for this session. Please run Master Update once, then reload.', 'warning');
-                    } else if (!savedLocally && options.system) {
-                        showAlert('Browser storage quota exceeded during a background save. Nothing was overwritten; use Master Update or free site data for this browser when you can.', 'warning');
+                    if (String(err).includes('QuotaExceeded')) {
+                        console.warn('[Storage] Quota exceeded on normal save, attempting emergency compact...');
                     }
                 }
-                if (!options.skipBackup) {
+
+                // Try 2: Reclaim space
+                if (!savedLocally && reclaimLocalStorageSpace()) {
+                    try {
+                        localStorage.setItem(this.storageKey, serialized);
+                        savedLocally = true;
+                        this._idbWrite(serializedFull);
+                        return savedLocally;
+                    } catch (retryErr) {
+                        console.warn('[Storage] Quota still exceeded after reclaim');
+                    }
+                }
+
+                // Try 3: Emergency ultra-compact snapshot (ALWAYS succeeds if localStorage is writable at all)
+                if (!savedLocally) {
+                    try {
+                        const emergency = JSON.stringify(buildEmergencyLocalStorageSnapshot(data));
+                        localStorage.setItem(this.storageKey, emergency);
+                        savedLocally = true;
+                        this._idbWrite(serializedFull);
+                        console.warn('[Storage] Using emergency compact snapshot (some logs cleared)');
+                        return savedLocally;
+                    } catch (emergencyErr) {
+                        console.error('[Storage] Even emergency save failed:', emergencyErr);
+                    }
+                }
+
+                // Try 4: Last resort - skip backup, skip most things, just save IndexedDB
+                if (!savedLocally) {
+                    try {
+                        this._idbWrite(serializedFull);
+                        savedLocally = true;
+                        console.warn('[Storage] localStorage full, using IndexedDB only');
+                    } catch (idbErr) {
+                        console.error('[Storage] All storage methods failed:', idbErr);
+                    }
+                }
+
+                // Only warn if we truly couldn't save anything
+                if (!savedLocally) {
+                    if (!options.system) {
+                        showAlert('Browser storage is full. Data is kept in-memory. Refresh will lose changes. Clear site data or use a different browser.', 'error');
+                    }
+                }
+
+                if (!options.skipBackup && savedLocally) {
                     maybeLocalBackup(data);
                 }
                 if (!options.skipSync && !this.suppressSync) {

@@ -5420,10 +5420,14 @@ def offline_data():
         else:
             current_app.logger.debug(f"GET /offline-data: Returning {len(attendance_records)} attendance records")
         
-        # Keep sync snapshots lean for reliability/performance. Activity log is fetched
-        # via dedicated endpoint and should not inflate every pull payload.
+        # Keep sync snapshots lean for reliability/performance. Large collections are fetched
+        # via dedicated endpoints and should not inflate every pull payload to prevent
+        # "QuotaExceeded" errors in browsers with strict storage limits.
         data_out = dict(data)
-        data_out['activity_log'] = []
+        data_out['activity_log'] = []  # Fetched via /activity-log endpoint
+        data_out['notification_history'] = (data_out.get('notification_history') or [])[-50:]  # Keep only recent
+        data_out['proposal_messages'] = (data_out.get('proposal_messages') or [])[-30:]  # Keep only recent
+        data_out['_sync_ops'] = []  # Clear pending sync ops
         resp = jsonify({'data': data_out, 'updated_at': updated_at})
         resp.headers['Cache-Control'] = 'no-store'
         return resp
