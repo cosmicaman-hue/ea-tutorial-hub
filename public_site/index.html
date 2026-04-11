@@ -267,23 +267,29 @@
         .pos { color: #15803d; font-weight: 700; }
         .neg { color: #b91c1c; font-weight: 700; }
         .empty { text-align: center; color: var(--muted); padding: 30px; }
-        /* Gradient scoreboard rows */
-        .sr-1 { background: linear-gradient(to right, rgba(255,215,0,.20), rgba(255,245,160,.07), transparent); }
-        .sr-1 td:first-child { border-left: 4px solid #d4af37; }
-        .sr-1 td { font-weight: 600; }
-        .sr-1 td.col-total { color: #92700a !important; font-size: 1.13em; }
-        .sr-2 { background: linear-gradient(to right, rgba(180,180,195,.20), rgba(210,210,225,.07), transparent); }
-        .sr-2 td:first-child { border-left: 4px solid #9ca3af; }
-        .sr-2 td { font-weight: 600; }
-        .sr-2 td.col-total { color: #374151 !important; font-size: 1.08em; }
-        .sr-3 { background: linear-gradient(to right, rgba(180,83,9,.16), rgba(220,150,80,.06), transparent); }
-        .sr-3 td:first-child { border-left: 4px solid #b45309; }
-        .sr-3 td { font-weight: 600; }
-        .sr-3 td.col-total { color: #92400e !important; font-size: 1.05em; }
-        .sr-top { background: linear-gradient(to right, rgba(26,77,46,.07), transparent); }
-        .sr-top td:first-child { border-left: 3px solid rgba(26,77,46,.28); }
-        .sr-mid { background: linear-gradient(to right, rgba(26,77,46,.03), transparent); }
-        .sr-mid td:first-child { border-left: 2px solid rgba(26,77,46,.13); }
+        /* ── SCOREBOARD ROW GRADIENTS ── */
+        .sr-1 { background: linear-gradient(105deg,rgba(255,200,0,.34) 0%,rgba(255,235,100,.16) 50%,transparent 100%); }
+        .sr-1 td:first-child { border-left: 5px solid #f59e0b; }
+        .sr-1 td { font-weight: 700; }
+        .sr-1 td.col-total { color: #a16207 !important; font-size: 1.16em; text-shadow: 0 0 10px rgba(245,158,11,.22); }
+        .sr-2 { background: linear-gradient(105deg,rgba(148,163,184,.28) 0%,rgba(203,213,225,.12) 50%,transparent 100%); }
+        .sr-2 td:first-child { border-left: 5px solid #94a3b8; }
+        .sr-2 td { font-weight: 700; }
+        .sr-2 td.col-total { color: #475569 !important; font-size: 1.10em; }
+        .sr-3 { background: linear-gradient(105deg,rgba(194,108,0,.28) 0%,rgba(234,148,60,.11) 50%,transparent 100%); }
+        .sr-3 td:first-child { border-left: 5px solid #d97706; }
+        .sr-3 td { font-weight: 700; }
+        .sr-3 td.col-total { color: #92400e !important; font-size: 1.07em; }
+        .sr-b4 { background: linear-gradient(105deg,rgba(16,185,129,.18) 0%,rgba(52,211,153,.07) 55%,transparent 100%); }
+        .sr-b4 td:first-child { border-left: 4px solid #10b981; }
+        .sr-b5 { background: linear-gradient(105deg,rgba(6,182,212,.15) 0%,rgba(103,232,249,.05) 55%,transparent 100%); }
+        .sr-b5 td:first-child { border-left: 4px solid #06b6d4; }
+        .sr-b6 { background: linear-gradient(105deg,rgba(139,92,246,.14) 0%,rgba(167,139,250,.05) 55%,transparent 100%); }
+        .sr-b6 td:first-child { border-left: 3px solid #8b5cf6; }
+        .sr-b7 { background: linear-gradient(105deg,rgba(59,130,246,.11) 0%,rgba(147,197,253,.04) 55%,transparent 100%); }
+        .sr-b7 td:first-child { border-left: 2px solid rgba(59,130,246,.55); }
+        .sr-b8 { background: linear-gradient(105deg,rgba(100,116,139,.07) 0%,transparent 100%); }
+        .sr-b8 td:first-child { border-left: 1px solid rgba(100,116,139,.30); }
         .info-wrap { padding: 16px; display: grid; gap: 12px; }
         .info-item {
             border: 1px solid var(--line);
@@ -445,9 +451,94 @@
             .planner-meta-card { border-right: none; border-bottom: 1px solid var(--line); }
             .planner-meta-card:last-child { border-bottom: none; }
         }
+
+        /* ── HEADER CONTROLS (ZOOM + THEME) ── */
+        .header-controls { margin-left: auto; display: flex; align-items: center; gap: 6px; }
+        .ctrl-btn {
+            width: 34px; height: 34px; border-radius: 50%;
+            border: 1px solid var(--line);
+            background: var(--surface); color: var(--text);
+            font-size: 15px; line-height: 1; cursor: pointer;
+            display: grid; place-items: center; padding: 0;
+            transition: background .2s, color .2s, border-color .2s, box-shadow .2s;
+            font-family: "Poppins", system-ui, sans-serif;
+        }
+        .ctrl-btn:hover { background: var(--primary); color: white; border-color: transparent; }
+        #themeToggle { font-size: 17px; }
+
+        /* ── AMOLED DARK THEME ── */
+        body.dark {
+            --bg: #000000; --surface: #0a0a0a; --surface-2: #111111;
+            --text: #f1f5f9; --muted: #94a3b8;
+            --primary: #22c55e; --secondary: #fb923c; --accent: #f43f5e;
+            --gold: #fbbf24; --line: rgba(255,255,255,.09);
+            --shadow: 0 14px 40px rgba(34,197,94,.10);
+            background: #000000;
+        }
+        body.dark .site-header {
+            background: rgba(0,0,0,.97);
+            border-bottom-color: rgba(34,197,94,.20);
+        }
+        body.dark .tabs {
+            background: #060606;
+            border-top-color: rgba(34,197,94,.14);
+        }
+        body.dark .tab-btn { background: transparent; border-color: transparent; color: var(--muted); }
+        body.dark .tab-btn:hover { background: rgba(34,197,94,.06); color: var(--primary); }
+        body.dark .tab-btn.active { background: rgba(34,197,94,.09); color: var(--primary); border-bottom-color: var(--primary); }
+        body.dark select,
+        body.dark button:not(.tab-btn):not(.ctrl-btn) {
+            background: #111; color: var(--text); border-color: rgba(255,255,255,.14);
+        }
+        body.dark .ctrl-btn { background: #111; border-color: rgba(255,255,255,.14); color: var(--text); }
+        body.dark .ctrl-btn:hover {
+            background: var(--primary); color: #000; border-color: transparent;
+            box-shadow: 0 0 16px rgba(34,197,94,.45);
+        }
+        body.dark .hero {
+            background: linear-gradient(135deg, #071a0e 0%, #000 100%);
+            border: 1px solid rgba(34,197,94,.18);
+            box-shadow: 0 0 60px rgba(34,197,94,.07);
+        }
+        body.dark .section { background: rgba(8,8,8,.96); border-color: rgba(255,255,255,.07); }
+        body.dark .card { background: #090909; border-color: rgba(255,255,255,.08); }
+        body.dark .card:hover { border-color: rgba(34,197,94,.40); box-shadow: 0 16px 40px rgba(34,197,94,.12); }
+        body.dark .highlight { background: linear-gradient(135deg, #7c2d00 0%, #431a00 100%); }
+        body.dark .cta { background: linear-gradient(135deg, #071a0e 0%, #000 100%); }
+        body.dark .panel-shell { background: #050505; border-color: rgba(34,197,94,.16); }
+        body.dark .controls { background: #0a0a0a; border-bottom-color: rgba(255,255,255,.07); }
+        body.dark .scoreboard-table { background: #000; }
+        body.dark .scoreboard-table th,
+        body.dark .scoreboard-table td { border-bottom-color: rgba(255,255,255,.06); }
+        body.dark .info-item { background: #080808; border-color: rgba(255,255,255,.08); }
+        body.dark .info-box { background: #040404; border-color: rgba(255,255,255,.07); }
+        body.dark .chip { background: #111; border-color: rgba(255,255,255,.11); }
+        body.dark footer { border-top: 1px solid rgba(255,255,255,.06); }
+        /* Dark row gradients — AMOLED neon glow */
+        body.dark .sr-1 { background: linear-gradient(105deg,rgba(251,191,36,.30) 0%,rgba(253,224,71,.10) 50%,transparent 100%); }
+        body.dark .sr-1 td.col-total { color: #fbbf24 !important; text-shadow: 0 0 20px rgba(251,191,36,.65); }
+        body.dark .sr-2 { background: linear-gradient(105deg,rgba(148,163,184,.22) 0%,rgba(226,232,240,.07) 50%,transparent 100%); }
+        body.dark .sr-2 td.col-total { color: #cbd5e1 !important; text-shadow: 0 0 14px rgba(203,213,225,.45); }
+        body.dark .sr-3 { background: linear-gradient(105deg,rgba(249,115,22,.26) 0%,rgba(251,146,60,.09) 50%,transparent 100%); }
+        body.dark .sr-3 td.col-total { color: #fb923c !important; text-shadow: 0 0 16px rgba(249,115,22,.55); }
+        body.dark .sr-b4 { background: linear-gradient(105deg,rgba(16,185,129,.24) 0%,rgba(52,211,153,.08) 55%,transparent 100%); }
+        body.dark .sr-b4 td:first-child { box-shadow: inset 4px 0 10px rgba(16,185,129,.28); }
+        body.dark .sr-b5 { background: linear-gradient(105deg,rgba(6,182,212,.20) 0%,rgba(34,211,238,.07) 55%,transparent 100%); }
+        body.dark .sr-b6 { background: linear-gradient(105deg,rgba(139,92,246,.20) 0%,rgba(196,181,253,.07) 55%,transparent 100%); }
+        body.dark .sr-b7 { background: linear-gradient(105deg,rgba(59,130,246,.17) 0%,rgba(147,197,253,.06) 55%,transparent 100%); }
+        body.dark .sr-b8 { background: linear-gradient(105deg,rgba(100,116,139,.11) 0%,transparent 100%); }
+        /* Dark planner */
+        body.dark .planner-container { background: #080808; border-color: rgba(255,255,255,.08); }
+        body.dark .planner-grid { background: #080808; }
+        body.dark .planner-grid th { background: #111; }
+        body.dark .planner-grid th, body.dark .planner-grid td { border-color: rgba(255,255,255,.07); }
+        body.dark .planner-weekly-row { background: #080808; border-bottom-color: rgba(255,255,255,.07); }
+        body.dark .planner-weekly-label { background: #111; border-right-color: rgba(255,255,255,.07); }
+        body.dark .planner-meta-card { background: #111; border-color: rgba(255,255,255,.07); }
     </style>
 </head>
 <body>
+<script>(function(){if(localStorage.getItem('ea_theme')==='dark')document.body.classList.add('dark');})()</script>
     <header class="site-header">
         <div class="topbar">
             <a class="brand" href="#home">
@@ -456,6 +547,11 @@
                     <strong>EXCEL ACADEMY</strong>
                 </div>
             </a>
+            <div class="header-controls">
+                <button id="zoomOut" class="ctrl-btn" type="button" title="Zoom out" aria-label="Zoom out">−</button>
+                <button id="zoomIn" class="ctrl-btn" type="button" title="Zoom in" aria-label="Zoom in">+</button>
+                <button id="themeToggle" class="ctrl-btn" type="button" title="Toggle theme" aria-label="Toggle dark mode">🌙</button>
+            </div>
         </div>
         <nav class="tabs" aria-label="Primary">
             <button id="tabHome" class="tab-btn active" type="button">Home</button>
@@ -739,7 +835,7 @@
                 const cls = Number(r.total) > 0 ? 'pos' : (Number(r.total) < 0 ? 'neg' : '');
                 const name = r.masked ? '&mdash;' : esc(cleanName(r.name || '-'));
                 const classVal = r.masked ? '&mdash;' : esc(r.class || '-');
-                const rowCls = rank === 1 ? 'sr-1' : rank === 2 ? 'sr-2' : rank === 3 ? 'sr-3' : rank <= 10 ? 'sr-top' : rank <= 20 ? 'sr-mid' : '';
+                const rowCls = rank === 1 ? 'sr-1' : rank === 2 ? 'sr-2' : rank === 3 ? 'sr-3' : rank <= 7 ? 'sr-b4' : rank <= 12 ? 'sr-b5' : rank <= 18 ? 'sr-b6' : rank <= 25 ? 'sr-b7' : 'sr-b8';
                 const rankDisp = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : rank;
                 return `<tr class="${rowCls}"><td class="rank">${rankDisp}</td><td class="col-roll">${esc(r.roll || '-')}</td><td class="col-name">${name}</td><td class="col-class">${classVal}</td><td class="col-total ${cls}">${Number(r.total) || 0}</td></tr>`;
             }).join('');
@@ -911,6 +1007,31 @@
         });
         fetchAndRender();
         setInterval(fetchAndRender, 30000);
+
+        // ── ZOOM ──
+        let zoomLevel = parseFloat(localStorage.getItem('ea_zoom') || '1');
+        function applyZoom() {
+            document.querySelector('.page').style.zoom = zoomLevel;
+            localStorage.setItem('ea_zoom', String(zoomLevel));
+        }
+        document.getElementById('zoomIn').addEventListener('click', () => {
+            if (zoomLevel < 1.4) { zoomLevel = Math.round((zoomLevel + 0.1) * 10) / 10; applyZoom(); }
+        });
+        document.getElementById('zoomOut').addEventListener('click', () => {
+            if (zoomLevel > 0.6) { zoomLevel = Math.round((zoomLevel - 0.1) * 10) / 10; applyZoom(); }
+        });
+        applyZoom();
+
+        // ── DARK / LIGHT THEME ──
+        let isDark = localStorage.getItem('ea_theme') === 'dark';
+        const themeBtn = document.getElementById('themeToggle');
+        function applyTheme() {
+            document.body.classList.toggle('dark', isDark);
+            themeBtn.textContent = isDark ? '☀️' : '🌙';
+            localStorage.setItem('ea_theme', isDark ? 'dark' : 'light');
+        }
+        themeBtn.addEventListener('click', () => { isDark = !isDark; applyTheme(); });
+        applyTheme();
     </script>
 </body>
 </html>
