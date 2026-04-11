@@ -267,23 +267,23 @@
         .col-class { width: 12%; }
         .col-total { width: 16%; }
         td.col-total { font-size: 1.05em; font-weight: 700; }
-        td.col-name { font-size: 1.06em; font-weight: 600; }
+        td.col-name { font-size: 1.02em; font-weight: 500; }
         .pos { color: #15803d; font-weight: 700; }
         .neg { color: #b91c1c; font-weight: 700; }
         .empty { text-align: center; color: var(--muted); padding: 30px; }
         /* ── SCOREBOARD ROW GRADIENTS ── */
         .sr-1 { background: linear-gradient(105deg,rgba(255,200,0,.34) 0%,rgba(255,235,100,.16) 50%,transparent 100%); }
         .sr-1 td:first-child { border-left: 5px solid #f59e0b; }
-        .sr-1 td { font-weight: 700; }
-        .sr-1 td.col-total { color: #a16207 !important; font-size: 1.16em; text-shadow: 0 0 10px rgba(245,158,11,.22); }
+        .sr-1 td { font-weight: 600; }
+        .sr-1 td.col-total { color: #a16207 !important; text-shadow: 0 0 10px rgba(245,158,11,.22); }
         .sr-2 { background: linear-gradient(105deg,rgba(148,163,184,.28) 0%,rgba(203,213,225,.12) 50%,transparent 100%); }
         .sr-2 td:first-child { border-left: 5px solid #94a3b8; }
-        .sr-2 td { font-weight: 700; }
-        .sr-2 td.col-total { color: #475569 !important; font-size: 1.10em; }
+        .sr-2 td { font-weight: 600; }
+        .sr-2 td.col-total { color: #475569 !important; }
         .sr-3 { background: linear-gradient(105deg,rgba(194,108,0,.28) 0%,rgba(234,148,60,.11) 50%,transparent 100%); }
         .sr-3 td:first-child { border-left: 5px solid #d97706; }
-        .sr-3 td { font-weight: 700; }
-        .sr-3 td.col-total { color: #92400e !important; font-size: 1.07em; }
+        .sr-3 td { font-weight: 600; }
+        .sr-3 td.col-total { color: #92400e !important; }
         .sr-b4 { background: linear-gradient(105deg,rgba(16,185,129,.18) 0%,rgba(52,211,153,.07) 55%,transparent 100%); }
         .sr-b4 td:first-child { border-left: 4px solid #10b981; }
         .sr-b5 { background: linear-gradient(105deg,rgba(6,182,212,.15) 0%,rgba(103,232,249,.05) 55%,transparent 100%); }
@@ -294,10 +294,8 @@
         .sr-b7 td:first-child { border-left: 2px solid rgba(59,130,246,.55); }
         .sr-b8 { background: linear-gradient(105deg,rgba(100,116,139,.07) 0%,transparent 100%); }
         .sr-b8 td:first-child { border-left: 1px solid rgba(100,116,139,.30); }
-        /* Rows 4+ — bold text and larger total */
-        .sr-b4 td, .sr-b5 td, .sr-b6 td, .sr-b7 td, .sr-b8 td { font-weight: 700; }
-        .sr-b4 td.col-name, .sr-b5 td.col-name, .sr-b6 td.col-name, .sr-b7 td.col-name, .sr-b8 td.col-name { font-size: 1.08em; }
-        .sr-b4 td.col-total, .sr-b5 td.col-total, .sr-b6 td.col-total, .sr-b7 td.col-total, .sr-b8 td.col-total { font-size: 1.10em; }
+        /* Rows 4-15 — same weight as base */
+        .sr-b4 td, .sr-b5 td, .sr-b6 td { font-weight: 500; }
         .info-wrap { padding: 16px; display: grid; gap: 12px; }
         .info-item {
             border: 1px solid var(--line);
@@ -530,7 +528,6 @@
         body.dark .sr-3 { background: linear-gradient(105deg,rgba(249,115,22,.26) 0%,rgba(251,146,60,.09) 50%,transparent 100%); }
         body.dark .sr-3 td.col-total { color: #fb923c !important; text-shadow: 0 0 16px rgba(249,115,22,.55); }
         body.dark .sr-b4 { background: linear-gradient(105deg,rgba(16,185,129,.24) 0%,rgba(52,211,153,.08) 55%,transparent 100%); }
-        body.dark .sr-b4 td:first-child { box-shadow: inset 4px 0 10px rgba(16,185,129,.28); }
         body.dark .sr-b5 { background: linear-gradient(105deg,rgba(6,182,212,.20) 0%,rgba(34,211,238,.07) 55%,transparent 100%); }
         body.dark .sr-b6 { background: linear-gradient(105deg,rgba(139,92,246,.20) 0%,rgba(196,181,253,.07) 55%,transparent 100%); }
         body.dark .sr-b7 { background: linear-gradient(105deg,rgba(59,130,246,.17) 0%,rgba(147,197,253,.06) 55%,transparent 100%); }
@@ -843,7 +840,7 @@
                 const cls = Number(r.total) > 0 ? 'pos' : (Number(r.total) < 0 ? 'neg' : '');
                 const name = r.masked ? '&mdash;' : esc(cleanName(r.name || '-'));
                 const classVal = r.masked ? '&mdash;' : esc(r.class || '-');
-                const rowCls = rank === 1 ? 'sr-1' : rank === 2 ? 'sr-2' : rank === 3 ? 'sr-3' : rank <= 7 ? 'sr-b4' : rank <= 12 ? 'sr-b5' : rank <= 18 ? 'sr-b6' : rank <= 25 ? 'sr-b7' : 'sr-b8';
+                const rowCls = rank === 1 ? 'sr-1' : rank === 2 ? 'sr-2' : rank === 3 ? 'sr-3' : rank <= 7 ? 'sr-b4' : rank <= 12 ? 'sr-b5' : rank <= 15 ? 'sr-b6' : '';
                 const rankDisp = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : rank;
                 return `<tr class="${rowCls}"><td class="rank">${rankDisp}</td><td class="col-roll">${esc(r.roll || '-')}</td><td class="col-name">${name}</td><td class="col-class">${classVal}</td><td class="col-total ${cls}">${Number(r.total) || 0}</td></tr>`;
             }).join('');
