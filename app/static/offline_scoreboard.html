@@ -3561,14 +3561,14 @@ body.sb-closing .main-content-wrapper { transition: margin-left var(--sb-close);
                     <table class="scoreboard" style="width: 100%; border-collapse: collapse;">
                         <thead>
                             <tr style="background: linear-gradient(90deg, #1e293b 0%, #0f172a 100%); border-bottom: 2px solid rgba(251, 191, 36, 0.25);">
-                                <th style="width: 80px; padding: 16px; color: #fbbf24; font-weight: 800; font-size: 14px; text-align: center;">Rank</th>
-                                <th style="width: 100px; padding: 16px; color: #fbbf24; font-weight: 800; font-size: 14px; text-align: center;">Pair ID</th>
-                                <th style="padding: 16px; color: #fbbf24; font-weight: 800; font-size: 14px; text-align: left;">Partner Students</th>
-                                <th style="width: 160px; padding: 16px; color: #fbbf24; font-weight: 800; font-size: 14px; text-align: center;">Total Points</th>
+                                <th style="width: 100px; padding: 18px 20px; color: #fbbf24; font-weight: 800; font-size: 18px; text-align: center;">Rank</th>
+                                <th style="width: 140px; padding: 18px 20px; color: #fbbf24; font-weight: 800; font-size: 18px; text-align: center;">Pair ID</th>
+                                <th style="padding: 18px 20px; color: #fbbf24; font-weight: 800; font-size: 18px; text-align: left;">Partner Students</th>
+                                <th style="width: 200px; padding: 18px 20px; color: #fbbf24; font-weight: 800; font-size: 18px; text-align: center;">Total Points</th>
                             </tr>
                         </thead>
                         <tbody id="lsPairRankingsScreenshotBody">
-                            <tr><td colspan="4" class="text-center" style="padding: 24px; color: #64748b;">No registered teams/pairs found.</td></tr>
+                            <tr><td colspan="4" class="text-center" style="padding: 24px; color: #64748b; font-size: 18px;">No registered teams/pairs found.</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -26545,20 +26545,20 @@ body.sb-closing .main-content-wrapper { transition: margin-left var(--sb-close);
 
                             return `
                                 <tr style="background: ${rowBg}; border-bottom: 1px solid rgba(148,163,184,0.08); transition: background 0.2s;">
-                                    <td style="padding: 14px; text-align: center; font-weight: 900; font-size: 15px; color: ${rankColor};">${rankBadge}</td>
-                                    <td style="padding: 14px; text-align: center;"><span style="font-family: monospace; font-size: 13px; font-weight: 800; color: #fbbf24; background: rgba(251,191,36,0.1); padding: 3px 6px; border-radius: 4px; border: 1px solid rgba(251,191,36,0.15);">${escapeHtml(cand.pairLabel || '')}</span></td>
-                                    <td style="padding: 14px; text-align: left;">
-                                        <div style="font-weight: 800; color: #fff; font-size: 14px; margin-bottom: 4px;">${escapeHtml(cand.name)}</div>
-                                        <div style="display: flex; gap: 8px; align-items: center; font-size: 11px;">
-                                            <span style="color: #cbd5e1; font-weight: 600;">${escapeHtml(clean1)} (${escapeHtml(roll1)})</span>
-                                            <span style="color: #64748b;">&amp;</span>
-                                            <span style="color: #cbd5e1; font-weight: 600;">${escapeHtml(clean2)} (${escapeHtml(roll2)})</span>
+                                    <td style="padding: 16px 20px; text-align: center; font-weight: 900; font-size: 22px; color: ${rankColor};">${rankBadge}</td>
+                                    <td style="padding: 16px 20px; text-align: center;"><span style="font-family: monospace; font-size: 18px; font-weight: 900; color: #fbbf24; background: rgba(251,191,36,0.1); padding: 5px 12px; border-radius: 6px; border: 1px solid rgba(251,191,36,0.22);">${escapeHtml(cand.pairLabel || '')}</span></td>
+                                    <td style="padding: 16px 20px; text-align: left;">
+                                        <div style="font-weight: 900; color: #fff; font-size: 18px; margin-bottom: 6px; letter-spacing: 0.3px;">${escapeHtml(cand.name)}</div>
+                                        <div style="display: flex; gap: 10px; align-items: center; font-size: 14px; margin-top: 4px;">
+                                            <span style="color: #cbd5e1; font-weight: 700;">${escapeHtml(clean1)} (${escapeHtml(roll1)})</span>
+                                            <span style="color: #64748b; font-weight: 800;">&amp;</span>
+                                            <span style="color: #cbd5e1; font-weight: 700;">${escapeHtml(clean2)} (${escapeHtml(roll2)})</span>
                                         </div>
                                     </td>
-                                    <td style="padding: 14px; text-align: center; font-weight: 900; color: #86efac; font-size: 16px;">${pts} <span style="font-size:11px; font-weight:600; color:#64748b;">pts</span></td>
+                                    <td style="padding: 16px 20px; text-align: center; font-weight: 900; color: #86efac; font-size: 24px;">${pts} <span style="font-size:14px; font-weight:700; color:#64748b;">pts</span></td>
                                 </tr>
                             `;
-                        }).join('') : `<tr><td colspan="4" class="text-center" style="padding: 24px; color: #64748b;">No registered teams/pairs found.</td></tr>`;
+                        }).join('') : `<tr><td colspan="4" class="text-center" style="padding: 24px; color: #64748b; font-size: 18px;">No registered teams/pairs found.</td></tr>`;
                     }
                 } else {
                     rankCard.classList.add('hidden');
