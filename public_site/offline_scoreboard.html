@@ -18105,6 +18105,12 @@ body.header-offscreen .header-kicker::after {
             }
             const preferServerConflicts = options.preferServerConflicts === true;
             const authoritativeReplace = options.authoritativeReplace === true;
+            // Detect unsynced local changes so we can protect tables (like public_information)
+            // that are not item-level superset-merged. Without this, a background pull arriving
+            // between a local deletion and its pushToServer would restore the deleted item.
+            const _localUpdatedStamp = parseSyncStamp(localData.updated_at || '');
+            const _localServerStamp = parseSyncStamp(localData.server_updated_at || '');
+            const _localHasUnsyncedChanges = _localUpdatedStamp > _localServerStamp;
             let mergedData;
             if (authoritativeReplace) {
                 const baseline = (db && typeof db.getDefaultData === 'function') ? db.getDefaultData() : {};
@@ -18118,7 +18124,12 @@ body.header-offscreen .header-kicker::after {
                     fee_records: mergeFeeRecordsSuperset(localData.fee_records || [], serverData.fee_records || []),
                     post_holder_history: mergePostHolderHistorySuperset(localData.post_holder_history || [], serverData.post_holder_history || []),
                     postholder_tickets: mergePostholderTickets(localData.postholder_tickets || {}, serverData.postholder_tickets || {}),
-                    postholder_ticket_log: mergePostholderTicketLog(localData.postholder_ticket_log || [], serverData.postholder_ticket_log || [])
+                    postholder_ticket_log: mergePostholderTicketLog(localData.postholder_ticket_log || [], serverData.postholder_ticket_log || []),
+                    // Protect local public_information deletions even in authoritative mode
+                    // when the local client has unsynced changes.
+                    public_information: _localHasUnsyncedChanges
+                        ? (localData.public_information || [])
+                        : (serverData.public_information || [])
                 };
                 mergedData.scores = mergeScoreRowsForAuthoritativePull(
                     localData.scores || [],
@@ -18166,7 +18177,14 @@ body.header-offscreen .header-kicker::after {
                     notification_history: mergeNotificationHistorySuperset(localData.notification_history || [], serverData.notification_history || []),
                     post_holder_history: mergePostHolderHistorySuperset(localData.post_holder_history || [], serverData.post_holder_history || []),
                     postholder_tickets: mergePostholderTickets(localData.postholder_tickets || {}, serverData.postholder_tickets || {}),
-                    postholder_ticket_log: mergePostholderTicketLog(localData.postholder_ticket_log || [], serverData.postholder_ticket_log || [])
+                    postholder_ticket_log: mergePostholderTicketLog(localData.postholder_ticket_log || [], serverData.postholder_ticket_log || []),
+                    // public_information is NOT a superset-merged table — deletions would be
+                    // silently undone by incoming server data if we let ...serverData overwrite
+                    // it. When the local client has unsynced changes (e.g. a fresh deletion),
+                    // keep the local array so the push can propagate it. Otherwise take server's.
+                    public_information: _localHasUnsyncedChanges
+                        ? (localData.public_information || [])
+                        : (serverData.public_information || [])
                 };
             }
             db.saveData(mergedData, { system: true, skipSync: true, preserveTimestamp: true, skipBackup: true, allowHistoricalWrite: true });
