@@ -71,6 +71,11 @@
             --spring: cubic-bezier(0.34, 1.56, 0.64, 1);       /* Bouncy spring */
             --spring-soft: cubic-bezier(0.175, 0.885, 0.32, 1.1); /* Smooth fluid spring */
 
+            /* Buttery-smooth motion — slower settle, ultra-smooth ease-out for tabs & modules */
+            --ease-buttery: cubic-bezier(0.22, 1, 0.36, 1);
+            --ease-silk:    cubic-bezier(0.33, 1, 0.68, 1);
+            --dur-buttery:  300ms;
+
             /* Font stacks — system-first for instant render, web fonts override via async load */
             --number-font: 'SF Mono', 'Segoe UI Mono', 'Roboto Mono', 'Courier New', monospace;
             --display-font: 'Cinzel Decorative', 'Segoe UI', Georgia, serif;
@@ -437,7 +442,8 @@
         body.light-mode .rules-block               { background: rgba(241,245,249,0.92) !important; border-color: rgba(100,116,139,0.2) !important; }
         body.light-mode .rules-block h4            { color: #1e293b !important; }
         body.light-mode .rules-list                { color: #374151 !important; }
-        body.light-mode .rule-row                  { background: linear-gradient(145deg, #ffffff, #f1f5f9) !important; border-color: rgba(100,116,139,0.22) !important; box-shadow: 0 4px 10px rgba(0,0,0,0.06) !important; }
+        body.light-mode .rule-row                  { background: linear-gradient(145deg, #ffffff, #f1f5f9) !important; border-color: rgba(100,116,139,0.22) !important; box-shadow: 0 4px 10px rgba(0,0,0,0.06) !important; transition: box-shadow 260ms var(--ease-buttery), border-color 260ms var(--ease-buttery); }
+        body.light-mode .rule-row:hover            { border-color: rgba(37,99,235,0.30) !important; box-shadow: 0 10px 24px rgba(0,0,0,0.10) !important; }
         body.light-mode .rule-row-id               { color: #1d4ed8 !important; }
         body.light-mode .rule-mini                 { color: #64748b !important; }
         body.light-mode .rule-main                 { background: rgba(239,246,255,0.92) !important; border-color: rgba(37,99,235,0.28) !important; color: #0f172a !important; }
@@ -1414,13 +1420,15 @@
             font-size: 14px;
             font-weight: 700;
             margin-bottom: -2px;
-            transition: color 180ms var(--ease-out), background 180ms var(--ease-out), border-color 180ms var(--ease-out);
+            transform: translateZ(0);
+            transition: color 220ms var(--ease-buttery), background 220ms var(--ease-buttery), border-color 220ms var(--ease-buttery), transform 220ms var(--ease-buttery), box-shadow 220ms var(--ease-buttery);
         }
 
         .tab-button i {
             margin-right: 7px;
             color: var(--tab-icon, var(--primary));
             font-size: 13px;
+            transition: transform 220ms var(--ease-buttery);
         }
 
         .tab-button.active {
@@ -1429,12 +1437,18 @@
             border-color: rgba(148, 163, 184, 0.30);
             border-bottom-color: var(--tab-icon, var(--primary));
             box-shadow: inset 0 2px 6px rgba(0,0,0,0.10);
+            transform: translateY(-1px) translateZ(0);
+        }
+
+        .tab-button.active i {
+            transform: scale(1.08);
         }
 
         .tab-button:hover:not(.active) {
             color: var(--text);
             background: rgba(148, 163, 184, 0.14);
             border-color: rgba(148, 163, 184, 0.28);
+            transform: translateY(-1px) translateZ(0);
         }
 
         .tab-spacer {
@@ -1551,7 +1565,7 @@
             background: linear-gradient(145deg, rgba(15, 23, 42, 0.95), rgba(30, 41, 59, 0.88));
             box-shadow: 0 10px 26px rgba(2, 6, 23, 0.28);
             overflow: hidden;
-            transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease;
+            transition: transform 0.3s var(--ease-buttery), box-shadow 0.3s var(--ease-buttery), border-color 0.3s var(--ease-buttery);
         }
 
         .rules-card::before {
@@ -1666,8 +1680,14 @@
             background: linear-gradient(145deg, rgba(15, 23, 42, 0.92), rgba(30, 41, 59, 0.78));
             opacity: 0;
             transform: translateY(8px);
-            animation: ruleRowIn 220ms ease-out forwards;
+            animation: ruleRowIn 280ms var(--ease-buttery) forwards;
             box-shadow: 0 6px 18px rgba(2, 6, 23, 0.24);
+            transition: box-shadow 260ms var(--ease-buttery), border-color 260ms var(--ease-buttery);
+        }
+
+        .rule-row:hover {
+            border-color: rgba(148, 163, 184, 0.42);
+            box-shadow: 0 10px 26px rgba(2, 6, 23, 0.34);
         }
 
         @keyframes ruleRowIn {
@@ -3736,12 +3756,13 @@
             margin-bottom: 25px;
             backdrop-filter: blur(2px);
             -webkit-backdrop-filter: blur(2px);
-            transition: border-color var(--dur-md) var(--spring-soft), box-shadow var(--dur-md) var(--ease-out);
+            transition: border-color var(--dur-md) var(--ease-buttery), box-shadow var(--dur-md) var(--ease-buttery), transform var(--dur-md) var(--ease-buttery);
         }
 
         .form-card:hover {
             border-color: rgba(148, 163, 184, 0.4);
             box-shadow: 0 24px 48px rgba(0,0,0,0.4);
+            transform: translateY(-2px) translateZ(0);
         }
 
         .form-card h3 {
@@ -6204,13 +6225,13 @@
         }
 
         @keyframes iosTabFadeIn {
-            from { 
-                opacity: 0; 
-                transform: translateY(8px);
+            from {
+                opacity: 0;
+                transform: translateY(10px) scale(0.994);
             }
-            to { 
-                opacity: 1; 
-                transform: translateY(0); 
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
             }
         }
 
@@ -6661,16 +6682,20 @@
             to   { opacity: 0; }
         }
 
-        /* ── Tab switch container entrance (snappy fade + slide) ── */
+        /* ── Tab switch container entrance (buttery fade + slide + micro-scale) ── */
         .tab-entering {
-            animation: iosTabFadeIn 160ms var(--spring-soft) both;
+            animation: iosTabFadeIn 280ms var(--ease-buttery) both;
         }
 
-        /* ── Tab-scoped card stagger (applied by .tab-entering parent) ──── */
-        .tab-entering .form-card:nth-child(1)  { animation: iosSlideUp 140ms var(--ease-out) 0ms  both; }
-        .tab-entering .form-card:nth-child(2)  { animation: iosSlideUp 140ms var(--ease-out) 20ms both; }
-        .tab-entering .form-card:nth-child(3)  { animation: iosSlideUp 140ms var(--ease-out) 40ms both; }
-        .tab-entering .form-card:nth-child(n+4){ animation: iosSlideUp 140ms var(--ease-out) 60ms both; }
+        /* ── Tab-scoped card stagger (buttery slide + micro-scale) ──── */
+        @keyframes butteryCardIn {
+            from { opacity: 0; transform: translateY(16px) scale(0.985); }
+            to   { opacity: 1; transform: translateY(0)   scale(1); }
+        }
+        .tab-entering .form-card:nth-child(1)  { animation: butteryCardIn 320ms var(--ease-silk) 0ms   both; }
+        .tab-entering .form-card:nth-child(2)  { animation: butteryCardIn 320ms var(--ease-silk) 70ms  both; }
+        .tab-entering .form-card:nth-child(3)  { animation: butteryCardIn 320ms var(--ease-silk) 140ms both; }
+        .tab-entering .form-card:nth-child(n+4){ animation: butteryCardIn 320ms var(--ease-silk) 200ms both; }
 
         /* ── .ios-appear utility — add to any element for a one-shot pop-in */
         .ios-appear {
@@ -7493,16 +7518,17 @@
             }
         }
 
-        /* ── View Transitions API: smooth tab cross-fade ────────────────── */
+        /* ── View Transitions API: buttery tab cross-fade ────────────────── */
         @media (prefers-reduced-motion: no-preference) {
+            ::view-transition-group(root),
             ::view-transition-group(tab-content) {
-                animation-duration: 0.25s;
-                animation-timing-function: cubic-bezier(0.25, 1, 0.5, 1);
+                animation-duration: 0.3s;
+                animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
             }
             ::view-transition-old(root),
             ::view-transition-new(root) {
-                animation-duration: 0.2s;
-                animation-timing-function: ease-out;
+                animation-duration: 0.28s;
+                animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
                 mix-blend-mode: normal;
             }
         }
