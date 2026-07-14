@@ -225,7 +225,17 @@
             box-shadow: var(--shadow);
             overflow: hidden;
         }
-        .controls {
+        .login-gate {
+            text-align: center;
+            padding: 60px 24px;
+            max-width: 440px;
+            margin: 0 auto;
+        }
+        .login-gate-icon { font-size: 48px; margin-bottom: 16px; }
+        .login-gate h2 { color: var(--primary); margin: 0 0 8px; }
+        .login-gate p { margin: 4px 0; color: var(--text); }
+        body.dark .login-gate h2 { color: var(--primary); }
+        body.dark .login-gate p { color: var(--text); }
             display: flex;
             gap: 10px;
             align-items: center;
@@ -471,6 +481,13 @@
         }
         .ctrl-btn:hover { background: var(--primary); color: white; border-color: transparent; }
         #themeToggle { font-size: 17px; }
+        .login-link {
+            width: auto !important; border-radius: 999px !important; padding: 0 16px !important;
+            font-size: 13px !important; font-weight: 600; gap: 5px; display: inline-flex !important;
+            align-items: center; text-decoration: none; background: var(--secondary); color: white;
+            border-color: transparent; box-shadow: 0 4px 12px rgba(247,147,30,.3);
+        }
+        .login-link:hover { background: var(--gold) !important; color: white !important; box-shadow: 0 6px 16px rgba(212,175,55,.4); }
 
         /* ── AMOLED DARK THEME ── */
         body.dark {
@@ -501,6 +518,7 @@
             background: var(--primary); color: #000; border-color: transparent;
             box-shadow: 0 0 16px rgba(34,197,94,.45);
         }
+        body.dark .login-link { background: var(--secondary); color: white; }
         body.dark .hero {
             background: linear-gradient(135deg, #071a0e 0%, #000 100%);
             border: 1px solid rgba(34,197,94,.18);
@@ -553,6 +571,7 @@
                 </div>
             </a>
             <div class="header-controls">
+                <a id="headerLoginBtn" class="ctrl-btn login-link" href="./offline_scoreboard.html" title="Login to access scoreboard">🔐 Login</a>
                 <button id="zoomOut" class="ctrl-btn" type="button" title="Zoom out" aria-label="Zoom out">−</button>
                 <button id="zoomIn" class="ctrl-btn" type="button" title="Zoom in" aria-label="Zoom in">+</button>
                 <button id="themeToggle" class="ctrl-btn" type="button" title="Toggle theme" aria-label="Toggle dark mode">🌙</button>
@@ -649,38 +668,27 @@
             <div class="section cta appear">
                 <h2 style="margin-top:0;">Join the Excel Academy Family</h2>
                 <p>Where Every Child's Potential Becomes Reality</p>
-                <a href="#scoreboardPanel" class="cta-button" id="goScoreboard">View Scoreboard</a>
+                <a href="#scoreboardPanel" class="cta-button" id="goScoreboard">🔐 Login to View Scoreboard</a>
             </div>
         </section>
 
         <section id="scoreboardPanel" class="panel panel-shell">
-            <div class="controls">
-                <button id="refreshBtn" type="button">Refresh</button>
-                <label for="monthSel">Month</label>
-                <select id="monthSel"></select>
-                <span id="syncMeta" class="meta">Syncing...</span>
-            </div>
-            <div class="scroll">
-                <table class="scoreboard-table">
-                    <thead>
-                        <tr>
-                            <th class="rank">Rank</th>
-                            <th class="col-roll">Roll</th>
-                            <th class="col-name">Name</th>
-                            <th class="col-class">Class</th>
-                            <th class="col-total">Total</th>
-                        </tr>
-                    </thead>
-                    <tbody id="body">
-                        <tr><td class="empty" colspan="5">Loading...</td></tr>
-                    </tbody>
-                </table>
+            <div class="login-gate">
+                <div class="login-gate-icon">🔒</div>
+                <h2>Login Required</h2>
+                <p>The scoreboard is only available to logged-in users.</p>
+                <p style="font-size:0.85rem;color:var(--muted);margin-bottom:18px;">Please log in to view student scores and rankings.</p>
+                <a href="./offline_scoreboard.html" class="cta-button" id="scoreboardLoginLink">🔐 Login to View Scoreboard</a>
             </div>
         </section>
 
         <section id="infoPanel" class="panel panel-shell">
-            <div id="publicInfoList" class="info-wrap">
-                <div class="empty">Loading information...</div>
+            <div class="login-gate">
+                <div class="login-gate-icon">🔒</div>
+                <h2>Login Required</h2>
+                <p>Information is only available to logged-in users.</p>
+                <p style="font-size:0.85rem;color:var(--muted);margin-bottom:18px;">Please log in to view school information and announcements.</p>
+                <a href="./offline_scoreboard.html" class="cta-button" id="infoLoginLink">🔐 Login to View Information</a>
             </div>
         </section>
     </main>
@@ -691,274 +699,23 @@
     </footer>
 
     <script>
-        const monthSel = document.getElementById('monthSel');
-        const refreshBtn = document.getElementById('refreshBtn');
-        const syncMeta = document.getElementById('syncMeta');
-        const body = document.getElementById('body');
-        const infoList = document.getElementById('publicInfoList');
         const tabHome = document.getElementById('tabHome');
         const tabScoreboard = document.getElementById('tabScoreboard');
         const tabInfo = document.getElementById('tabInfo');
         const homePanel = document.getElementById('homePanel');
         const scoreboardPanel = document.getElementById('scoreboardPanel');
         const infoPanel = document.getElementById('infoPanel');
-        let latest = { months: [], scoreboard: {}, top_full_count: 15, public_information: [] };
 
-        function esc(s) {
-            return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-        }
-        function cleanName(value) {
-            return String(value || '').replace(/\s*\([^)]*\)/g, '').replace(/\s+/g, ' ').trim() || '-';
-        }
-        function parseStamp(v) {
-            const n = Date.parse(String(v || ''));
-            return Number.isFinite(n) ? n : 0;
-        }
-        function rollKey(v) { return String(v || '').trim().toUpperCase(); }
-        function normStatus(v) {
-            const s = String(v || '').toLowerCase();
-            return ['present', 'absent', 'late', 'leave'].includes(s) ? s : 'present';
-        }
-        function penaltyOf(status) {
-            if (status === 'absent') return -20;
-            if (status === 'late') return -5;
-            return 0;
-        }
-        function monthKeys(data) {
-            const set = new Set();
-            (data.months || []).forEach(m => set.add(String(m || '').trim()));
-            (data.scores || []).forEach(s => set.add(String(s && s.month || '').trim()));
-            (data.attendance || []).forEach(a => {
-                const d = String(a && a.date || '').trim();
-                if (d.length >= 7) set.add(d.slice(0, 7));
-            });
-            return Array.from(set).filter(v => /^\d{4}-\d{2}$/.test(v)).sort((a, b) => b.localeCompare(a)).slice(0, 3);
-        }
-        function latestThreeMonths(rawMonths) {
-            const now = new Date();
-            const keep = new Set();
-            const y = now.getFullYear();
-            const m = now.getMonth() + 1;
-            for (let i = 0; i < 3; i++) {
-                const dt = new Date(y, m - 1 - i, 1);
-                keep.add(`${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}`);
-            }
-            const months = Array.isArray(rawMonths) ? rawMonths.map(v => String(v || '').trim()) : [];
-            return months.filter(month => keep.has(month)).sort((a, b) => b.localeCompare(a)).slice(0, 3);
-        }
-        function getMonthRosterRolls(data, month) {
-            const rolls = new Set();
-            const ms = data && data.month_students && data.month_students[month];
-            const mp = data && data.month_roster_profiles && data.month_roster_profiles[month];
-            (Array.isArray(ms) ? ms : []).forEach(v => { const r = rollKey(v); if (r) rolls.add(r); });
-            (Array.isArray(mp) ? mp : []).forEach(p => { const r = rollKey(p && p.roll); if (r) rolls.add(r); });
-            return rolls;
-        }
-        function legacyRowsForMonth(data, month) {
-            const rosterRolls = getMonthRosterRolls(data, month);
-            const baseStudents = (data.students || []).filter(s => s && s.active !== false);
-            const visible = rosterRolls.size ? baseStudents.filter(s => rosterRolls.has(rollKey(s && s.roll))) : baseStudents;
-            const dedupByRoll = new Map();
-            visible.forEach(s => {
-                const r = rollKey(s && s.roll);
-                if (r && !dedupByRoll.has(r)) dedupByRoll.set(r, s);
-            });
-            const students = Array.from(dedupByRoll.values());
-            const byId = new Map(students.map(s => [parseInt(s.id, 10), s]));
-            const totals = new Map(students.map(s => [parseInt(s.id, 10), 0]));
-            (data.scores || []).forEach(sc => {
-                const sid = parseInt(sc && sc.studentId, 10);
-                if (!sid || !totals.has(sid)) return;
-                if (String(sc && sc.month || '').trim() !== month) return;
-                const pts = parseInt(sc && sc.points, 10) || 0;
-                totals.set(sid, (totals.get(sid) || 0) + pts);
-            });
-            const attLatest = new Map();
-            (data.attendance || []).forEach(a => {
-                const sid = parseInt(a && a.studentId, 10);
-                const d = String(a && a.date || '').trim();
-                if (!sid || !d.startsWith(month)) return;
-                const key = `${sid}|${d}`;
-                const prev = attLatest.get(key);
-                const pts = parseStamp(prev && (prev.updated_at || prev.created_at));
-                const nts = parseStamp((a && (a.updated_at || a.created_at)) || '');
-                if (!prev || nts >= pts) attLatest.set(key, a);
-            });
-            attLatest.forEach(a => {
-                const sid = parseInt(a && a.studentId, 10);
-                if (sid && totals.has(sid)) totals.set(sid, (totals.get(sid) || 0) + penaltyOf(normStatus(a && a.status)));
-            });
-            return Array.from(totals.entries()).map(([sid, total]) => {
-                const s = byId.get(sid) || {};
-                return { rank: 0, roll: rollKey(s.roll || ''), name: cleanName(s.base_name || s.name || ''), class: s.class || '-', total: total || 0, masked: false };
-            }).sort((a, b) => b.total !== a.total ? b.total - a.total : a.roll.localeCompare(b.roll)).map((row, i) => ({
-                ...row, rank: i + 1, masked: i + 1 > 15, name: i + 1 > 15 ? '' : row.name, class: i + 1 > 15 ? '' : row.class
-            }));
-        }
-        function normalizePayload(payload) {
-            if (payload && payload.scoreboard && !payload.data) {
-                const months = latestThreeMonths(payload.months);
-                const scoreboard = payload.scoreboard || {};
-                return {
-                    updated_at: payload.updated_at || '',
-                    top_full_count: Number(payload.top_full_count) || 15,
-                    months,
-                    scoreboard: Object.fromEntries(months.map(month => [month, Array.isArray(scoreboard[month]) ? scoreboard[month] : []])),
-                    public_information: Array.isArray(payload.public_information) ? payload.public_information : []
-                };
-            }
-            const raw = payload && payload.data ? payload.data : {};
-            const months = monthKeys(raw);
-            const scoreboard = {};
-            months.forEach(month => { scoreboard[month] = legacyRowsForMonth(raw, month); });
-            return {
-                updated_at: payload && payload.updated_at ? payload.updated_at : '',
-                top_full_count: 15,
-                months,
-                scoreboard,
-                public_information: []
-            };
-        }
-        function renderScoreboard(snapshot) {
-            latest = snapshot || { months: [], scoreboard: {}, top_full_count: 15, public_information: [] };
-            const months = Array.isArray(latest.months) ? latest.months : [];
-            const preferred = localStorage.getItem('ea_pub_month') || '';
-            monthSel.innerHTML = months.map(m => `<option value="${m}">${m}</option>`).join('');
-            const selected = months.includes(preferred) ? preferred : (months[0] || '');
-            monthSel.value = selected;
-            if (!selected) {
-                body.innerHTML = '<tr><td class="empty" colspan="5">No month data available</td></tr>';
-                return;
-            }
-            const rows = Array.isArray((latest.scoreboard || {})[selected]) ? latest.scoreboard[selected] : [];
-            if (!rows.length) {
-                body.innerHTML = '<tr><td class="empty" colspan="5">No data for this month</td></tr>';
-                return;
-            }
-            body.innerHTML = rows.map((r, i) => {
-                const rank = Number(r.rank) || (i + 1);
-                const cls = Number(r.total) > 0 ? 'pos' : (Number(r.total) < 0 ? 'neg' : '');
-                const name = r.masked ? '&mdash;' : esc(cleanName(r.name || '-'));
-                const classVal = r.masked ? '&mdash;' : esc(r.class || '-');
-                const rowCls = rank === 1 ? 'sr-1' : rank === 2 ? 'sr-2' : rank === 3 ? 'sr-3' : rank <= 7 ? 'sr-b4' : rank <= 12 ? 'sr-b5' : rank <= 15 ? 'sr-b6' : '';
-                const rankDisp = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : rank;
-                return `<tr class="${rowCls}"><td class="rank">${rankDisp}</td><td class="col-roll">${esc(r.roll || '-')}</td><td class="col-name">${name}</td><td class="col-class">${classVal}</td><td class="col-total ${cls}">${Number(r.total) || 0}</td></tr>`;
-            }).join('');
-        }
-        function renderPublicInformation(snapshot) {
-            const items = Array.isArray(snapshot && snapshot.public_information) ? snapshot.public_information : [];
-            if (!items.length) {
-                infoList.innerHTML = '<div class="empty">No public information posted yet.</div>';
-                return;
-            }
-            infoList.innerHTML = items.map(item => {
-                const title = esc(item.title || 'Information');
-                const layoutValue = String(item.layout || 'cards').toLowerCase();
-                const layoutLabel = esc(layoutValue.toUpperCase());
-                const category = String(item.category || '').toLowerCase();
-                const audience = String(item.audience || '').trim();
-                const periodType = String(item.period_type || '').trim();
-                const periodLabel = String(item.period_label || '').trim();
-                const isSchedule = category === 'schedule_class' || category === 'schedule_group';
-                
-                let bodyHtml = '';
-                if (layoutValue === 'planner' && item.planner_data) {
-                    bodyHtml = renderPlannerView(item.planner_data);
-                } else if (layoutValue === 'table') {
-                    const cols = Array.isArray(item.table_columns) ? item.table_columns : [];
-                    const rows = Array.isArray(item.table_rows) ? item.table_rows : [];
-                    const th = cols.map(c => `<th>${esc(c)}</th>`).join('');
-                    const tr = rows.map(row => `<tr>${(Array.isArray(row) ? row : []).map(cell => `<td>${esc(cell)}</td>`).join('')}</tr>`).join('');
-                    bodyHtml = `<div class="scroll"><table class="info-table"><thead><tr>${th}</tr></thead><tbody>${tr || '<tr><td class="empty">No table rows</td></tr>'}</tbody></table></div>`;
-                } else {
-                    const lines = String(item.content || '').split(/\r?\n/).map(v => v.trim()).filter(Boolean);
-                    bodyHtml = `<div class="info-boxes">${lines.length ? lines.map(line => `<div class="info-box">${esc(line)}</div>`).join('') : '<div class="info-box">No details</div>'}</div>`;
-                }
-                
-                let attachmentHtml = '';
-                const attachment = item.attachment || null;
-                if (attachment && attachment.data_url) {
-                    const mime = String(attachment.mime || '').toLowerCase();
-                    const name = esc(attachment.name || 'attachment');
-                    if (mime.startsWith('image/')) attachmentHtml = `<div class="info-attachment"><img src="${attachment.data_url}" alt="${name}"></div>`;
-                    else if (mime === 'application/pdf') attachmentHtml = `<div class="info-attachment"><a href="${attachment.data_url}" target="_blank" rel="noopener noreferrer">Open PDF: ${name}</a></div>`;
-                }
-                const updated = esc(item.updated_at || '');
-                const scheduleBadge = isSchedule ? `<div style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0;"><span class="chip">${esc(category === 'schedule_class' ? 'CLASS SCHEDULE' : 'GROUP SCHEDULE')}</span>${audience ? `<span class="chip">${esc(audience)}</span>` : ''}${(periodType || periodLabel) ? `<span class="chip">${esc((periodType ? periodType.toUpperCase() : '') + (periodLabel ? ' - ' + periodLabel : ''))}</span>` : ''}</div>` : '';
-                return `<article class="info-item"><div class="info-head"><h3 style="margin:0;font-size:16px;">${title}</h3><span class="chip">${layoutLabel}</span></div>${scheduleBadge}${bodyHtml}${attachmentHtml}${updated ? `<div class="meta" style="margin-top:8px;">Updated: ${updated}</div>` : ''}</article>`;
-            }).join('');
+        // Check if the user has a cross-origin login token (set by the SPA on the same origin).
+        // If logged in, clicking Scoreboard/Info redirects straight to the full SPA.
+        function hasLoginToken() {
+            try { return !!localStorage.getItem('login_code'); } catch(e) { return false; }
         }
 
-        function renderPlannerView(p) {
-            if (!p) return '';
-            let html = '<div class="planner-container">';
-            
-            if (p.type === 'weekly') {
-                if (p.goals || p.notes) {
-                    html += '<div class="planner-meta">';
-                    if (p.goals) html += `<div class="planner-meta-card"><div class="planner-meta-hdr">🎯 Week's Goals</div><div class="planner-meta-txt">${esc(p.goals)}</div></div>`;
-                    if (p.notes) html += `<div class="planner-meta-card"><div class="planner-meta-hdr">📌 Notes & Events</div><div class="planner-meta-txt">${esc(p.notes)}</div></div>`;
-                    html += '</div>';
-                }
-                
-                const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-                const weekStart = new Date(p.weekStart);
-                for (let i = 0; i < 7; i++) {
-                    const d = new Date(weekStart);
-                    d.setDate(weekStart.getDate() + i);
-                    const dateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-                    const key = `w${i}`;
-                    const val = p.data[key];
-                    
-                    let contentHtml = '';
-                    if (val && typeof val === 'object') {
-                        const times = ['Morning', 'Mid-Day', 'Evening'];
-                        times.forEach(t => {
-                            if (val[t]) contentHtml += `<div class="planner-time-block"><span class="planner-time-tag">${t}</span><div class="planner-time-text">${esc(val[t])}</div></div>`;
-                        });
-                    } else if (val) {
-                        contentHtml = `<div class="planner-time-text">${esc(String(val))}</div>`;
-                    }
-                    
-                    if (!contentHtml) contentHtml = '<div style="font-style:italic;color:var(--muted);font-size:12px;">No schedule set</div>';
-
-                    html += `
-                        <div class="planner-weekly-row">
-                            <div class="planner-weekly-label">
-                                <div class="planner-weekly-day">${days[i].slice(0, 3)}</div>
-                                <div class="planner-weekly-date">${dateStr}</div>
-                            </div>
-                            <div class="planner-weekly-content">${contentHtml}</div>
-                        </div>
-                    `;
-                }
-            } else {
-                // Monthly
-                const daysInMonth = new Date(p.year, p.month + 1, 0).getDate();
-                const firstDay = new Date(p.year, p.month, 1).getDay();
-                let startOffset = firstDay === 0 ? 6 : firstDay - 1;
-                
-                html += '<div class="scroll" style="border:none;"><table class="planner-grid"><thead><tr><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th><th>Sun</th></tr></thead><tbody><tr>';
-                
-                for (let i = 0; i < startOffset; i++) html += '<td style="background:var(--surface-2);"></td>';
-                
-                for (let d = 1; d <= daysInMonth; d++) {
-                    if ((startOffset + d - 1) % 7 === 0 && d > 1) html += '</tr><tr>';
-                    const key = `d${d}`;
-                    const val = p.data[key] || '';
-                    html += `<td><span class="planner-day-num">${d}</span><div class="planner-day-text">${esc(val)}</div></td>`;
-                }
-                
-                const totalCells = startOffset + daysInMonth;
-                const remaining = (7 - (totalCells % 7)) % 7;
-                for (let i = 0; i < remaining; i++) html += '<td style="background:var(--surface-2);"></td>';
-                
-                html += '</tr></tbody></table></div>';
-            }
-            
-            html += '</div>';
-            return html;
+        function goToSPA() {
+            window.location.href = './offline_scoreboard.html';
         }
+
         function setActiveTab(tabKey) {
             const isHome = tabKey === 'home';
             const isScoreboard = tabKey === 'scoreboard';
@@ -975,32 +732,20 @@
                 });
             }
         }
-        async function fetchAndRender() {
-            try {
-                const resp = await fetch(`./scores.json?_=${Date.now()}`, { cache: 'no-store' });
-                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-                const payload = await resp.json();
-                const snap = normalizePayload(payload);
-                renderScoreboard(snap);
-                renderPublicInformation(snap);
-                const stamp = payload && payload.updated_at ? payload.updated_at : '';
-                syncMeta.textContent = stamp ? `Last updated: ${new Date(stamp).toLocaleString()}` : 'Updated';
-            } catch (err) {
-                syncMeta.textContent = 'Unable to load latest scores';
-                body.innerHTML = '<tr><td class="empty" colspan="5">Failed to load scores.json</td></tr>';
-                infoList.innerHTML = '<div class="empty">Failed to load public information.</div>';
-            }
-        }
         tabHome.addEventListener('click', () => setActiveTab('home'));
-        tabScoreboard.addEventListener('click', () => setActiveTab('scoreboard'));
-        tabInfo.addEventListener('click', () => setActiveTab('info'));
-        refreshBtn.addEventListener('click', fetchAndRender);
-        monthSel.addEventListener('change', () => {
-            localStorage.setItem('ea_pub_month', monthSel.value);
-            renderScoreboard(latest || {});
+        // Scoreboard and Info tabs require login — redirect to SPA if logged in,
+        // otherwise show the login-gate panel (already in the HTML).
+        tabScoreboard.addEventListener('click', () => {
+            if (hasLoginToken()) { goToSPA(); return; }
+            setActiveTab('scoreboard');
+        });
+        tabInfo.addEventListener('click', () => {
+            if (hasLoginToken()) { goToSPA(); return; }
+            setActiveTab('info');
         });
         document.getElementById('goScoreboard').addEventListener('click', (e) => {
             e.preventDefault();
+            if (hasLoginToken()) { goToSPA(); return; }
             setActiveTab('scoreboard');
             document.getElementById('scoreboardPanel').scrollIntoView({ behavior: 'smooth', block: 'start' });
         });
@@ -1010,8 +755,6 @@
                 setTimeout(() => el.classList.add('visible'), 120 + idx * 75);
             });
         });
-        fetchAndRender();
-        setInterval(fetchAndRender, 30000);
 
         // ── ZOOM ──
         let zoomLevel = parseFloat(localStorage.getItem('ea_zoom') || '1');
