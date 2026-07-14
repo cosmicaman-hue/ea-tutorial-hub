@@ -6,3 +6,9 @@
 /index.html
   Cache-Control: no-cache, must-revalidate, max-age=0
 
+/offline_scoreboard.html
+  Cache-Control: no-cache, must-revalidate, max-age=0
+
+/static/css/offline-scoreboard.css
+  Cache-Control: public, max-age=3600, must-revalidate
+
