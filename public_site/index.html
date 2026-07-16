@@ -236,6 +236,7 @@
         .login-gate p { margin: 4px 0; color: var(--text); }
         body.dark .login-gate h2 { color: var(--primary); }
         body.dark .login-gate p { color: var(--text); }
+        .controls {
             display: flex;
             gap: 10px;
             align-items: center;
@@ -244,6 +245,112 @@
             background: rgba(244,240,232,.85);
             border-bottom: 1px solid var(--line);
         }
+        /* ── AUTH BAR (shown when logged in) ── */
+        .auth-bar {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 16px;
+            background: rgba(26,77,46,.06);
+            border-bottom: 1px solid var(--line);
+            font-size: 13px;
+            color: var(--muted);
+            font-family: "Poppins", "Segoe UI", sans-serif;
+        }
+        .auth-bar .auth-spacer { flex: 1; }
+        .auth-bar .logout-btn {
+            border: 1px solid var(--line);
+            border-radius: 999px;
+            padding: 6px 14px;
+            background: white;
+            color: var(--accent);
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: inherit;
+            transition: background .2s, color .2s;
+        }
+        .auth-bar .logout-btn:hover { background: var(--accent); color: white; }
+        body.dark .auth-bar { background: rgba(34,197,94,.06); }
+        body.dark .auth-bar .logout-btn { background: #111; color: var(--accent); border-color: rgba(255,255,255,.14); }
+        body.dark .auth-bar .logout-btn:hover { background: var(--accent); color: #000; }
+        /* ── LOGIN MODAL ── */
+        .login-modal-overlay {
+            position: fixed; inset: 0; z-index: 100;
+            background: rgba(10,20,30,.55);
+            backdrop-filter: blur(4px);
+            display: none;
+            align-items: center; justify-content: center;
+            padding: 20px;
+            animation: modalFade .2s ease;
+        }
+        .login-modal-overlay.open { display: flex; }
+        @keyframes modalFade { from { opacity: 0; } to { opacity: 1; } }
+        .login-modal {
+            background: var(--surface);
+            border: 1px solid var(--line);
+            border-radius: 20px;
+            box-shadow: 0 24px 60px rgba(0,0,0,.30);
+            width: 100%; max-width: 380px;
+            padding: 28px 26px 24px;
+            text-align: center;
+            animation: modalRise .25s ease;
+        }
+        @keyframes modalRise { from { transform: translateY(18px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        .login-modal-icon { font-size: 42px; margin-bottom: 10px; }
+        .login-modal h2 { margin: 0 0 4px; color: var(--primary); font-family: "Playfair Display", Georgia, serif; }
+        .login-modal p { margin: 0 0 18px; color: var(--muted); font-size: 13px; }
+        .login-modal label {
+            display: block; text-align: left;
+            font-size: 12px; font-weight: 600; color: var(--muted);
+            margin: 12px 0 4px; text-transform: uppercase; letter-spacing: .5px;
+            font-family: "Poppins", "Segoe UI", sans-serif;
+        }
+        .login-modal input {
+            width: 100%;
+            background: var(--surface-2);
+            color: var(--text);
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            padding: 11px 13px;
+            font-size: 15px;
+            transition: border-color .2s, box-shadow .2s;
+            font-family: inherit;
+        }
+        .login-modal input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(26,77,46,.12);
+        }
+        .login-modal-actions { display: flex; gap: 10px; margin-top: 20px; }
+        .login-modal-actions button {
+            flex: 1;
+            padding: 12px;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            border: 1px solid var(--line);
+            font-family: "Poppins", "Segoe UI", sans-serif;
+            transition: background .2s, color .2s, border-color .2s;
+        }
+        .login-modal .btn-cancel { background: var(--surface-2); color: var(--muted); }
+        .login-modal .btn-cancel:hover { background: var(--line); }
+        .login-modal .btn-submit {
+            background: var(--primary); color: white; border-color: transparent;
+        }
+        .login-modal .btn-submit:hover { background: #0d2818; }
+        .login-modal .btn-submit:disabled { opacity: .6; cursor: wait; }
+        .login-error {
+            color: var(--accent); font-size: 12px; margin-top: 12px;
+            min-height: 16px; font-family: "Poppins", "Segoe UI", sans-serif;
+        }
+        body.dark .login-modal { background: #0a0a0a; border-color: rgba(34,197,94,.18); box-shadow: 0 24px 60px rgba(0,0,0,.6); }
+        body.dark .login-modal h2 { color: var(--primary); }
+        body.dark .login-modal input { background: #111; border-color: rgba(255,255,255,.12); }
+        body.dark .login-modal .btn-cancel { background: #111; color: var(--muted); }
+        body.dark .login-modal .btn-submit { background: var(--primary); color: #000; }
+        body.dark .login-modal .btn-submit:hover { background: #16a34a; }
         select, button {
             background: white;
             color: var(--text);
@@ -571,7 +678,7 @@
                 </div>
             </a>
             <div class="header-controls">
-                <a id="headerLoginBtn" class="ctrl-btn login-link" href="./offline_scoreboard.html" title="Login to access scoreboard">🔐 Login</a>
+                <button id="headerLoginBtn" class="ctrl-btn login-link" type="button" title="Login to access scoreboard">🔐 Login</button>
                 <button id="zoomOut" class="ctrl-btn" type="button" title="Zoom out" aria-label="Zoom out">−</button>
                 <button id="zoomIn" class="ctrl-btn" type="button" title="Zoom in" aria-label="Zoom in">+</button>
                 <button id="themeToggle" class="ctrl-btn" type="button" title="Toggle theme" aria-label="Toggle dark mode">🌙</button>
@@ -673,22 +780,56 @@
         </section>
 
         <section id="scoreboardPanel" class="panel panel-shell">
-            <div class="login-gate">
+            <div class="login-gate" id="scoreboardGate">
                 <div class="login-gate-icon">🔒</div>
                 <h2>Login Required</h2>
                 <p>The scoreboard is only available to logged-in users.</p>
                 <p style="font-size:0.85rem;color:var(--muted);margin-bottom:18px;">Please log in to view student scores and rankings.</p>
-                <a href="./offline_scoreboard.html" class="cta-button" id="scoreboardLoginLink">🔐 Login to View Scoreboard</a>
+                <button type="button" class="cta-button" id="scoreboardLoginLink">🔐 Login to View Scoreboard</button>
+            </div>
+            <div id="scoreboardContent" hidden>
+                <div class="auth-bar">
+                    <span id="scoreboardAuthUser"></span>
+                    <span class="auth-spacer"></span>
+                    <button type="button" class="logout-btn" data-logout>Logout</button>
+                </div>
+                <div class="controls">
+                    <label for="monthSelect">Month</label>
+                    <select id="monthSelect"></select>
+                    <span class="meta" id="scoreboardMeta"></span>
+                </div>
+                <div class="scroll">
+                    <table class="scoreboard-table">
+                        <thead>
+                            <tr>
+                                <th class="rank">#</th>
+                                <th class="col-roll">Roll</th>
+                                <th class="col-name">Name</th>
+                                <th class="col-class">Class</th>
+                                <th class="col-total">Total</th>
+                            </tr>
+                        </thead>
+                        <tbody id="scoreboardBody"></tbody>
+                    </table>
+                </div>
             </div>
         </section>
 
         <section id="infoPanel" class="panel panel-shell">
-            <div class="login-gate">
+            <div class="login-gate" id="infoGate">
                 <div class="login-gate-icon">🔒</div>
                 <h2>Login Required</h2>
                 <p>Information is only available to logged-in users.</p>
                 <p style="font-size:0.85rem;color:var(--muted);margin-bottom:18px;">Please log in to view school information and announcements.</p>
-                <a href="./offline_scoreboard.html" class="cta-button" id="infoLoginLink">🔐 Login to View Information</a>
+                <button type="button" class="cta-button" id="infoLoginLink">🔐 Login to View Information</button>
+            </div>
+            <div id="infoContent" hidden>
+                <div class="auth-bar">
+                    <span id="infoAuthUser"></span>
+                    <span class="auth-spacer"></span>
+                    <button type="button" class="logout-btn" data-logout>Logout</button>
+                </div>
+                <div class="info-wrap" id="infoBody"></div>
             </div>
         </section>
     </main>
@@ -698,7 +839,37 @@
         <div style="margin-top:6px;">Public site hosted on Cloudflare</div>
     </footer>
 
+    <!-- ── LOGIN MODAL ── -->
+    <div class="login-modal-overlay" id="loginModal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="loginModalTitle">
+        <div class="login-modal">
+            <div class="login-modal-icon">🔐</div>
+            <h2 id="loginModalTitle">Login</h2>
+            <p>Enter your roll number and password to view the scoreboard.</p>
+            <form id="loginForm" autocomplete="off">
+                <label for="loginRoll">Roll No.</label>
+                <input type="text" id="loginRoll" placeholder="e.g. EA24B15" autocapitalize="characters" spellcheck="false" required>
+                <label for="loginPass">Password</label>
+                <input type="password" id="loginPass" placeholder="Password" required>
+                <div class="login-error" id="loginError"></div>
+                <div class="login-modal-actions">
+                    <button type="button" class="btn-cancel" id="loginCancel">Cancel</button>
+                    <button type="submit" class="btn-submit" id="loginSubmit">Login</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <script>
+        // ════════════════════════════════════════════════════════════
+        // CLIENT-SIDE LOGIN GATE (soft gate — see README.md)
+        // Credentials verified against ./credentials.json (salted SHA-256).
+        // On success the Scoreboard and Information tabs render from
+        // ./scores.json. No server / SPA routing required.
+        // ════════════════════════════════════════════════════════════
+        const AUTH_KEY = 'ea_public_auth';
+        const CREDENTIALS_URL = './credentials.json';
+        const SCORES_URL = './scores.json';
+
         const tabHome = document.getElementById('tabHome');
         const tabScoreboard = document.getElementById('tabScoreboard');
         const tabInfo = document.getElementById('tabInfo');
@@ -706,17 +877,248 @@
         const scoreboardPanel = document.getElementById('scoreboardPanel');
         const infoPanel = document.getElementById('infoPanel');
 
-        // Check if the user has a cross-origin login token (set by the SPA on the same origin).
-        // If logged in, clicking Scoreboard/Info redirects straight to the full SPA.
-        function hasLoginToken() {
-            try { return !!localStorage.getItem('login_code'); } catch(e) { return false; }
+        const loginModal = document.getElementById('loginModal');
+        const loginForm = document.getElementById('loginForm');
+        const loginRoll = document.getElementById('loginRoll');
+        const loginPass = document.getElementById('loginPass');
+        const loginError = document.getElementById('loginError');
+        const loginSubmit = document.getElementById('loginSubmit');
+        const headerLoginBtn = document.getElementById('headerLoginBtn');
+
+        let scoresData = null;        // cached scores.json payload
+        let credentialsCache = null;  // cached credentials.json payload
+        let activeTab = 'home';
+
+        // ── Auth state ──
+        function getAuth() {
+            try { return JSON.parse(localStorage.getItem(AUTH_KEY) || 'null'); } catch(e) { return null; }
+        }
+        function isLoggedIn() { return !!getAuth(); }
+
+        function setAuth(roll) {
+            try { localStorage.setItem(AUTH_KEY, JSON.stringify({ roll: roll, ts: Date.now() })); } catch(e) {}
+        }
+        function clearAuth() {
+            try { localStorage.removeItem(AUTH_KEY); } catch(e) {}
         }
 
-        function goToSPA() {
-            window.location.href = './offline_scoreboard.html';
+        // SHA-256 of a UTF-8 string → hex. Matches scripts/generate_credentials.py.
+        async function sha256Hex(text) {
+            const buf = new TextEncoder().encode(text);
+            const digest = await crypto.subtle.digest('SHA-256', buf);
+            return Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
         }
 
+        async function loadCredentials() {
+            if (credentialsCache) return credentialsCache;
+            const res = await fetch(CREDENTIALS_URL, { cache: 'no-store' });
+            if (!res.ok) throw new Error('credentials file unavailable');
+            credentialsCache = await res.json();
+            return credentialsCache;
+        }
+
+        async function loadScores() {
+            if (scoresData) return scoresData;
+            const res = await fetch(SCORES_URL, { cache: 'no-store' });
+            if (!res.ok) throw new Error('scoreboard data unavailable');
+            scoresData = await res.json();
+            return scoresData;
+        }
+
+        // ── Login modal ──
+        function openLoginModal() {
+            loginError.textContent = '';
+            loginForm.reset();
+            loginModal.classList.add('open');
+            loginModal.setAttribute('aria-hidden', 'false');
+            setTimeout(() => loginRoll.focus(), 50);
+        }
+        function closeLoginModal() {
+            loginModal.classList.remove('open');
+            loginModal.setAttribute('aria-hidden', 'true');
+        }
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            loginError.textContent = '';
+            loginSubmit.disabled = true;
+            const roll = loginRoll.value.trim().toUpperCase();
+            const pass = loginPass.value;
+            if (!roll || !pass) {
+                loginError.textContent = 'Please enter both roll number and password.';
+                loginSubmit.disabled = false;
+                return;
+            }
+            if (!window.crypto || !crypto.subtle) {
+                loginError.textContent = 'Login requires a secure context (https).';
+                loginSubmit.disabled = false;
+                return;
+            }
+            try {
+                const creds = await loadCredentials();
+                const list = (creds && creds.credentials) || [];
+                const entry = list.find(c => String(c.roll || '').toUpperCase() === roll);
+                if (!entry) {
+                    loginError.textContent = 'Invalid roll number or password.';
+                    loginSubmit.disabled = false;
+                    return;
+                }
+                const computed = await sha256Hex(entry.salt + pass);
+                if (computed.toLowerCase() !== String(entry.hash || '').toLowerCase()) {
+                    loginError.textContent = 'Invalid roll number or password.';
+                    loginSubmit.disabled = false;
+                    return;
+                }
+                setAuth(roll);
+                closeLoginModal();
+                loginSubmit.disabled = false;
+                applyAuthState();
+                // Open the panel the user was trying to reach
+                setActiveTab(activeTab === 'home' ? 'scoreboard' : activeTab);
+                if (activeTab === 'scoreboard') scoreboardPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            } catch (err) {
+                loginError.textContent = 'Login failed: ' + (err.message || 'unknown error');
+                loginSubmit.disabled = false;
+            }
+        });
+        document.getElementById('loginCancel').addEventListener('click', closeLoginModal);
+        loginModal.addEventListener('click', (e) => { if (e.target === loginModal) closeLoginModal(); });
+        document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && loginModal.classList.contains('open')) closeLoginModal(); });
+
+        // ── Logout ──
+        function logout() {
+            clearAuth();
+            applyAuthState();
+            setActiveTab('home');
+        }
+        headerLoginBtn.addEventListener('click', () => {
+            if (isLoggedIn()) { logout(); } else { openLoginModal(); }
+        });
+        document.querySelectorAll('[data-logout]').forEach(btn => btn.addEventListener('click', logout));
+
+        // ── Apply auth state to UI ──
+        function applyAuthState() {
+            const auth = getAuth();
+            const loggedIn = !!auth;
+            headerLoginBtn.textContent = loggedIn ? '🚪 Logout' : '🔐 Login';
+            headerLoginBtn.title = loggedIn ? 'Logout' : 'Login to access scoreboard';
+
+            const sbGate = document.getElementById('scoreboardGate');
+            const sbContent = document.getElementById('scoreboardContent');
+            const infoGate = document.getElementById('infoGate');
+            const infoContent = document.getElementById('infoContent');
+            sbGate.hidden = loggedIn;
+            sbContent.hidden = !loggedIn;
+            infoGate.hidden = loggedIn;
+            infoContent.hidden = !loggedIn;
+
+            if (loggedIn) {
+                document.getElementById('scoreboardAuthUser').textContent = 'Signed in: ' + auth.roll;
+                document.getElementById('infoAuthUser').textContent = 'Signed in: ' + auth.roll;
+                if (scoresData) { renderScoreboard(scoresData); renderInfo(scoresData); }
+            }
+        }
+
+        // ── Scoreboard rendering ──
+        function rankClass(rank) {
+            if (rank === 1) return 'sr-1';
+            if (rank === 2) return 'sr-2';
+            if (rank === 3) return 'sr-3';
+            if (rank === 4) return 'sr-b4';
+            if (rank === 5) return 'sr-b5';
+            if (rank === 6) return 'sr-b6';
+            if (rank === 7) return 'sr-b7';
+            return 'sr-b8';
+        }
+        function fmtTotal(total) {
+            const n = Number(total || 0);
+            const cls = n < 0 ? 'neg' : 'pos';
+            const sign = n > 0 ? '+' : '';
+            return '<td class="col-total ' + cls + '">' + sign + n + '</td>';
+        }
+        function escapeHtml(s) {
+            return String(s == null ? '' : s).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+        }
+        function renderScoreboardTable(month) {
+            const body = document.getElementById('scoreboardBody');
+            const rows = (scoresData && scoresData.scoreboard && scoresData.scoreboard[month]) || [];
+            if (!rows.length) {
+                body.innerHTML = '<tr><td colspan="5" class="empty">No scores for this month.</td></tr>';
+                return;
+            }
+            body.innerHTML = rows.map(r => {
+                const cls = rankClass(Number(r.rank) || 0);
+                const name = r.masked ? '<span style="color:var(--muted)">—</span>' : escapeHtml(r.name);
+                const klass = r.masked ? '' : escapeHtml(r.class);
+                return '<tr class="' + cls + '">'
+                    + '<td class="rank">' + escapeHtml(r.rank) + '</td>'
+                    + '<td class="col-roll">' + escapeHtml(r.roll) + '</td>'
+                    + '<td class="col-name">' + name + '</td>'
+                    + '<td class="col-class">' + klass + '</td>'
+                    + fmtTotal(r.total) + '</tr>';
+            }).join('');
+        }
+        function renderScoreboard(data) {
+            scoresData = data;
+            const months = (data && data.months) || [];
+            const sel = document.getElementById('monthSelect');
+            sel.innerHTML = months.map(m => '<option value="' + escapeHtml(m) + '">' + escapeHtml(m) + '</option>').join('');
+            const meta = document.getElementById('scoreboardMeta');
+            if (data && data.updated_at) {
+                const d = new Date(data.updated_at);
+                meta.textContent = 'Updated ' + (isNaN(d) ? data.updated_at : d.toLocaleString());
+            } else {
+                meta.textContent = '';
+            }
+            if (months.length) {
+                renderScoreboardTable(months[0]);
+                sel.onchange = () => renderScoreboardTable(sel.value);
+            } else {
+                document.getElementById('scoreboardBody').innerHTML = '<tr><td colspan="5" class="empty">No scoreboard data available.</td></tr>';
+            }
+        }
+
+        // ── Information rendering ──
+        function renderInfo(data) {
+            scoresData = data;
+            const wrap = document.getElementById('infoBody');
+            const items = (data && data.public_information) || [];
+            if (!items.length) {
+                wrap.innerHTML = '<div class="empty" style="padding:30px;text-align:center;color:var(--muted);">No information published yet.</div>';
+                return;
+            }
+            wrap.innerHTML = items.map(item => {
+                const chips = [];
+                if (item.category && item.category !== 'general') chips.push('<span class="chip">' + escapeHtml(item.category) + '</span>');
+                if (item.audience) chips.push('<span class="chip">' + escapeHtml(item.audience) + '</span>');
+                if (item.period_label) chips.push('<span class="chip">' + escapeHtml(item.period_label) + '</span>');
+                let body = '';
+                if (item.layout === 'table' && item.table_columns && item.table_columns.length) {
+                    const head = '<tr>' + item.table_columns.map(c => '<th>' + escapeHtml(c) + '</th>').join('') + '</tr>';
+                    const rows = (item.table_rows || []).map(row =>
+                        '<tr>' + row.map(cell => '<td>' + escapeHtml(cell) + '</td>').join('') + '</tr>'
+                    ).join('');
+                    body = '<div class="info-boxes"><div class="info-box"><table class="info-table"><thead>' + head + '</thead><tbody>' + rows + '</tbody></table></div></div>';
+                } else if (item.content) {
+                    body = '<div class="info-boxes"><div class="info-box">' + escapeHtml(item.content).replace(/\n/g, '<br>') + '</div></div>';
+                }
+                let attach = '';
+                if (item.attachment && item.attachment.data_url) {
+                    const a = item.attachment;
+                    if (a.mime && a.mime.indexOf('image/') === 0) {
+                        attach = '<div class="info-attachment"><img src="' + a.data_url + '" alt="' + escapeHtml(a.name || '') + '"></div>';
+                    } else if (a.mime === 'application/pdf') {
+                        attach = '<div class="info-attachment"><a href="' + a.data_url + '" target="_blank" rel="noopener">📄 ' + escapeHtml(a.name || 'View attachment') + '</a></div>';
+                    }
+                }
+                return '<div class="info-item">'
+                    + '<div class="info-head"><h4>' + escapeHtml(item.title || 'Information') + '</h4>' + (chips.length ? '<div>' + chips.join('') + '</div>' : '') + '</div>'
+                    + body + attach + '</div>';
+            }).join('');
+        }
+
+        // ── Tabs ──
         function setActiveTab(tabKey) {
+            activeTab = tabKey;
             const isHome = tabKey === 'home';
             const isScoreboard = tabKey === 'scoreboard';
             tabHome.classList.toggle('active', isHome);
@@ -731,30 +1133,41 @@
                     requestAnimationFrame(() => setTimeout(() => el.classList.add('visible'), 60 + idx * 70));
                 });
             }
+            // Preload data when an authenticated user opens a locked tab
+            if (isLoggedIn() && (isScoreboard || tabKey === 'info')) {
+                loadScores().then(d => { renderScoreboard(d); renderInfo(d); }).catch(() => {});
+            }
         }
         tabHome.addEventListener('click', () => setActiveTab('home'));
-        // Scoreboard and Info tabs require login — redirect to SPA if logged in,
-        // otherwise show the login-gate panel (already in the HTML).
         tabScoreboard.addEventListener('click', () => {
-            if (hasLoginToken()) { goToSPA(); return; }
+            if (!isLoggedIn()) { openLoginModal(); return; }
             setActiveTab('scoreboard');
         });
         tabInfo.addEventListener('click', () => {
-            if (hasLoginToken()) { goToSPA(); return; }
+            if (!isLoggedIn()) { openLoginModal(); return; }
             setActiveTab('info');
         });
         document.getElementById('goScoreboard').addEventListener('click', (e) => {
             e.preventDefault();
-            if (hasLoginToken()) { goToSPA(); return; }
+            if (!isLoggedIn()) { openLoginModal(); return; }
             setActiveTab('scoreboard');
-            document.getElementById('scoreboardPanel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+            scoreboardPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
         });
+        document.getElementById('scoreboardLoginLink').addEventListener('click', openLoginModal);
+        document.getElementById('infoLoginLink').addEventListener('click', openLoginModal);
+
+        // ── Init ──
         setActiveTab('home');
+        applyAuthState();
         requestAnimationFrame(() => {
             document.querySelectorAll('.appear').forEach((el, idx) => {
                 setTimeout(() => el.classList.add('visible'), 120 + idx * 75);
             });
         });
+        // If already authenticated from a previous session, preload the data
+        if (isLoggedIn()) {
+            loadScores().then(d => { renderScoreboard(d); renderInfo(d); }).catch(() => {});
+        }
 
         // ── ZOOM ──
         let zoomLevel = parseFloat(localStorage.getItem('ea_zoom') || '1');
