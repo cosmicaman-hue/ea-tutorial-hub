@@ -7225,6 +7225,61 @@ body.header-offscreen .header-kicker::after {
                         </table>
                     </div>
                 </div>
+
+                <h4 style="margin-top:18px;margin-bottom:4px"><i class="fas fa-cloud"></i> Public Site Login Credentials (Cloudflare)</h4>
+                <p class="section-subtitle" style="margin-bottom:10px">
+                    Set the roll + password students use to log in to the public Cloudflare scoreboard.
+                    Stored as salted SHA-256 hashes and exported to <code>credentials.json</code> on
+                    <strong>Force Publish</strong>. This is a SOFT GATE — the file is public, so use strong passwords.
+                </p>
+                <div id="publicCredsWarning" class="alert" style="display:none;background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.35);color:#fde68a;padding:10px 12px;border-radius:8px;margin-bottom:10px;font-size:12px">
+                    <i class="fas fa-triangle-exclamation"></i> No credentials configured. The public site will be locked until you set at least one.
+                </div>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>Roll No. (single)</label>
+                        <input id="pubCredRollInput" type="text" list="pubCredRollList" placeholder="e.g. EA24B15" autocapitalize="characters">
+                        <datalist id="pubCredRollList"></datalist>
+                    </div>
+                    <div class="form-group">
+                        <label>Password (single)</label>
+                        <input id="pubCredPassInput" type="text" placeholder="Password for this roll">
+                    </div>
+                </div>
+                <div class="form-buttons">
+                    <button onclick="adminSetPublicCredential()"><i class="fas fa-floppy-disk"></i> Set / Update One</button>
+                </div>
+                <div class="form-grid" style="margin-top:10px">
+                    <div class="form-group">
+                        <label>Shared Password (bulk)</label>
+                        <input id="pubCredBulkPassInput" type="text" placeholder="One password for many students">
+                    </div>
+                    <div class="form-group">
+                        <label>Rolls (optional, comma/space separated; leave empty = all students)</label>
+                        <input id="pubCredBulkRollsInput" type="text" placeholder="EA24B15, EA24B09 ...">
+                    </div>
+                </div>
+                <div class="form-buttons">
+                    <button class="secondary" onclick="adminBulkSetPublicCredentials()"><i class="fas fa-layer-group"></i> Set for All / Listed</button>
+                </div>
+                <div class="scoreboard-wrapper" style="margin-top:10px">
+                    <div class="scoreboard-scroll">
+                        <table class="scoreboard" id="adminPublicCredsTable">
+                            <thead>
+                                <tr>
+                                    <th>Roll</th>
+                                    <th>Active</th>
+                                    <th>Set By</th>
+                                    <th>Set At</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="adminPublicCredsBody">
+                                <tr><td colspan="5" class="text-center">Refresh to load credentials.</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -51664,6 +51719,7 @@ body.header-offscreen .header-kicker::after {
                             </tr>`;
                     }).join('') || '<tr><td colspan="8" class="text-center">No device sessions found</td></tr>';
                 }
+                _renderPublicCredsTable(payload.public_credentials, payload.student_rolls);
             } catch (err) {
                 showAlert('Failed to load control panel data', 'danger');
             }
@@ -51753,6 +51809,148 @@ body.header-offscreen .header-kicker::after {
                 await loadAdminControlPanel();
             } catch (err) {
                 showAlert('Failed to save access window', 'danger');
+            }
+        }
+
+        // ── Public site (Cloudflare) login credentials ──────────────────────
+        function _renderPublicCredsTable(creds, studentRolls) {
+            const tbody = document.getElementById('adminPublicCredsBody');
+            if (tbody) {
+                if (!Array.isArray(creds) || !creds.length) {
+                    tbody.innerHTML = '<tr><td colspan="5" class="text-center">No credentials configured.</td></tr>';
+                } else {
+                    tbody.innerHTML = creds.map(c => {
+                        const roll = String(c.roll || '');
+                        const active = !!c.active;
+                        const activeColor = active ? '#4ade80' : '#94a3b8';
+                        return `
+                            <tr>
+                                <td>${_esc(roll)}</td>
+                                <td style="color:${activeColor};font-weight:600">${active ? 'Enabled' : 'Disabled'}</td>
+                                <td>${_esc(String(c.set_by_login || ''))}</td>
+                                <td>${_esc(_fmtTs(c.set_at || '') || '-')}</td>
+                                <td style="white-space:nowrap">
+                                    <button class="secondary" onclick="adminTogglePublicCredential('${_esc(roll)}', ${active ? 'false' : 'true'})">${active ? 'Disable' : 'Enable'}</button>
+                                    <button class="danger" onclick="adminDeletePublicCredential('${_esc(roll)}')">Revoke</button>
+                                </td>
+                            </tr>`;
+                    }).join('');
+                }
+            }
+            const list = document.getElementById('pubCredRollList');
+            if (list && Array.isArray(studentRolls)) {
+                list.innerHTML = studentRolls.map(r => `<option value="${_esc(String(r))}"></option>`).join('');
+            }
+            const warn = document.getElementById('publicCredsWarning');
+            if (warn) warn.style.display = (!Array.isArray(creds) || !creds.length) ? '' : 'none';
+        }
+
+        async function adminSetPublicCredential() {
+            if (currentUserRole !== 'admin') return;
+            const roll = String(getElementValue('pubCredRollInput') || '').trim();
+            const password = String(getElementValue('pubCredPassInput') || '');
+            if (!roll || !password) {
+                showAlert('Enter both roll number and password.', 'warning');
+                return;
+            }
+            try {
+                const resp = await eaFetch('/scoreboard/admin/public-credential', {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ roll, password })
+                });
+                const payload = await resp.json().catch(() => ({}));
+                if (!resp.ok || payload.success === false) {
+                    showAlert(payload.error || 'Failed to set credential', 'danger');
+                    return;
+                }
+                showAlert(payload.message || 'Credential set', 'success');
+                setElementValue('pubCredRollInput', '');
+                setElementValue('pubCredPassInput', '');
+                await loadAdminControlPanel();
+            } catch (err) {
+                showAlert('Failed to set credential', 'danger');
+            }
+        }
+
+        async function adminBulkSetPublicCredentials() {
+            if (currentUserRole !== 'admin') return;
+            const password = String(getElementValue('pubCredBulkPassInput') || '');
+            const rollsRaw = String(getElementValue('pubCredBulkRollsInput') || '').trim();
+            if (!password) {
+                showAlert('Enter a shared password first.', 'warning');
+                return;
+            }
+            const scope = rollsRaw ? 'the listed rolls' : 'all students in the ledger';
+            if (!confirm(`Set this password for ${scope}? Existing credentials for those rolls will be overwritten (new salt).`)) return;
+            const body = { password };
+            if (rollsRaw) body.rolls = rollsRaw;
+            try {
+                const resp = await eaFetch('/scoreboard/admin/public-credential/bulk', {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+                const payload = await resp.json().catch(() => ({}));
+                if (!resp.ok || payload.success === false) {
+                    showAlert(payload.error || 'Bulk set failed', 'danger');
+                    return;
+                }
+                let msg = payload.message || 'Bulk set complete';
+                if (Array.isArray(payload.failed) && payload.failed.length) {
+                    msg += ` (${payload.failed.length} failed)`;
+                }
+                showAlert(msg, 'success');
+                setElementValue('pubCredBulkPassInput', '');
+                setElementValue('pubCredBulkRollsInput', '');
+                await loadAdminControlPanel();
+            } catch (err) {
+                showAlert('Bulk set failed', 'danger');
+            }
+        }
+
+        async function adminTogglePublicCredential(roll, active) {
+            if (currentUserRole !== 'admin') return;
+            try {
+                const resp = await eaFetch('/scoreboard/admin/public-credential/toggle', {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ roll, active })
+                });
+                const payload = await resp.json().catch(() => ({}));
+                if (!resp.ok || payload.success === false) {
+                    showAlert(payload.error || 'Toggle failed', 'danger');
+                    return;
+                }
+                showAlert(payload.message || 'Toggled', 'success');
+                await loadAdminControlPanel();
+            } catch (err) {
+                showAlert('Toggle failed', 'danger');
+            }
+        }
+
+        async function adminDeletePublicCredential(roll) {
+            if (currentUserRole !== 'admin') return;
+            if (!confirm(`Revoke credential for ${roll}? They will no longer be able to log in to the public site.`)) return;
+            try {
+                const resp = await eaFetch('/scoreboard/admin/public-credential/delete', {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ roll })
+                });
+                const payload = await resp.json().catch(() => ({}));
+                if (!resp.ok || payload.success === false) {
+                    showAlert(payload.error || 'Revoke failed', 'danger');
+                    return;
+                }
+                showAlert(payload.message || 'Credential revoked', 'success');
+                await loadAdminControlPanel();
+            } catch (err) {
+                showAlert('Revoke failed', 'danger');
             }
         }
         // ══════════════════════════════════════════════════════════════════════
