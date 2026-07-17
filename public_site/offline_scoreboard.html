@@ -6677,10 +6677,14 @@ body.header-offscreen .header-kicker::after {
                 body:not(.light-mode) .nb-selector-row select,
                 body:not(.light-mode) .nb-selector-row input[type="date"] { background: #374151; color: #f9fafb; border-color: #4b5563; }
                 body:not(.light-mode) .nb-selector-row select:disabled { background: #1a2230; color: #4b5563; }
-                body:not(.light-mode) .nb-table { box-shadow: 0 2px 10px rgba(0,0,0,.35); }
+                body:not(.light-mode) .nb-table { box-shadow: 0 2px 10px rgba(0,0,0,.35); background: #1a2230; }
                 body:not(.light-mode) .nb-table th { background: #1a2230; color: #9ca3af; border-color: #374151; }
-                body:not(.light-mode) .nb-table td { border-color: #2d3748; color: #e2e8f0; }
-                body:not(.light-mode) .nb-table td:first-child { color: #f3f4f6; }
+                body:not(.light-mode) .nb-table td { background: #1a2230; border-color: #2d3748; color: #e2e8f0; }
+                body:not(.light-mode) .nb-table tbody tr:nth-child(even) td { background: #18222f !important; }
+                body:not(.light-mode) .nb-table tbody tr:hover td { background: #1e2d3f !important; }
+                body:not(.light-mode) .nb-table td:first-child { color: #f3f4f6 !important; }
+                body:not(.light-mode) .nb-table tr.nb-exempt-row td { background: #111827 !important; color: #4b5563; }
+                body:not(.light-mode) .nb-exempt-label { background: #374151 !important; color: #9ca3af !important; }
                 body:not(.light-mode) .nb-grade-pill { background: #374151; color: #d1d5db; border-color: #4b5563; }
                 body:not(.light-mode) .nb-grade-pill:hover:not(.nb-grade-pill-active) { background: #4b5563; color: #f9fafb; }
                 body:not(.light-mode) .nb-grade-pill-active { color: #fff !important; }
@@ -6942,40 +6946,89 @@ body.header-offscreen .header-kicker::after {
         </div>
 
         <div id="tools-tab" class="tab-content hidden">
-            <div class="form-card">
-                <h3><i class="fas fa-file-import"></i> Excel Uploads</h3>
-                <p style="color: var(--text-muted); margin-bottom: 15px; font-size: 14px;">
-                    Use separate uploads for historical data and the latest active roster.
-                </p>
-                <div class="form-grid">
-                    <div class="form-group">
-                        <label>Historical Data Workbook</label>
-                        <input type="file" id="excelFile" accept=".xlsx,.xls,.xlsm">
-                    </div>
-                    <div class="form-group" style="display: flex; align-items: end;">
-                        <button onclick="importExcel()">Import Historical Data</button>
-                    </div>
+            <!-- ── Admin Overview strip ─────────────────────────────────────── -->
+            <div class="tools-overview" id="toolsOverviewStrip">
+                <div class="toc-chip">
+                    <span class="toc-label"><i class="fas fa-server"></i> LAN Server</span>
+                    <span class="toc-value" id="toolsOverviewServer">—</span>
+                    <span class="toc-sub" id="toolsOverviewServerSub">Health check pending…</span>
                 </div>
-                <div class="form-grid" style="margin-top: 10px;">
-                    <div class="form-group">
-                        <label>Latest Active Roster Workbook</label>
-                        <input type="file" id="activeRosterFile" accept=".xlsx,.xls,.xlsm">
-                    </div>
-                    <div class="form-group">
-                        <label>Target Month (Optional)</label>
-                        <input type="month" id="activeRosterMonth">
-                    </div>
+                <div class="toc-chip">
+                    <span class="toc-label"><i class="fas fa-cloud"></i> Supabase</span>
+                    <span class="toc-value" id="toolsOverviewSupabase">—</span>
+                    <span class="toc-sub" id="toolsOverviewSupabaseSub">Health check pending…</span>
                 </div>
-                <div class="form-buttons" style="margin-top: 6px;">
-                    <button class="secondary" onclick="importActiveRosterExcel()">Import Latest Active Roster</button>
+                <div class="toc-chip">
+                    <span class="toc-label"><i class="fas fa-users"></i> Users</span>
+                    <span class="toc-value" id="toolsOverviewUsers">—</span>
+                    <span class="toc-sub" id="toolsOverviewUsersSub">Refresh to count</span>
+                </div>
+                <div class="toc-chip">
+                    <span class="toc-label"><i class="fas fa-laptop"></i> Devices</span>
+                    <span class="toc-value" id="toolsOverviewDevices">—</span>
+                    <span class="toc-sub" id="toolsOverviewDevicesSub">Refresh to count</span>
+                </div>
+                <div class="toc-chip">
+                    <span class="toc-label"><i class="fas fa-database"></i> Local DB</span>
+                    <span class="toc-value" id="toolsOverviewBackup">—</span>
+                    <span class="toc-sub" id="toolsOverviewBackupSub">Students · Scores · Months</span>
                 </div>
             </div>
 
-            <div class="form-card">
-                <h3><i class="fas fa-wifi"></i> LAN Sync & Backups</h3>
-                <p style="color: var(--text-muted); margin-bottom: 8px; font-size: 14px;">
-                    Your work is saved locally and LAN sync runs in near real-time. Changes are pushed automatically within a second of each edit.
-                </p>
+            <!-- ── In-tab anchor sub-nav ────────────────────────────────────── -->
+            <div class="tools-subnav" id="toolsSubnav">
+                <a class="subnav-btn" href="#toolsOnlineNow"><i class="fas fa-circle-dot"></i> Online Now</a>
+                <a class="subnav-btn" href="#toolsDataIO"><i class="fas fa-file-export"></i> Data Export</a>
+                <a class="subnav-btn" href="#toolsSync"><i class="fas fa-wifi"></i> Sync &amp; Health</a>
+                <a class="subnav-btn" href="#toolsBackup"><i class="fas fa-database"></i> Backup &amp; Restore</a>
+                <a class="subnav-btn" href="#deviceMonitorCard"><i class="fas fa-network-wired"></i> Devices</a>
+                <a class="subnav-btn" href="#adminControlCard"><i class="fas fa-user-shield"></i> User Admin</a>
+                <a class="subnav-btn" href="#toolsPublicGate"><i class="fas fa-cloud"></i> Public Gate</a>
+            </div>
+
+            <!-- 0 ── Currently Online ──────────────────────────────────────── -->
+            <div class="form-card tools-anchor" id="toolsOnlineNow" style="display:none">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                    <h3 style="margin:0;"><i class="fas fa-circle-dot" style="color:#22c55e"></i> Currently Online</h3>
+                    <span id="toolsOnlineCount" style="font-size:13px; color:var(--text-muted);">— users online</span>
+                </div>
+                <p class="section-subtitle" style="margin-bottom:12px;">Users with an active session (seen in the last 15 minutes). Duration updates live.</p>
+                <div class="scoreboard-wrapper">
+                    <div class="scoreboard-scroll" style="max-height:360px; overflow-y:auto;">
+                        <table class="scoreboard" id="toolsOnlineTable">
+                            <thead>
+                                <tr>
+                                    <th>User</th>
+                                    <th>Role</th>
+                                    <th>Device</th>
+                                    <th>OS / Browser</th>
+                                    <th>Logged In</th>
+                                    <th>Duration</th>
+                                </tr>
+                            </thead>
+                            <tbody id="toolsOnlineBody">
+                                <tr><td colspan="6" class="text-center" style="color:var(--text-muted)">Loading…</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 1 ── Data Export ────────────────────────────────────────────── -->
+            <div class="form-card tools-anchor" id="toolsDataIO">
+                <h3><i class="fas fa-file-export"></i> Data Export</h3>
+                <p class="section-subtitle">Export the current dataset to Excel, JSON, or the public scoreboard file.</p>
+                <div class="export-area">
+                    <button onclick="exportToExcel()"><i class="fas fa-file-excel"></i> Export as Excel</button>
+                    <button class="secondary" onclick="exportJSON()"><i class="fas fa-code"></i> Export as JSON</button>
+                    <button class="secondary" onclick="exportPublicScoreboardJSON()"><i class="fas fa-globe"></i> Export Public scores.json</button>
+                </div>
+            </div>
+
+            <!-- 2 ── Sync & Server Health ───────────────────────────────────── -->
+            <div class="form-card tools-anchor" id="toolsSync">
+                <h3><i class="fas fa-wifi"></i> Sync &amp; Server Health</h3>
+                <p class="section-subtitle">Your work is saved locally and LAN sync runs in near real-time — changes are pushed automatically within a second of each edit.</p>
                 <div style="display: flex; gap: 10px; flex-wrap: wrap;">
                     <button class="secondary" data-allow="true" onclick="downloadServerBackup()"><i class="fas fa-download"></i> Download Server Backup</button>
                     <button class="secondary" data-allow="true" id="installAppBtn" style="display: none;"><i class="fas fa-mobile-alt"></i> Install App</button>
@@ -6993,7 +7046,7 @@ body.header-offscreen .header-kicker::after {
                 <div class="form-buttons" style="margin-top: 8px;">
                     <button class="secondary" data-allow="true" onclick="saveServerEndpoints()">Save Server Endpoints</button>
                 </div>
-                <div style="margin-top: 10px;">
+                <div style="margin-top: 14px;">
                     <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:6px;">
                         <strong>LAN Server Health</strong>
                         <button class="secondary" data-allow="true" onclick="refreshServerHealth()"><i class="fas fa-heartbeat"></i> Refresh Health</button>
@@ -7015,7 +7068,7 @@ body.header-offscreen .header-kicker::after {
                         </table>
                     </div>
                 </div>
-                <div style="margin-top: 10px;">
+                <div style="margin-top: 12px;">
                     <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:6px;">
                         <strong>Supabase Health</strong>
                         <button class="secondary" data-allow="true" onclick="refreshSupabaseHealth()"><i class="fas fa-cloud"></i> Refresh Supabase</button>
@@ -7024,34 +7077,19 @@ body.header-offscreen .header-kicker::after {
                         <div id="supabaseHealthText" style="font-size:13px; color:var(--text-muted);">Health check pending...</div>
                     </div>
                 </div>
-                <p class="section-subtitle" style="margin-top: 8px;">
-                    If server is down, installed app keeps working locally and auto-syncs queued changes when any configured server comes back online.
+                <p class="section-subtitle" style="margin-top: 10px;">
+                    If the server is down, the installed app keeps working locally and auto-syncs queued changes when any configured server comes back online.
                 </p>
             </div>
 
-            <div class="export-area">
-                <button onclick="exportToExcel()"><i class="fas fa-download"></i> Export as Excel</button>
-                <button class="secondary" onclick="exportJSON()"><i class="fas fa-code"></i> Export as JSON</button>
-                <button class="secondary" onclick="exportPublicScoreboardJSON()"><i class="fas fa-globe"></i> Export Public scores.json</button>
-                <button class="secondary" onclick="importJSON()"><i class="fas fa-upload"></i> Import JSON</button>
-            </div>
+            <!-- 3 ── Backup & Restore ───────────────────────────────────────── -->
+            <div class="form-card tools-anchor" id="toolsBackup">
+                <h3><i class="fas fa-database"></i> Backup &amp; Restore</h3>
+                <p class="section-subtitle">Preview and restore a server backup snapshot. Current live data is auto-backed up before any restore.</p>
 
-            <div class="form-card">
-                <h3><i class="fas fa-database"></i> Database Management</h3>
-                <p style="color: var(--text-muted); margin-bottom: 15px; font-size: 14px;">
-                    Manage your offline database
-                </p>
-                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                    <button class="secondary" onclick="backupData()"><i class="fas fa-save"></i> Backup Data</button>
-                    <button class="secondary" onclick="showStats()"><i class="fas fa-chart-bar"></i> Show Stats</button>
-                    <button class="secondary" onclick="loadFeb26Seed()"><i class="fas fa-database"></i> Load Feb 26 Data</button>
-                    <button class="danger" onclick="clearAllData()"><i class="fas fa-trash"></i> Clear All Data</button>
-                </div>
-                <hr style="margin: 16px 0; border-color: rgba(148,163,184,0.2);">
-                <h4 style="margin-bottom: 8px;"><i class="fas fa-history"></i> Restore From Backup (Admin)</h4>
-                <p style="color: var(--text-muted); margin-bottom: 10px; font-size: 13px;">
-                    Preview and restore a server backup. Current live data is auto-backed up before restore.
-                </p>
+                <div id="toolsStatsInline" style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:14px;"></div>
+
+                <div class="tools-subhead"><i class="fas fa-history"></i> Restore Points</div>
                 <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:10px;">
                     <button class="secondary" onclick="loadRestorePoints()"><i class="fas fa-list"></i> Refresh Restore List</button>
                     <button class="secondary" onclick="previewRestorePoint()"><i class="fas fa-eye"></i> Preview Selected</button>
@@ -7064,10 +7102,16 @@ body.header-offscreen .header-kicker::after {
                     <select id="restorePointSelect"></select>
                 </div>
                 <pre id="restorePreview" style="margin-top:10px; white-space:pre-wrap; background:rgba(2,6,23,0.55); border:1px solid rgba(148,163,184,0.2); border-radius:8px; padding:10px; font-size:12px; max-height:180px; overflow:auto;"></pre>
+
+                <div class="tools-danger-zone">
+                    <h4><i class="fas fa-triangle-exclamation"></i> Danger Zone</h4>
+                    <p><strong>Clear All Data</strong> permanently wipes the local dataset (students, scores, months, parties, leadership). This cannot be undone — download a server backup first.</p>
+                    <button class="danger" onclick="clearAllData()"><i class="fas fa-trash"></i> Clear All Data</button>
+                </div>
             </div>
 
-            <!-- ── Device Monitoring Panel (Admin only) ─────────────────────── -->
-            <div class="form-card" id="deviceMonitorCard" style="display:none">
+            <!-- 4 ── Connected Devices Log (Admin only) ─────────────────────── -->
+            <div class="form-card tools-anchor" id="deviceMonitorCard" style="display:none">
                 <h3><i class="fas fa-network-wired"></i> Connected Devices Log</h3>
                 <p style="color:var(--text-muted);font-size:13px;margin-bottom:12px">
                     Every login from any device is recorded here with device name, OS, browser, IP and a persistent
@@ -7149,44 +7193,56 @@ body.header-offscreen .header-kicker::after {
                     </div>
                 </details>
             </div>
-            <!-- ── End Device Monitoring Panel ──────────────────────────────── -->
 
-            <div class="form-card" id="adminControlCard" style="display:none">
-                <h3><i class="fas fa-user-shield"></i> Admin Control Panel</h3>
-                <p class="section-subtitle">Manage user accounts, join code, teacher month windows, and active device sessions.</p>
-                <div class="form-grid">
-                    <div class="form-group">
-                        <label>New Join Code</label>
-                        <input id="adminJoinCodeInput" type="text" placeholder="Enter new join code">
+            <!-- 5 ── User Administration (Admin only) ──────────────────────── -->
+            <div class="form-card tools-anchor" id="adminControlCard" style="display:none">
+                <h3><i class="fas fa-user-shield"></i> User Administration</h3>
+                <p class="section-subtitle">Join code, teacher month windows, and user accounts (Hold / Resume / Delete). Devices live in the dedicated Devices card above.</p>
+
+                <!-- Compact two-column: Join Code | Teacher Window side-by-side -->
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; align-items:start;">
+                    <div>
+                        <div class="tools-subhead"><i class="fas fa-key"></i> Join Code</div>
+                        <div class="form-group" style="margin-bottom:8px;">
+                            <label>New Join Code</label>
+                            <input id="adminJoinCodeInput" type="text" placeholder="Enter new join code">
+                        </div>
+                        <div class="form-group" style="margin-bottom:8px;">
+                            <label>Expiry (optional)</label>
+                            <input id="adminJoinCodeExpiry" type="datetime-local">
+                        </div>
+                        <div class="form-buttons" style="margin-top:4px;">
+                            <button onclick="adminRotateJoinCode()"><i class="fas fa-key"></i> Rotate</button>
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label>Join Code Expiry (optional)</label>
-                        <input id="adminJoinCodeExpiry" type="datetime-local">
+                    <div>
+                        <div class="tools-subhead"><i class="fas fa-calendar-check"></i> Teacher Window</div>
+                        <div class="form-group" style="margin-bottom:8px;">
+                            <label>Teacher Login ID</label>
+                            <input id="adminAccessLoginId" type="text" placeholder="Teacher login id">
+                        </div>
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px;">
+                            <div class="form-group" style="margin-bottom:0;">
+                                <label>From</label>
+                                <input id="adminAccessFrom" type="month">
+                            </div>
+                            <div class="form-group" style="margin-bottom:0;">
+                                <label>To</label>
+                                <input id="adminAccessTo" type="month">
+                            </div>
+                        </div>
+                        <div class="form-buttons" style="margin-top:4px;">
+                            <button class="secondary" onclick="adminSetAccessWindow()"><i class="fas fa-calendar-check"></i> Save Window</button>
+                        </div>
                     </div>
                 </div>
-                <div class="form-buttons">
-                    <button onclick="adminRotateJoinCode()"><i class="fas fa-key"></i> Rotate Join Code</button>
-                    <button class="secondary" onclick="loadAdminControlPanel()"><i class="fas fa-sync"></i> Refresh Control Data</button>
+
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-top:16px; margin-bottom:6px;">
+                    <h4 style="margin:0; font-size:14px;"><i class="fas fa-users-cog"></i> User Accounts</h4>
+                    <button class="secondary" onclick="loadAdminControlPanel()" style="font-size:12px; padding:5px 10px;"><i class="fas fa-sync"></i> Refresh</button>
                 </div>
-                <div class="form-grid" style="margin-top:10px">
-                    <div class="form-group">
-                        <label>Teacher Login ID</label>
-                        <input id="adminAccessLoginId" type="text" placeholder="Teacher login id">
-                    </div>
-                    <div class="form-group">
-                        <label>Month From</label>
-                        <input id="adminAccessFrom" type="month">
-                    </div>
-                    <div class="form-group">
-                        <label>Month To</label>
-                        <input id="adminAccessTo" type="month">
-                    </div>
-                </div>
-                <div class="form-buttons">
-                    <button class="secondary" onclick="adminSetAccessWindow()"><i class="fas fa-calendar-check"></i> Save Teacher Window</button>
-                </div>
-                <div class="scoreboard-wrapper" style="margin-top:10px">
-                    <div class="scoreboard-scroll">
+                <div class="scoreboard-wrapper" style="margin-top:4px">
+                    <div class="scoreboard-scroll" style="max-height:340px; overflow-y:auto;">
                         <table class="scoreboard" id="adminUsersTable">
                             <thead>
                                 <tr>
@@ -7203,67 +7259,54 @@ body.header-offscreen .header-kicker::after {
                         </table>
                     </div>
                 </div>
-                <h4 style="margin-top:16px;margin-bottom:6px"><i class="fas fa-laptop-house"></i> Connected Devices</h4>
-                <div class="scoreboard-wrapper" style="margin-top:4px">
-                    <div class="scoreboard-scroll">
-                        <table class="scoreboard" id="adminDevicesTable">
-                            <thead>
-                                <tr>
-                                    <th>Login</th>
-                                    <th>Role</th>
-                                    <th>Device</th>
-                                    <th>OS</th>
-                                    <th>Browser</th>
-                                    <th>IP</th>
-                                    <th>Last Seen</th>
-                                    <th>Status</th>
-                                </tr>
-                            </thead>
-                            <tbody id="adminDevicesBody">
-                                <tr><td colspan="8" class="text-center">Refresh to load devices.</td></tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
+            </div>
 
-                <h4 style="margin-top:18px;margin-bottom:4px"><i class="fas fa-cloud"></i> Public Site Login Credentials (Cloudflare)</h4>
-                <p class="section-subtitle" style="margin-bottom:10px">
-                    Set the roll + password students use to log in to the public Cloudflare scoreboard.
-                    Stored as salted SHA-256 hashes and exported to <code>credentials.json</code> on
-                    <strong>Force Publish</strong>. This is a SOFT GATE — the file is public, so use strong passwords.
+            <!-- 6 ── Public Site Gate (Admin only) ──────────────────────────── -->
+            <div class="form-card tools-anchor" id="toolsPublicGate" style="display:none">
+                <h3><i class="fas fa-cloud"></i> Public Site Gate (Cloudflare)</h3>
+                <p class="section-subtitle">
+                    Roll + password for the public Cloudflare scoreboard. Salted SHA-256 hashes, exported to <code>credentials.json</code> on <strong>Force Publish</strong>. SOFT GATE — use strong passwords.
                 </p>
                 <div id="publicCredsWarning" class="alert" style="display:none;background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.35);color:#fde68a;padding:10px 12px;border-radius:8px;margin-bottom:10px;font-size:12px">
                     <i class="fas fa-triangle-exclamation"></i> No credentials configured. The public site will be locked until you set at least one.
                 </div>
-                <div class="form-grid">
-                    <div class="form-group">
-                        <label>Roll No. (single)</label>
-                        <input id="pubCredRollInput" type="text" list="pubCredRollList" placeholder="e.g. EA24B15" autocapitalize="characters">
-                        <datalist id="pubCredRollList"></datalist>
+
+                <!-- Compact two-column: Single | Bulk side-by-side -->
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; align-items:start;">
+                    <div>
+                        <div class="tools-subhead"><i class="fas fa-user-lock"></i> Single Credential</div>
+                        <div class="form-group" style="margin-bottom:8px;">
+                            <label>Roll No.</label>
+                            <input id="pubCredRollInput" type="text" list="pubCredRollList" placeholder="e.g. EA24B15" autocapitalize="characters">
+                            <datalist id="pubCredRollList"></datalist>
+                        </div>
+                        <div class="form-group" style="margin-bottom:8px;">
+                            <label>Password</label>
+                            <input id="pubCredPassInput" type="text" placeholder="Password for this roll">
+                        </div>
+                        <div class="form-buttons" style="margin-top:4px;">
+                            <button onclick="adminSetPublicCredential()"><i class="fas fa-floppy-disk"></i> Set / Update One</button>
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label>Password (single)</label>
-                        <input id="pubCredPassInput" type="text" placeholder="Password for this roll">
+                    <div>
+                        <div class="tools-subhead"><i class="fas fa-layer-group"></i> Bulk Credential</div>
+                        <div class="form-group" style="margin-bottom:8px;">
+                            <label>Shared Password</label>
+                            <input id="pubCredBulkPassInput" type="text" placeholder="One password for many students">
+                        </div>
+                        <div class="form-group" style="margin-bottom:8px;">
+                            <label>Rolls (comma/space; empty = all)</label>
+                            <input id="pubCredBulkRollsInput" type="text" placeholder="EA24B15, EA24B09 ...">
+                        </div>
+                        <div class="form-buttons" style="margin-top:4px;">
+                            <button class="secondary" onclick="adminBulkSetPublicCredentials()"><i class="fas fa-layer-group"></i> Set for All / Listed</button>
+                        </div>
                     </div>
                 </div>
-                <div class="form-buttons">
-                    <button onclick="adminSetPublicCredential()"><i class="fas fa-floppy-disk"></i> Set / Update One</button>
-                </div>
-                <div class="form-grid" style="margin-top:10px">
-                    <div class="form-group">
-                        <label>Shared Password (bulk)</label>
-                        <input id="pubCredBulkPassInput" type="text" placeholder="One password for many students">
-                    </div>
-                    <div class="form-group">
-                        <label>Rolls (optional, comma/space separated; leave empty = all students)</label>
-                        <input id="pubCredBulkRollsInput" type="text" placeholder="EA24B15, EA24B09 ...">
-                    </div>
-                </div>
-                <div class="form-buttons">
-                    <button class="secondary" onclick="adminBulkSetPublicCredentials()"><i class="fas fa-layer-group"></i> Set for All / Listed</button>
-                </div>
-                <div class="scoreboard-wrapper" style="margin-top:10px">
-                    <div class="scoreboard-scroll">
+
+                <h4 style="margin-top:16px;margin-bottom:8px;font-size:14px;"><i class="fas fa-list-check"></i> Configured Credentials</h4>
+                <div class="scoreboard-wrapper" style="margin-top:4px">
+                    <div class="scoreboard-scroll" style="max-height:340px; overflow-y:auto;">
                         <table class="scoreboard" id="adminPublicCredsTable">
                             <thead>
                                 <tr>
@@ -7609,8 +7652,6 @@ body.header-offscreen .header-kicker::after {
         </div>
     </div>
 
-    <!-- JSON IMPORT INPUT -->
-    <input type="file" id="jsonFile" accept=".json" style="display: none;">
     <input type="file" id="studentsExcelFile" accept=".xlsx,.xls,.xlsm" style="display: none;">
     <input type="file" id="activeRosterExcelFile" accept=".xlsx,.xls,.xlsm" style="display: none;">
 
@@ -7727,19 +7768,82 @@ body.header-offscreen .header-kicker::after {
             else if (/Chrome\//.test(ua)) browser = 'Chrome';
             else if (/Firefox\//.test(ua)) browser = 'Firefox';
             else if (/Safari\//.test(ua)) browser = 'Safari';
-            // Device name
+            // Device brand + model
             let deviceName = 'Unknown Device';
-            if (/iPhone/.test(ua)) deviceName = 'iPhone';
-            else if (/iPad/.test(ua)) deviceName = 'iPad';
+            let brand = '';
+            if (/iPhone/.test(ua)) { deviceName = 'iPhone'; brand = 'Apple'; }
+            else if (/iPad/.test(ua)) { deviceName = 'iPad'; brand = 'Apple'; }
             else if (/Android/.test(ua)) {
                 const m = ua.match(/;\s*([^;()]+)\sBuild\//);
-                deviceName = m ? m[1].trim() : 'Android Device';
+                const rawModel = m ? m[1].trim() : '';
+                const friendly = _androidModelLookup(rawModel);
+                deviceName = friendly || rawModel || 'Android Device';
+                brand = _androidBrandLookup(rawModel, ua);
             }
-            else if (/Windows/.test(ua)) deviceName = 'Windows PC';
-            else if (/Mac OS X/.test(ua)) deviceName = 'Mac';
-            else if (/Linux/.test(ua)) deviceName = 'Linux PC';
+            else if (/Windows/.test(ua)) { deviceName = 'Windows PC'; brand = 'PC'; }
+            else if (/Mac OS X/.test(ua)) { deviceName = 'Mac'; brand = 'Apple'; }
+            else if (/Linux/.test(ua)) { deviceName = 'Linux PC'; brand = 'PC'; }
             const screen = `${window.screen.width}×${window.screen.height}`;
-            return { os, browser, screen, deviceName };
+            return { os, browser, screen, deviceName, brand };
+        }
+
+        // Map common Android build model codes to friendly brand + model names
+        function _androidModelLookup(rawModel) {
+            if (!rawModel) return '';
+            const r = rawModel.toUpperCase().replace(/\s+/g, '');
+            const map = {
+                // Samsung Galaxy S series
+                'SM-S921': 'Galaxy S24', 'SM-S926': 'Galaxy S24+', 'SM-S928': 'Galaxy S24 Ultra',
+                'SM-S911': 'Galaxy S23', 'SM-S916': 'Galaxy S23+', 'SM-S918': 'Galaxy S23 Ultra',
+                'SM-G991': 'Galaxy S21', 'SM-G996': 'Galaxy S21+', 'SM-G998': 'Galaxy S21 Ultra',
+                'SM-G981': 'Galaxy S20', 'SM-G986': 'Galaxy S20+', 'SM-G988': 'Galaxy S20 Ultra',
+                // Samsung Galaxy A series
+                'SM-A145': 'Galaxy A14', 'SM-A155': 'Galaxy A15', 'SM-A165': 'Galaxy A16',
+                'SM-A245': 'Galaxy A24', 'SM-A256': 'Galaxy A25', 'SM-A346': 'Galaxy A34',
+                'SM-A356': 'Galaxy A35', 'SM-A546': 'Galaxy A54', 'SM-A556': 'Galaxy A55',
+                // Samsung Galaxy M series
+                'SM-M145': 'Galaxy M14', 'SM-M155': 'Galaxy M15', 'SM-M345': 'Galaxy M34',
+                // Samsung Galaxy Note
+                'SM-N986': 'Galaxy Note 20 Ultra', 'SM-N981': 'Galaxy Note 20',
+                // Redmi / Xiaomi
+                '23028RA60L': 'Redmi Note 12', '23053RN02A': 'Redmi Note 12 Pro',
+                '22101316I': 'Redmi Note 12 Pro+', '23090RA98C': 'Redmi Note 13 Pro',
+                '23117RA86G': 'Redmi Note 13 Pro+', '24013RAM75G': 'Redmi Note 13 Pro+ 5G',
+                'M2007J3SY': 'Mi 10T Pro', '2201123G': 'Xiaomi 12', '2211133G': 'Xiaomi 13',
+                // OnePlus
+                'CPH2581': 'OnePlus 12', 'CPH2449': 'OnePlus 12R', 'CPH2399': 'OnePlus 11',
+                'CPH2381': 'OnePlus Nord 3', 'CPH2661': 'OnePlus Nord 4',
+                // Google Pixel
+                'PIXEL 8 PRO': 'Pixel 8 Pro', 'PIXEL 8': 'Pixel 8',
+                'PIXEL 7 PRO': 'Pixel 7 Pro', 'PIXEL 7': 'Pixel 7',
+                'PIXEL 6 PRO': 'Pixel 6 Pro', 'PIXEL 6': 'Pixel 6',
+                // Vivo / Oppo / Realme
+                'V2231': 'Vivo V29', 'V2254': 'Vivo V30', 'CPH2553': 'Oppo Reno 10',
+            };
+            // Try exact match, then prefix match (first 7-8 chars)
+            if (map[r]) return map[r];
+            for (const key of Object.keys(map)) {
+                if (r.startsWith(key)) return map[key];
+            }
+            return '';  // fall back to raw model
+        }
+
+        function _androidBrandLookup(rawModel, ua) {
+            if (!rawModel) return '';
+            const r = rawModel.toUpperCase();
+            if (r.startsWith('SM-') || r.startsWith('SC-') || r.startsWith('SGH-')) return 'Samsung';
+            if (/XIAOMI|REDMI|MI[\s\d]|POCO/i.test(ua) || r.startsWith('2') && r.length === 10) return 'Xiaomi';
+            if (r.startsWith('CPH') || /ONEPLUS/i.test(ua)) return 'OnePlus';
+            if (r.startsWith('V') && /VIVO/i.test(ua)) return 'Vivo';
+            if (r.startsWith('CPH') && /OPPO/i.test(ua)) return 'Oppo';
+            if (r.startsWith('RMX') || /REALME/i.test(ua)) return 'Realme';
+            if (/PIXEL/i.test(ua)) return 'Google';
+            if (/MOTO|MOTOROLA/i.test(ua)) return 'Motorola';
+            if (/INFINIX/i.test(ua)) return 'Infinix';
+            if (/TECNO/i.test(ua)) return 'Tecno';
+            if (/NOKIA/i.test(ua)) return 'Nokia';
+            if (/HUAWEI|HONOR/i.test(ua)) return 'Huawei';
+            return '';
         }
 
         async function checkinDevice(event = 'login') {
@@ -7753,6 +7857,7 @@ body.header-offscreen .header-kicker::after {
                     body: JSON.stringify({
                         device_id: getOrCreateDeviceUUID(),
                         device_name: info.deviceName,
+                        brand: info.brand || '',
                         os: info.os,
                         browser: info.browser,
                         screen: info.screen,
@@ -8950,6 +9055,13 @@ body.header-offscreen .header-kicker::after {
                     </tr>
                 `;
             }).join('');
+            // Overview chip — overall LAN status across all configured servers
+            const onlineCount = rows.filter(r => String(r.status).toLowerCase() === 'online').length;
+            const degradedCount = rows.filter(r => String(r.status).toLowerCase() === 'degraded').length;
+            const overallState = onlineCount ? 'ok' : (degradedCount ? 'warn' : 'bad');
+            const overallLabel = onlineCount ? 'ONLINE' : (degradedCount ? 'DEGRADED' : 'OFFLINE');
+            _setToolsOverviewChip('toolsOverviewServer', overallLabel,
+                `${onlineCount}/${rows.length} online · ${rows.length} server${rows.length === 1 ? '' : 's'}`, overallState);
         }
 
         async function refreshSupabaseHealth() {
@@ -8978,9 +9090,12 @@ body.header-offscreen .header-kicker::after {
                 const err = payload.error ? ` | Error: ${String(payload.error)}` : '';
                 textEl.style.color = color;
                 textEl.textContent = `Status: ${status.toUpperCase()} | Latency: ${latency} | Last snapshot: ${stamp} | Source: ${src}${probe}${err}`;
+                const _supaState = status === 'online' ? 'ok' : ((status === 'disabled' || status === 'degraded') ? 'warn' : 'bad');
+                _setToolsOverviewChip('toolsOverviewSupabase', status.toUpperCase(), `Latency: ${latency}`, _supaState);
             } catch (err) {
                 textEl.style.color = '#f87171';
                 textEl.textContent = `Status: OFFLINE | ${err.message || 'Unknown error'}`;
+                _setToolsOverviewChip('toolsOverviewSupabase', 'OFFLINE', err.message || 'Unknown error', 'bad');
             }
         }
 
@@ -16325,11 +16440,15 @@ body.header-offscreen .header-kicker::after {
             setTabVisibility('gr', isAdmin || isTeacher);
             setTabVisibility('team-competition', true);
 
-            // Device monitor card — admin only
+            // Tools-tab admin-only cards — admin only
             const devCard = document.getElementById('deviceMonitorCard');
             if (devCard) devCard.style.display = isAdmin ? '' : 'none';
             const adminControlCard = document.getElementById('adminControlCard');
             if (adminControlCard) adminControlCard.style.display = isAdmin ? '' : 'none';
+            const publicGateCard = document.getElementById('toolsPublicGate');
+            if (publicGateCard) publicGateCard.style.display = isAdmin ? '' : 'none';
+            const onlineNowCard = document.getElementById('toolsOnlineNow');
+            if (onlineNowCard) onlineNowCard.style.display = isAdmin ? '' : 'none';
             if (isAdmin) {
                 setTimeout(loadAdminControlPanel, 150);
             }
@@ -27948,16 +28067,6 @@ body.header-offscreen .header-kicker::after {
                 }
             };
             reader.readAsArrayBuffer(file);
-        }
-
-        function importActiveRosterExcel() {
-            const file = getElementFile('activeRosterFile');
-            if (!file) {
-                showAlert('Please select the latest active roster workbook', 'danger');
-                return;
-            }
-            const preferredMonth = getElementValue('activeRosterMonth') || '';
-            importActiveRosterFile(file, preferredMonth);
         }
 
         function deleteStudent(studentId) {
@@ -51339,65 +51448,6 @@ body.header-offscreen .header-kicker::after {
             };
         }
 
-        async function importExcel() {
-            // Server-side historical import:
-            // - monthly totals from Total Score / Final Score
-            // - per-date star usage markers from real date columns
-            // Feb 26 and newer months are never touched.
-            const file = document.getElementById('excelFile').files[0];
-            if (!file) {
-                showAlert('Please select an Excel file', 'danger');
-                return;
-            }
-            if (!confirm(
-                'Import Historical Scores from Excel workbook?\n\n' +
-                '• Reads historical monthly totals from "Total Score" (fallback: "Final Score")\n' +
-                '• Imports historical star usage from date columns only (for red * cells)\n' +
-                '• Old admin-imported scores for those months will be replaced\n' +
-                '• Feb 2026, Mar 2026 and current teacher data are NOT changed\n\n' +
-                'Continue?'
-            )) return;
-
-            const btn = event && event.target;
-            if (btn) { btn.disabled = true; btn.textContent = 'Importing…'; }
-
-            const formData = new FormData();
-            formData.append('file', file);
-            try {
-                const resp = await eaFetch('/scoreboard/import-historical-data', {
-                    method: 'POST',
-                    body: formData,
-                    credentials: 'same-origin'
-                });
-                if (!resp.ok) {
-                    const errText = await resp.text();
-                    showAlert('Import failed (HTTP ' + resp.status + '): ' + errText, 'danger');
-                    return;
-                }
-                const result = await resp.json();
-                if (result.success) {
-                    const lines = [`✓ ${result.message}`];
-                    Object.entries(result.month_report || {}).forEach(([mk, r]) => {
-                        if (r.status === 'ok') {
-                            lines.push(`  ${mk} (${r.sheet}): ${r.students_imported} totals + ${r.star_usage_rows || 0} star markers [total col ${r.total_col || '-'}, date cols ${r.date_columns || 0}, header row ${r.header_row}]`);
-                        } else {
-                            lines.push(`  ${mk}: SKIPPED — ${r.reason}`);
-                        }
-                    });
-                    showAlert(lines.join('\n'), 'success');
-                    // Pull fresh data from server so the scoreboard reflects the import
-                    await pullFromServer(false, true);
-                    loadScoreboard();
-                } else {
-                    showAlert('Import failed: ' + (result.error || 'Unknown error'), 'danger');
-                }
-            } catch (e) {
-                showAlert('Import error: ' + e.message, 'danger');
-            } finally {
-                if (btn) { btn.disabled = false; btn.textContent = 'Import Historical Data'; }
-            }
-        }
-
         async function exportToExcel() {
             await ensureXlsxLoaded();
             const students = db.getStudents();
@@ -51438,30 +51488,6 @@ body.header-offscreen .header-kicker::after {
             a.click();
             URL.revokeObjectURL(url);
             showAlert('Public scores.json exported successfully!', 'success');
-        }
-
-        function importJSON() {
-            document.getElementById('jsonFile').click();
-            document.getElementById('jsonFile').onchange = (e) => {
-                const file = e.target.files[0];
-                if (!file) return;
-                
-                const reader = new FileReader();
-                reader.onload = (event) => {
-                    try {
-                        const data = JSON.parse(event.target.result);
-                        db.saveData(data);
-                        db.ensureSchema();
-                        showAlert('Data imported successfully!', 'success');
-                        loadScoreboard();
-                        loadStudents();
-                        updateAppealsTabNotification();
-                    } catch (err) {
-                        showAlert('Error importing JSON: ' + err.message, 'danger');
-                    }
-                };
-                reader.readAsText(file);
-            };
         }
 
         // ══════════════════════════════════════════════════════════════════════
@@ -51700,25 +51726,14 @@ body.header-offscreen .header-kicker::after {
                             </tr>`;
                     }).join('') || '<tr><td colspan="5" class="text-center">No users found</td></tr>';
                 }
+                // Device sessions feed the overview chip only — the full
+                // device log lives in the dedicated Connected Devices card.
                 const sessions = Array.isArray(payload.device_sessions) ? payload.device_sessions : [];
-                const devBody = document.getElementById('adminDevicesBody');
-                if (devBody) {
-                    devBody.innerHTML = sessions.map(s => {
-                        const st = String(s.status || '').toLowerCase();
-                        const stColor = st === 'online' ? '#4ade80' : '#94a3b8';
-                        return `
-                            <tr>
-                                <td>${_esc(String(s.login_id || ''))}</td>
-                                <td>${_esc(String(s.role || ''))}</td>
-                                <td>${_esc(String(s.device_name || ''))}</td>
-                                <td>${_esc(String(s.os || ''))}</td>
-                                <td>${_esc(String(s.browser || ''))}</td>
-                                <td>${_esc(String(s.ip || ''))}</td>
-                                <td>${_esc(_fmtTs(s.last_seen || '') || '-')}</td>
-                                <td style="color:${stColor};font-weight:600">${_esc(st || 'offline')}</td>
-                            </tr>`;
-                    }).join('') || '<tr><td colspan="8" class="text-center">No device sessions found</td></tr>';
-                }
+                _setToolsOverviewChip('toolsOverviewUsers', users.length,
+                    `${users.length} account${users.length === 1 ? '' : 's'} loaded`);
+                const onlineNow = sessions.filter(s => String(s.status || '').toLowerCase() === 'online').length;
+                _setToolsOverviewChip('toolsOverviewDevices', sessions.length,
+                    `${onlineNow} online · ${sessions.length} total session${sessions.length === 1 ? '' : 's'}`);
                 _renderPublicCredsTable(payload.public_credentials, payload.student_rolls);
             } catch (err) {
                 showAlert('Failed to load control panel data', 'danger');
@@ -51954,16 +51969,6 @@ body.header-offscreen .header-kicker::after {
             }
         }
         // ══════════════════════════════════════════════════════════════════════
-
-        function backupData() {
-            const data = db.getData();
-            const backup = {
-                timestamp: new Date().toISOString(),
-                data
-            };
-            eaLog('Backup:', backup);
-            showAlert('Backup created: ' + backup.timestamp, 'success');
-        }
 
         // ==========================================
         // GOOD CONDUCT BADGE
@@ -52365,6 +52370,13 @@ body.header-offscreen .header-kicker::after {
 
         async function loadRestorePoints() {
             if (currentUserRole !== 'admin') return;
+            // Refresh the overview strip + health panels whenever the Tools tab opens
+            try { showStats(); } catch (e) {}
+            try { refreshServerHealth(); } catch (e) {}
+            try { refreshSupabaseHealth(); } catch (e) {}
+            // Load the Currently Online panel + start live duration ticker
+            try { loadOnlineSessions(); } catch (e) {}
+            _startOnlineDurationTicker();
             const select = document.getElementById('restorePointSelect');
             const preview = document.getElementById('restorePreview');
             if (!select) return;
@@ -52485,16 +52497,124 @@ body.header-offscreen .header-kicker::after {
         }
 
         function showStats() {
-            const data = db.getData();
-            const stats = `
-                Total Students: ${data.students.length}
-                Total Scores Recorded: ${data.scores.length}
-                Months with Data: ${db.getMonths().length}
-                Parties: ${(data.parties || []).length}
-                Leadership Posts: ${(data.leadership || []).length}
-                Storage Used: ~${(JSON.stringify(data).length / 1024).toFixed(2)} KB
-            `;
-            alert(stats);
+            // Renders the local-DB summary into the Backup & Restore card and
+            // updates the "Local DB" overview chip. Replaces the old alert().
+            const data = db.getData() || {};
+            const students = (data.students || []).length;
+            const scores = (data.scores || []).length;
+            const months = (db.getMonths ? db.getMonths() : []).length;
+            const parties = (data.parties || []).length;
+            const leadership = (data.leadership || []).length;
+            const sizeKb = (JSON.stringify(data).length / 1024).toFixed(1);
+            _renderToolsOverviewDb({ students, scores, months, parties, leadership, sizeKb });
+        }
+
+        // ── Tools tab: overview strip helpers ────────────────────────────────
+        function _setToolsOverviewChip(valueId, value, sub, state) {
+            const v = document.getElementById(valueId);
+            if (!v) return;
+            v.textContent = String(value);
+            v.classList.remove('ok', 'warn', 'bad');
+            if (state) v.classList.add(state);
+            if (arguments.length >= 3 && sub !== undefined) {
+                const subEl = document.getElementById(valueId + 'Sub');
+                if (subEl) subEl.textContent = sub;
+            }
+        }
+
+        function _renderToolsOverviewDb(s) {
+            const inline = document.getElementById('toolsStatsInline');
+            const fmt = (n, label) => `<div style="flex:1; min-width:110px; background:rgba(2,6,23,0.45); border:1px solid rgba(148,163,184,0.2); border-radius:8px; padding:10px 12px;">
+                <div style="font-size:18px; font-weight:700; color:var(--text); line-height:1.1;">${n}</div>
+                <div style="font-size:11px; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.4px; margin-top:2px;">${label}</div></div>`;
+            if (inline) {
+                inline.innerHTML =
+                    fmt(s.students, 'Students') +
+                    fmt(s.scores, 'Scores') +
+                    fmt(s.months, 'Months') +
+                    fmt(s.parties, 'Parties') +
+                    fmt(s.leadership, 'Leadership') +
+                    fmt(s.sizeKb + ' KB', 'Storage');
+            }
+            _setToolsOverviewChip('toolsOverviewBackup', s.sizeKb + ' KB',
+                `${s.students} students · ${s.scores} scores · ${s.months} months`);
+        }
+
+        // ── Tools tab: Currently Online panel ────────────────────────────────
+        let _onlineSessionsCache = [];
+        let _onlineSessionsTimer = null;
+        let _onlineDurationTimer = null;
+
+        async function loadOnlineSessions() {
+            if (!SERVER_SYNC.enabled) return;
+            try {
+                const resp = await eaFetch('/scoreboard/online-sessions', {
+                    method: 'GET', credentials: 'include', cache: 'no-store'
+                });
+                if (!resp.ok) return;
+                const payload = await resp.json();
+                if (!payload.success) return;
+                _onlineSessionsCache = Array.isArray(payload.sessions) ? payload.sessions : [];
+                _renderOnlineSessions();
+            } catch (e) { /* non-critical */ }
+        }
+
+        function _renderOnlineSessions() {
+            const tbody = document.getElementById('toolsOnlineBody');
+            const countEl = document.getElementById('toolsOnlineCount');
+            if (!tbody) return;
+            const sessions = _onlineSessionsCache;
+            if (countEl) {
+                countEl.textContent = `${sessions.length} user${sessions.length === 1 ? '' : 's'} online`;
+            }
+            if (!sessions.length) {
+                tbody.innerHTML = '<tr><td colspan="6" class="text-center" style="color:var(--text-muted)">No users currently online.</td></tr>';
+                return;
+            }
+            const roleColor = (r) => {
+                const rl = String(r || '').toLowerCase();
+                return rl === 'admin' ? '#fbbf24' : (rl === 'teacher' ? '#06b6d4' : '#94a3b8');
+            };
+            tbody.innerHTML = sessions.map(s => {
+                const loginTime = s.login_at ? new Date(s.login_at + 'Z').toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '-';
+                const dur = _formatDuration(s.duration_sec || 0);
+                const device = s.device_name || '—';
+                const osBr = [s.os, s.browser].filter(Boolean).join(' · ') || '—';
+                return `<tr>
+                    <td style="font-weight:600">${_esc(s.login_id || '')}</td>
+                    <td style="color:${roleColor(s.role)};font-weight:600">${_esc(s.role || '')}</td>
+                    <td>${_esc(device)}</td>
+                    <td style="font-size:12px;color:var(--text-muted)">${_esc(osBr)}</td>
+                    <td style="white-space:nowrap">${loginTime}</td>
+                    <td style="white-space:nowrap" data-duration="${s.duration_sec || 0}">${dur}</td>
+                </tr>`;
+            }).join('');
+        }
+
+        function _formatDuration(sec) {
+            const h = Math.floor(sec / 3600);
+            const m = Math.floor((sec % 3600) / 60);
+            const s = sec % 60;
+            if (h > 0) return `${h}h ${m}m`;
+            if (m > 0) return `${m}m ${s}s`;
+            return `${s}s`;
+        }
+
+        // Tick duration counters every second while the online panel is visible
+        function _startOnlineDurationTicker() {
+            if (_onlineDurationTimer) return;
+            _onlineDurationTimer = setInterval(() => {
+                if (document.hidden) return;
+                if (getActiveTabName() !== 'tools') return;
+                const card = document.getElementById('toolsOnlineNow');
+                if (!card || card.style.display === 'none') return;
+                document.querySelectorAll('#toolsOnlineBody td[data-duration]').forEach(td => {
+                    let v = parseInt(td.getAttribute('data-duration'), 10) || 0;
+                    v++;
+                    td.setAttribute('data-duration', v);
+                    td.textContent = _formatDuration(v);
+                });
+            }, 1000);
         }
 
         function clearAllData() {
@@ -52503,43 +52623,6 @@ body.header-offscreen .header-kicker::after {
                 showAlert('All data cleared', 'success');
                 loadScoreboard();
             }
-        }
-
-        async function loadFeb26Seed() {
-            if (!confirm('This will replace current data with Feb 26 sheet data. Continue?')) {
-                return;
-            }
-            const seedData = await getFeb26Seed();
-            const existing = db.getData();
-            const seed = cloneSeed(seedData || {});
-            seed.students = seed.students.map(student => normalizeStudentMeta({ ...student, active: true, group: deriveGroupFromRoll(student.roll) }));
-            seed.parties = seed.parties.map((party, idx) => ({ id: idx + 1, ...party, members: [] }));
-            seed.leadership = seed.leadership.map((post, idx) => ({ id: idx + 1, ...post }));
-
-            db.saveData({
-                students: seed.students,
-                scores: seed.scores,
-                months: [],
-                month_students: seed.month_students || {},
-                month_roster_profiles: { '2026-02': toRosterProfiles(FEB26_STUDENT_ROSTER) },
-                parties: seed.parties,
-                leadership: seed.leadership,
-                class_reps: [],
-                election_candidates: [],
-                election_votes: [],
-                election_individual_votes: [],
-                post_holder_history: existing.post_holder_history || [],
-                notification_history: existing.notification_history || [],
-                appeals: existing.appeals || [],
-                attendance: existing.attendance || [],
-                fee_records: existing.fee_records || [],
-            });
-            db.ensureSchema();
-            showAlert('Feb 26 data loaded successfully!', 'success');
-            loadScoreboard();
-            loadStudents();
-            loadParties();
-            loadLeadership();
         }
 
         // ── iOS table-row stagger ─────────────────────────────────────────────
@@ -53409,6 +53492,7 @@ body.header-offscreen .header-kicker::after {
                 if (getActiveTabName() !== 'tools') return;
                 refreshServerHealth();
                 refreshSupabaseHealth();
+                loadOnlineSessions();
             }, 30000);
 
             // ── IDB startup recovery ───────────────────────────────────────────
