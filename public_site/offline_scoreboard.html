@@ -821,6 +821,7 @@ body.header-offscreen .header-kicker::after {
         <div class="sidebar-section-label">Rankings</div>
         <button class="sidebar-nav-item" data-tab="ranking" onclick="switchTab('ranking')" title="Rankings"><i class="fas fa-trophy" style="color:#eab308"></i><span class="sidebar-link-text">Rankings</span></button>
         <button class="sidebar-nav-item" data-tab="group-scoreboard" onclick="switchTab('group-scoreboard')" title="Group Scoreboard"><i class="fas fa-layer-group" style="color:#a855f7"></i><span class="sidebar-link-text">Group Scoreboard</span></button>
+        <button class="sidebar-nav-item" data-tab="party-standings" onclick="switchTab('party-standings')" title="Party Standings"><i class="fas fa-flag" style="color:#f97316"></i><span class="sidebar-link-text">Party Standings</span></button>
         <button class="sidebar-nav-item" data-tab="team-competition" onclick="switchTab('team-competition')" title="Team Competition"><i class="fas fa-people-group" style="color:#22c55e"></i><span class="sidebar-link-text">Team Competition</span></button>
         <div class="sidebar-section-label">Governance</div>
         <button class="sidebar-nav-item" data-tab="gr" onclick="switchTab('gr')" title="Class Representative"><i class="fas fa-user-check" style="color:#ec4899"></i><span class="sidebar-link-text">Group Rep (GR)</span></button>
@@ -1417,6 +1418,9 @@ body.header-offscreen .header-kicker::after {
             </button>
             <button class="tab-button" onclick="switchTab('group-scoreboard')" style="--tab-icon: #a855f7;">
                 <i class="fas fa-layer-group"></i> Group Scoreboard
+            </button>
+            <button class="tab-button" onclick="switchTab('party-standings')" style="--tab-icon: #f97316;">
+                <i class="fas fa-flag"></i> Party Standings
             </button>
             <button class="tab-button" onclick="switchTab('team-competition')" style="--tab-icon: #22c55e;">
                 <i class="fas fa-people-group"></i> Team Competition
@@ -3786,6 +3790,58 @@ body.header-offscreen .header-kicker::after {
                         <tbody id="groupRosterBody">
                             <tr>
                                 <td colspan="8" class="text-center loading">Loading...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB: PARTY STANDINGS -->
+        <div id="party-standings-tab" class="tab-content hidden">
+            <div class="controls">
+                <div class="control-group">
+                    <label>Select Month</label>
+                    <select id="partyStandingsMonthFilter" onchange="renderPartyStandings()"></select>
+                </div>
+            </div>
+            <div class="scoreboard-wrapper">
+                <div class="scoreboard-scroll">
+                    <table class="scoreboard" id="partyStandingsTable">
+                        <thead>
+                            <tr>
+                                <th style="width: 90px;">Rank</th>
+                                <th style="width: 200px;">Party</th>
+                                <th style="width: 120px;">Members</th>
+                                <th style="width: 140px;">Total Score</th>
+                                <th style="width: 140px;">Avg Score</th>
+                                <th style="width: 140px;">Vote Power</th>
+                            </tr>
+                        </thead>
+                        <tbody id="partyStandingsBody">
+                            <tr>
+                                <td colspan="6" class="text-center loading">Loading...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="scoreboard-wrapper" style="margin-top: 18px;">
+                <div class="scoreboard-scroll">
+                    <table class="scoreboard" id="partyStandingsRosterTable">
+                        <thead>
+                            <tr>
+                                <th style="width: 200px;">Party</th>
+                                <th style="width: 120px;">Roll No.</th>
+                                <th>Student</th>
+                                <th style="width: 90px;">Class</th>
+                                <th style="width: 130px;">Total</th>
+                                <th style="width: 130px;">Role</th>
+                            </tr>
+                        </thead>
+                        <tbody id="partyStandingsRosterBody">
+                            <tr>
+                                <td colspan="6" class="text-center loading">Loading...</td>
                             </tr>
                         </tbody>
                     </table>
@@ -14510,6 +14566,7 @@ body.header-offscreen .header-kicker::after {
                 'party':                 loadParties,
                 'ranking':               initRankingForm,
                 'group-scoreboard':      loadGroupScoreboard,
+                'party-standings':       loadPartyStandings,
                 'team-competition':      loadTeamCompetitionTab,
                 'voting':                loadVotingTab,
                 'teachers':              loadTeachersTab,
@@ -16355,6 +16412,8 @@ body.header-offscreen .header-kicker::after {
         function setTabVisibility(tabName, visible) {
             const button = document.querySelector(`.tab-button[onclick*=\"switchTab('${tabName}')\"]`);
             if (button) button.style.display = visible ? '' : 'none';
+            const sidebarBtn = document.querySelector(`.sidebar-nav-item[data-tab="${tabName}"]`);
+            if (sidebarBtn) sidebarBtn.style.display = visible ? '' : 'none';
             const tab = document.getElementById(`${tabName}-tab`);
             if (tab && !visible) tab.classList.add('hidden');
         }
@@ -16363,38 +16422,21 @@ body.header-offscreen .header-kicker::after {
             const isAdmin = currentUserRole === 'admin';
             const isTeacher = currentUserRole === 'teacher';
             const isStudent = !isAdmin && !isTeacher;
+            // Tabs visible to everyone (students, teachers, admins)
+            if (['scoreboard', 'group-scoreboard', 'information', 'rules', 'syllabus',
+                 'resources', 'excel-mela', 'team-competition', 'awf', 'good-conduct',
+                 'appeals', 'proposals', 'party-standings'].includes(tabName)) return true;
+            // Student-only tabs
             if (tabName === 'my-dashboard') return isStudent;
-            if (tabName === 'scoreboard') return true;
-            if (tabName === 'group-scoreboard') return true;
-            if (tabName === 'gr') return isAdmin || isTeacher;
-            if (tabName === 'appeals') return true;
-            if (tabName === 'notifications') return isAdmin || isTeacher;
-            if (tabName === 'proposals') return true;
-            if (tabName === 'activity-log') return isAdmin;
-            if (tabName === 'attendance') return true;
-            if (tabName === 'syllabus') return true;
-            if (tabName === 'rules') return true;
-            if (tabName === 'information') return true;
-            if (tabName === 'good-conduct') return true;
-            if (tabName === 'profile') return true;
+            // Teacher + Admin tabs
+            if (['profile', 'attendance', 'add-score', 'students', 'gr', 'notebooks',
+                 'reports', 'office', 'voting', 'leadership-selection', 'notifications']
+                .includes(tabName)) return isAdmin || isTeacher;
+            // Admin-only tabs
+            if (['teachers', 'party', 'leadership', 'activity-log', 'ranking', 'tools', 'settings']
+                .includes(tabName)) return isAdmin;
+            // Fees module visible to admin only when enabled
             if (tabName === 'fees') return feesModuleEnabled && isAdmin;
-            if (tabName === 'resources') return true;
-            if (tabName === 'excel-mela') return true;
-            if (tabName === 'add-score') return isAdmin || isTeacher;
-            if (tabName === 'students') return isAdmin;
-            if (tabName === 'party') return isAdmin;
-            if (tabName === 'office') return isAdmin || isTeacher;
-            if (tabName === 'voting') return isAdmin || isTeacher;
-            if (tabName === 'leadership') return isAdmin;
-            if (tabName === 'leadership-selection') return isAdmin || isTeacher;
-            if (tabName === 'tools') return isAdmin;
-            if (tabName === 'settings') return isAdmin;
-            if (tabName === 'ranking') return isAdmin;
-            if (tabName === 'teachers') return isAdmin;
-            if (tabName === 'team-competition') return true;
-            if (tabName === 'reports') return isAdmin || isTeacher;
-            if (tabName === 'awf') return true;
-            if (tabName === 'notebooks') return isAdmin || isTeacher;
             return false;
         }
 
@@ -16407,38 +16449,50 @@ body.header-offscreen .header-kicker::after {
         function applyRolePermissions() {
             const isAdmin = currentUserRole === 'admin';
             const isTeacher = currentUserRole === 'teacher';
+            const isStudent = !isAdmin && !isTeacher;
 
+            // Tabs visible to everyone
             setTabVisibility('scoreboard', true);
-            setTabVisibility('ranking', isAdmin);
             setTabVisibility('group-scoreboard', true);
-            setTabVisibility('gr', true);
-            setTabVisibility('teachers', isAdmin);
-            setTabVisibility('add-score', isAdmin || isTeacher);
-            setTabVisibility('students', isAdmin);
-            setTabVisibility('fees', feesModuleEnabled && isAdmin);
-            setTabVisibility('resources', true);
-            setTabVisibility('syllabus', true);
-            setTabVisibility('rules', true);
             setTabVisibility('information', true);
-            setTabVisibility('party', isAdmin);
+            setTabVisibility('rules', true);
+            setTabVisibility('syllabus', true);
+            setTabVisibility('resources', true);
+            setTabVisibility('excel-mela', true);
+            setTabVisibility('team-competition', true);
+            setTabVisibility('awf', true);
+            setTabVisibility('good-conduct', true);
+            setTabVisibility('appeals', true);
+            setTabVisibility('proposals', true);
+            setTabVisibility('party-standings', true);
+
+            // Student-only tabs
+            setTabVisibility('my-dashboard', isStudent);
+
+            // Teacher + Admin tabs
+            setTabVisibility('profile', isAdmin || isTeacher);
+            setTabVisibility('attendance', isAdmin || isTeacher);
+            setTabVisibility('add-score', isAdmin || isTeacher);
+            setTabVisibility('students', isAdmin || isTeacher);
+            setTabVisibility('gr', isAdmin || isTeacher);
+            setTabVisibility('notebooks', isAdmin || isTeacher);
+            setTabVisibility('reports', isAdmin || isTeacher);
             setTabVisibility('office', isAdmin || isTeacher);
             setTabVisibility('voting', isAdmin || isTeacher);
-            setTabVisibility('appeals', true);
-            setTabVisibility('notifications', isAdmin || isTeacher);
-            setTabVisibility('proposals', true);
-            setTabVisibility('activity-log', isAdmin);
-            setTabVisibility('attendance', isAdmin || isTeacher);
-            setTabVisibility('good-conduct', isAdmin || isTeacher);
-            setTabVisibility('profile', isAdmin || isTeacher);
-            setTabVisibility('leadership', isAdmin);
             setTabVisibility('leadership-selection', isAdmin || isTeacher);
-            setTabVisibility('reports', isAdmin || isTeacher);
-            setTabVisibility('awf', true);
-            setTabVisibility('notebooks', isAdmin || isTeacher);
+            setTabVisibility('notifications', isAdmin || isTeacher);
+
+            // Admin-only tabs
+            setTabVisibility('teachers', isAdmin);
+            setTabVisibility('party', isAdmin);
+            setTabVisibility('leadership', isAdmin);
+            setTabVisibility('activity-log', isAdmin);
+            setTabVisibility('ranking', isAdmin);
             setTabVisibility('tools', isAdmin);
             setTabVisibility('settings', isAdmin);
-            setTabVisibility('gr', isAdmin || isTeacher);
-            setTabVisibility('team-competition', true);
+
+            // Fees module visible to admin only when enabled
+            setTabVisibility('fees', feesModuleEnabled && isAdmin);
 
             // Tools-tab admin-only cards — admin only
             const devCard = document.getElementById('deviceMonitorCard');
@@ -16461,8 +16515,6 @@ body.header-offscreen .header-kicker::after {
             if (publishBtn) publishBtn.style.display = (SERVER_SYNC.enabled && isAdmin) ? '' : 'none';
             updateAuthButtons();
 
-            const isStudent = !isAdmin && !isTeacher;
-            setTabVisibility('my-dashboard', isStudent);
             renderPointsStarConfigUI();
             renderGoodConductFormulaUI();
             if (isStudent) {
@@ -16497,11 +16549,18 @@ body.header-offscreen .header-kicker::after {
                     if (el.closest('.app-sidebar') || el.closest('.mobile-topbar') || el.closest('.sidebar-overlay')) return;
                     if (el.closest('#scoreboard-tab')) return;
                     if (el.closest('#group-scoreboard-tab')) return;
-                    if (el.closest('#appeals-tab')) return;
-                    if (el.closest('#profile-tab')) return;
-                    if (el.closest('#resources-tab')) return;
+                    if (el.closest('#information-tab')) return;
+                    if (el.closest('#rules-tab')) return;
                     if (el.closest('#syllabus-tab')) return;
-                    if (el.closest('#attendance-tab')) return;
+                    if (el.closest('#resources-tab')) return;
+                    if (el.closest('#excel-mela-tab')) return;
+                    if (el.closest('#team-competition-tab')) return;
+                    if (el.closest('#awf-tab')) return;
+                    if (el.closest('#good-conduct-tab')) return;
+                    if (el.closest('#appeals-tab')) return;
+                    if (el.closest('#proposals-tab')) return;
+                    if (el.closest('#party-standings-tab')) return;
+                    if (el.closest('#my-dashboard-tab')) return;
                     el.disabled = true;
                 });
             }
@@ -16517,13 +16576,27 @@ body.header-offscreen .header-kicker::after {
                         el.closest('#add-score-tab') ||
                         el.closest('#scoreboard-tab') ||
                         el.closest('#group-scoreboard-tab') ||
+                        el.closest('#party-standings-tab') ||
+                        el.closest('#information-tab') ||
+                        el.closest('#rules-tab') ||
+                        el.closest('#syllabus-tab') ||
+                        el.closest('#resources-tab') ||
+                        el.closest('#excel-mela-tab') ||
+                        el.closest('#team-competition-tab') ||
+                        el.closest('#awf-tab') ||
+                        el.closest('#good-conduct-tab') ||
                         el.closest('#gr-tab') ||
                         el.closest('#appeals-tab') ||
+                        el.closest('#proposals-tab') ||
                         el.closest('#attendance-tab') ||
                         el.closest('#profile-tab') ||
-                        el.closest('#resources-tab') ||
-                        el.closest('#syllabus-tab') ||
-                        el.closest('#office-tab')
+                        el.closest('#students-tab') ||
+                        el.closest('#notebooks-tab') ||
+                        el.closest('#reports-tab') ||
+                        el.closest('#office-tab') ||
+                        el.closest('#voting-tab') ||
+                        el.closest('#leadership-selection-tab') ||
+                        el.closest('#notifications-tab')
                     ) {
                         el.disabled = false;
                         return;
@@ -29039,6 +29112,138 @@ body.header-offscreen .header-kicker::after {
                     autoAdjustTableFonts();
                 });
             }
+        }
+
+        function loadPartyStandings() {
+            const months = db.getMonths();
+            const monthSelect = document.getElementById('partyStandingsMonthFilter');
+            if (!monthSelect) return;
+            monthSelect.innerHTML = months.map(m => {
+                const date = new Date(m + '-01');
+                return `<option value="${m}">${date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</option>`;
+            }).join('');
+            if (!monthSelect.value && months.length) {
+                monthSelect.value = months[0];
+            }
+            renderPartyStandings();
+        }
+
+        function renderPartyStandings() {
+            const month = getElementValue('partyStandingsMonthFilter');
+            const tbody = document.getElementById('partyStandingsBody');
+            const rosterBody = document.getElementById('partyStandingsRosterBody');
+            if (!month || !tbody) return;
+
+            const data = db.getData();
+            const parties = data.parties || [];
+            const students = db.getStudents ? db.getStudents() : (data.students || []);
+            const sb = db.getMonthlyScoreboard(month);
+            const studentMap = new Map(students.map(s => [parseInt(s.id, 10), s]));
+            const scoreboardMap = new Map();
+            (sb || []).forEach(r => {
+                const sid = r && r.student ? parseInt(r.student.id, 10) : 0;
+                if (sid) scoreboardMap.set(sid, r);
+            });
+
+            const rows = [];
+            parties.forEach(party => {
+                const activeMembers = (party.members || []).filter(m => normalizePostHolderStatus(m.status || '') === 'active');
+                let totalScore = 0;
+                let votePower = 0;
+                let memberCount = 0;
+                activeMembers.forEach(m => {
+                    const sid = parseInt(m.studentId, 10);
+                    const student = studentMap.get(sid);
+                    if (!student) return;
+                    memberCount++;
+                    const sbRow = scoreboardMap.get(sid);
+                    if (sbRow) {
+                        totalScore += sbRow.total || 0;
+                        votePower += computeVotePower(sbRow.total);
+                    }
+                });
+                rows.push({
+                    party: party,
+                    memberCount: memberCount,
+                    totalScore: totalScore,
+                    votePower: votePower,
+                    avgScore: memberCount ? Math.round(totalScore / memberCount) : 0
+                });
+            });
+
+            rows.sort((a, b) => b.totalScore - a.totalScore);
+
+            if (!rows.length) {
+                tbody.innerHTML = `<tr><td colspan="6" class="text-center" style="padding: 30px;">No parties found</td></tr>`;
+            } else {
+                const summaryRows = rows.map((row, idx) => `
+                    <tr>
+                        <td class="rank-cell">${idx + 1}</td>
+                        <td>${renderPartyChip(row.party.code, { large: true })}</td>
+                        <td>${row.memberCount}</td>
+                        <td class="total-cell">${row.totalScore}</td>
+                        <td>${row.avgScore}</td>
+                        <td class="vote-cell">${row.votePower}</td>
+                    </tr>
+                `).join('');
+                const totalMembers = rows.reduce((sum, r) => sum + r.memberCount, 0);
+                const totalScoreAll = rows.reduce((sum, r) => sum + r.totalScore, 0);
+                const totalVotePower = rows.reduce((sum, r) => sum + r.votePower, 0);
+                tbody.innerHTML = summaryRows + `
+                    <tr>
+                        <td></td>
+                        <td><strong>Total</strong></td>
+                        <td>${totalMembers}</td>
+                        <td class="total-cell"><strong>${totalScoreAll}</strong></td>
+                        <td></td>
+                        <td class="vote-cell"><strong>${totalVotePower}</strong></td>
+                    </tr>`;
+            }
+
+            if (rosterBody) {
+                const partyRankMap = new Map(rows.map((r, idx) => [r.party, idx]));
+                const _rosterRows = [];
+                rows.forEach(row => {
+                    const activeMembers = (row.party.members || []).filter(m => normalizePostHolderStatus(m.status || '') === 'active');
+                    activeMembers.forEach(m => {
+                        const sid = parseInt(m.studentId, 10);
+                        const student = studentMap.get(sid);
+                        if (!student) return;
+                        const sbRow = scoreboardMap.get(sid);
+                        const role = m.designation === 'president' ? 'President' : m.designation === 'deputy_president' ? 'Deputy President' : 'Member';
+                        _rosterRows.push({
+                            party: row.party,
+                            student: student,
+                            sbRow: sbRow,
+                            role: role
+                        });
+                    });
+                });
+                _rosterRows.sort((a, b) => {
+                    const pa = partyRankMap.get(a.party);
+                    const pb = partyRankMap.get(b.party);
+                    if (pa !== pb) return pa - pb;
+                    return (b.sbRow ? b.sbRow.total : 0) - (a.sbRow ? a.sbRow.total : 0);
+                });
+                rosterBody.innerHTML = _rosterRows.length
+                    ? _rosterRows.map(r => `
+                        <tr>
+                            <td>${renderPartyChip(r.party.code)}</td>
+                            <td>${escapeHtml(formatRollDisplay(r.student.roll) || '-')}</td>
+                            <td>${escapeHtml(r.student.base_name || r.student.name || '')}</td>
+                            <td>${r.student.class || '-'}</td>
+                            <td class="total-cell">${r.sbRow ? r.sbRow.total : '—'}</td>
+                            <td style="color:var(--text-muted);font-size:12px">${r.role}</td>
+                        </tr>
+                    `).join('')
+                    : `<tr><td colspan="6" class="text-center" style="padding: 30px;">No party members found</td></tr>`;
+            }
+
+            eaScheduleRender(() => {
+                animateTableRows(tbody);
+                if (rosterBody) animateTableRows(rosterBody);
+                autoAdjustTableFonts();
+            });
         }
 
         function getDefaultTeamCompetitionState() {
