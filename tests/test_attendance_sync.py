@@ -10,6 +10,8 @@ import time
 from datetime import datetime
 from typing import Dict, List, Optional
 
+__test__ = False
+
 # Configuration
 SERVER_URL = "http://localhost:5000"
 TEACHER_LOGIN = "Teacher"

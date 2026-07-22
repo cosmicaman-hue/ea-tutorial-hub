@@ -10,16 +10,23 @@ Implements the exact VETO logic as specified:
 """
 import json
 import shutil
+import sys
 from pathlib import Path
 from datetime import datetime
 from typing import Dict, List, Optional, Tuple
+
+# Allow importing app.utils when run as a script from project root
+_project_root = str(Path(__file__).resolve().parent.parent)
+if _project_root not in sys.path:
+    sys.path.insert(0, _project_root)
+from app.utils.data_paths import get_data_path
 
 
 class VetoManager:
     """Complete VETO system manager"""
     
-    def __init__(self, data_path: Path = Path('instance/offline_scoreboard_data.json')):
-        self.data_path = data_path
+    def __init__(self, data_path: Optional[Path] = None):
+        self.data_path = Path(data_path) if data_path else Path(get_data_path())
         self.data = None
         self._load_data()
     
@@ -99,15 +106,15 @@ class VetoManager:
         
         # Map of names to VETO counts (as specified)
         individual_veto_by_name = {
-            'Ayush': 1,
-            'Arman': 1,
-            'Vishes': 1,
-            'Pari': 1,
+            'Ayush Gupta': 1,
+            'Abdul Arman': 1,
+            'Vishes Xalxo': 1,
+            'Pari Gupta': 1,
             'Rashi': 1,
-            'Sahil': 3,
+            'Sahil Yadav': 3,
             'Sakshi': 1,
-            'Reeyansh': 3,
-            'Nandani': 1,
+            'Reeyansh Lama': 3,
+            'Nandani Gupta': 1,
         }
         
         print("\n=== STEP 2: GRANTING INDIVIDUAL VETOs ===")
@@ -125,10 +132,13 @@ class VetoManager:
                 
                 # Exact match on name (case-insensitive)
                 if student_name.lower() == target_name.lower() and roll:
+                    # Specific check to make sure Sahil Yadav is Roll: EA24C02
+                    if target_name.lower() == 'sahil yadav' and roll != 'EA24C02':
+                        continue
                     student['veto_count'] = veto_count
                     granted_students[target_name] = student
                     granted_count += veto_count
-                    print(f"  {target_name:12} | {roll:12} | Granted: {veto_count}V")
+                    print(f"  {target_name:15} | {roll:12} | Granted: {veto_count}V")
                     found = True
                     break
             
@@ -150,14 +160,9 @@ class VetoManager:
         Step 3: Add role-grant VETOs to post-holders
         Returns count of role VETOs granted
         """
-        # Role VETO quotas
-        role_veto_quotas = {
-            'LEADER': 5,
-            'LEADER OF OPPOSITION': 2,
-            'CO-LEADER': 3,
-            'CR': 2,  # Class Representative
-            'DEFAULT': 0
-        }
+        # Role VETO quotas — single source of truth from constants
+        from app.config.constants import VETO_QUOTAS
+        role_veto_quotas = VETO_QUOTAS
         
         print("\n=== STEP 3: GRANTING ROLE VETOs TO POST-HOLDERS ===")
         

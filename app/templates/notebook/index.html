@@ -1,0 +1,1581 @@
+{% extends "base.html" %}
+{% block title %}Notebooks Check – EXCEL ACADEMY{% endblock %}
+
+{% block extra_css %}
+<style>
+/* ── Page layout ── */
+.nb-page { padding: 1.5rem; max-width: 1140px; margin: 0 auto; }
+.nb-page h1 { font-size: 1.4rem; font-weight: 700; color: var(--primary-color, #667eea); margin-bottom: 1.2rem; }
+
+/* ── Outer tabs (plain buttons, no Bootstrap) ── */
+.nb-tabs { display:flex; gap:4px; overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none; margin-bottom:1.2rem; border-bottom:2px solid #dee2e6; padding-bottom:0; }
+.nb-tabs::-webkit-scrollbar { display:none; }
+.nb-tab { background:none; border:none; border-bottom:3px solid transparent; padding:0.55rem 1.1rem; font-weight:500; font-size:0.9rem; color:#555; cursor:pointer; white-space:nowrap; transition:color .15s,border-color .15s,background .15s; display:inline-flex; align-items:center; gap:5px; min-height:44px; touch-action:manipulation; }
+.nb-tab:hover { color:#667eea; background:rgba(102,126,234,.06); }
+.nb-tab.active { color:#667eea; border-bottom-color:#667eea; font-weight:600; }
+
+/* ── Type pills ── */
+.type-pills { display: flex; gap: 8px; margin-bottom: 1rem; }
+.type-pill { padding: 6px 20px; border-radius: 20px; border: 2px solid #667eea;
+             background: #fff; color: #667eea; font-weight: 600; cursor: pointer; transition: .18s; }
+.type-pill.active { background: #667eea; color: #fff; }
+.type-pill:hover:not(.active) { background: #f0f3ff; }
+
+/* ── Selector row ── */
+.selector-row { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 1.2rem; align-items: flex-end; }
+.selector-row .field { display: flex; flex-direction: column; gap: 4px; min-width: 150px; }
+.selector-row label { font-size: 0.78rem; font-weight: 600; color: #555; text-transform: uppercase; letter-spacing: .4px; }
+.selector-row select, .selector-row input[type="date"] {
+    border: 1.5px solid #ced4da; border-radius: 8px; padding: 7px 10px;
+    font-size: 0.9rem; background: #fff; min-width: 140px; }
+.selector-row select:focus, .selector-row input:focus { outline: none; border-color: #667eea; }
+
+/* ── All-completed bar ── */
+.all-completed-bar {
+    display: flex; align-items: center; gap: 10px;
+    background: #f0f4ff; border: 1.5px solid #c7d2fe; border-radius: 9px;
+    padding: 9px 14px; margin-bottom: 12px; }
+.all-completed-bar input[type="checkbox"] { width: 17px; height: 17px; cursor: pointer; accent-color: #667eea; }
+.all-completed-bar label { cursor: pointer; font-weight: 600; font-size: 0.88rem; color: #3730a3; margin: 0; }
+.all-completed-bar small { color: #6b7280; font-size: 0.78rem; }
+
+/* ── Subject table ── */
+/* Override .subject-row display:flex for actual table rows (flex is for settings tab divs) */
+.nb-table tr.subject-row { display: table-row; padding: 0; gap: 0; border-bottom: none; }
+#subjectPanel { animation: fadeIn .2s; }
+@keyframes fadeIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:none; } }
+.nb-table { width: 100%; border-collapse: separate; border-spacing: 0; border-radius: 10px; overflow: hidden;
+            box-shadow: 0 2px 10px rgba(0,0,0,.07); }
+.nb-table thead { background: linear-gradient(135deg, #667eea, #764ba2); color: #fff; }
+.nb-table thead th { padding: 10px 12px; font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; }
+.nb-table tbody tr:nth-child(even) { background: #f8f9ff; }
+.nb-table tbody tr:hover { background: #f0f3ff; }
+.nb-table td { padding: 8px 10px; vertical-align: middle; border-bottom: 1px solid #e9ecef; }
+.nb-table td:first-child { font-weight: 600; font-size: 0.9rem; }
+
+/* Checkbox cell */
+.check-cell { text-align: center; }
+.check-cell input[type="checkbox"] { width: 18px; height: 18px; cursor: pointer; accent-color: #667eea; }
+
+/* Grade select */
+.grade-select {
+    border: 1.5px solid #ced4da; border-radius: 6px; padding: 5px 7px;
+    font-size: 0.83rem; background: #fff; min-width: 155px;
+    cursor: pointer; transition: border-color .15s;
+}
+.grade-select:disabled { background: #f0f0f0; color: #aaa; cursor: default; }
+.grade-select:focus { outline: none; border-color: #667eea; }
+
+/* Points badge */
+.pts-badge {
+    display: inline-block; min-width: 46px; text-align: center;
+    border: 1.5px solid #dee2e6; border-radius: 6px; padding: 4px 6px;
+    font-weight: 800; font-size: 0.92rem; background: #f9fafb;
+}
+
+/* Remarks textarea */
+.remarks-input { width: 100%; min-width: 110px; border: 1.5px solid #ced4da; border-radius: 6px;
+                 padding: 5px 8px; font-size: 0.83rem; resize: vertical; background: #fff; }
+.remarks-input:focus { outline: none; border-color: #667eea; }
+
+/* Exempt row */
+.exempt-row td { background: #f9fafb !important; opacity: .65; }
+.exempt-row td:first-child { text-decoration: line-through; color: #9ca3af; }
+.exempt-label { display: inline-block; font-size: 0.7rem; font-weight: 700; background: #e5e7eb;
+                color: #6b7280; border-radius: 4px; padding: 1px 6px; margin-right: 5px; vertical-align: middle; }
+
+/* Exempt / Restore buttons */
+.btn-exempt-sub, .btn-unexempt {
+    background: none; border: 1px solid #aaa; border-radius: 5px;
+    padding: 3px 8px; font-size: 0.72rem; cursor: pointer; white-space: nowrap;
+    transition: .15s;
+}
+.btn-exempt-sub { color: #9ca3af; }
+.btn-exempt-sub:hover { border-color: #dc3545; color: #dc3545; background: #fff0f0; }
+.btn-unexempt { border-color: #667eea; color: #667eea; }
+.btn-unexempt:hover { background: #667eea; color: #fff; }
+
+/* ── Totals bar ── */
+.totals-bar {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 12px;
+    background: #f8f9ff; border: 1.5px solid #dee2e6; border-radius: 10px;
+    padding: 10px 16px; margin-top: 12px; }
+.totals-bar .label { font-size: 0.82rem; color: #666; font-weight: 600; }
+.totals-bar .pts-display { font-size: 1.5rem; font-weight: 800; }
+.totals-bar .checked-display { font-size: 0.83rem; color: #555; }
+.totals-bar .limit-hint { font-size: 0.75rem; color: #9ca3af; margin-left: auto; }
+.cap-warning { font-size: 0.8rem; color: #d97706; font-weight: 600; }
+.pts-positive { color: #16a34a; }
+.pts-negative { color: #dc2626; }
+.pts-neutral  { color: #555; }
+
+/* ── Consolidated remarks ── */
+.consol-section { margin-top: 1.2rem; }
+.consol-section label { font-weight: 600; font-size: 0.85rem; color: #444; display: block; margin-bottom: 6px; }
+.consol-textarea { width: 100%; min-height: 80px; border: 1.5px solid #ced4da; border-radius: 8px;
+                   padding: 10px 12px; font-size: 0.9rem; resize: vertical; background: #fff; }
+.consol-textarea:focus { outline: none; border-color: #667eea; }
+
+/* ── Save button ── */
+.btn-save-nb { background: linear-gradient(135deg, #667eea, #764ba2); color: #fff; border: none;
+               border-radius: 8px; padding: 10px 28px; font-weight: 700; font-size: 0.95rem;
+               cursor: pointer; transition: .2s; margin-top: 12px; }
+.btn-save-nb:hover:not(:disabled) { opacity: .88; transform: translateY(-1px); }
+.btn-save-nb:disabled { opacity: .5; cursor: not-allowed; }
+
+/* ── Records table ── */
+.filter-row { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 1rem; align-items: flex-end; }
+.filter-row select, .filter-row input { border: 1.5px solid #ced4da; border-radius: 8px; padding: 6px 10px; font-size: 0.87rem; background: #fff; }
+.btn-filter { background: #667eea; color: #fff; border: none; border-radius: 8px; padding: 7px 18px; font-weight: 600; cursor: pointer; }
+.btn-filter:hover { opacity: .85; }
+
+.records-table { width: 100%; border-collapse: collapse; font-size: 0.87rem; }
+.records-table th { background: #f3f4f6; padding: 9px 10px; text-align: left; font-weight: 700;
+                    font-size: 0.78rem; text-transform: uppercase; color: #555; border-bottom: 2px solid #dee2e6; }
+.records-table td { padding: 9px 10px; border-bottom: 1px solid #f0f0f0; vertical-align: middle; }
+.records-table tr:hover td { background: #f8f9ff; }
+.badge-school  { background: #e3f2fd; color: #1565c0; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: 700; }
+.badge-tuition { background: #fce4ec; color: #c62828; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: 700; }
+.btn-view-detail { background: none; border: 1px solid #667eea; color: #667eea; border-radius: 6px;
+                   padding: 3px 10px; font-size: 0.78rem; cursor: pointer; }
+.btn-view-detail:hover { background: #667eea; color: #fff; }
+.btn-del-record { background: none; border: 1px solid #dc3545; color: #dc3545; border-radius: 6px;
+                  padding: 3px 10px; font-size: 0.78rem; cursor: pointer; }
+.btn-del-record:hover { background: #dc3545; color: #fff; }
+
+/* ── Notifications ── */
+.notif-filters { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 1rem; align-items: flex-end; }
+.notif-filters select { border: 1.5px solid #ced4da; border-radius: 8px; padding: 6px 10px; font-size: 0.87rem; background: #fff; }
+.notif-card { border-radius: 10px; padding: 12px 16px; margin-bottom: 10px; display: flex; align-items: flex-start; gap: 12px; }
+.notif-card.severity-never   { background: #fff3cd; border-left: 4px solid #ffc107; }
+.notif-card.severity-full    { background: #fde8e8; border-left: 4px solid #dc3545; }
+.notif-card.severity-partial { background: #fff8e1; border-left: 4px solid #ff9800; }
+.notif-card .notif-icon   { font-size: 1.4rem; margin-top: 2px; }
+.notif-card .notif-body   { flex: 1; }
+.notif-card .notif-name   { font-weight: 700; font-size: 0.95rem; }
+.notif-card .notif-meta   { font-size: 0.8rem; color: #666; margin-top: 2px; }
+.notif-card .notif-subjects { font-size: 0.82rem; color: #c62828; margin-top: 4px; }
+.notif-card .notif-badge  { font-size: 0.72rem; font-weight: 700; padding: 2px 10px; border-radius: 12px; align-self: flex-start; }
+.notif-card.severity-never   .notif-badge { background: #856404; color: #fff; }
+.notif-card.severity-full    .notif-badge { background: #dc3545; color: #fff; }
+.notif-card.severity-partial .notif-badge { background: #ff9800; color: #fff; }
+
+/* ── Subject settings ── */
+.settings-panel { display: flex; gap: 20px; flex-wrap: wrap; }
+.settings-left  { flex: 1; min-width: 280px; }
+.settings-right { flex: 1; min-width: 280px; }
+.settings-card { background: #fff; border: 1.5px solid #dee2e6; border-radius: 10px; padding: 16px; margin-bottom: 12px; }
+.settings-card h6 { font-weight: 700; font-size: 0.85rem; color: #667eea; margin-bottom: 10px;
+                    text-transform: uppercase; letter-spacing: .4px; }
+.subject-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid #f0f0f0; }
+.subject-row:last-child { border-bottom: none; }
+.subject-row .sub-name { flex: 1; font-size: 0.88rem; }
+.sub-inactive { opacity: .45; text-decoration: line-through; }
+.btn-toggle-sub { background: none; border: 1px solid #aaa; border-radius: 5px; padding: 2px 8px; font-size: 0.75rem; cursor: pointer; }
+.btn-del-sub { background: none; border: 1px solid #dc3545; color: #dc3545; border-radius: 5px; padding: 2px 8px; font-size: 0.75rem; cursor: pointer; }
+
+/* ── Score settings card ── */
+.score-settings-card { background: #fff; border: 1.5px solid #c7d2fe; border-radius: 10px; padding: 16px; margin-bottom: 16px; }
+.score-settings-card h6 { font-weight: 700; font-size: 0.85rem; color: #667eea; margin-bottom: 8px;
+                           text-transform: uppercase; letter-spacing: .4px; }
+.score-formula-hint { font-size: 0.78rem; color: #888; margin-bottom: 10px; font-style: italic; }
+.score-limits-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.score-limits-input { width: 80px; border: 1.5px solid #ced4da; border-radius: 6px; padding: 6px 8px;
+                      font-size: 0.92rem; font-weight: 700; text-align: center; }
+.score-limits-input:focus { outline: none; border-color: #667eea; }
+.score-limits-input:read-only { background: #f3f4f6; color: #888; cursor: default; }
+.btn-save-limits { background: #667eea; color: #fff; border: none; border-radius: 6px;
+                   padding: 6px 16px; font-weight: 600; font-size: 0.85rem; cursor: pointer; }
+.btn-save-limits:hover:not(:disabled) { opacity: .85; }
+.btn-save-limits:disabled { opacity: .4; cursor: not-allowed; }
+.limits-saved-msg { font-size: 0.8rem; color: #16a34a; font-weight: 600; display: none; }
+
+/* ── Detail modal ── */
+.nb-modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.55);
+                    z-index:2000; align-items:center; justify-content:center; }
+.nb-modal-overlay.open { display:flex; }
+.nb-modal { background:#fff; border-radius:12px; padding:24px; max-width:660px;
+            width:94%; max-height:88vh; max-height:88dvh; overflow-y:auto; margin:auto; }
+.nb-modal h4 { margin:0 0 14px; font-size:1.1rem; font-weight:700; color:#333; }
+.nb-modal .close-modal { float:right; background:none; border:none; font-size:1.4rem; cursor:pointer; color:#888; }
+.detail-table { width:100%; border-collapse:collapse; font-size:.85rem; }
+.detail-table th { background:#f3f4f6; padding:7px 10px; text-align:left; font-weight:700; }
+.detail-table td { padding:7px 10px; border-bottom:1px solid #f0f0f0; }
+
+/* ── Empty / alert ── */
+.empty-state { text-align:center; padding:2.5rem 1rem; color:#aaa; }
+.empty-state i { font-size:2.5rem; margin-bottom:.7rem; display:block; }
+.nb-alert { border-radius:8px; padding:10px 16px; margin-bottom:12px; font-size:.88rem; display:none; }
+.nb-alert.show { display:block; }
+.nb-alert.success { background:#d4edda; color:#155724; border:1px solid #c3e6cb; }
+.nb-alert.error   { background:#f8d7da; color:#721c24; border:1px solid #f5c6cb; }
+
+/* ═══════════════════════════════════════════════════════════════
+   NOTEBOOK — Smartphone responsive overrides
+   ═══════════════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+    /* Prevent iOS zoom on input focus */
+    .selector-row select,
+    .selector-row input[type="date"],
+    .grade-select,
+    .remarks-input,
+    .consol-textarea,
+    .filter-row select,
+    .filter-row input,
+    .notif-filters select,
+    .score-limits-input,
+    .settings-card .form-select,
+    .settings-card .form-control {
+        font-size: 16px !important;
+    }
+    .nb-page { padding: 0.75rem; }
+    .nb-page h1 { font-size: 1.15rem; margin-bottom: 0.8rem; }
+
+    /* Tab bar: compact on mobile */
+    .nb-tab { padding: 0.5rem 0.8rem; font-size: 0.82rem; }
+
+    /* Type pills: full-width */
+    .type-pills { flex-wrap: wrap; }
+    .type-pill { flex: 1; min-width: 120px; text-align: center; padding: 8px 14px; min-height: 44px; }
+
+    /* Selector row: stack vertically */
+    .selector-row { flex-direction: column; gap: 8px; }
+    .selector-row .field { min-width: unset; width: 100%; }
+
+    /* Subject table: scrollable */
+    .nb-table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .nb-table thead { min-width: 600px; }
+    .nb-table tbody { min-width: 600px; }
+
+    /* Grade select: wider for touch */
+    .grade-select { min-width: 130px; }
+
+    /* Totals bar: wrap */
+    .totals-bar { flex-wrap: wrap; gap: 8px; padding: 8px 12px; }
+    .totals-bar .pts-display { font-size: 1.2rem; }
+
+    /* All-completed bar */
+    .all-completed-bar { flex-wrap: wrap; gap: 6px; padding: 8px 10px; }
+
+    /* Records table: scrollable */
+    .records-table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .records-table thead { min-width: 500px; }
+    .records-table tbody { min-width: 500px; }
+
+    /* Filter row: stack */
+    .filter-row { flex-direction: column; gap: 6px; }
+    .filter-row select, .filter-row input { width: 100%; }
+
+    /* Notif filters: stack */
+    .notif-filters { flex-direction: column; gap: 6px; }
+    .notif-filters select { width: 100%; }
+
+    /* Settings panel: single column */
+    .settings-panel { flex-direction: column; }
+    .settings-left, .settings-right { min-width: unset; }
+
+    /* Detail modal: full-width on mobile */
+    .nb-modal { width: 96%; max-width: none; padding: 16px; border-radius: 10px; max-height: 90vh; }
+    .nb-modal h4 { font-size: 1rem; }
+    .detail-table { font-size: 0.8rem; }
+    .detail-table th, .detail-table td { padding: 5px 6px; }
+
+    /* Save button: full-width */
+    .btn-save-nb { width: 100%; padding: 12px 20px; min-height: 44px; }
+
+    /* Buttons: touch-friendly */
+    .btn-filter, .btn-view-detail, .btn-del-record,
+    .btn-toggle-sub, .btn-del-sub, .btn-save-limits,
+    .btn-exempt-sub, .btn-unexempt { min-height: 36px; padding: 6px 12px; }
+
+    /* Notification cards */
+    .notif-card { flex-direction: column; gap: 6px; padding: 10px 12px; }
+
+    /* Score limits row */
+    .score-limits-row { flex-wrap: wrap; gap: 8px; }
+}
+
+/* Extra-small phones */
+@media (max-width: 400px) {
+    .nb-page { padding: 0.5rem; }
+    .nb-page h1 { font-size: 1rem; }
+    .type-pill { font-size: 0.82rem; padding: 6px 10px; }
+    .nb-table thead, .nb-table tbody { min-width: 520px; }
+    .nb-modal { padding: 12px; }
+}
+
+/* Landscape phone */
+@media (max-width: 768px) and (orientation: landscape) {
+    .nb-page { padding: 0.4rem; }
+    .nb-modal { max-height: 80vh; }
+}
+
+/* Touch: remove sticky hover */
+@media (hover: none) {
+    .nb-table tbody tr:hover td { background: transparent; }
+    .records-table tr:hover td { background: transparent; }
+    .type-pill:hover:not(.active) { background: #fff; }
+}
+
+/* Dark mode subject bands — keep every row dark so text always contrasts */
+body:not(.light-mode) .nb-table tbody tr.subject-row td {
+    background: #1a2230 !important;
+    color: #e2e8f0 !important;
+}
+body:not(.light-mode) .nb-table tbody tr.subject-row:nth-child(even) td {
+    background: #18222f !important;
+}
+body:not(.light-mode) .nb-table tbody tr.subject-row:hover td {
+    background: #1e2d3f !important;
+}
+body:not(.light-mode) .nb-table tbody tr.subject-row td:first-child {
+    color: #f3f4f6 !important;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="nb-page">
+    <h1><i class="fas fa-book-open me-2"></i>Notebooks Check</h1>
+
+    <!-- Outer tab bar — plain buttons, no Bootstrap nav-link class -->
+    <div class="nb-tabs" id="nbTabs">
+        <button class="nb-tab active" data-tab="entry">
+            <i class="fas fa-pen-to-square"></i> Entry
+        </button>
+        <button class="nb-tab" data-tab="records">
+            <i class="fas fa-table-list"></i> Records
+        </button>
+        <button class="nb-tab" data-tab="notifications">
+            <i class="fas fa-bell"></i> Notifications
+            <span id="notifBadge" class="badge bg-danger ms-1" style="display:none">0</span>
+        </button>
+        <button class="nb-tab" data-tab="settings">
+            <i class="fas fa-sliders"></i> Subject Settings
+        </button>
+    </div>
+
+    <div id="nbAlert" class="nb-alert"></div>
+
+    <!-- ══════════════════════ ENTRY TAB ══════════════════════ -->
+    <div id="tab-entry" class="nb-tab-pane">
+        <!-- Type pills -->
+        <div class="type-pills">
+            <button class="type-pill active" data-type="tuition">
+                <i class="fas fa-chalkboard-teacher me-1"></i> Tuition (Excel Academy)
+            </button>
+            <button class="type-pill" data-type="school">
+                <i class="fas fa-school me-1"></i> School
+            </button>
+        </div>
+
+        <!-- Selectors -->
+        <div class="selector-row">
+            <div class="field">
+                <label>Date</label>
+                <input type="date" id="entryDate">
+            </div>
+            <div class="field">
+                <label>Group</label>
+                <select id="entryGroup">
+                    <option value="">-- Select Group --</option>
+                </select>
+            </div>
+            <div class="field">
+                <label>Class</label>
+                <select id="entryClass" disabled>
+                    <option value="">-- Select Class --</option>
+                </select>
+            </div>
+            <div class="field">
+                <label>Student</label>
+                <select id="entryStudent" disabled>
+                    <option value="">-- Select Student --</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Subject panel (hidden until student selected) -->
+        <div id="subjectPanel" style="display:none">
+            <div id="defaultSubjectWarning" class="nb-alert"
+                 style="background:#fff3cd;color:#856404;border:1px solid #ffc107;display:none">
+                <i class="fas fa-info-circle me-1"></i>
+                No subjects configured for this group — showing defaults.
+                Go to <strong>Subject Settings</strong> to customise.
+            </div>
+
+            <!-- All-completed checkbox -->
+            <div class="all-completed-bar">
+                <input type="checkbox" id="allCompletedCb">
+                <label for="allCompletedCb">
+                    <i class="fas fa-check-double me-1"></i>
+                    Mark All Applicable Subjects as Checked
+                </label>
+                <small>(auto-sets grade to "Good" — adjust individually below)</small>
+            </div>
+
+            <!-- Subject table -->
+            <div style="overflow-x:auto">
+                <table class="nb-table">
+                    <thead>
+                        <tr>
+                            <th style="width:22%">Subject</th>
+                            <th class="check-cell" style="width:8%">Checked</th>
+                            <th style="width:22%">
+                                Grade
+                                <small style="font-weight:400;font-size:.7rem;display:block">select when checked</small>
+                            </th>
+                            <th style="width:9%">Points</th>
+                            <th style="width:28%">Remarks</th>
+                            <th style="width:11%" title="Mark subject as not applicable for this student">N/A</th>
+                        </tr>
+                    </thead>
+                    <tbody id="subjectRows"></tbody>
+                </table>
+            </div>
+
+            <!-- Totals bar -->
+            <div class="totals-bar">
+                <span class="label">Final Points:</span>
+                <span class="pts-display" id="totalPtsDisplay">0</span>
+                <span id="capWarning" class="cap-warning" style="display:none"></span>
+                <span class="checked-display" id="checkedDisplay">0 / 0 subjects checked</span>
+                <span class="limit-hint" id="limitHint">Limits: −30 to +20</span>
+            </div>
+
+            <!-- Consolidated remarks + save -->
+            <div class="consol-section">
+                <label><i class="fas fa-comment-dots me-1"></i>Consolidated Remarks</label>
+                <textarea class="consol-textarea" id="consolRemarks"
+                          placeholder="Overall feedback for this student's notebooks…"></textarea>
+            </div>
+
+            <button class="btn-save-nb" id="savebtn" onclick="saveCheck()">
+                <i class="fas fa-save me-2"></i>Save &amp; Add to Scoreboard
+            </button>
+            <span id="saveStatus" style="margin-left:12px;font-size:.87rem;color:#555"></span>
+        </div>
+
+        <div id="entryEmpty" class="empty-state">
+            <i class="fas fa-user-check"></i>
+            Select group, class and student to begin notebook check entry.
+        </div>
+    </div>
+
+    <!-- ══════════════════════ RECORDS TAB ══════════════════════ -->
+    <div id="tab-records" class="nb-tab-pane" style="display:none">
+        <div class="filter-row">
+            <div>
+                <label style="font-size:.78rem;font-weight:600;display:block;margin-bottom:3px">Type</label>
+                <select id="recType">
+                    <option value="">All Types</option>
+                    <option value="tuition">Tuition</option>
+                    <option value="school">School</option>
+                </select>
+            </div>
+            <div>
+                <label style="font-size:.78rem;font-weight:600;display:block;margin-bottom:3px">Group</label>
+                <select id="recGroup"><option value="">All Groups</option></select>
+            </div>
+            <div>
+                <label style="font-size:.78rem;font-weight:600;display:block;margin-bottom:3px">Class</label>
+                <select id="recClass"><option value="">All Classes</option></select>
+            </div>
+            <div>
+                <label style="font-size:.78rem;font-weight:600;display:block;margin-bottom:3px">Student</label>
+                <select id="recStudent"><option value="">All Students</option></select>
+            </div>
+            <div>
+                <label style="font-size:.78rem;font-weight:600;display:block;margin-bottom:3px">Month</label>
+                <select id="recMonth">
+                    <option value="">All Months</option>
+                    <option value="1">January</option><option value="2">February</option>
+                    <option value="3">March</option><option value="4">April</option>
+                    <option value="5">May</option><option value="6">June</option>
+                    <option value="7">July</option><option value="8">August</option>
+                    <option value="9">September</option><option value="10">October</option>
+                    <option value="11">November</option><option value="12">December</option>
+                </select>
+            </div>
+            <div>
+                <label style="font-size:.78rem;font-weight:600;display:block;margin-bottom:3px">Year</label>
+                <input type="number" id="recYear" style="width:90px" placeholder="Year">
+            </div>
+            <div style="align-self:flex-end">
+                <button class="btn-filter" onclick="loadRecords()">
+                    <i class="fas fa-search me-1"></i> Search
+                </button>
+            </div>
+        </div>
+        <div id="recordsWrap">
+            <div class="empty-state">
+                <i class="fas fa-table-list"></i>
+                Apply filters and click Search to view records.
+            </div>
+        </div>
+    </div>
+
+    <!-- ══════════════════════ NOTIFICATIONS TAB ══════════════════════ -->
+    <div id="tab-notifications" class="nb-tab-pane" style="display:none">
+        <div class="notif-filters">
+            <div>
+                <label style="font-size:.78rem;font-weight:600;display:block;margin-bottom:3px">Type</label>
+                <select id="notifType">
+                    <option value="">Both</option>
+                    <option value="tuition">Tuition</option>
+                    <option value="school">School</option>
+                </select>
+            </div>
+            <div>
+                <label style="font-size:.78rem;font-weight:600;display:block;margin-bottom:3px">Group</label>
+                <select id="notifGroup"><option value="">All Groups</option></select>
+            </div>
+            <div>
+                <label style="font-size:.78rem;font-weight:600;display:block;margin-bottom:3px">Class</label>
+                <select id="notifClass"><option value="">All Classes</option></select>
+            </div>
+            <div>
+                <label style="font-size:.78rem;font-weight:600;display:block;margin-bottom:3px">Look-back</label>
+                <select id="notifDays">
+                    <option value="7">Last 7 days</option>
+                    <option value="14">Last 14 days</option>
+                    <option value="30" selected>Last 30 days</option>
+                    <option value="60">Last 60 days</option>
+                </select>
+            </div>
+            <div style="align-self:flex-end">
+                <button class="btn-filter" onclick="loadNotifications()">
+                    <i class="fas fa-sync me-1"></i> Refresh
+                </button>
+            </div>
+        </div>
+        <div style="font-size:.82rem;color:#888;margin-bottom:10px">
+            <i class="fas fa-info-circle me-1"></i>
+            Exempt subjects are excluded. Students whose all applicable subjects are checked will not appear here.
+        </div>
+        <div id="notifWrap">
+            <div class="empty-state"><i class="fas fa-bell"></i>Click Refresh to load.</div>
+        </div>
+    </div>
+
+    <!-- ══════════════════════ SUBJECT SETTINGS TAB ══════════════════════ -->
+    <div id="tab-settings" class="nb-tab-pane" style="display:none">
+
+        <!-- Score limits card (full width, above columns) -->
+        <div class="score-settings-card">
+            <h6><i class="fas fa-gauge-high me-1"></i> Score Limits</h6>
+            <div class="score-formula-hint">
+                Formula: sum of all grade points for checked subjects → clamped between Min and Max.
+                Grades: Excellent +5, Very Good +4, Good +3, Fair +2, Satisfactory +1,
+                Incomplete −5, Untidy Work −3, Not Submitted −10.
+            </div>
+            <div class="score-limits-row">
+                <label style="font-size:.82rem;font-weight:600">Max Points:</label>
+                <input type="number" id="limitMax" class="score-limits-input" value="20">
+                <label style="font-size:.82rem;font-weight:600">Min Points:</label>
+                <input type="number" id="limitMin" class="score-limits-input" value="-30">
+                {% if current_user.role == 'admin' %}
+                <button class="btn-save-limits" onclick="saveScoreLimits()">
+                    <i class="fas fa-save me-1"></i> Save Limits
+                </button>
+                {% else %}
+                <span style="font-size:.8rem;color:#888"><i class="fas fa-lock me-1"></i>Admin only</span>
+                {% endif %}
+                <span class="limits-saved-msg" id="limitsSavedMsg">
+                    <i class="fas fa-check me-1"></i>Saved!
+                </span>
+            </div>
+            {% if current_user.role != 'admin' %}
+            <script>
+                document.getElementById('limitMax').readOnly = true;
+                document.getElementById('limitMin').readOnly = true;
+            </script>
+            {% endif %}
+        </div>
+
+        <div class="settings-panel">
+            <!-- Add new subject -->
+            <div class="settings-left">
+                <div class="settings-card">
+                    <h6><i class="fas fa-plus-circle me-1"></i> Add Subject</h6>
+                    <div class="mb-2">
+                        <label style="font-size:.82rem;font-weight:600">Type</label>
+                        <select id="addSubType" class="form-select form-select-sm mt-1">
+                            <option value="tuition">Tuition</option>
+                            <option value="school">School</option>
+                        </select>
+                    </div>
+                    <div class="mb-2">
+                        <label style="font-size:.82rem;font-weight:600">Group</label>
+                        <select id="addSubGroup" class="form-select form-select-sm mt-1">
+                            <option value="">-- Select Group --</option>
+                        </select>
+                    </div>
+                    <div class="mb-2">
+                        <label style="font-size:.82rem;font-weight:600">Class (optional)</label>
+                        <input type="text" id="addSubClass" class="form-control form-control-sm mt-1"
+                               placeholder="e.g. 10 — leave blank for all classes">
+                    </div>
+                    <div class="mb-2">
+                        <label style="font-size:.82rem;font-weight:600">Subject Name</label>
+                        <input type="text" id="addSubName" class="form-control form-control-sm mt-1"
+                               placeholder="e.g. Maths">
+                    </div>
+                    <button class="btn-filter mt-1" onclick="addSubject()">
+                        <i class="fas fa-plus me-1"></i> Add Subject
+                    </button>
+                </div>
+            </div>
+
+            <!-- Existing subjects list -->
+            <div class="settings-right">
+                <div class="settings-card">
+                    <h6><i class="fas fa-list me-1"></i> Configured Subjects</h6>
+                    <div class="mb-2" style="display:flex;gap:8px;flex-wrap:wrap">
+                        <select id="filterSubType" class="form-select form-select-sm" style="width:130px">
+                            <option value="">All Types</option>
+                            <option value="tuition">Tuition</option>
+                            <option value="school">School</option>
+                        </select>
+                        <select id="filterSubGroup" class="form-select form-select-sm" style="width:130px">
+                            <option value="">All Groups</option>
+                        </select>
+                        <button class="btn-filter" onclick="loadSubjectConfigs()"
+                                style="padding:5px 12px;font-size:.8rem">
+                            <i class="fas fa-filter"></i>
+                        </button>
+                    </div>
+                    <div id="subjectConfigList">
+                        <div class="empty-state" style="padding:1rem">
+                            <i class="fas fa-list"></i> Click filter to load subjects.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ══════════════════════ DETAIL MODAL ══════════════════════ -->
+<div class="nb-modal-overlay" id="detailModal">
+    <div class="nb-modal">
+        <button class="close-modal" onclick="closeDetailModal()">&times;</button>
+        <h4 id="detailModalTitle">Check Detail</h4>
+        <div id="detailModalBody"></div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const CSRF_TOKEN = '{{ csrf_token() }}';
+const IS_ADMIN = {{ 'true' if current_user.role == 'admin' else 'false' }};
+
+// Grade → points lookup (mirrors backend GRADE_POINTS)
+const GRADE_POINTS = {
+    'Excellent': 5, 'Very Good': 4, 'Good': 3, 'Fair': 2,
+    'Satisfactory': 1, 'Incomplete': -5, 'Untidy work': -3, 'Not submitted': -10,
+};
+
+// Score limits (loaded from server on init)
+let NB_MAX_PTS = 20;
+let NB_MIN_PTS = -30;
+
+let currentType = 'tuition';
+let currentStudentRoll = null;
+
+/* ── helpers ─────────────────────────────────────────────────────── */
+function escHtml(str) {
+    if (str === null || str === undefined) return '';
+    return String(str)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+function showAlert(msg, type = 'success') {
+    const el = document.getElementById('nbAlert');
+    el.className = `nb-alert ${type} show`;
+    el.innerHTML = `<i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-circle'} me-1"></i>${msg}`;
+    setTimeout(() => { el.className = 'nb-alert'; }, 5500);
+}
+
+function apiFetch(url, opts = {}) {
+    const defaults = {
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
+    };
+    return fetch(url, Object.assign(defaults, opts)).then(r => r.json());
+}
+
+function today() { return new Date().toISOString().slice(0, 10); }
+
+/* ── Tab switching ────────────────────────────────────────────────── */
+function switchNbTab(tab) {
+    document.querySelectorAll('.nb-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.nb-tab-pane').forEach(p => p.style.display = 'none');
+    const btn = document.querySelector(`.nb-tab[data-tab="${tab}"]`);
+    if (btn) btn.classList.add('active');
+    const pane = document.getElementById(`tab-${tab}`);
+    if (pane) pane.style.display = 'block';
+    if (tab === 'records')      populateRecordFilters();
+    if (tab === 'notifications') { populateNotifFilters(); loadNotifications(); }
+    if (tab === 'settings')     { populateSettingsGroups(); loadSubjectConfigs(); loadScoreLimits(); }
+}
+
+document.querySelectorAll('.nb-tab').forEach(btn => {
+    btn.addEventListener('click', () => switchNbTab(btn.dataset.tab));
+});
+
+/* ── Type pills ───────────────────────────────────────────────────── */
+document.querySelectorAll('.type-pill').forEach(pill => {
+    pill.addEventListener('click', () => {
+        document.querySelectorAll('.type-pill').forEach(p => p.classList.remove('active'));
+        pill.classList.add('active');
+        currentType = pill.dataset.type;
+        resetSubjectPanel();
+        if (currentStudentRoll) loadSubjectRows();
+    });
+});
+
+/* ── Init ─────────────────────────────────────────────────────────── */
+document.getElementById('entryDate').value = today();
+
+async function init() {
+    // Load groups + score limits in parallel
+    const [groupData, limitsData] = await Promise.all([
+        apiFetch('/notebooks/api/groups'),
+        apiFetch('/notebooks/api/score-settings'),
+    ]);
+
+    // Populate groups
+    const sel = document.getElementById('entryGroup');
+    (groupData.groups || []).forEach(g => {
+        const opt = document.createElement('option');
+        opt.value = opt.textContent = g;
+        sel.appendChild(opt);
+    });
+
+    // Apply score limits
+    if (limitsData) {
+        NB_MAX_PTS = limitsData.max_points || 20;
+        NB_MIN_PTS = limitsData.min_points || -30;
+        updateLimitHint();
+    }
+}
+init();
+
+function updateLimitHint() {
+    const hint = document.getElementById('limitHint');
+    if (hint) hint.textContent = `Limits: ${NB_MIN_PTS} to +${NB_MAX_PTS}`;
+}
+
+/* ── Group → Class cascade ────────────────────────────────────────── */
+document.getElementById('entryGroup').addEventListener('change', async function () {
+    const group = this.value;
+    resetSubjectPanel();
+    const classSel = document.getElementById('entryClass');
+    const studSel  = document.getElementById('entryStudent');
+    classSel.innerHTML = '<option value="">-- Select Class --</option>';
+    studSel.innerHTML  = '<option value="">-- Select Student --</option>';
+    classSel.disabled = !group;
+    studSel.disabled  = true;
+    if (!group) return;
+    const data = await apiFetch(`/notebooks/api/classes?group=${encodeURIComponent(group)}`);
+    (data.classes || []).forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = opt.textContent = c;
+        classSel.appendChild(opt);
+    });
+    classSel.disabled = false;
+});
+
+/* ── Class → Student cascade ──────────────────────────────────────── */
+document.getElementById('entryClass').addEventListener('change', async function () {
+    const group = document.getElementById('entryGroup').value;
+    const cls   = this.value;
+    resetSubjectPanel();
+    const studSel = document.getElementById('entryStudent');
+    studSel.innerHTML = '<option value="">-- Select Student --</option>';
+    studSel.disabled  = !cls;
+    if (!cls) return;
+    const data = await apiFetch(
+        `/notebooks/api/students?group=${encodeURIComponent(group)}&class_name=${encodeURIComponent(cls)}`
+    );
+    (data.students || []).forEach(s => {
+        const opt = document.createElement('option');
+        opt.value = s.roll;
+        opt.textContent = `${s.roll} – ${s.name}`;
+        studSel.appendChild(opt);
+    });
+    studSel.disabled = false;
+});
+
+/* ── Student selection ────────────────────────────────────────────── */
+document.getElementById('entryStudent').addEventListener('change', function () {
+    currentStudentRoll = this.value || null;
+    if (currentStudentRoll) loadSubjectRows();
+    else resetSubjectPanel();
+});
+
+document.getElementById('entryDate').addEventListener('change', () => {
+    if (currentStudentRoll) loadSubjectRows();
+});
+
+function resetSubjectPanel() {
+    document.getElementById('subjectPanel').style.display  = 'none';
+    document.getElementById('entryEmpty').style.display    = '';
+    document.getElementById('subjectRows').innerHTML       = '';
+    document.getElementById('consolRemarks').value         = '';
+    document.getElementById('totalPtsDisplay').textContent = '0';
+    document.getElementById('totalPtsDisplay').className   = 'pts-display';
+    document.getElementById('checkedDisplay').textContent  = '0 / 0 subjects checked';
+    document.getElementById('capWarning').style.display    = 'none';
+    document.getElementById('saveStatus').textContent      = '';
+    const allCb = document.getElementById('allCompletedCb');
+    if (allCb) allCb.checked = false;
+}
+
+/* ── Build grade options HTML ─────────────────────────────────────── */
+function gradeOptionsHtml(selectedGrade) {
+    const opts = [
+        ['', '— Select Grade —'],
+        ['Excellent',     'Excellent (+5)'],
+        ['Very Good',     'Very Good (+4)'],
+        ['Good',          'Good (+3)'],
+        ['Fair',          'Fair (+2)'],
+        ['Satisfactory',  'Satisfactory (+1)'],
+        ['Incomplete',    'Incomplete (−5)'],
+        ['Untidy work',   'Untidy Work (−3)'],
+        ['Not submitted', 'Not Submitted (−10)'],
+    ];
+    return opts.map(([v, t]) =>
+        `<option value="${escHtml(v)}"${v === selectedGrade ? ' selected' : ''}>${escHtml(t)}</option>`
+    ).join('');
+}
+
+/* ── Load subject rows ────────────────────────────────────────────── */
+async function loadSubjectRows(preserveData = false) {
+    const group   = document.getElementById('entryGroup').value;
+    const cls     = document.getElementById('entryClass').value;
+    const dateVal = document.getElementById('entryDate').value;
+    const roll    = currentStudentRoll;
+
+    // Snapshot unsaved form data if preserving (e.g. after exemption toggle)
+    let savedSnapshot = null;
+    if (preserveData) savedSnapshot = snapshotSubjectData();
+
+    const [subData, chkData, exemData] = await Promise.all([
+        apiFetch(`/notebooks/api/subjects?group=${encodeURIComponent(group)}&class_name=${encodeURIComponent(cls)}&type=${currentType}`),
+        apiFetch(`/notebooks/api/check?roll=${encodeURIComponent(roll)}&date=${encodeURIComponent(dateVal)}&type=${currentType}`),
+        apiFetch(`/notebooks/api/exemptions?roll=${encodeURIComponent(roll)}&type=${currentType}`),
+    ]);
+
+    const subjects     = subData.subjects || [];
+    const existingCheck = chkData.check;
+    const exemptSet    = new Set(exemData.exemptions || []);
+
+    // Build map: subject name → existing check row
+    const existingMap = {};
+    if (existingCheck && existingCheck.subject_checks) {
+        existingCheck.subject_checks.forEach(sc => { existingMap[sc.subject_name] = sc; });
+    }
+
+    // Default warning
+    const warn = document.getElementById('defaultSubjectWarning');
+    warn.style.display = subData.is_default ? 'block' : 'none';
+
+    const tbody = document.getElementById('subjectRows');
+    tbody.innerHTML = '';
+
+    subjects.forEach(sub => {
+        const isExempt = exemptSet.has(sub.name);
+
+        // Data source: snapshot (if preserving) > existing DB check > empty
+        let ex = {};
+        if (savedSnapshot && savedSnapshot[sub.name]) {
+            ex = savedSnapshot[sub.name];
+        } else if (existingMap[sub.name]) {
+            ex = existingMap[sub.name];
+        }
+
+        const isChecked = !isExempt && (ex.is_checked || false);
+        const grade     = (isChecked ? ex.grade : '') || '';
+        const remarks   = ex.remarks || '';
+
+        let rowHtml;
+        if (isExempt) {
+            rowHtml = `
+            <tr class="subject-row exempt-row" data-subject-name="${escHtml(sub.name)}">
+                <td><span class="exempt-label">N/A</span> ${escHtml(sub.name)}</td>
+                <td class="check-cell" style="color:#aaa">—</td>
+                <td style="color:#aaa;font-style:italic;font-size:.82rem" colspan="2">Not applicable for this student</td>
+                <td></td>
+                <td class="check-cell">
+                    <button class="btn-unexempt btn-restore-exempt" title="Mark subject as applicable again">
+                        <i class="fas fa-rotate-left me-1"></i>Restore
+                    </button>
+                </td>
+            </tr>`;
+        } else {
+            const pts = (isChecked && grade) ? (GRADE_POINTS[grade] || 0) : 0;
+            const ptsCls = pts > 0 ? 'pts-positive' : pts < 0 ? 'pts-negative' : 'pts-neutral';
+            rowHtml = `
+            <tr class="subject-row" data-subject-name="${escHtml(sub.name)}">
+                <td>${escHtml(sub.name)}</td>
+                <td class="check-cell">
+                    <input type="checkbox" class="sub-checkbox" ${isChecked ? 'checked' : ''}>
+                </td>
+                <td>
+                    <select class="grade-select" ${isChecked ? '' : 'disabled'}>
+                        ${gradeOptionsHtml(grade)}
+                    </select>
+                </td>
+                <td class="check-cell">
+                    <span class="pts-badge ${ptsCls}">${pts >= 0 ? '+' : ''}${pts}</span>
+                </td>
+                <td>
+                    <textarea class="remarks-input" rows="1"
+                              placeholder="Remarks…">${escHtml(remarks)}</textarea>
+                </td>
+                <td class="check-cell">
+                    <button class="btn-exempt-sub btn-mark-exempt" title="Mark as not applicable for this student">
+                        <i class="fas fa-ban"></i>
+                    </button>
+                </td>
+            </tr>`;
+        }
+
+        tbody.insertAdjacentHTML('beforeend', rowHtml);
+    });
+
+    // Pre-fill consolidated remarks
+    if (!preserveData && existingCheck) {
+        document.getElementById('consolRemarks').value = existingCheck.consolidated_remarks || '';
+        document.getElementById('saveStatus').textContent = '✓ Record exists for this date (editing)';
+        document.getElementById('saveStatus').style.color = '#16a34a';
+    } else if (!preserveData) {
+        document.getElementById('consolRemarks').value = '';
+        document.getElementById('saveStatus').textContent = '';
+    }
+
+    updateTotals();
+    document.getElementById('subjectPanel').style.display = '';
+    document.getElementById('entryEmpty').style.display   = 'none';
+}
+
+/* ── Subject table event delegation ──────────────────────────────── */
+document.getElementById('subjectRows').addEventListener('change', function (e) {
+    if (e.target.classList.contains('sub-checkbox')) onCheckboxChange(e.target);
+    if (e.target.classList.contains('grade-select'))  onGradeChange(e.target);
+});
+
+document.getElementById('subjectRows').addEventListener('click', function (e) {
+    const exemptBtn  = e.target.closest('.btn-mark-exempt');
+    const restoreBtn = e.target.closest('.btn-restore-exempt');
+    if (exemptBtn)  toggleSubjectExempt(exemptBtn.closest('tr').dataset.subjectName, true);
+    if (restoreBtn) toggleSubjectExempt(restoreBtn.closest('tr').dataset.subjectName, false);
+});
+
+/* ── Checkbox change ──────────────────────────────────────────────── */
+function onCheckboxChange(cb) {
+    const row      = cb.closest('tr');
+    const gradeSel = row.querySelector('.grade-select');
+    const ptsBadge = row.querySelector('.pts-badge');
+
+    if (cb.checked) {
+        gradeSel.disabled = false;
+        if (!gradeSel.value) gradeSel.value = 'Good'; // sensible default
+    } else {
+        gradeSel.disabled = true;
+        gradeSel.value = '';
+        // Uncheck the "all completed" master checkbox
+        const allCb = document.getElementById('allCompletedCb');
+        if (allCb) allCb.checked = false;
+    }
+
+    _updateRowBadge(row);
+    updateTotals();
+}
+
+/* ── Grade select change ──────────────────────────────────────────── */
+function onGradeChange(sel) {
+    _updateRowBadge(sel.closest('tr'));
+    updateTotals();
+}
+
+function _updateRowBadge(row) {
+    const cb       = row.querySelector('.sub-checkbox');
+    const gradeSel = row.querySelector('.grade-select');
+    const ptsBadge = row.querySelector('.pts-badge');
+    if (!ptsBadge) return;
+    const grade = (cb && cb.checked && gradeSel) ? gradeSel.value : '';
+    const pts   = grade ? (GRADE_POINTS[grade] || 0) : 0;
+    ptsBadge.textContent = (pts >= 0 ? '+' : '') + pts;
+    ptsBadge.className   = `pts-badge ${pts > 0 ? 'pts-positive' : pts < 0 ? 'pts-negative' : 'pts-neutral'}`;
+}
+
+/* ── All-completed master checkbox ───────────────────────────────── */
+document.getElementById('allCompletedCb').addEventListener('change', function () {
+    document.querySelectorAll('#subjectRows tr.subject-row:not(.exempt-row)').forEach(tr => {
+        const cb       = tr.querySelector('.sub-checkbox');
+        const gradeSel = tr.querySelector('.grade-select');
+        if (!cb || !gradeSel) return;
+        if (this.checked) {
+            cb.checked = true;
+            gradeSel.disabled = false;
+            if (!gradeSel.value) gradeSel.value = 'Good';
+        } else {
+            cb.checked = false;
+            gradeSel.disabled = true;
+            gradeSel.value = '';
+        }
+        _updateRowBadge(tr);
+    });
+    updateTotals();
+});
+
+/* ── Toggle subject exemption ─────────────────────────────────────── */
+async function toggleSubjectExempt(subjectName, makeExempt) {
+    if (!currentStudentRoll) return;
+    const result = await apiFetch('/notebooks/api/exemptions', {
+        method: 'POST',
+        body: JSON.stringify({
+            roll: currentStudentRoll,
+            type: currentType,
+            subject: subjectName,
+            exempt: makeExempt,
+        }),
+    });
+    if (!result.success) {
+        showAlert(result.error || 'Failed to update exemption', 'error');
+        return;
+    }
+    // Reload rows while preserving current unsaved form data
+    await loadSubjectRows(true);
+    showAlert(
+        makeExempt
+            ? `"${subjectName}" marked as Not Applicable — won't trigger notifications.`
+            : `"${subjectName}" restored to applicable subjects.`,
+        'success'
+    );
+}
+
+/* ── Snapshot unsaved form data ───────────────────────────────────── */
+function snapshotSubjectData() {
+    const snap = {};
+    document.querySelectorAll('#subjectRows tr.subject-row:not(.exempt-row)').forEach(tr => {
+        const name     = tr.dataset.subjectName;
+        const cb       = tr.querySelector('.sub-checkbox');
+        const gradeSel = tr.querySelector('.grade-select');
+        const rem      = tr.querySelector('.remarks-input');
+        snap[name] = {
+            is_checked: cb ? cb.checked : false,
+            grade:      gradeSel ? gradeSel.value : '',
+            remarks:    rem ? rem.value : '',
+        };
+    });
+    return snap;
+}
+
+/* ── Update totals bar ────────────────────────────────────────────── */
+function updateTotals() {
+    let rawTotal = 0, checked = 0, nonExemptTotal = 0;
+
+    document.querySelectorAll('#subjectRows tr.subject-row').forEach(tr => {
+        if (tr.classList.contains('exempt-row')) return;
+        nonExemptTotal++;
+        const cb       = tr.querySelector('.sub-checkbox');
+        const gradeSel = tr.querySelector('.grade-select');
+        if (cb && cb.checked) {
+            checked++;
+            if (gradeSel && gradeSel.value) {
+                rawTotal += GRADE_POINTS[gradeSel.value] || 0;
+            }
+        }
+    });
+
+    const finalTotal = Math.max(NB_MIN_PTS, Math.min(NB_MAX_PTS, rawTotal));
+
+    const disp = document.getElementById('totalPtsDisplay');
+    disp.textContent = (finalTotal >= 0 ? '+' : '') + finalTotal;
+    disp.className   = `pts-display ${finalTotal > 0 ? 'pts-positive' : finalTotal < 0 ? 'pts-negative' : 'pts-neutral'}`;
+
+    document.getElementById('checkedDisplay').textContent =
+        `${checked} / ${nonExemptTotal} subjects checked`;
+
+    const capWarn = document.getElementById('capWarning');
+    if (rawTotal !== finalTotal) {
+        const sr = (rawTotal >= 0 ? '+' : '') + rawTotal;
+        const sf = (finalTotal >= 0 ? '+' : '') + finalTotal;
+        capWarn.textContent = `⚠ Raw: ${sr} → Capped to: ${sf}`;
+        capWarn.style.display = '';
+    } else {
+        capWarn.style.display = 'none';
+    }
+}
+
+/* ── Collect subjects for save payload ────────────────────────────── */
+function collectSubjects() {
+    const rows = [];
+    document.querySelectorAll('#subjectRows tr.subject-row').forEach(tr => {
+        const isExempt = tr.classList.contains('exempt-row');
+        const name     = tr.dataset.subjectName;
+        const cb       = tr.querySelector('.sub-checkbox');
+        const gradeSel = tr.querySelector('.grade-select');
+        const rem      = tr.querySelector('.remarks-input');
+        rows.push({
+            name:       name,
+            is_exempt:  isExempt,
+            is_checked: !isExempt && cb && cb.checked,
+            grade:      (!isExempt && gradeSel) ? gradeSel.value : '',
+            remarks:    rem ? rem.value.trim() : '',
+        });
+    });
+    return rows;
+}
+
+/* ── Save notebook check ──────────────────────────────────────────── */
+async function saveCheck() {
+    if (!currentStudentRoll) return;
+    const btn = document.getElementById('savebtn');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Saving…';
+
+    const payload = {
+        roll:                 currentStudentRoll,
+        date:                 document.getElementById('entryDate').value,
+        type:                 currentType,
+        subjects:             collectSubjects(),
+        consolidated_remarks: document.getElementById('consolRemarks').value.trim(),
+    };
+
+    const data = await apiFetch('/notebooks/save', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+    });
+
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-save me-2"></i>Save &amp; Add to Scoreboard';
+
+    if (data.success) {
+        showAlert(data.message || 'Saved successfully!', 'success');
+        document.getElementById('saveStatus').textContent = '✓ Saved successfully';
+        document.getElementById('saveStatus').style.color = '#16a34a';
+    } else {
+        showAlert(data.error || 'Save failed', 'error');
+    }
+}
+
+/* ── Records Tab ──────────────────────────────────────────────────── */
+async function populateRecordFilters() {
+    const data = await apiFetch('/notebooks/api/groups');
+    const sel  = document.getElementById('recGroup');
+    sel.innerHTML = '<option value="">All Groups</option>';
+    (data.groups || []).forEach(g => {
+        const opt = document.createElement('option');
+        opt.value = opt.textContent = g;
+        sel.appendChild(opt);
+    });
+    const yr = document.getElementById('recYear');
+    if (!yr.value) yr.value = new Date().getFullYear();
+}
+
+document.getElementById('recGroup').addEventListener('change', async function () {
+    const cls  = document.getElementById('recClass');
+    const stud = document.getElementById('recStudent');
+    cls.innerHTML  = '<option value="">All Classes</option>';
+    stud.innerHTML = '<option value="">All Students</option>';
+    if (!this.value) return;
+    const data = await apiFetch(`/notebooks/api/classes?group=${encodeURIComponent(this.value)}`);
+    (data.classes || []).forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = opt.textContent = c;
+        cls.appendChild(opt);
+    });
+});
+
+document.getElementById('recClass').addEventListener('change', async function () {
+    const group = document.getElementById('recGroup').value;
+    const stud  = document.getElementById('recStudent');
+    stud.innerHTML = '<option value="">All Students</option>';
+    if (!this.value || !group) return;
+    const data = await apiFetch(
+        `/notebooks/api/students?group=${encodeURIComponent(group)}&class_name=${encodeURIComponent(this.value)}`
+    );
+    (data.students || []).forEach(s => {
+        const opt = document.createElement('option');
+        opt.value = s.roll;
+        opt.textContent = `${s.roll} – ${s.name}`;
+        stud.appendChild(opt);
+    });
+});
+
+async function loadRecords() {
+    const params = new URLSearchParams();
+    const type  = document.getElementById('recType').value;
+    const group = document.getElementById('recGroup').value;
+    const cls   = document.getElementById('recClass').value;
+    const stud  = document.getElementById('recStudent').value;
+    const month = document.getElementById('recMonth').value;
+    const year  = document.getElementById('recYear').value;
+    if (type)  params.set('type', type);
+    if (group) params.set('group', group);
+    if (cls)   params.set('class_name', cls);
+    if (stud)  params.set('roll', stud);
+    if (month) params.set('month', month);
+    if (year)  params.set('year', year);
+
+    const data = await apiFetch(`/notebooks/api/records?${params}`);
+    const wrap = document.getElementById('recordsWrap');
+
+    if (!data.records || !data.records.length) {
+        wrap.innerHTML = '<div class="empty-state"><i class="fas fa-table-list"></i>No records found.</div>';
+        return;
+    }
+
+    const adminCols = IS_ADMIN ? '<th>Delete</th>' : '';
+    let html = `
+    <div style="font-size:.82rem;color:#666;margin-bottom:8px">Showing ${data.records.length} record(s)</div>
+    <div style="overflow-x:auto">
+    <table class="records-table">
+        <thead>
+            <tr>
+                <th>Date</th><th>Student</th><th>Group/Class</th>
+                <th>Type</th><th>Checked</th><th>Points</th>
+                <th>Remarks</th><th>By</th><th>Detail</th>
+                ${adminCols}
+            </tr>
+        </thead>
+        <tbody>`;
+
+    data.records.forEach(r => {
+        const typeBadge = r.notebook_type === 'school'
+            ? '<span class="badge-school">School</span>'
+            : '<span class="badge-tuition">Tuition</span>';
+        const pts    = r.total_points;
+        const ptsStr = `<strong style="color:${pts>0?'#16a34a':pts<0?'#dc2626':'#555'}">${pts>=0?'+':''}${pts}</strong>`;
+        const adminAction = IS_ADMIN
+            ? `<td><button class="btn-del-record" onclick="deleteRecord(${r.id})"><i class="fas fa-trash"></i></button></td>`
+            : '';
+        const remarks = r.consolidated_remarks
+            ? `<span title="${escHtml(r.consolidated_remarks)}" style="cursor:help">${escHtml(r.consolidated_remarks.slice(0,28))}${r.consolidated_remarks.length>28?'…':''}</span>`
+            : '<span style="color:#aaa">—</span>';
+
+        html += `
+        <tr>
+            <td>${r.date_checked}</td>
+            <td><strong>${escHtml(r.student_name)}</strong><br>
+                <small style="color:#888">${escHtml(r.roll_number)}</small></td>
+            <td>${escHtml(r.group)} / ${escHtml(r.class_name)}</td>
+            <td>${typeBadge}</td>
+            <td>${r.checked_count} / ${r.total_subjects}</td>
+            <td>${ptsStr}</td>
+            <td style="max-width:140px">${remarks}</td>
+            <td style="font-size:.78rem;color:#888">${escHtml(r.recorded_by)}</td>
+            <td><button class="btn-view-detail" onclick="showDetail(${r.id})">View</button></td>
+            ${adminAction}
+        </tr>`;
+    });
+
+    html += '</tbody></table></div>';
+    wrap.innerHTML = html;
+}
+
+async function deleteRecord(id) {
+    if (!confirm('Delete this record? The linked scoreboard entry will also be removed.')) return;
+    const data = await apiFetch(`/notebooks/api/records/${id}`, { method: 'DELETE' });
+    if (data.success) { showAlert('Record deleted.', 'success'); loadRecords(); }
+    else showAlert(data.error || 'Delete failed', 'error');
+}
+
+/* ── Notifications Tab ────────────────────────────────────────────── */
+async function populateNotifFilters() {
+    const data = await apiFetch('/notebooks/api/groups');
+    const sel  = document.getElementById('notifGroup');
+    sel.innerHTML = '<option value="">All Groups</option>';
+    (data.groups || []).forEach(g => {
+        const opt = document.createElement('option');
+        opt.value = opt.textContent = g;
+        sel.appendChild(opt);
+    });
+}
+
+document.getElementById('notifGroup').addEventListener('change', async function () {
+    const cls = document.getElementById('notifClass');
+    cls.innerHTML = '<option value="">All Classes</option>';
+    if (!this.value) return;
+    const data = await apiFetch(`/notebooks/api/classes?group=${encodeURIComponent(this.value)}`);
+    (data.classes || []).forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = opt.textContent = c;
+        cls.appendChild(opt);
+    });
+});
+
+async function loadNotifications() {
+    const params = new URLSearchParams();
+    const type  = document.getElementById('notifType').value;
+    const group = document.getElementById('notifGroup').value;
+    const cls   = document.getElementById('notifClass').value;
+    const days  = document.getElementById('notifDays').value;
+    if (type)  params.set('type', type);
+    if (group) params.set('group', group);
+    if (cls)   params.set('class_name', cls);
+    params.set('days', days);
+
+    const data  = await apiFetch(`/notebooks/api/notifications?${params}`);
+    const wrap  = document.getElementById('notifWrap');
+    const badge = document.getElementById('notifBadge');
+    const notifs = data.notifications || [];
+
+    if (!notifs.length) {
+        wrap.innerHTML = '<div class="empty-state"><i class="fas fa-check-circle" style="color:#16a34a"></i>All notebooks checked — no reminders!</div>';
+        badge.style.display = 'none';
+        return;
+    }
+
+    badge.textContent    = notifs.length;
+    badge.style.display  = '';
+
+    const order  = { full: 0, partial: 1, never: 2 };
+    notifs.sort((a, b) => (order[a.severity] || 0) - (order[b.severity] || 0));
+
+    const icons  = { full: '🔴', partial: '🟠', never: '🟡' };
+    const labels = { full: 'All Unchecked', partial: 'Partially Checked', never: 'Never Checked' };
+    const typeBadge = t => t === 'school'
+        ? '<span class="badge-school">School</span>'
+        : '<span class="badge-tuition">Tuition</span>';
+
+    let html = '';
+    notifs.forEach(n => {
+        const uncheckedText = n.unchecked_subjects && n.unchecked_subjects.length
+            ? `Unchecked subjects: <strong>${n.unchecked_subjects.map(escHtml).join(', ')}</strong>`
+            : (n.severity === 'never' ? 'No check recorded in the selected period.' : '');
+        const dateText = n.date_checked ? `Last checked: ${n.date_checked}` : 'Never checked in this period';
+
+        html += `
+        <div class="notif-card severity-${n.severity}">
+            <div class="notif-icon">${icons[n.severity]}</div>
+            <div class="notif-body">
+                <div class="notif-name">${escHtml(n.student_name)}
+                    <small style="color:#888;font-weight:400"> (${escHtml(n.roll_number)})</small>
+                    ${typeBadge(n.notebook_type)}
+                </div>
+                <div class="notif-meta">Group ${escHtml(n.group||'')} · Class ${escHtml(n.class_name||'')} · ${dateText}</div>
+                ${uncheckedText ? `<div class="notif-subjects">${uncheckedText}</div>` : ''}
+            </div>
+            <span class="notif-badge">${labels[n.severity]}</span>
+        </div>`;
+    });
+
+    wrap.innerHTML = html;
+}
+
+/* ── Subject Settings Tab ─────────────────────────────────────────── */
+async function populateSettingsGroups() {
+    const data = await apiFetch('/notebooks/api/groups');
+    ['addSubGroup', 'filterSubGroup'].forEach(selId => {
+        const sel  = document.getElementById(selId);
+        const prev = sel.value;
+        sel.innerHTML = selId === 'addSubGroup'
+            ? '<option value="">-- Select Group --</option>'
+            : '<option value="">All Groups</option>';
+        (data.groups || []).forEach(g => {
+            const opt = document.createElement('option');
+            opt.value = opt.textContent = g;
+            sel.appendChild(opt);
+        });
+        if (prev) sel.value = prev;
+    });
+}
+
+async function loadSubjectConfigs() {
+    const type  = document.getElementById('filterSubType').value;
+    const group = document.getElementById('filterSubGroup').value;
+    const params = new URLSearchParams();
+    if (type)  params.set('type', type);
+    if (group) params.set('group', group);
+
+    const data    = await apiFetch(`/notebooks/api/subject-configs?${params}`);
+    const list    = document.getElementById('subjectConfigList');
+    const configs = data.configs || [];
+
+    if (!configs.length) {
+        list.innerHTML = '<div class="empty-state" style="padding:.8rem"><i class="fas fa-list"></i> No subjects configured yet.</div>';
+        return;
+    }
+
+    const grouped = {};
+    configs.forEach(c => {
+        const key = `${c.group}|${c.notebook_type}`;
+        if (!grouped[key]) grouped[key] = { group: c.group, type: c.notebook_type, items: [] };
+        grouped[key].items.push(c);
+    });
+
+    let html = '';
+    Object.values(grouped).forEach(g => {
+        const typeLabel = g.type === 'school' ? 'School' : 'Tuition';
+        html += `<div style="margin-bottom:10px">
+            <div style="font-size:.78rem;font-weight:700;color:#667eea;text-transform:uppercase;
+                        letter-spacing:.4px;margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid #eee">
+                Group ${escHtml(g.group)} · ${typeLabel}
+            </div>`;
+        g.items.forEach(c => {
+            const cls = c.class_name ? ` (Class ${escHtml(c.class_name)})` : '';
+            const inactiveCls = c.is_active ? '' : 'sub-inactive';
+            const delBtn = IS_ADMIN
+                ? `<button class="btn-del-sub" onclick="deleteSubject(${c.id})" title="Delete"><i class="fas fa-trash"></i></button>`
+                : '';
+            html += `
+            <div class="subject-row">
+                <span class="sub-name ${inactiveCls}">${escHtml(c.subject_name)}${cls}</span>
+                <button class="btn-toggle-sub" onclick="toggleSubject(${c.id}, this)"
+                        title="${c.is_active?'Disable':'Enable'}">
+                    ${c.is_active ? 'Disable' : 'Enable'}
+                </button>
+                ${delBtn}
+            </div>`;
+        });
+        html += '</div>';
+    });
+
+    list.innerHTML = html;
+}
+
+async function addSubject() {
+    const type  = document.getElementById('addSubType').value;
+    const group = document.getElementById('addSubGroup').value;
+    const cls   = document.getElementById('addSubClass').value.trim() || null;
+    const name  = document.getElementById('addSubName').value.trim();
+    if (!group || !name) { showAlert('Group and Subject Name are required', 'error'); return; }
+
+    const data = await apiFetch('/notebooks/api/subject-configs/save', {
+        method: 'POST',
+        body: JSON.stringify({ group, class_name: cls, notebook_type: type, subject_name: name }),
+    });
+    if (data.success) {
+        showAlert(`Subject "${name}" added to Group ${group} (${type})`, 'success');
+        document.getElementById('addSubName').value = '';
+        loadSubjectConfigs();
+    } else {
+        showAlert(data.error || 'Failed to add', 'error');
+    }
+}
+
+async function toggleSubject(id, btn) {
+    const data = await apiFetch(`/notebooks/api/subject-configs/${id}/toggle`, { method: 'POST' });
+    if (data.success) {
+        btn.textContent = data.is_active ? 'Disable' : 'Enable';
+        const row = btn.closest('.subject-row').querySelector('.sub-name');
+        row.classList.toggle('sub-inactive', !data.is_active);
+    }
+}
+
+async function deleteSubject(id) {
+    if (!confirm('Delete this subject? Existing check records are not affected.')) return;
+    const data = await apiFetch(`/notebooks/api/subject-configs/${id}`, { method: 'DELETE' });
+    if (data.success) { showAlert('Subject deleted.', 'success'); loadSubjectConfigs(); }
+    else showAlert(data.error || 'Delete failed', 'error');
+}
+
+/* ── Score limits ─────────────────────────────────────────────────── */
+async function loadScoreLimits() {
+    const data = await apiFetch('/notebooks/api/score-settings');
+    if (data.max_points !== undefined) {
+        document.getElementById('limitMax').value = data.max_points;
+        document.getElementById('limitMin').value = data.min_points;
+        NB_MAX_PTS = data.max_points;
+        NB_MIN_PTS = data.min_points;
+        updateLimitHint();
+    }
+}
+
+async function saveScoreLimits() {
+    const maxPts = parseInt(document.getElementById('limitMax').value);
+    const minPts = parseInt(document.getElementById('limitMin').value);
+
+    if (isNaN(maxPts) || isNaN(minPts)) {
+        showAlert('Please enter valid numbers for both limits.', 'error'); return;
+    }
+    if (maxPts <= 0) { showAlert('Max points must be a positive number.', 'error'); return; }
+    if (minPts >= 0) { showAlert('Min points must be a negative number.', 'error'); return; }
+
+    const data = await apiFetch('/notebooks/api/score-settings', {
+        method: 'POST',
+        body: JSON.stringify({ max_points: maxPts, min_points: minPts }),
+    });
+
+    if (data.success) {
+        NB_MAX_PTS = data.max_points;
+        NB_MIN_PTS = data.min_points;
+        updateLimitHint();
+        updateTotals();
+        const msg = document.getElementById('limitsSavedMsg');
+        msg.style.display = '';
+        setTimeout(() => { msg.style.display = 'none'; }, 3000);
+    } else {
+        showAlert(data.error || 'Failed to save limits', 'error');
+    }
+}
+
+/* ── Detail Modal ─────────────────────────────────────────────────── */
+async function showDetail(checkId) {
+    const data = await apiFetch(`/notebooks/api/records/${checkId}`);
+    const c = data.check;
+    if (!c) return;
+
+    const typeLbl = c.notebook_type === 'school' ? 'School' : 'Tuition';
+    document.getElementById('detailModalTitle').textContent =
+        `${typeLbl} Check — ${c.date_checked} — ${c.student_name || c.roll_number}`;
+
+    let rows = '';
+    (c.subject_checks || []).forEach(sc => {
+        const pts    = sc.points;
+        const grade  = sc.grade || '—';
+        rows += `
+        <tr>
+            <td>${escHtml(sc.subject_name)}</td>
+            <td style="text-align:center">${sc.is_checked ? '✅' : '❌'}</td>
+            <td>${escHtml(grade)}</td>
+            <td style="text-align:center;font-weight:700;color:${pts>0?'#16a34a':pts<0?'#dc2626':'#555'}">
+                ${pts>=0?'+':''}${pts}
+            </td>
+            <td>${escHtml(sc.remarks||'')}</td>
+        </tr>`;
+    });
+
+    document.getElementById('detailModalBody').innerHTML = `
+    <table class="detail-table">
+        <thead>
+            <tr><th>Subject</th><th>Checked</th><th>Grade</th><th>Points</th><th>Remarks</th></tr>
+        </thead>
+        <tbody>${rows}</tbody>
+    </table>
+    <div style="margin-top:12px">
+        <strong>Final Points:</strong>
+        <span style="font-size:1.15rem;font-weight:800;color:${c.total_points>=0?'#16a34a':'#dc2626'}">
+            ${c.total_points>=0?'+':''}${c.total_points}
+        </span>
+        <small style="color:#888;margin-left:8px">Limits applied: ${NB_MIN_PTS} to +${NB_MAX_PTS}</small>
+    </div>
+    ${c.consolidated_remarks ? `
+    <div style="margin-top:10px;padding:10px 12px;background:#f8f9fa;border-radius:8px;font-size:.88rem">
+        <strong>Consolidated Remarks:</strong><br>${escHtml(c.consolidated_remarks)}
+    </div>` : ''}
+    <div style="margin-top:8px;font-size:.78rem;color:#888">
+        Recorded by: ${escHtml(c.recorded_by||'—')}
+        &nbsp;·&nbsp;
+        ${c.created_at ? c.created_at.slice(0,16).replace('T',' ') : ''}
+    </div>`;
+
+    document.getElementById('detailModal').classList.add('open');
+}
+
+function closeDetailModal() {
+    document.getElementById('detailModal').classList.remove('open');
+}
+
+document.getElementById('detailModal').addEventListener('click', function (e) {
+    if (e.target === this) closeDetailModal();
+});
+</script>
+{% endblock %}

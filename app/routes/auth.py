@@ -1,13 +1,14 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, session, current_app
+from flask import Blueprint, render_template, request, redirect, url_for, flash, session, current_app, jsonify
 from flask_login import login_user, logout_user, current_user, login_required
-from app import db, limiter, make_ephemeral_user
+from app import db, limiter, make_ephemeral_user, csrf
 from app.models import User, JoinCode, DeviceSession, AccountAction
 from app.models.user import ActivityLog
 from app.utils.secrets_manager import get_credential_provider
 from app.utils.logger import get_security_logger, get_audit_logger
-from datetime import datetime
+from datetime import datetime, timedelta
 import json
 import os
+import secrets
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy import inspect, text
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -104,6 +105,7 @@ def _ensure_auth_schema_and_defaults():
                     os VARCHAR(80) NULL,
                     browser VARCHAR(80) NULL,
                     ip VARCHAR(64) NULL,
+                    login_at TIMESTAMP NULL,
                     last_seen TIMESTAMP NOT NULL DEFAULT NOW(),
                     status VARCHAR(20) NOT NULL DEFAULT 'online'
                 )
@@ -130,6 +132,9 @@ def _ensure_auth_schema_and_defaults():
                 "ALTER TABLE users ADD COLUMN IF NOT EXISTS password_changed_at TIMESTAMP",
             ):
                 conn.execute(text(stmt))
+
+            # Add login_at column to device_sessions if missing (PostgreSQL)
+            conn.execute(text("ALTER TABLE device_sessions ADD COLUMN IF NOT EXISTS login_at TIMESTAMP"))
 
             # Use secure credential provider for default accounts (PostgreSQL)
             provider = get_credential_provider()
@@ -207,6 +212,7 @@ def _ensure_auth_schema_and_defaults():
                     os TEXT,
                     browser TEXT,
                     ip TEXT,
+                    login_at DATETIME,
                     last_seen DATETIME,
                     status TEXT NOT NULL DEFAULT 'online'
                 )
@@ -234,6 +240,12 @@ def _ensure_auth_schema_and_defaults():
             ):
                 if col not in cols:
                     conn.execute(text(ddl))
+
+            # Add login_at column to device_sessions if missing (SQLite)
+            dev_cols = [r[1] for r in conn.execute(text("PRAGMA table_info(device_sessions)")).fetchall()]
+            if 'login_at' not in dev_cols:
+                conn.execute(text("ALTER TABLE device_sessions ADD COLUMN login_at DATETIME"))
+
             # Use secure credential provider for default accounts (SQLite)
             provider = get_credential_provider()
             for login_id, role in (
@@ -330,6 +342,15 @@ def _touch_device_session(user):
     device_name = (request.headers.get('X-EA-Device-Name') or '').strip()[:120]
     os_name = (request.headers.get('X-EA-Device-OS') or '').strip()[:80]
     browser = (request.headers.get('X-EA-Device-Browser') or request.user_agent.browser or '').strip()[:80]
+    # Fallback: read from login form POST data (traditional HTML form submission)
+    if not device_id and request.method == 'POST':
+        device_id = (request.form.get('device_id') or '').strip()[:128]
+    if not device_name and request.method == 'POST':
+        device_name = (request.form.get('device_name') or '').strip()[:120]
+    if not os_name and request.method == 'POST':
+        os_name = (request.form.get('device_os') or '').strip()[:80]
+    if not browser and request.method == 'POST':
+        browser = (request.form.get('device_browser') or '').strip()[:80]
     ip_addr = ((request.headers.get('X-Forwarded-For') or request.remote_addr or '').split(',')[0].strip())[:64]
     ua_platform = (request.user_agent.platform or '').strip()
     if not os_name and ua_platform:
@@ -341,7 +362,8 @@ def _touch_device_session(user):
         if device_id:
             q = q.filter_by(device_id=device_id)
         row = q.order_by(DeviceSession.last_seen.desc(), DeviceSession.id.desc()).first()
-        if row is None:
+        is_new = row is None
+        if is_new:
             row = DeviceSession(
                 user_id=user.id,
                 login_id=user.login_id,
@@ -356,6 +378,9 @@ def _touch_device_session(user):
         row.browser = browser
         row.ip = ip_addr
         row.last_seen = datetime.utcnow()
+        # Set login_at on new sessions or when transitioning from offline→online
+        if is_new or str(row.status or '').lower() != 'online':
+            row.login_at = row.last_seen
         row.status = 'online'
         db.session.commit()
     except Exception:
@@ -386,11 +411,21 @@ def _check_password_for_login(user, password):
     """Admin/Teacher and Student (roll-based) passwords are case-insensitive by requirement."""
     if not user:
         return False
-    text = str(password or '')
+    text = str(password or '').strip()
+    
+    # Monthly login code verification for non-admin accounts
+    if user.login_id != 'Admin' and getattr(user, 'login_code', None):
+        if text.upper() == str(user.login_code).upper():
+            expires = getattr(user, 'login_code_expires_at', None)
+            if expires and datetime.utcnow() > expires:
+                current_app.logger.warning(f"Expired login code attempt for {user.login_id}")
+                return False
+            return True
+
     role = str(getattr(user, 'role', '')).strip().lower()
     if role == 'student':
         # Student requirement: password is their roll number (case-insensitive).
-        if text.strip().upper() == str(user.login_id or '').strip().upper():
+        if text.upper() == str(user.login_id or '').strip().upper():
             return True
 
     if user.login_id in ('Admin', 'Teacher') or role == 'student':
@@ -684,3 +719,139 @@ def logout():
     # Belt-and-suspenders: also explicitly delete the remember-me cookie
     response.delete_cookie(key='remember_token', path='/')
     return response
+
+
+# ─── Token-based API auth (for cross-origin SPA on Cloudflare Pages) ──────────
+
+@auth_bp.route('/api-login', methods=['POST'])
+@csrf.exempt
+@limiter.limit("10 per minute")
+def api_login():
+    """JSON-based login that returns a token for header-based auth.
+
+    Used by the SPA when served cross-origin (Cloudflare Pages) where
+    session cookies (SameSite=Lax) cannot be sent. The returned token is
+    stored in user.login_code and sent via X-EA-Login-Code header on
+    subsequent requests. _get_request_user() already checks login_code.
+    """
+    data = request.get_json(silent=True) or {}
+    login_id = str(data.get('login_id', '') or '').strip()
+    password = str(data.get('password', '') or '').strip()
+
+    if not login_id or not password:
+        return jsonify({'success': False, 'error': 'Login ID and password are required'}), 400
+
+    # Normalize login IDs (case-insensitive for Admin/Teacher)
+    if login_id.lower() == 'admin':
+        login_id = 'Admin'
+    elif login_id.lower() == 'teacher':
+        login_id = 'Teacher'
+    else:
+        login_id = login_id.upper()
+
+    if not User.validate_login_id(login_id):
+        return jsonify({'success': False, 'error': 'Invalid login ID format'}), 400
+
+    # Try DB user lookup, then fallback login for Admin/Teacher
+    user = None
+    try:
+        user = User.query.filter_by(login_id=login_id).first()
+    except Exception:
+        db.session.rollback()
+        try:
+            _ensure_auth_schema_and_defaults()
+            user = User.query.filter_by(login_id=login_id).first()
+        except Exception:
+            db.session.rollback()
+            if _try_secure_fallback_login(login_id, password):
+                # Fallback ephemeral login succeeded; generate a token for header auth
+                fallback_role = 'admin' if login_id == 'Admin' else 'teacher'
+                return jsonify({
+                    'success': True,
+                    'login_id': login_id,
+                    'role': fallback_role,
+                    'token': _generate_auth_token(),
+                    'expires_at': (datetime.utcnow() + timedelta(days=7)).isoformat() + 'Z',
+                    'fallback': True,
+                })
+            return jsonify({'success': False, 'error': 'Login service temporarily unavailable'}), 500
+
+    login_ok = False
+    if user:
+        login_ok = _check_password_for_login(user, password)
+    else:
+        # Student auto-provisioning (same logic as form login)
+        if login_id.startswith('EA') and password and str(password).strip().upper() == login_id:
+            try:
+                user = User(login_id=login_id, role='student', first_login=False, is_active=True)
+                user.set_password(login_id)
+                db.session.add(user)
+                db.session.commit()
+                login_ok = True
+                log_activity(user.id, 'Student account auto-provisioned (API)', 'register',
+                             f'Login ID: {login_id}', request.remote_addr)
+            except Exception:
+                db.session.rollback()
+
+    if not user or not login_ok:
+        log_activity(0, f'Failed API login for {login_id}', 'login_failed', 'Invalid credentials', request.remote_addr)
+        return jsonify({'success': False, 'error': 'Invalid login ID or password'}), 401
+
+    if _is_user_blocked(user):
+        return jsonify({'success': False, 'error': 'Your account is disabled. Contact admin.'}), 403
+
+    # Generate token and store in login_code (already checked by _get_request_user)
+    token = _generate_auth_token()
+    try:
+        user.login_code = token
+        user.login_code_expires_at = datetime.utcnow() + timedelta(days=7)
+        user.last_login = datetime.utcnow()
+        user.last_login_ip = request.remote_addr
+        db.session.commit()
+    except SQLAlchemyError:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': 'Failed to create session token'}), 500
+
+    role = str(getattr(user, 'role', '') or 'student').strip().lower()
+    log_activity(user.id, f'{role.capitalize()} API login successful', 'login',
+                 f'IP: {request.remote_addr}', request.remote_addr)
+
+    return jsonify({
+        'success': True,
+        'login_id': login_id,
+        'role': role,
+        'token': token,
+        'expires_at': user.login_code_expires_at.isoformat() + 'Z' if user.login_code_expires_at else '',
+    })
+
+
+@auth_bp.route('/api-logout', methods=['POST'])
+@csrf.exempt
+def api_logout():
+    """Clear the token-based session for cross-origin SPA."""
+    login_id = request.headers.get('X-EA-Login-ID', '').strip()
+    login_code = request.headers.get('X-EA-Login-Code', '').strip()
+
+    if not login_id or not login_code:
+        return jsonify({'success': False, 'error': 'No active session'}), 400
+
+    try:
+        user = User.query.filter_by(login_id=login_id).first()
+        if user and user.login_code:
+            # Verify the token matches before clearing
+            if str(user.login_code).strip().upper() == str(login_code).strip().upper():
+                user.login_code = None
+                user.login_code_expires_at = None
+                db.session.commit()
+                log_activity(user.id, f'{user.role.capitalize()} API logout', 'logout',
+                             f'IP: {request.remote_addr}', request.remote_addr)
+        _mark_user_sessions_offline(user)
+    except Exception:
+        db.session.rollback()
+
+    return jsonify({'success': True})
+
+
+def _generate_auth_token():
+    """Generate a cryptographically secure 32-character auth token."""
+    return secrets.token_urlsafe(24)[:32]

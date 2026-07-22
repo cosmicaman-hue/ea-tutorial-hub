@@ -60,8 +60,7 @@ def merge_syllabus_catalog_superset(existing_catalog, incoming_catalog, parse_in
                         continue
                     chapter_seen.add(norm)
                     merged_chapters.append(text)
-                if merged_chapters:
-                    merged_subjects[str(subject)] = merged_chapters
+                merged_subjects[str(subject)] = merged_chapters if merged_chapters else []  # Keep subjects even when they have no chapters
             merged_classes[str(class_key)] = {'subjects': merged_subjects}
         merged['boards'][str(board)] = {'classes': merged_classes}
     return merged
@@ -77,7 +76,7 @@ def merge_syllabus_tracking_superset(existing_rows, incoming_rows, parse_int_saf
         board = str(item.get('board') or '').strip().upper()
         class_level = str(item.get('class_level') or item.get('class') or '').strip()
         subject = str(item.get('subject') or '').strip()
-        chapter = str(item.get('chapter') or '').strip()
+        chapter = str(item.get('topic') or item.get('chapter') or '').strip()
         key = str(item.get('key') or '').strip()
         if not key:
             key = f'{board}||{class_level}||{subject.lower()}||{chapter.lower()}'
@@ -131,6 +130,7 @@ def merge_syllabus_tracking_superset(existing_rows, incoming_rows, parse_int_saf
             'board': board,
             'class_level': class_level,
             'subject': subject,
+            'topic': chapter,
             'chapter': chapter,
             'conducted_dates': dates,
             'sessions': [sessions_by_date[k] for k in sorted(sessions_by_date.keys())],

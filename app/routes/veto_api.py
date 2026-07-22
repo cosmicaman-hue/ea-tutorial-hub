@@ -5,6 +5,7 @@ Uses single source of truth (veto_tracking) for all operations.
 from flask import Blueprint, jsonify, request
 from flask_login import login_required, current_user
 from app.utils.veto_manager_unified import get_unified_veto_manager
+from app.config.constants import VETO_QUOTAS
 from datetime import datetime
 
 veto_bp = Blueprint('veto', __name__, url_prefix='/api/veto')
@@ -182,12 +183,7 @@ def get_setup_info():
                 'Reeyansh': 3,
                 'Nandani': 1
             },
-            'role_veto_quotas': {
-                'LEADER': 5,
-                'LEADER OF OPPOSITION': 2,
-                'CO-LEADER': 3,
-                'CR': 2
-            },
+            'role_veto_quotas': VETO_QUOTAS,
             'setup_steps': [
                 '1. Remove all VETOs from everyone',
                 '2. Grant individual VETOs to specific students',

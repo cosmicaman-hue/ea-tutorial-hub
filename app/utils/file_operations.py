@@ -11,18 +11,39 @@ import tempfile
 from pathlib import Path
 from typing import Any, Dict, Optional, Callable
 from datetime import datetime
-import threading
 import time
 
 
+_DEFAULT_READ_VALUE = object()
+
+
 class FileLock:
-    """Simple file-based lock mechanism"""
-    
-    def __init__(self, lock_file: Path, timeout: int = 30):
+    """Simple file-based lock mechanism with stale-lock reclamation.
+
+    If the holder process crashes mid-operation, its lock file would otherwise
+    block every subsequent writer forever. To prevent this, a lock file older
+    than ``stale_after`` seconds is treated as orphaned and reclaimed. The
+    default (60s) is far longer than any legitimate JSON write, so a healthy
+    holder is never disturbed.
+    """
+
+    def __init__(self, lock_file: Path, timeout: int = 30, stale_after: int = 60):
         self.lock_file = Path(lock_file)
         self.timeout = timeout
+        self.stale_after = stale_after
         self.acquired = False
-    
+
+    def _reclaim_if_stale(self):
+        """Remove the lock file if it is older than stale_after seconds."""
+        try:
+            age = time.time() - self.lock_file.stat().st_mtime
+            if age > self.stale_after:
+                self.lock_file.unlink()
+        except FileNotFoundError:
+            pass  # Already gone — another waiter reclaimed it.
+        except Exception:
+            pass  # Best-effort; fall through and keep retrying.
+
     def acquire(self) -> bool:
         """Acquire lock with timeout"""
         start_time = time.time()
@@ -35,6 +56,8 @@ class FileLock:
                 self.acquired = True
                 return True
             except FileExistsError:
+                # Lock is held. If it's stale (crashed holder), reclaim it.
+                self._reclaim_if_stale()
                 time.sleep(0.1)  # Wait and retry
         
         return False
@@ -57,6 +80,44 @@ class FileLock:
         self.release()
 
 
+def atomic_write_json(file_path: Path, data: Any, *, indent=None, separators=None,
+                      ensure_ascii: bool = False, backup: bool = False,
+                      lock_timeout: int = 30) -> None:
+    file_path = Path(file_path)
+    file_path.parent.mkdir(parents=True, exist_ok=True)
+    lock_file = file_path.parent / f'.{file_path.name}.lock'
+    temp_path = None
+    with FileLock(lock_file, timeout=lock_timeout):
+        if backup and file_path.exists():
+            backup_path = file_path.parent / f'{file_path.name}.backup'
+            shutil.copy2(file_path, backup_path)
+        fd, temp_name = tempfile.mkstemp(
+            dir=file_path.parent,
+            prefix=f'.{file_path.name}.',
+            suffix='.tmp'
+        )
+        temp_path = Path(temp_name)
+        try:
+            with os.fdopen(fd, 'w', encoding='utf-8') as temp_file:
+                json.dump(
+                    data,
+                    temp_file,
+                    ensure_ascii=ensure_ascii,
+                    indent=indent,
+                    separators=separators
+                )
+                temp_file.flush()
+                os.fsync(temp_file.fileno())
+            os.replace(temp_path, file_path)
+            temp_path = None
+        finally:
+            if temp_path is not None:
+                try:
+                    temp_path.unlink()
+                except FileNotFoundError:
+                    pass
+
+
 class SafeFileWriter:
     """Safe file writing with atomic operations"""
     
@@ -69,30 +130,15 @@ class SafeFileWriter:
         """
         try:
             file_path = Path(file_path)
-            file_path.parent.mkdir(parents=True, exist_ok=True)
-            
-            lock_file = file_path.parent / f".{file_path.name}.lock"
-            
-            with FileLock(lock_file, timeout=lock_timeout):
-                # Create backup if file exists
-                if backup and file_path.exists():
-                    backup_path = file_path.parent / f"{file_path.name}.backup"
-                    shutil.copy2(file_path, backup_path)
-                
-                # Write to temporary file first
-                with tempfile.NamedTemporaryFile(
-                    mode='w',
-                    dir=file_path.parent,
-                    delete=False,
-                    suffix='.tmp',
-                    encoding='utf-8'
-                ) as tmp_file:
-                    json.dump(data, tmp_file, indent=2, ensure_ascii=False)
-                    tmp_path = Path(tmp_file.name)
-                
-                # Atomic rename
-                tmp_path.replace(file_path)
-                return True
+            atomic_write_json(
+                file_path,
+                data,
+                indent=2,
+                ensure_ascii=False,
+                backup=backup,
+                lock_timeout=lock_timeout
+            )
+            return True
                 
         except Exception as e:
             print(f"Error writing JSON to {file_path}: {e}")
@@ -140,16 +186,17 @@ class SafeFileReader:
     """Safe file reading with error handling"""
     
     @staticmethod
-    def read_json(file_path: Path, default: Optional[Dict] = None,
-                  lock_timeout: int = 30) -> Dict[str, Any]:
+    def read_json(file_path: Path, default: Any = _DEFAULT_READ_VALUE,
+                  lock_timeout: int = 30) -> Any:
         """
         Safely read JSON file with fallback to backup if corrupted.
         """
+        fallback = {} if default is _DEFAULT_READ_VALUE else default
         try:
             file_path = Path(file_path)
             
             if not file_path.exists():
-                return default or {}
+                return fallback
             
             lock_file = file_path.parent / f".{file_path.name}.lock"
             
@@ -167,11 +214,11 @@ class SafeFileReader:
                         except Exception:
                             pass
                     
-                    return default or {}
+                    return fallback
                     
         except Exception as e:
             print(f"Error reading JSON from {file_path}: {e}")
-            return default or {}
+            return fallback
     
     @staticmethod
     def read_text(file_path: Path, default: str = "",

@@ -224,7 +224,7 @@ Rankings: Auto-generated
 ```
 Roll No.  Name                        Class  Fees
 ─────────────────────────────────────────────────
-EA24A01   Ayush Gupta** (CR) (Vv)     4      500
+EA24A01   Ayush Gupta** (GR) (Vv)     4      500
 EA24A02   Abdul Arman*                4      0
 EA24A03   Ayat Parveen                4      800
 EA24A04   Tanu Sinha**                4      600

@@ -21,7 +21,7 @@ class StudentProfile(db.Model):
     # School Information
     school_name = db.Column(db.String(200))
     class_name = db.Column(db.String(20), nullable=False)
-    group = db.Column(db.String(5), default='A')  # A, B, C, D
+    group = db.Column(db.String(5), default='A')  # A, B, C, D, E, F, G, H
     section = db.Column(db.String(10))
     roll_number = db.Column(db.String(20), unique=True, nullable=False)
     

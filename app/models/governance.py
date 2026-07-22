@@ -26,6 +26,7 @@ class DeviceSession(db.Model):
     os = db.Column(db.String(80), nullable=True)
     browser = db.Column(db.String(80), nullable=True)
     ip = db.Column(db.String(64), nullable=True)
+    login_at = db.Column(db.DateTime, nullable=True)  # when this session started (first check-in)
     last_seen = db.Column(db.DateTime, default=datetime.utcnow, nullable=False, index=True)
     status = db.Column(db.String(20), nullable=False, default='online')  # online/offline
 
@@ -122,3 +123,24 @@ class ScoreAdjustmentAction(db.Model):
     __table_args__ = (
         db.Index('ix_score_adj_actor_day', 'actor_login_id', 'target_date'),
     )
+
+
+class PublicSiteCredential(db.Model):
+    """Per-student login credentials for the Cloudflare public site.
+
+    Stored as salted SHA-256 hashes (matching the browser's Web Crypto
+    SHA-256(salt + password) over UTF-8). Exported to
+    public_site/credentials.json on Force Publish. This is a SOFT GATE only —
+    the published file is publicly downloadable, so passwords must be strong
+    and must never reuse any password that protects sensitive accounts.
+    Decoupled from User.password_hash, which must never be published.
+    """
+    __tablename__ = 'public_site_credentials'
+
+    id = db.Column(db.Integer, primary_key=True)
+    roll = db.Column(db.String(20), unique=True, nullable=False, index=True)
+    salt = db.Column(db.String(16), nullable=False)   # 8-byte hex
+    hash = db.Column(db.String(64), nullable=False)   # sha256(salt+password) hex
+    active = db.Column(db.Boolean, default=True, nullable=False, index=True)
+    set_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    set_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False, index=True)

@@ -492,22 +492,282 @@ python test_teacher_sync.py
 
 ---
 
-## 🎉 Project Status
+---
 
-**ALL FIXES IMPLEMENTED ✅**
+# Phase 2: Historical Data Protection & Data Integrity (April 2026)
 
-The Offline Scoreboard system is now:
-- ✅ Data-safe (no race conditions)
-- ✅ Teacher-accessible (April 2026 visible)
-- ✅ Peer-sync reliable (no overwrites)
-- ✅ UI-correct (modals centered)
-- ✅ Production-ready (backward compatible)
+## 5. ✅ Student Name Rendering — Multi-Pass Suffix Stripping
 
-**Ready for deployment! 🚀**
+### Problem
+Student names displayed with raw suffixes like `Ayat Parveen (Co-LoP) 3`, `Sourav Das 1`, or `Name (EC) *3 VV` across Scoreboard, Students, Fees, and Resources tabs.
+
+### Root Cause
+`stripPostHolderSuffixes()` only handled a single pass and missed several suffix patterns: EC, SMI roles, empty parentheses `( )`, standalone trailing digits, trailing veto annotations, and trailing star counts.
+
+### Solution
+Rewrote `stripPostHolderSuffixes()` as a **multi-pass pipeline**:
+1. Strip trailing veto annotations (`V1`, `VV`)
+2. Strip trailing star counts (`*3`)
+3. Strip trailing role suffix blocks (`(CR)`, `(PP)`, `(EC)`, `(SMI)`, `(Co-LoP)`, etc.)
+4. Strip empty parentheses `( )`
+5. Strip standalone trailing class numbers (`Sourav Das 1`)
+
+### Impact
+✅ Clean base names across all tabs (Scoreboard, Students, Fees, Resources)
+✅ `normalizeStudentMeta()` cleans `base_name` on load using the same pipeline
+✅ All tabs use `renderStudentName()` for consistent display
 
 ---
 
-**Last Updated**: 2026-04-04
-**Documentation**: Complete
-**Tests**: All passing
-**Status**: ✅ READY FOR DEPLOYMENT
+## 6. ✅ Historical Data Guard — `canMutateMonthSnapshot()`
+
+### Problem
+Current-month edits (roll upgrades, class changes, score recording, student deactivation, roster mutations, merge/link operations) could retroactively corrupt locked historical months.
+
+### Solution
+Introduced `canMutateMonthSnapshot(monthKey, options)` guard function that:
+- Returns `false` for any month flagged as historical or explicitly locked
+- Allows writes only when `options.allowHistoricalWrite === true` (used exclusively by the admin Historical Month Editor)
+- Applied to **all** month snapshot write paths:
+
+| Write Path | Guard Applied |
+|---|---|
+| `updateStudent()` — roll propagation loops | ✅ |
+| `updateStudent()` — class propagation loops | ✅ |
+| `replaceRollReferencesInData()` — month_students, profiles, extras | ✅ |
+| Score recording (`saveRecordScoreRow`) | ✅ |
+| Student deactivation — roster removal loops | ✅ |
+| Student merge/link — roster insertion loops | ✅ |
+| `ensureStudentInMonthRoster()` | ✅ |
+
+### Impact
+✅ Past months (Aug 2024 – present-1) are fully immutable during normal operations
+✅ Roll upgrades propagate only from effective month onward, skipping locked months
+✅ Class changes propagate only from effective month onward
+✅ Score recording blocked for historical months with clear user message
+✅ Only admin Historical Month Editor can write to historical months via `allowHistoricalWrite` flag
+
+---
+
+## 7. ✅ Enhanced Historical Month Editor (Admin Portal)
+
+### Problem
+Original editor only showed Roll, Name, Stars, VETOs with no context for corrections.
+
+### Enhancements
+| Feature | Before | After |
+|---|---|---|
+| Name display | Raw names with suffixes | Clean names via `stripPostHolderSuffixes()` |
+| Columns | Roll, Name, Stars, VETOs | Roll, Name, **Class**, **Score Total**, Stars, VETOs |
+| Save confirmation | Immediate save | **Diff summary dialog** showing old → new values per row |
+| Audit metadata | `_admin_locked: true` only | `_admin_locked`, **`_admin_locked_at`**, **`_admin_locked_by`** |
+| Score context | None | Per-student month score totals computed from `data.scores` |
+
+### Impact
+✅ Admins see full context (class, scores) when correcting historical data
+✅ Confirmation dialog prevents accidental saves with clear change summary
+✅ Full audit trail: who locked, when locked
+✅ Clean names for accurate identification
+
+---
+
+## 8. ✅ Resource Data Restoration
+
+### Problem
+Resource tab showed empty items list and no transaction history — critical for payment tracking.
+
+### Solution
+Restored from `PRE_NUCLEAR_REBUILD_20260405.json` backup:
+- `resource_cabinet`: 20 items
+- `resource_requests`: 56 records
+- `resource_transactions`: 59 records
+- `resource_advantage_deductions`: 2 records
+
+### Impact
+✅ Resource tab fully functional with items and transaction history
+✅ Payment-related data restored for audit purposes
+
+---
+
+# Phase 3: Major Enhancements Roadmap
+
+The following enhancements are recommended for robust, reliable, data-priority functioning. Organized by priority.
+
+---
+
+## 🔴 Priority 1 — Critical Data Safety
+
+### E1. Automated Pre-Save Snapshots
+**Problem**: A single bad save can corrupt the entire `offline_scoreboard_data.json`. Recovery requires manual backup hunting.
+**Proposal**:
+- Before every `saveData()`, write a timestamped snapshot to IndexedDB (already partially implemented as write-through)
+- Maintain a rolling window of the last 10 snapshots in IndexedDB
+- Add a "Restore from Snapshot" admin UI under Settings tab
+- Auto-detect data shrinkage (>20% fewer students or scores) and prompt before saving
+
+### E2. Server-Side Write-Ahead Log (WAL)
+**Problem**: Server-side `_save_offline_data()` overwrites the file atomically, but a crash mid-write can corrupt it.
+**Proposal**:
+- Write changes to a `.wal` file first, then rename atomically
+- On startup, check for `.wal` files and replay/recover
+- Add checksums to detect partial writes
+
+### E3. Conflict Resolution UI
+**Problem**: When local and server data diverge (e.g., two admins editing simultaneously), the merge is silent. Users have no visibility into what was merged or lost.
+**Proposal**:
+- After each pull/merge, compute a diff summary
+- If the diff includes deletions or score changes, show a non-blocking notification: "Sync merged X changes. [View Details]"
+- Provide a "Merge History" panel under Settings showing the last 20 sync events with diffs
+
+---
+
+## 🟠 Priority 2 — Operational Reliability
+
+### E4. Month Transition Automation
+**Problem**: New month rosters require manual setup. If forgotten, teachers can't record scores.
+**Proposal**:
+- Auto-create next month's roster on the 1st of each month (or on first login)
+- Copy active students from previous month roster as starting roster
+- Auto-lock previous month after a configurable grace period (e.g., 7 days into new month)
+- Notify admin when a month is about to be auto-locked
+
+### E5. Student Data Validation Layer
+**Problem**: Invalid roll numbers, duplicate entries, and orphaned references accumulate over time.
+**Proposal**:
+- Run validation on every `ensureSchema()` call:
+  - Detect duplicate roll numbers across active students
+  - Detect orphaned score entries (studentId not in students list)
+  - Detect orphaned roster entries (roll not in students list)
+- Surface validation errors in a "Data Health" dashboard under Settings
+- Provide one-click fixes: merge duplicates, archive orphans
+
+### E6. Offline Queue with Retry
+**Problem**: If the server is unreachable, edits are saved locally but sync fails silently. Users don't know if their changes reached the server.
+**Proposal**:
+- Maintain a persistent queue of unsent changes in IndexedDB
+- Show a badge/indicator: "3 changes pending sync"
+- Auto-retry with exponential backoff when connectivity returns
+- Guarantee eventual consistency
+
+---
+
+## 🟡 Priority 3 — User Experience & Efficiency
+
+### E7. Batch Score Entry Mode
+**Problem**: Recording scores for 40+ students one at a time is slow and error-prone.
+**Proposal**:
+- Add a "Batch Entry" mode on the Scoreboard tab
+- Spreadsheet-like grid: rows = students, columns = score categories
+- Tab/Enter navigation between cells
+- Single "Save All" button with validation summary
+- Import from Excel/CSV option
+
+### E8. Activity Audit Trail
+**Problem**: No comprehensive log of who changed what and when. The `activity_log` array exists but isn't surfaced in UI.
+**Proposal**:
+- Log every data mutation with: user, timestamp, action type, affected entity, old value, new value
+- Add "Activity Log" tab (admin-only) with filtering by user, date range, action type
+- Support CSV export for external auditing
+- Highlight destructive actions (deletions, score reductions)
+
+### E9. Data Export & Reporting
+**Problem**: Monthly reports and fee reconciliation require manual data extraction.
+**Proposal**:
+- One-click export per month: student roster, scores, stars, VETOs as Excel
+- Fee collection summary report: paid vs. pending vs. overdue
+- Resource transaction ledger export
+- Cumulative performance report per student across all months
+
+### E10. Role-Based Access Hardening
+**Problem**: Access control is enforced client-side only. A knowledgeable user could bypass restrictions via browser console.
+**Proposal**:
+- Move all write operations through server API endpoints with role verification
+- Server rejects unauthorized writes (e.g., teacher trying to edit locked month)
+- Sign sync payloads with user tokens
+- Rate-limit API endpoints to prevent abuse
+
+---
+
+## 🟢 Priority 4 — Technical Debt & Performance
+
+### E11. Code Modularization
+**Problem**: `offline_scoreboard.html` is a ~42,000-line monolith. Any change risks unintended side effects.
+**Proposal**:
+- Extract into modules: `db.js`, `scoreboard.js`, `students.js`, `fees.js`, `resources.js`, `elections.js`, `sync.js`
+- Use ES modules or a bundler (Vite/esbuild)
+- Add unit tests per module
+- Maintain a single built output for deployment
+
+### E12. IndexedDB as Primary Store
+**Problem**: localStorage has a ~5-10MB limit. As data grows, saves will start failing silently.
+**Proposal**:
+- Migrate primary storage from localStorage to IndexedDB (already initialized)
+- Use localStorage only as a lightweight cache/fallback
+- Implement async `getData()`/`saveData()` with synchronous cache layer
+- Monitor storage usage and warn at 80% capacity
+
+### E13. Incremental Sync Protocol
+**Problem**: Current sync sends the entire data payload (~2-5MB) on every push. This is slow on mobile networks and wastes bandwidth.
+**Proposal**:
+- Track a per-record `updated_at` timestamp
+- On sync, send only records modified since last successful sync
+- Server applies incremental patches instead of full replacements
+- Reduces sync payload from megabytes to kilobytes for typical edits
+
+### E14. Automated Testing Suite
+**Problem**: No automated regression tests. Every change requires manual verification across tabs.
+**Proposal**:
+- Add Playwright end-to-end tests for critical workflows:
+  - Score recording and month totals
+  - Student add/edit/deactivate
+  - Historical month editor
+  - Fee recording
+  - Role-based access
+- Run tests on every deploy
+- Add unit tests for pure functions (`stripPostHolderSuffixes`, `canMutateMonthSnapshot`, `normalizeStudentMeta`)
+
+---
+
+## Implementation Priority Matrix
+
+| Enhancement | Impact | Effort | Priority |
+|---|---|---|---|
+| E1. Pre-Save Snapshots | 🔴 Critical | Medium | **Implement Next** |
+| E4. Month Transition Automation | 🟠 High | Medium | **Implement Next** |
+| E5. Student Data Validation | 🟠 High | Medium | **Implement Next** |
+| E6. Offline Queue with Retry | 🟠 High | High | Q2 2026 |
+| E2. Server-Side WAL | 🔴 Critical | High | Q2 2026 |
+| E7. Batch Score Entry | 🟡 Medium | Medium | Q2 2026 |
+| E8. Activity Audit Trail | 🟡 Medium | Medium | Q3 2026 |
+| E3. Conflict Resolution UI | 🔴 Critical | High | Q3 2026 |
+| E9. Data Export & Reporting | 🟡 Medium | Medium | Q3 2026 |
+| E10. Role-Based Access Hardening | 🟡 Medium | High | Q3 2026 |
+| E11. Code Modularization | 🟢 Low (short-term) | Very High | Q4 2026 |
+| E12. IndexedDB Primary Store | 🟢 Low (short-term) | High | Q4 2026 |
+| E13. Incremental Sync | 🟢 Low (short-term) | Very High | 2027 |
+| E14. Automated Testing | 🟢 Ongoing Value | High | Ongoing |
+
+---
+
+## 🎉 Project Status
+
+**PHASE 1 & 2 COMPLETE ✅ | PHASE 3 ROADMAP DEFINED**
+
+The Offline Scoreboard system is now:
+- ✅ Data-safe (no race conditions, debounced sync)
+- ✅ History-protected (canMutateMonthSnapshot guards on all write paths)
+- ✅ Teacher-accessible (April 2026 visible, month creation enabled)
+- ✅ Peer-sync reliable (superset merge, no overwrites)
+- ✅ UI-correct (modals centered, clean names across all tabs)
+- ✅ Audit-ready (admin-locked historical edits with timestamps)
+- ✅ Resource-complete (restored cabinet, transactions, requests from backup)
+- ✅ Production-ready (backward compatible)
+
+**Phase 3 roadmap ready for prioritized implementation.**
+
+---
+
+**Last Updated**: 2026-04-06
+**Documentation**: Complete (Phase 1 + 2 + Roadmap)
+**Tests**: Manual verification passing
+**Status**: ✅ PHASE 1 & 2 DEPLOYED | PHASE 3 PLANNED

@@ -14,6 +14,7 @@ class StudentPoints(db.Model):
     vetos = db.Column(db.Integer, default=0)   # Vetos (negative points)
     notes = db.Column(db.Text)                 # Notes about the points
     recorded_by = db.Column(db.String(120))    # Who recorded this
+    entry_type = db.Column(db.String(30), default='manual')  # 'manual' | 'notebook_school' | 'notebook_tuition'
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
@@ -30,6 +31,7 @@ class StudentPoints(db.Model):
             'vetos': self.vetos,
             'notes': self.notes,
             'recorded_by': self.recorded_by,
+            'entry_type': self.entry_type or 'manual',
             'created_at': self.created_at.isoformat(),
             'updated_at': self.updated_at.isoformat()
         }

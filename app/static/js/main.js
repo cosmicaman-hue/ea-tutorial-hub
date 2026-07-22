@@ -183,6 +183,8 @@ function debounce(func, wait) {
     };
 }
 
+// Mobile sidebar toggle — handled by inline JS in base.html (class-based .mobile-open / .active)
+
 // Theme switching
 function toggleTheme() {
     const body = document.body;
@@ -192,11 +194,17 @@ function toggleTheme() {
 }
 
 function updateThemeButton(isLight) {
-    const themeToggleBtn = document.getElementById('themeToggleBtn');
-    if (themeToggleBtn) {
-        themeToggleBtn.innerHTML = isLight
-            ? '<i class="fas fa-moon"></i> Dark'
-            : '<i class="fas fa-sun"></i> Light';
+    const btn = document.getElementById('themeToggleBtn');
+    if (!btn) return;
+    const icon = btn.querySelector('i');
+    const text = btn.querySelector('.sidebar-link-text');
+    if (icon) icon.className = isLight ? 'fas fa-moon' : 'fas fa-sun';
+    if (text) text.textContent = isLight ? 'Dark Mode' : 'Light Mode';
+    // Sync mobile topbar theme button
+    const mobileBtn = document.getElementById('mobileThemeBtn');
+    if (mobileBtn) {
+        const mIcon = mobileBtn.querySelector('i');
+        if (mIcon) mIcon.className = isLight ? 'fas fa-moon' : 'fas fa-sun';
     }
 }
 
@@ -206,5 +214,54 @@ document.addEventListener('DOMContentLoaded', function() {
         document.body.classList.add('light-mode');
     }
     updateThemeButton(savedTheme === 'light');
+
+    // Sidebar toggle (desktop collapse)
+    const sidebar = document.getElementById('appSidebar');
+    const toggleBtn = document.getElementById('sidebarToggle');
+
+    if (sidebar && toggleBtn) {
+        var mcw = document.getElementById('mainContentWrapper');
+        if (localStorage.getItem('ea_sidebar_collapsed') === 'true') {
+            document.body.classList.add('sidebar-collapsed');
+        }
+        function setWillChange() {
+            if (sidebar) sidebar.style.willChange = 'width';
+            if (mcw) mcw.style.willChange = 'margin-left, width';
+        }
+        function clearWillChange() {
+            if (sidebar) sidebar.style.willChange = 'auto';
+            if (mcw) mcw.style.willChange = 'auto';
+        }
+        toggleBtn.addEventListener('click', function() {
+            if (document.body.classList.contains('sidebar-collapsed')) {
+                // Expanding: remove all collapse classes at once so open curve wins
+                setWillChange();
+                document.body.classList.remove('sb-closing', 'sidebar-collapsed');
+                localStorage.setItem('ea_sidebar_collapsed', 'false');
+                // Fallback cleanup
+                setTimeout(clearWillChange, 220);
+            } else {
+                // Collapsing: add sb-closing first so close curve applies
+                setWillChange();
+                document.body.classList.add('sb-closing');
+                requestAnimationFrame(function() {
+                    document.body.classList.add('sidebar-collapsed');
+                    localStorage.setItem('ea_sidebar_collapsed', 'true');
+                    // Fallback cleanup
+                    setTimeout(function() {
+                        document.body.classList.remove('sb-closing');
+                        clearWillChange();
+                    }, 200);
+                });
+            }
+        });
+        // Clean up sb-closing and will-change after transition ends
+        sidebar.addEventListener('transitionend', function(e) {
+            if (e.propertyName === 'width' || e.propertyName === 'margin-left') {
+                document.body.classList.remove('sb-closing');
+                clearWillChange();
+            }
+        });
+    }
 });
 

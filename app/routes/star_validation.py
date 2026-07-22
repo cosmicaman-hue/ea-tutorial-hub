@@ -95,7 +95,7 @@ def get_star_bonus(student_id, date, month_key):
                 'date': date,
                 'month': month_key,
                 'bonus': bonus,
-                'formula': '+100 per normal star use if day score >= -50'
+                'formula': '+100 per normal star use if day score > -50'
             }
         })
         
@@ -118,8 +118,9 @@ def get_star_limits():
                 'Daily award limit: 100 stars per day',
                 'Daily usage limit: 100 stars per day',
                 'Monthly award limit: 500 stars per month',
-                'Star bonus: +100 per normal star use if day score >= -50',
-                'Disciplinary usage: Erases that day\'s awarded score',
+                'Normal star usage: Erases negative day score. +100 bonus if day score > -50 (including positives)',
+                'Normal star usage on score <= -50: Erases negative only, no bonus',
+                'Disciplinary usage: Halves negative score per star (floor). No effect on positive scores. Skipped if normal star on same day',
                 'Star transfers: Limited to 3 per 24 hours'
             ]
         }

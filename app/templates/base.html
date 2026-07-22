@@ -2,55 +2,123 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>{% block title %}EXCEL ACADEMY{% endblock %}</title>
     <link rel="icon" type="image/svg+xml" href="{{ url_for('favicon.favicon') }}">
     <link rel="apple-touch-icon" href="{{ url_for('favicon.apple_touch_icon') }}">
     <link rel="manifest" href="{{ url_for('favicon.webmanifest') }}">
     <meta name="theme-color" content="#1d4ed8">
+    <meta name="x-ea-version" content="2026-04-24-v3">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <link href="{{ static_v('css/style.css') }}" rel="stylesheet">
     <link href="{{ static_v('css/dark_mode.css') }}" rel="stylesheet">
+    <style>
+        /* ═══ CRITICAL INLINE CSS — sidebar mobile toggle ═══
+           JS toggles .mobile-open on .app-sidebar and .active on .sidebar-overlay.
+           Inlined here to bypass external-CSS caching issues. */
+        .sidebar-overlay { position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:1040; cursor:pointer; opacity:0; pointer-events:none; transition:opacity 200ms cubic-bezier(0.16,1,0.3,1); }
+        .sidebar-overlay.active { opacity:1; pointer-events:auto; }
+        .sidebar-overlay.closing { opacity:0; pointer-events:none; }
+        .app-sidebar.mobile-open { transform:translateX(0) !important; visibility:visible !important; }
+        .sidebar-close-btn { display:none; background:none; border:none; color:var(--sidebar-text,#94a3b8); font-size:1.3rem; cursor:pointer; padding:6px 10px; line-height:1; min-width:44px; min-height:44px; align-items:center; justify-content:center; }
+        @media (max-width: 768px) {
+            .app-sidebar { display:flex !important; width:280px !important; position:fixed; z-index:1050; transform:translateX(-100%); visibility:hidden; transition:transform 280ms cubic-bezier(0.16,1,0.3,1), visibility 0s 280ms; will-change:transform; }
+            .app-sidebar.mobile-open { transform:translateX(0) !important; visibility:visible !important; transition:transform 320ms cubic-bezier(0.34,1.2,0.64,1), visibility 0s; }
+            .sidebar-close-btn { display:flex; }
+            .sidebar-collapse-btn { display:none; }
+            .main-content-wrapper { margin-left:0 !important; width:100% !important; }
+            .mobile-topbar { display:flex; }
+        }
+        @media (min-width: 769px) {
+            .sidebar-overlay { opacity:0 !important; pointer-events:none !important; }
+            .sidebar-close-btn { display:none !important; }
+        }
+    </style>
     {% block extra_css %}{% endblock %}
 </head>
 <body>
     {% if current_user.is_authenticated %}
-    <nav class="navbar navbar-expand-lg navbar-dark bg-primary sticky-top">
-        <div class="container-fluid">
-            <a class="navbar-brand" href="{{ url_for('points.offline_scoreboard') }}">
-                <i class="fas fa-school"></i> EXCEL ACADEMY
-            </a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-            <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav ms-auto">
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('points.offline_scoreboard') }}">Offline Scoreboard</a>
-                    </li>
-                    <li class="nav-item">
-                        <button id="themeToggleBtn" class="nav-link" data-allow="true" onclick="toggleTheme()" title="Switch between dark and light mode">
-                            <i class="fas fa-moon"></i> Theme
-                        </button>
-                    </li>
-                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" id="profileDropdown" role="button" data-bs-toggle="dropdown">
-                            <i class="fas fa-user-circle"></i> {{ current_user.login_id }}
-                        </a>
-                        <ul class="dropdown-menu" aria-labelledby="profileDropdown">
-                            <li><a class="dropdown-item" href="{{ url_for('auth.change_password') }}">Change Password</a></li>
-                            <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item" href="{{ url_for('auth.logout') }}">Logout</a></li>
-                        </ul>
-                    </li>
-                </ul>
+    <!-- Hidden checkbox (kept for accessibility; JS is primary toggle) -->
+    <input type="checkbox" id="sidebarCheckbox" aria-hidden="true">
+    <!-- Left Sidebar -->
+    <aside class="app-sidebar" id="appSidebar">
+        <div class="sidebar-header">
+            <div class="sidebar-brand">
+                <i class="fas fa-school"></i>
+                <span class="sidebar-brand-text">EXCEL ACADEMY</span>
             </div>
+            <button class="sidebar-close-btn" id="sidebarCloseBtn" title="Close menu">
+                <i class="fas fa-xmark"></i>
+            </button>
+            <button class="sidebar-collapse-btn" id="sidebarToggle" title="Collapse sidebar">
+                <i class="fas fa-chevron-left"></i>
+            </button>
         </div>
-    </nav>
+
+        <nav class="sidebar-nav">
+            <ul>
+                <li>
+                    <a href="{{ url_for('points.offline_scoreboard') }}"
+                       class="sidebar-link {% if request.endpoint and request.endpoint.startswith('points.') %}active{% endif %}"
+                       title="Scoreboard">
+                        <i class="fas fa-ranking-star"></i>
+                        <span class="sidebar-link-text">Scoreboard</span>
+                    </a>
+                </li>
+                {% if current_user.role in ('admin', 'teacher') %}
+                <li>
+                    <a href="{{ url_for('notebook.index') }}"
+                       class="sidebar-link {% if request.endpoint and request.endpoint.startswith('notebook.') %}active{% endif %}"
+                       title="Notebooks Check">
+                        <i class="fas fa-book-open"></i>
+                        <span class="sidebar-link-text">Notebooks Check</span>
+                    </a>
+                </li>
+                {% endif %}
+            </ul>
+        </nav>
+
+        <div class="sidebar-footer">
+            <div class="sidebar-user" title="{{ current_user.login_id }}">
+                <i class="fas fa-user-circle"></i>
+                <span class="sidebar-link-text">{{ current_user.login_id }}</span>
+            </div>
+            <button class="sidebar-link" id="themeToggleBtn" data-allow="true" onclick="toggleTheme()" title="Toggle theme">
+                <i class="fas fa-moon"></i>
+                <span class="sidebar-link-text">Theme</span>
+            </button>
+            <a href="{{ url_for('auth.change_password') }}" class="sidebar-link" title="Change Password">
+                <i class="fas fa-key"></i>
+                <span class="sidebar-link-text">Change Password</span>
+            </a>
+            <a href="{{ url_for('auth.logout') }}" class="sidebar-link sidebar-logout" title="Logout">
+                <i class="fas fa-sign-out-alt"></i>
+                <span class="sidebar-link-text">Logout</span>
+            </a>
+        </div>
+    </aside>
+
+    <!-- Mobile overlay — JS closes sidebar on tap -->
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
     {% endif %}
 
-    <div class="{% if current_user.is_authenticated %}container-fluid{% else %}container{% endif %}" style="min-height: 100vh;">
+    <!-- Main content -->
+    <div class="main-content-wrapper {% if not current_user.is_authenticated %}no-sidebar{% endif %}" id="mainContentWrapper">
+        {% if current_user.is_authenticated %}
+        <div class="mobile-topbar">
+            <button class="mobile-menu-btn" id="mobileMenuBtn" type="button" title="Open menu">
+                <i class="fas fa-bars"></i>
+            </button>
+            <span class="mobile-brand">EXCEL ACADEMY</span>
+            <button class="mobile-topbar-btn" id="mobileThemeBtn" onclick="toggleTheme()" title="Toggle theme">
+                <i class="fas fa-moon"></i>
+            </button>
+        </div>
+        {% endif %}
+
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 {% for category, message in messages %}
@@ -62,16 +130,94 @@
             {% endif %}
         {% endwith %}
 
-        {% block content %}{% endblock %}
+        <div class="{% if current_user.is_authenticated %}content-area{% else %}container{% endif %}">
+            {% block content %}{% endblock %}
+        </div>
+
+        <footer class="bg-dark text-white text-center py-3 mt-4">
+            <div class="container">
+                <p class="mb-1">EXCEL ACADEMY</p>
+                <small>Student Leadership Board</small>
+            </div>
+        </footer>
+        <style>
+            /* Mobile topbar right-side button */
+            .mobile-topbar-btn {
+                background: none;
+                border: none;
+                color: #f1f5f9;
+                font-size: 1.1rem;
+                cursor: pointer;
+                padding: 4px 10px;
+                line-height: 1;
+                margin-left: auto;
+                min-width: 44px;
+                min-height: 44px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+            @media (min-width: 769px) {
+                .mobile-topbar-btn { display: none; }
+            }
+        </style>
     </div>
 
-    <footer class="bg-dark text-white text-center py-3 mt-4">
-        <div class="container">
-            <p class="mb-1">EXCEL ACADEMY</p>
-            <small>Student Leadership Board</small>
-        </div>
-    </footer>
+    <script>
+    /* ═══ INLINE: Mobile sidebar toggle (loads BEFORE Bootstrap/main.js) ═══ */
+    (function() {
+        function openSidebar() {
+            var sb = document.getElementById('appSidebar');
+            var ov = document.getElementById('sidebarOverlay');
+            if (sb) sb.classList.add('mobile-open');
+            if (ov) ov.classList.add('active');
+        }
+        function closeSidebar() {
+            var sb = document.getElementById('appSidebar');
+            var ov = document.getElementById('sidebarOverlay');
+            if (sb) sb.classList.remove('mobile-open');
+            if (ov) {
+                ov.classList.add('closing');
+                ov.classList.remove('active');
+                setTimeout(function() { ov.classList.remove('closing'); }, 300);
+            }
+        }
 
+        function initSidebar() {
+            var menuBtn  = document.getElementById('mobileMenuBtn');
+            var closeBtn = document.getElementById('sidebarCloseBtn');
+            var overlay  = document.getElementById('sidebarOverlay');
+
+            if (menuBtn) {
+                menuBtn.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    var sb = document.getElementById('appSidebar');
+                    if (sb && sb.classList.contains('mobile-open')) { closeSidebar(); }
+                    else { openSidebar(); }
+                });
+            }
+            if (closeBtn) {
+                closeBtn.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    closeSidebar();
+                });
+            }
+            if (overlay) {
+                overlay.addEventListener('click', function() { closeSidebar(); });
+            }
+            /* Close sidebar when any nav link is clicked */
+            document.querySelectorAll('.sidebar-link[href]').forEach(function(link) {
+                link.addEventListener('click', function() { closeSidebar(); });
+            });
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initSidebar);
+        } else {
+            initSidebar();
+        }
+    })();
+    </script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="{{ static_v('js/main.js') }}"></script>
     {% block extra_js %}{% endblock %}

@@ -1,0 +1,764 @@
+======================================================================
+CURRENT DB: C:\var\data\ea_tutorial_hub\offline_scoreboard_data.json
+  Students: 81   Total scores: 10862
+  Scores in 2026-03-27–2026-04-04: 12
+
+======================================================================
+JSON BACKUP: offline_scoreboard_data_20260401_092140.json
+  Students: 92   Total scores: 20910
+  Scores in 2026-03-27–2026-04-04: 12
+  No students missing from backup (vs current) by ID.
+
+  Students in BACKUP but NOT in current (11):
+    id=15  roll=EA24C01  name=Nandani Gupta  active=False  deact=None
+    id=26  roll=EA24E01  name=Siddharth Mallik  active=False  deact=None
+    id=28  roll=EA24B04  name=Aditya Sah  active=False  deact=None
+    id=36  roll=EA25A06  name=Meraimayum Aaniya  active=False  deact=None
+    id=63  roll=EA25B11  name=Karyan Sai Purjapun  active=False  deact=None
+    id=72  roll=EA25D21  name=Xavier Herenj  active=False  deact=None
+    id=88  roll=EA26C24  name=Rishabh Kumar Singh  active=True  deact=None
+    id=89  roll=EA24D25  name=Nandani Gupta  active=True  deact=None
+    id=90  roll=EA25D26  name=Shankar Pradhan (CI)  active=True  deact=None
+    id=91  roll=EA26D27  name=Riya Singh (RM)  active=True  deact=None
+    id=95  roll=EA26D28  name=Riya Singh  active=False  deact=None
+
+  Field differences on matching students (228):
+    id=1 (Ayush Gupta V)  roll: backup='EA24A01'  current='EA24B15'
+    id=1 (Ayush Gupta V)  base_name: backup='Ayush Gupta (CR)'  current='Ayush Gupta V'
+    id=2 (Jay Kumar Yadav)  active: backup=False  current=True
+    id=2 (Jay Kumar Yadav)  roll: backup='EA24A02'  current='EA24D01'
+    id=2 (Jay Kumar Yadav)  base_name: backup='Abdul Arman'  current='Jay Kumar Yadav'
+    id=3 (Nandani Gupta V)  roll: backup='EA24A03'  current='EA24D25'
+    id=3 (Nandani Gupta V)  base_name: backup='Ayat Parveen'  current='Nandani Gupta V'
+    id=4 (Sahil Yadav V)  roll: backup='EA24A04'  current='EA24C02'
+    id=4 (Sahil Yadav V)  base_name: backup='Tanu Sinha'  current='Sahil Yadav V'
+    id=5 (Pari Gupta V)  roll: backup='EA24A05'  current='EA24B01'
+    id=5 (Pari Gupta V)  base_name: backup='Rashi'  current='Pari Gupta V'
+    id=6 (Hasibul Alam)  deactivation_month: backup=None  current='2025-04'
+    id=6 (Hasibul Alam)  roll: backup='EA24A06'  current='EA24D02'
+    id=7 (Abdul Arman)  active: backup=False  current=True
+    id=7 (Abdul Arman)  roll: backup='EA24A07'  current='EA24B09'
+    id=8 (MD. Aamir)  deactivation_month: backup=None  current='2024-12'
+    id=8 (MD. Aamir)  roll: backup='EA24A08'  current='EA24B02'
+    id=9 (Abhik Mallik)  active: backup=False  current=True
+    id=9 (Abhik Mallik)  roll: backup='EA24A09'  current='EA24C03'
+    id=10 (Anisha Begum)  deactivation_month: backup=None  current='2025-02'
+    id=10 (Anisha Begum)  roll: backup='EA24A10'  current='EA24D03'
+    id=11 (Ayat Parveen (Co-LoP))  active: backup=False  current=True
+    id=11 (Ayat Parveen (Co-LoP))  roll: backup='EA24A11'  current='EA24A03'
+    id=11 (Ayat Parveen (Co-LoP))  base_name: backup='Ayat Parveen'  current='Ayat Parveen (Co-LoP)'
+    id=12 (Tanu Sinha)  roll: backup='EA24B01'  current='EA24B16'
+    id=12 (Tanu Sinha)  base_name: backup='Pari Gupta'  current='Tanu Sinha'
+    id=13 (Deep Das V)  active: backup=False  current=True
+    id=13 (Deep Das V)  roll: backup='EA24B02'  current='EA24B03'
+    id=13 (Deep Das V)  base_name: backup='MD. Aamir'  current='Deep Das V'
+    id=14 (Divya Mallik)  roll: backup='EA24B03'  current='EA24C04'
+    id=14 (Divya Mallik)  base_name: backup='Deep Das'  current='Divya Mallik'
+    id=16 (Aman Yadav)  active: backup=True  current=False
+    id=16 (Aman Yadav)  deactivation_month: backup=None  current='2024-11'
+    id=16 (Aman Yadav)  roll: backup='EA24C02'  current='EA24D04'
+    id=16 (Aman Yadav)  base_name: backup='Sahil Yadav'  current='Aman Yadav'
+    id=17 (Deepak Panjiyar)  active: backup=True  current=False
+    id=17 (Deepak Panjiyar)  deactivation_month: backup=None  current='2025-06'
+    id=17 (Deepak Panjiyar)  roll: backup='EA24C03'  current='EA24D05'
+    id=17 (Deepak Panjiyar)  base_name: backup='Abhik Mallik'  current='Deepak Panjiyar'
+    id=18 (Tanmay Biswas)  active: backup=False  current=True
+    id=18 (Tanmay Biswas)  roll: backup='EA24C04'  current='EA24D06'
+    id=18 (Tanmay Biswas)  base_name: backup='Divya Mallik'  current='Tanmay Biswas'
+    id=19 (Isneha Panjiyar)  active: backup=True  current=False
+    id=19 (Isneha Panjiyar)  deactivation_month: backup=None  current='2025-10'
+    id=19 (Isneha Panjiyar)  roll: backup='EA24D01'  current='EA24D07'
+    id=19 (Isneha Panjiyar)  base_name: backup='Jay Kumar Yadav (CR)'  current='Isneha Panjiyar'
+    id=20 (Siddharth Mallik)  deactivation_month: backup=None  current='2025-08'
+    id=20 (Siddharth Mallik)  roll: backup='EA24D02'  current='EA24E01'
+    id=20 (Siddharth Mallik)  base_name: backup='Hasibul Alam'  current='Siddharth Mallik'
+    id=21 (Salma Khatun)  deactivation_month: backup=None  current='2025-05'
+    id=21 (Salma Khatun)  roll: backup='EA24D03'  current='EA24Z01'
+    id=21 (Salma Khatun)  base_name: backup='Anisha Begum'  current='Salma Khatun'
+    id=22 (Aditya Sah)  deactivation_month: backup=None  current='2025-02'
+    id=22 (Aditya Sah)  roll: backup='EA24D04'  current='EA24B04'
+    id=22 (Aditya Sah)  base_name: backup='Aman Yadav'  current='Aditya Sah'
+    id=23 (Sanjana Sutradhar V)  active: backup=False  current=True
+    id=23 (Sanjana Sutradhar V)  roll: backup='EA24D05'  current='EA24D08'
+    id=23 (Sanjana Sutradhar V)  base_name: backup='Deepak Panjiyar'  current='Sanjana Sutradhar V'
+    id=24 (Nishant Kr)  active: backup=True  current=False
+    id=24 (Nishant Kr)  deactivation_month: backup=None  current='2024-12'
+    id=24 (Nishant Kr)  roll: backup='EA24D06'  current='EA24D09'
+    id=24 (Nishant Kr)  base_name: backup='Tanmay Biswas'  current='Nishant Kr'
+    id=25 (Naitik Kr)  deactivation_month: backup=None  current='2024-12'
+    id=25 (Naitik Kr)  roll: backup='EA24D07'  current='EA24D10'
+    id=25 (Naitik Kr)  base_name: backup='Isneha Panjiyar'  current='Naitik Kr'
+    id=27 (Reeyansh Lama V)  active: backup=False  current=True
+    id=27 (Reeyansh Lama V)  roll: backup='EA24Z01'  current='EA24D15'
+    id=27 (Reeyansh Lama V)  base_name: backup='Salma Khatun'  current='Reeyansh Lama V'
+    id=29 (Sahil Ali)  deactivation_month: backup=None  current='2025-02'
+    id=29 (Sahil Ali)  roll: backup='EA24D08'  current='EA24D11'
+    id=29 (Sahil Ali)  base_name: backup='Sanjana Sutradhar (PP)'  current='Sahil Ali'
+    id=30 (Sanaya Sinha)  deactivation_month: backup=None  current='2025-08'
+    id=30 (Sanaya Sinha)  roll: backup='EA24D09'  current='EA24E02'
+    id=30 (Sanaya Sinha)  base_name: backup='Nishant Kr Sah'  current='Sanaya Sinha'
+    id=31 (Meraimayum Aaniya)  deactivation_month: backup=None  current='2025-02'
+    id=31 (Meraimayum Aaniya)  roll: backup='EA24D10'  current='EA25A06'
+    id=31 (Meraimayum Aaniya)  base_name: backup='Naitik Kr Ram'  current='Meraimayum Aaniya'
+    id=32 (Vishes Xalxo V)  active: backup=False  current=True
+    id=32 (Vishes Xalxo V)  roll: backup='EA24C05'  current='EA25A07'
+    id=32 (Vishes Xalxo V)  base_name: backup='Reeyansh Lama'  current='Vishes Xalxo V'
+    id=33 (Rajveer Thakur)  roll: backup='EA24C06'  current='EA25B05'
+    id=33 (Rajveer Thakur)  base_name: backup='Sakshi (CCAI)'  current='Rajveer Thakur'
+    id=34 (Khushi Paswan)  active: backup=False  current=True
+    id=34 (Khushi Paswan)  roll: backup='EA24D11'  current='EA25C07'
+    id=34 (Khushi Paswan)  base_name: backup='Sahil Ali'  current='Khushi Paswan'
+    id=35 (Roshan Paswan V)  active: backup=False  current=True
+    id=35 (Roshan Paswan V)  roll: backup='EA24E02'  current='EA25D12'
+    id=35 (Roshan Paswan V)  base_name: backup='Sanaya Sinha'  current='Roshan Paswan V'
+    id=37 (Shankar Pradhan V)  roll: backup='EA25A07'  current='EA25D26'
+    id=37 (Shankar Pradhan V)  base_name: backup='Vishes Xalxo'  current='Shankar Pradhan V'
+    id=38 (Shomiya Xalxo ( v))  roll: backup='EA25B05'  current='EA25C09'
+    id=38 (Shomiya Xalxo ( v))  base_name: backup='Rajveer Thakur'  current='Shomiya Xalxo ( v)'
+    id=39 (Rashi V)  roll: backup='EA25C07'  current='EA24A05'
+    id=39 (Rashi V)  base_name: backup='Khushi Paswan'  current='Rashi V'
+    id=40 (Rishab Thakur)  active: backup=True  current=False
+    id=40 (Rishab Thakur)  deactivation_month: backup=None  current='2025-06'
+    id=40 (Rishab Thakur)  roll: backup='EA25D12'  current='EA25A10'
+    id=40 (Rishab Thakur)  base_name: backup='Roshan Paswan (PP)'  current='Rishab Thakur'
+    id=41 (Jay Arya V)  roll: backup='EA25D13'  current='EA25B06'
+    id=41 (Jay Arya V)  base_name: backup='Aamna Khatoon'  current='Jay Arya V'
+    id=42 (Malina Khatun)  deactivation_month: backup=None  current='2025-06'
+    id=42 (Malina Khatun)  roll: backup='EA25C08'  current='EA25B07'
+    id=42 (Malina Khatun)  base_name: backup='Shankar Pradhan (CR)'  current='Malina Khatun'
+    id=43 (Karanchand)  active: backup=True  current=False
+    id=43 (Karanchand)  deactivation_month: backup=None  current='2025-04'
+    id=43 (Karanchand)  roll: backup='EA25C09'  current='EA25B08'
+    id=43 (Karanchand)  base_name: backup='Shomiya Xalxo (WCI) (PP)'  current='Karanchand'
+    id=44 (Sakshi V)  active: backup=False  current=True
+    id=44 (Sakshi V)  roll: backup='EA25A08'  current='EA24C06'
+    id=44 (Sakshi V)  base_name: backup='Rishab Thakur'  current='Sakshi V'
+    id=45 (Adarsh Arya V)  roll: backup='EA25B06'  current='EA25C10'
+    id=45 (Adarsh Arya V)  base_name: backup='Jay Arya'  current='Adarsh Arya V'
+    id=46 (Aamna Khatoon)  active: backup=False  current=True
+    id=46 (Aamna Khatoon)  roll: backup='EA25B07'  current='EA25D13'
+    id=46 (Aamna Khatoon)  base_name: backup='Malina Khatun'  current='Aamna Khatoon'
+    id=47 (Dhruv Mallick)  deactivation_month: backup=None  current='2025-08'
+    id=47 (Dhruv Mallick)  roll: backup='EA25B08'  current='EA25E03'
+    id=47 (Dhruv Mallick)  base_name: backup='Karanchand'  current='Dhruv Mallick'
+    id=48 (Rayan Kujur)  active: backup=True  current=False
+    id=48 (Rayan Kujur)  deactivation_month: backup=None  current='2025-05'
+    id=48 (Rayan Kujur)  roll: backup='EA25C10'  current='EA25A09'
+    id=48 (Rayan Kujur)  base_name: backup='Adarsh Arya'  current='Rayan Kujur'
+    id=49 (Sourav Das)  active: backup=False  current=True
+    id=49 (Sourav Das)  roll: backup='EA25E03'  current='EA25C11'
+    id=49 (Sourav Das)  base_name: backup='Dhruv Mallick'  current='Sourav Das'
+    id=50 (Shubham Singha V)  active: backup=False  current=True
+    id=50 (Shubham Singha V)  roll: backup='EA25A09'  current='EA25C12'
+    id=50 (Shubham Singha V)  base_name: backup='Rayan Kujur'  current='Shubham Singha V'
+    id=51 (Ruchika Panjiyar V)  active: backup=True  current=False
+    id=51 (Ruchika Panjiyar V)  deactivation_month: backup=None  current='2025-10'
+    id=51 (Ruchika Panjiyar V)  roll: backup='EA24B09'  current='EA25C13'
+    id=51 (Ruchika Panjiyar V)  base_name: backup='Abdul Arman (ECS) (PP)'  current='Ruchika Panjiyar V'
+    id=52 (Aruna Kumari)  active: backup=True  current=False
+    id=52 (Aruna Kumari)  deactivation_month: backup=None  current='2025-07'
+    id=52 (Aruna Kumari)  roll: backup='EA25C11'  current='EA25D14'
+    id=52 (Aruna Kumari)  base_name: backup='Sourav Das'  current='Aruna Kumari'
+    id=53 (Ankita Jha)  active: backup=True  current=False
+    id=53 (Ankita Jha)  deactivation_month: backup=None  current='2025-06'
+    id=53 (Ankita Jha)  roll: backup='EA25C12'  current='EA25D16'
+    id=53 (Ankita Jha)  base_name: backup='Shubham Singha (PP)'  current='Ankita Jha'
+    id=54 (Aditya Singh V)  active: backup=False  current=True
+    id=54 (Aditya Singh V)  roll: backup='EA25C13'  current='EA25D17'
+    id=54 (Aditya Singh V)  base_name: backup='Ruchika Panjiyar'  current='Aditya Singh V'
+    id=55 (Karandeep Singh)  deactivation_month: backup=None  current='2025-08'
+    id=55 (Karandeep Singh)  roll: backup='EA25D14'  current='EA25D18'
+    id=55 (Karandeep Singh)  base_name: backup='Aruna Kumari'  current='Karandeep Singh'
+    id=56 (Catherine Hauhnar V)  roll: backup='EA24D15'  current='EA25D19'
+    id=56 (Catherine Hauhnar V)  base_name: backup='Reeyansh Lama (CoL) (SC)'  current='Catherine Hauhnar V'
+    id=57 (Harsh Mallik V)  roll: backup='EA25D17'  current='EA25D20'
+    id=57 (Harsh Mallik V)  base_name: backup='Aditya Singh'  current='Harsh Mallik V'
+    id=58 (Shiva Mallick V)  active: backup=False  current=True
+    id=58 (Shiva Mallick V)  roll: backup='EA25D18'  current='EA25B10'
+    id=58 (Shiva Mallick V)  base_name: backup='Karandeep Singh'  current='Shiva Mallick V'
+    id=59 (Karyan Sai Purjapun)  deactivation_month: backup=None  current='2025-12'
+    id=59 (Karyan Sai Purjapun)  roll: backup='EA25D19'  current='EA25B11'
+    id=59 (Karyan Sai Purjapun)  base_name: backup='Catherine Hauhnar'  current='Karyan Sai Purjapun'
+    id=60 (Sewant Kumar Rai)  deactivation_month: backup=None  current='2025-07'
+    id=60 (Sewant Kumar Rai)  roll: backup='EA25D20'  current='EA25C14'
+    id=60 (Sewant Kumar Rai)  base_name: backup='Harsh Mallik (L)'  current='Sewant Kumar Rai'
+    id=61 (Nirupam Vaid)  active: backup=False  current=True
+    id=61 (Nirupam Vaid)  roll: backup='EA25A10'  current='EA25C15'
+    id=61 (Nirupam Vaid)  base_name: backup='Rishab Thakur'  current='Nirupam Vaid'
+    id=62 (Xavier Herenj)  roll: backup='EA25B10'  current='EA25D21'
+    id=62 (Xavier Herenj)  base_name: backup='Shiva Mallick'  current='Xavier Herenj'
+    id=64 (Prachi Oraon)  deactivation_month: backup=None  current='2025-10'
+    id=64 (Prachi Oraon)  roll: backup='EA25C14'  current='EA25D23'
+    id=64 (Prachi Oraon)  base_name: backup='Sewant Kumar Rai'  current='Prachi Oraon'
+    id=65 (Aansh Mandal V)  deactivation_month: backup=None  current='2025-07'
+    id=65 (Aansh Mandal V)  roll: backup='EA25C15'  current='EA25D24'
+    id=65 (Aansh Mandal V)  base_name: backup='Nirupam Vaid'  current='Aansh Mandal V'
+    id=66 (Rainy Alicia)  deactivation_month: backup=None  current='2025-07'
+    id=66 (Rainy Alicia)  roll: backup='EA25D16'  current='EA25A11'
+    id=66 (Rainy Alicia)  base_name: backup='Ankita Jha'  current='Rainy Alicia'
+    id=67 (Ishika Lakra)  active: backup=True  current=False
+    id=67 (Ishika Lakra)  deactivation_month: backup=None  current='2025-07'
+    id=67 (Ishika Lakra)  roll: backup='EA25D22'  current='EA25B12'
+    id=67 (Ishika Lakra)  base_name: backup='Mahek Mahato'  current='Ishika Lakra'
+    id=68 (Mahek Mahato)  active: backup=False  current=True
+    id=68 (Mahek Mahato)  roll: backup='EA25D23'  current='EA25D22'
+    id=68 (Mahek Mahato)  base_name: backup='Prachi Oraon'  current='Mahek Mahato'
+    id=69 (Jayson Tirkey)  active: backup=True  current=False
+    id=69 (Jayson Tirkey)  deactivation_month: backup=None  current='2025-09'
+    id=69 (Jayson Tirkey)  roll: backup='EA25D24'  current='EA25A12'
+    id=69 (Jayson Tirkey)  base_name: backup='Aansh Mandal (DWI)'  current='Jayson Tirkey'
+    id=70 (Joya Tirkey)  deactivation_month: backup=None  current='2025-09'
+    id=70 (Joya Tirkey)  roll: backup='EA25A11'  current='EA25C16'
+    id=70 (Joya Tirkey)  base_name: backup='Rainy Alicia Minj'  current='Joya Tirkey'
+    id=71 (Alen Ghartimagar)  active: backup=False  current=True
+    id=71 (Alen Ghartimagar)  roll: backup='EA25B12'  current='EA25C17'
+    id=71 (Alen Ghartimagar)  base_name: backup='Ishika Lakra'  current='Alen Ghartimagar'
+    id=73 (Samarth Patel)  active: backup=False  current=True
+    id=73 (Samarth Patel)  roll: backup='EA25A12'  current='EA25C19'
+    id=73 (Samarth Patel)  base_name: backup='Jayson Tirkey'  current='Samarth Patel'
+    id=74 (Aansh Mandal V)  active: backup=False  current=True
+    id=74 (Aansh Mandal V)  roll: backup='EA25C16'  current='EA25D24'
+    id=74 (Aansh Mandal V)  base_name: backup='Joya Tirkey'  current='Aansh Mandal V'
+    id=75 (Suryanarayan Pradhan)  active: backup=True  current=False
+    id=75 (Suryanarayan Pradhan)  deactivation_month: backup=None  current='2025-11'
+    id=75 (Suryanarayan Pradhan)  roll: backup='EA25C17'  current='EA25Z02'
+    id=75 (Suryanarayan Pradhan)  base_name: backup='Alen Ghartimagar'  current='Suryanarayan Pradhan'
+    id=76 (Afreen Khatun)  roll: backup='EA25C18'  current='EA25A13'
+    id=76 (Afreen Khatun)  base_name: backup='N Riya Kumari'  current='Afreen Khatun'
+    id=77 (Rehmetun Khatun V)  roll: backup='EA25C19'  current='EA25B13'
+    id=77 (Rehmetun Khatun V)  base_name: backup='Samarth Patel(CITC)'  current='Rehmetun Khatun V'
+    id=78 (Rishi Trivedi)  active: backup=False  current=True
+    id=78 (Rishi Trivedi)  roll: backup='EA25Z02'  current='EA25C20'
+    id=78 (Rishi Trivedi)  base_name: backup='Suryanarayan Pradhan'  current='Rishi Trivedi'
+    id=79 (Aditya Sharma)  active: backup=True  current=False
+    id=79 (Aditya Sharma)  deactivation_month: backup=None  current='2026-01'
+    id=79 (Aditya Sharma)  roll: backup='EA25A13'  current='EA25A14'
+    id=79 (Aditya Sharma)  base_name: backup='Afreen Khatun'  current='Aditya Sharma'
+    id=80 (Prem Oraon)  roll: backup='EA25B13'  current='EA25B14'
+    id=80 (Prem Oraon)  base_name: backup='Rehmetun Khatun (ECJ)'  current='Prem Oraon'
+    id=81 (Sristi Kumari)  roll: backup='EA25C20'  current='EA25C21'
+    id=81 (Sristi Kumari)  base_name: backup='Rishi Trivedi'  current='Sristi Kumari'
+    id=82 (Piyush Rajak)  active: backup=False  current=True
+    id=82 (Piyush Rajak)  roll: backup='EA25A14'  current='EA25C22'
+    id=82 (Piyush Rajak)  base_name: backup='Aditya Sharma'  current='Piyush Rajak'
+    id=83 (Abhinav Khati)  roll: backup='EA25B14'  current='EA25C23'
+    id=83 (Abhinav Khati)  base_name: backup='Prem Oraon'  current='Abhinav Khati'
+    id=84 (Ansh Kumar Singh)  roll: backup='EA25C21'  current='EA25A15'
+    id=84 (Ansh Kumar Singh)  base_name: backup='Sristi Kumari'  current='Ansh Kumar Singh'
+    id=85 (N Riya Kumari)  roll: backup='EA25C22'  current='EA25C18'
+    id=85 (N Riya Kumari)  base_name: backup='Piyush Rajak'  current='N Riya Kumari'
+    id=86 (Rishabh Kumar Singh)  roll: backup='EA25C23'  current='EA26C24'
+    id=86 (Rishabh Kumar Singh)  base_name: backup='Abhinav Khati (CR) (PP)'  current='Rishabh Kumar Singh'
+    id=87 (Riya Singh)  roll: backup='EA25A15'  current='EA26D27'
+    id=87 (Riya Singh)  base_name: backup='Ansh Kumar Singh'  current='Riya Singh'
+
+  Scores in BACKUP range NOT in current (12):
+    studentId=16 (Sahil Yadav)  date=2026-03-27  pts=-30
+    studentId=19 (Jay Kumar Yadav (CR))  date=2026-03-27  pts=0
+    studentId=24 (Tanmay Biswas)  date=2026-03-27  pts=-30
+    studentId=40 (Roshan Paswan (PP))  date=2026-03-27  pts=-30
+    studentId=41 (Aamna Khatoon)  date=2026-03-27  pts=-30
+    studentId=56 (Reeyansh Lama (CoL) (SC))  date=2026-03-27  pts=-30
+    studentId=57 (Aditya Singh)  date=2026-03-27  pts=0
+    studentId=67 (Mahek Mahato)  date=2026-03-27  pts=-30
+    studentId=75 (Alen Ghartimagar)  date=2026-03-27  pts=-30
+    studentId=76 (N Riya Kumari)  date=2026-03-27  pts=-30
+    studentId=89 (Nandani Gupta)  date=2026-03-27  pts=-30
+    studentId=90 (Shankar Pradhan (CI))  date=2026-03-27  pts=-30
+
+  Scores in CURRENT range NOT in backup (12):
+    studentId=2 (Jay Kumar Yadav)  date=2026-03-27  pts=0
+    studentId=3 (Nandani Gupta V)  date=2026-03-27  pts=-30
+    studentId=4 (Sahil Yadav V)  date=2026-03-27  pts=-30
+    studentId=18 (Tanmay Biswas)  date=2026-03-27  pts=-30
+    studentId=27 (Reeyansh Lama V)  date=2026-03-27  pts=-30
+    studentId=35 (Roshan Paswan V)  date=2026-03-27  pts=-30
+    studentId=37 (Shankar Pradhan V)  date=2026-03-27  pts=-30
+    studentId=46 (Aamna Khatoon)  date=2026-03-27  pts=-30
+    studentId=54 (Aditya Singh V)  date=2026-03-27  pts=0
+    studentId=68 (Mahek Mahato)  date=2026-03-27  pts=-30
+    studentId=71 (Alen Ghartimagar)  date=2026-03-27  pts=-30
+    studentId=85 (N Riya Kumari)  date=2026-03-27  pts=-30
+
+======================================================================
+JSON BACKUP: offline_scoreboard_data_20260404_085247.json
+  Students: 162   Total scores: 12463
+  Scores in 2026-03-27–2026-04-04: 12
+
+  Students in CURRENT but NOT in backup (7):
+    id=2  roll=EA24D01  name=Jay Kumar Yadav  active=True  deact=None
+    id=6  roll=EA24D02  name=Hasibul Alam  active=False  deact=2025-04
+    id=8  roll=EA24B02  name=MD. Aamir  active=False  deact=2024-12
+    id=9  roll=EA24C03  name=Abhik Mallik  active=True  deact=None
+    id=10  roll=EA24D03  name=Anisha Begum  active=False  deact=2025-02
+    id=11  roll=EA24A03  name=Ayat Parveen (Co-LoP)  active=True  deact=None
+    id=44  roll=EA24C06  name=Sakshi V  active=True  deact=None
+
+  Students in BACKUP but NOT in current (88):
+    id=26  roll=EA24E01  name=Siddharth Mallik  active=False  deact=None
+    id=28  roll=EA24B04  name=Aditya Sah  active=False  deact=None
+    id=36  roll=EA25A06  name=Meraimayum Aaniya  active=False  deact=None
+    id=63  roll=EA25B11  name=Karyan Sai Purjapun  active=False  deact=None
+    id=72  roll=EA25D21  name=Xavier Herenj  active=False  deact=None
+    id=88  roll=EA26C24  name=Rishabh Kumar Singh  active=True  deact=None
+    id=89  roll=EA24D25  name=Nandani Gupta  active=True  deact=None
+    id=90  roll=EA25D26  name=Shankar Pradhan (CI)  active=True  deact=None
+    id=91  roll=EA26D27  name=Riya Singh (RM)  active=True  deact=None
+    id=95  roll=EA26D28  name=Riya Singh  active=False  deact=None
+    id=96  roll=EA24A01  name=Ayush Gupta  active=False  deact=None
+    id=97  roll=EA24D01  name=Abhishek Yadav  active=False  deact=None
+    id=98  roll=EA24C01  name=Nandini Gupta  active=False  deact=None
+    id=99  roll=EA24D02  name=Salman Khan  active=False  deact=None
+    id=100  roll=EA24D08  name=Sanjana Sutradhar  active=False  deact=None
+    id=101  roll=EA24A05  name=Rashi Singh  active=False  deact=None
+    id=102  roll=EA24C06  name=Sakshi Singh  active=False  deact=None
+    id=103  roll=EA24A02  name=Abdul Arman (CoL)  active=False  deact=None
+    id=104  roll=EA25D12  name=Roshan Paswan  active=False  deact=None
+    id=105  roll=EA25D13  name=Aamna  active=False  deact=None
+    id=106  roll=EA24Z01  name=Salma Khatun (L)  active=False  deact=None
+    id=107  roll=EA25C07  name=Khushi Paswan (CAI)/  active=False  deact=None
+    id=108  roll=EA25D26  name=Shankar Pradhan  active=False  deact=None
+    id=109  roll=EA25C09  name=Shomiya Xalxo (EC)  active=False  deact=None
+    id=110  roll=EA24D01  name=Abhishek Yadav(CoL)  active=False  deact=None
+    id=111  roll=EA25D12  name=Roshan Paswan (SC)/  active=False  deact=None
+    id=112  roll=EA24Z01  name=Salma Khatun (L)/ (WCI)  active=False  deact=None
+    id=113  roll=EA25C09  name=Shomiya Xalxo  active=False  deact=None
+    id=114  roll=EA24C02  name=Sahil Yadav (CoL)  active=False  deact=None
+    id=115  roll=EA24C06  name=Sakshi  active=False  deact=None
+    id=116  roll=EA25C10  name=Adarsh Arya (DWI)  active=False  deact=None
+    id=117  roll=EA24D01  name=Jay Kumar Yadav (L)  active=False  deact=None
+    id=118  roll=EA24D05  name=Deepak Panjiyar (SMI)  active=False  deact=None
+    id=119  roll=EA25D12  name=Roshan Paswan (CAI)  active=False  deact=None
+    id=120  roll=EA24Z01  name=Salma Khatun (EC)/ (WCI)  active=False  deact=None
+    id=121  roll=EA24A01  name=Ayush Gupta (CoL1)  active=False  deact=None
+    id=122  roll=EA25C09  name=Shomiya Xalxo (DWI)/ (EC)  active=False  deact=None
+    id=123  roll=EA24C02  name=Sahil Yadav (L)  active=False  deact=None
+    id=124  roll=EA25C08  name=Shankar Pradhan (SC)  active=False  deact=None
+    id=125  roll=EA25C12  name=Shubham Singha  active=False  deact=None
+    id=126  roll=EA24D01  name=Jay Kumar Yadav (CoL2)/(WCI)  active=False  deact=None
+    id=127  roll=EA24D15  name=Reeyansh Lama (RM)  active=False  deact=None
+    id=128  roll=EA25D16  name=Ankita Jha (CAI)/ (SMI)  active=False  deact=None
+    id=129  roll=EA25D20  name=Harsh Mallik  active=False  deact=None
+    id=130  roll=EA24A05  name=Rashi v  active=False  deact=None
+    id=131  roll=EA24C02  name=Sahil Yadav (L)v  active=False  deact=None
+    id=132  roll=EA24D01  name=Jay Kumar Yadav (CI)/ (WCI)  active=False  deact=None
+    id=133  roll=EA25D12  name=Roshan Paswan (CoL1)  active=False  deact=None
+    id=134  roll=EA25D21  name=Xavier Herenj (SMI)  active=False  deact=None
+    id=135  roll=EA25D22  name=Mahak Mahato  active=False  deact=None
+    id=136  roll=EA25D24  name=Tapashya Gurung  active=False  deact=None
+    id=137  roll=EA24A03  name=Ayat Parveen (Co-LoP)  active=False  deact=None
+    id=138  roll=EA24B09  name=Abdul Arman (WCI)  active=False  deact=None
+    id=139  roll=EA24C02  name=Sahil Yadav(CoL1)/ (SC)  active=False  deact=None
+    id=140  roll=EA24C06  name=Sakshi (LoP)  active=False  deact=None
+    id=141  roll=EA25C09  name=Shomiya Xalxo (L)/ (CAI)/ (CI)/ (DWI)  active=False  deact=None
+    id=142  roll=EA24D01  name=Jay Kumar Yadav  active=False  deact=None
+    id=143  roll=EA25D19  name=Catherine Hauhnar (RM)/ (EC)  active=False  deact=None
+    id=144  roll=EA24B09  name=Abdul Arman (CoL2)  active=False  deact=None
+    id=145  roll=EA25C18  name=Riya Kumari  active=False  deact=None
+    id=146  roll=EA25C19  name=Samarth Patel  active=False  deact=None
+    id=147  roll=EA24D01  name=Jay Kumar Yadav (L) (SC)/ (WCI)  active=False  deact=None
+    id=148  roll=EA25D17  name=Aditya Singh (CoL1)  active=False  deact=None
+    id=149  roll=EA25D19  name=Catherine Hauhnar (EC)  active=False  deact=None
+    id=150  roll=EA25D24  name=Aansh Mandal  active=False  deact=None
+    id=151  roll=EA25B13  name=Rehmetun Khatun  active=False  deact=None
+    id=152  roll=EA25C10  name=Adarsh Arya (CI)  active=False  deact=None
+    id=153  roll=EA25D12  name=Roshan Paswan (DWI)  active=False  deact=None
+    id=154  roll=EA24B03  name=Deep Das (CR)  active=False  deact=None
+    id=155  roll=EA24C02  name=Sahil Yadav (CoL2) (SC)  active=False  deact=None
+    id=156  roll=EA24D01  name=Jay Kumar Yadav (L)/ (WCI)  active=False  deact=None
+    id=157  roll=EA25D24  name=Aansh Mandal (CR)  active=False  deact=None
+    id=158  roll=EA25B13  name=Rehmetun Khatun (CR)  active=False  deact=None
+    id=159  roll=EA24C02  name=Sahil Yadav (CoL1)  active=False  deact=None
+    id=160  roll=EA25C09  name=Shomiya Xalxo (L)  active=False  deact=None
+    id=161  roll=EA25C18  name=Riya Kumari (EC)  active=False  deact=None
+    id=162  roll=EA24D01  name=Jay Kumar Yadav (SC)/ (DWI)/ (WCI)/ (Col2)  active=False  deact=None
+    id=163  roll=EA25D12  name=Roshan Paswan (CCAI)/ (CI)/ (CR)  active=False  deact=None
+    id=164  roll=EA24B09  name=Abdul Arman (CR)  active=False  deact=None
+    id=165  roll=EA25B06  name=Jay Arya (CoL2)  active=False  deact=None
+    id=166  roll=EA25C09  name=Shomiya Xalxo (CR)  active=False  deact=None
+    id=167  roll=EA25C10  name=Adarsh Arya (CoL1)  active=False  deact=None
+    id=168  roll=EA25C23  name=Abhinav Khati  active=False  deact=None
+    id=169  roll=EA24D08  name=Sanjana Sutradhar (CR)  active=False  deact=None
+    id=170  roll=EA24D15  name=Reeyansh Lama (L)  active=False  deact=None
+    id=171  roll=EA25B13  name=Rehmetun Khatun (CoL2)  active=False  deact=None
+    id=172  roll=EA24D15  name=Reeyansh Lama (L)(CI)  active=False  deact=None
+    id=173  roll=EA25D19  name=Catherine Hauhnar (CR) (EC) (RM)  active=False  deact=None
+
+  Field differences on matching students (210):
+    id=1 (Ayush Gupta V)  roll: backup='EA24A01'  current='EA24B15'
+    id=1 (Ayush Gupta V)  base_name: backup='Ayush Gupta (CR)'  current='Ayush Gupta V'
+    id=3 (Nandani Gupta V)  roll: backup='EA24A03'  current='EA24D25'
+    id=3 (Nandani Gupta V)  base_name: backup='Ayat Parveen'  current='Nandani Gupta V'
+    id=4 (Sahil Yadav V)  roll: backup='EA24A04'  current='EA24C02'
+    id=4 (Sahil Yadav V)  base_name: backup='Tanu Sinha'  current='Sahil Yadav V'
+    id=5 (Pari Gupta V)  roll: backup='EA24A05'  current='EA24B01'
+    id=5 (Pari Gupta V)  base_name: backup='Rashi'  current='Pari Gupta V'
+    id=7 (Abdul Arman)  active: backup=False  current=True
+    id=12 (Tanu Sinha)  roll: backup='EA24B01'  current='EA24B16'
+    id=12 (Tanu Sinha)  base_name: backup='Pari Gupta'  current='Tanu Sinha'
+    id=13 (Deep Das V)  active: backup=False  current=True
+    id=13 (Deep Das V)  roll: backup='EA24B02'  current='EA24B03'
+    id=13 (Deep Das V)  base_name: backup='MD. Aamir'  current='Deep Das V'
+    id=14 (Divya Mallik)  roll: backup='EA24B03'  current='EA24C04'
+    id=14 (Divya Mallik)  base_name: backup='Deep Das'  current='Divya Mallik'
+    id=16 (Aman Yadav)  active: backup=True  current=False
+    id=16 (Aman Yadav)  deactivation_month: backup=None  current='2024-11'
+    id=16 (Aman Yadav)  roll: backup='EA24C02'  current='EA24D04'
+    id=16 (Aman Yadav)  base_name: backup='Sahil Yadav'  current='Aman Yadav'
+    id=17 (Deepak Panjiyar)  active: backup=True  current=False
+    id=17 (Deepak Panjiyar)  deactivation_month: backup=None  current='2025-06'
+    id=17 (Deepak Panjiyar)  roll: backup='EA24C03'  current='EA24D05'
+    id=17 (Deepak Panjiyar)  base_name: backup='Abhik Mallik'  current='Deepak Panjiyar'
+    id=18 (Tanmay Biswas)  active: backup=False  current=True
+    id=18 (Tanmay Biswas)  roll: backup='EA24C04'  current='EA24D06'
+    id=18 (Tanmay Biswas)  base_name: backup='Divya Mallik'  current='Tanmay Biswas'
+    id=19 (Isneha Panjiyar)  active: backup=True  current=False
+    id=19 (Isneha Panjiyar)  deactivation_month: backup=None  current='2025-10'
+    id=19 (Isneha Panjiyar)  roll: backup='EA24D01'  current='EA24D07'
+    id=19 (Isneha Panjiyar)  base_name: backup='Jay Kumar Yadav (CR)'  current='Isneha Panjiyar'
+    id=20 (Siddharth Mallik)  deactivation_month: backup=None  current='2025-08'
+    id=20 (Siddharth Mallik)  roll: backup='EA24D02'  current='EA24E01'
+    id=20 (Siddharth Mallik)  base_name: backup='Hasibul Alam'  current='Siddharth Mallik'
+    id=21 (Salma Khatun)  deactivation_month: backup=None  current='2025-05'
+    id=21 (Salma Khatun)  roll: backup='EA24D03'  current='EA24Z01'
+    id=21 (Salma Khatun)  base_name: backup='Anisha Begum'  current='Salma Khatun'
+    id=22 (Aditya Sah)  deactivation_month: backup=None  current='2025-02'
+    id=22 (Aditya Sah)  roll: backup='EA24D04'  current='EA24B04'
+    id=22 (Aditya Sah)  base_name: backup='Aman Yadav'  current='Aditya Sah'
+    id=23 (Sanjana Sutradhar V)  active: backup=False  current=True
+    id=23 (Sanjana Sutradhar V)  roll: backup='EA24D05'  current='EA24D08'
+    id=23 (Sanjana Sutradhar V)  base_name: backup='Deepak Panjiyar'  current='Sanjana Sutradhar V'
+    id=24 (Nishant Kr)  active: backup=True  current=False
+    id=24 (Nishant Kr)  deactivation_month: backup=None  current='2024-12'
+    id=24 (Nishant Kr)  roll: backup='EA24D06'  current='EA24D09'
+    id=24 (Nishant Kr)  base_name: backup='Tanmay Biswas'  current='Nishant Kr'
+    id=25 (Naitik Kr)  deactivation_month: backup=None  current='2024-12'
+    id=25 (Naitik Kr)  roll: backup='EA24D07'  current='EA24D10'
+    id=25 (Naitik Kr)  base_name: backup='Isneha Panjiyar'  current='Naitik Kr'
+    id=27 (Reeyansh Lama V)  active: backup=False  current=True
+    id=27 (Reeyansh Lama V)  roll: backup='EA24Z01'  current='EA24D15'
+    id=27 (Reeyansh Lama V)  base_name: backup='Salma Khatun'  current='Reeyansh Lama V'
+    id=29 (Sahil Ali)  deactivation_month: backup=None  current='2025-02'
+    id=29 (Sahil Ali)  roll: backup='EA24D08'  current='EA24D11'
+    id=29 (Sahil Ali)  base_name: backup='Sanjana Sutradhar (PP)'  current='Sahil Ali'
+    id=30 (Sanaya Sinha)  deactivation_month: backup=None  current='2025-08'
+    id=30 (Sanaya Sinha)  roll: backup='EA24D09'  current='EA24E02'
+    id=30 (Sanaya Sinha)  base_name: backup='Nishant Kr Sah'  current='Sanaya Sinha'
+    id=31 (Meraimayum Aaniya)  deactivation_month: backup=None  current='2025-02'
+    id=31 (Meraimayum Aaniya)  roll: backup='EA24D10'  current='EA25A06'
+    id=31 (Meraimayum Aaniya)  base_name: backup='Naitik Kr Ram'  current='Meraimayum Aaniya'
+    id=32 (Vishes Xalxo V)  active: backup=False  current=True
+    id=32 (Vishes Xalxo V)  roll: backup='EA24D15'  current='EA25A07'
+    id=32 (Vishes Xalxo V)  base_name: backup='Reeyansh Lama'  current='Vishes Xalxo V'
+    id=33 (Rajveer Thakur)  roll: backup='EA24C06'  current='EA25B05'
+    id=33 (Rajveer Thakur)  base_name: backup='Sakshi (CCAI)'  current='Rajveer Thakur'
+    id=34 (Khushi Paswan)  active: backup=False  current=True
+    id=34 (Khushi Paswan)  roll: backup='EA24D11'  current='EA25C07'
+    id=34 (Khushi Paswan)  base_name: backup='Sahil Ali'  current='Khushi Paswan'
+    id=35 (Roshan Paswan V)  active: backup=False  current=True
+    id=35 (Roshan Paswan V)  roll: backup='EA24E02'  current='EA25D12'
+    id=35 (Roshan Paswan V)  base_name: backup='Sanaya Sinha'  current='Roshan Paswan V'
+    id=37 (Shankar Pradhan V)  roll: backup='EA25A07'  current='EA25D26'
+    id=37 (Shankar Pradhan V)  base_name: backup='Vishes Xalxo'  current='Shankar Pradhan V'
+    id=38 (Shomiya Xalxo ( v))  roll: backup='EA25B05'  current='EA25C09'
+    id=38 (Shomiya Xalxo ( v))  base_name: backup='Rajveer Thakur'  current='Shomiya Xalxo ( v)'
+    id=39 (Rashi V)  roll: backup='EA25C07'  current='EA24A05'
+    id=39 (Rashi V)  base_name: backup='Khushi Paswan'  current='Rashi V'
+    id=40 (Rishab Thakur)  active: backup=True  current=False
+    id=40 (Rishab Thakur)  deactivation_month: backup=None  current='2025-06'
+    id=40 (Rishab Thakur)  roll: backup='EA25D12'  current='EA25A10'
+    id=40 (Rishab Thakur)  base_name: backup='Roshan Paswan (PP)'  current='Rishab Thakur'
+    id=41 (Jay Arya V)  roll: backup='EA25D13'  current='EA25B06'
+    id=41 (Jay Arya V)  base_name: backup='Aamna Khatoon'  current='Jay Arya V'
+    id=42 (Malina Khatun)  deactivation_month: backup=None  current='2025-06'
+    id=42 (Malina Khatun)  roll: backup='EA25C08'  current='EA25B07'
+    id=42 (Malina Khatun)  base_name: backup='Shankar Pradhan (CR)'  current='Malina Khatun'
+    id=43 (Karanchand)  active: backup=True  current=False
+    id=43 (Karanchand)  deactivation_month: backup=None  current='2025-04'
+    id=43 (Karanchand)  roll: backup='EA25C09'  current='EA25B08'
+    id=43 (Karanchand)  base_name: backup='Shomiya Xalxo (WCI) (PP)'  current='Karanchand'
+    id=45 (Adarsh Arya V)  roll: backup='EA25B06'  current='EA25C10'
+    id=45 (Adarsh Arya V)  base_name: backup='Jay Arya'  current='Adarsh Arya V'
+    id=46 (Aamna Khatoon)  active: backup=False  current=True
+    id=46 (Aamna Khatoon)  roll: backup='EA25B07'  current='EA25D13'
+    id=46 (Aamna Khatoon)  base_name: backup='Malina Khatun'  current='Aamna Khatoon'
+    id=47 (Dhruv Mallick)  deactivation_month: backup=None  current='2025-08'
+    id=47 (Dhruv Mallick)  roll: backup='EA25B08'  current='EA25E03'
+    id=47 (Dhruv Mallick)  base_name: backup='Karanchand'  current='Dhruv Mallick'
+    id=48 (Rayan Kujur)  active: backup=True  current=False
+    id=48 (Rayan Kujur)  deactivation_month: backup=None  current='2025-05'
+    id=48 (Rayan Kujur)  roll: backup='EA25C10'  current='EA25A09'
+    id=48 (Rayan Kujur)  base_name: backup='Adarsh Arya'  current='Rayan Kujur'
+    id=49 (Sourav Das)  active: backup=False  current=True
+    id=49 (Sourav Das)  roll: backup='EA25E03'  current='EA25C11'
+    id=49 (Sourav Das)  base_name: backup='Dhruv Mallick'  current='Sourav Das'
+    id=50 (Shubham Singha V)  active: backup=False  current=True
+    id=50 (Shubham Singha V)  roll: backup='EA25A09'  current='EA25C12'
+    id=50 (Shubham Singha V)  base_name: backup='Rayan Kujur'  current='Shubham Singha V'
+    id=51 (Ruchika Panjiyar V)  active: backup=True  current=False
+    id=51 (Ruchika Panjiyar V)  deactivation_month: backup=None  current='2025-10'
+    id=51 (Ruchika Panjiyar V)  roll: backup='EA24B09'  current='EA25C13'
+    id=51 (Ruchika Panjiyar V)  base_name: backup='Abdul Arman (ECS) (PP)'  current='Ruchika Panjiyar V'
+    id=52 (Aruna Kumari)  active: backup=True  current=False
+    id=52 (Aruna Kumari)  deactivation_month: backup=None  current='2025-07'
+    id=52 (Aruna Kumari)  roll: backup='EA25C11'  current='EA25D14'
+    id=52 (Aruna Kumari)  base_name: backup='Sourav Das'  current='Aruna Kumari'
+    id=53 (Ankita Jha)  active: backup=True  current=False
+    id=53 (Ankita Jha)  deactivation_month: backup=None  current='2025-06'
+    id=53 (Ankita Jha)  roll: backup='EA25C12'  current='EA25D16'
+    id=53 (Ankita Jha)  base_name: backup='Shubham Singha (PP)'  current='Ankita Jha'
+    id=54 (Aditya Singh V)  active: backup=False  current=True
+    id=54 (Aditya Singh V)  roll: backup='EA25C13'  current='EA25D17'
+    id=54 (Aditya Singh V)  base_name: backup='Ruchika Panjiyar'  current='Aditya Singh V'
+    id=55 (Karandeep Singh)  deactivation_month: backup=None  current='2025-08'
+    id=55 (Karandeep Singh)  roll: backup='EA25D14'  current='EA25D18'
+    id=55 (Karandeep Singh)  base_name: backup='Aruna Kumari'  current='Karandeep Singh'
+    id=56 (Catherine Hauhnar V)  roll: backup='EA24D15'  current='EA25D19'
+    id=56 (Catherine Hauhnar V)  base_name: backup='Reeyansh Lama (CoL) (SC)'  current='Catherine Hauhnar V'
+    id=57 (Harsh Mallik V)  roll: backup='EA25D17'  current='EA25D20'
+    id=57 (Harsh Mallik V)  base_name: backup='Aditya Singh'  current='Harsh Mallik V'
+    id=58 (Shiva Mallick V)  active: backup=False  current=True
+    id=58 (Shiva Mallick V)  roll: backup='EA25D18'  current='EA25B10'
+    id=58 (Shiva Mallick V)  base_name: backup='Karandeep Singh'  current='Shiva Mallick V'
+    id=59 (Karyan Sai Purjapun)  deactivation_month: backup=None  current='2025-12'
+    id=59 (Karyan Sai Purjapun)  roll: backup='EA25D19'  current='EA25B11'
+    id=59 (Karyan Sai Purjapun)  base_name: backup='Catherine Hauhnar'  current='Karyan Sai Purjapun'
+    id=60 (Sewant Kumar Rai)  deactivation_month: backup=None  current='2025-07'
+    id=60 (Sewant Kumar Rai)  roll: backup='EA25D20'  current='EA25C14'
+    id=60 (Sewant Kumar Rai)  base_name: backup='Harsh Mallik (L)'  current='Sewant Kumar Rai'
+    id=61 (Nirupam Vaid)  active: backup=False  current=True
+    id=61 (Nirupam Vaid)  roll: backup='EA25A10'  current='EA25C15'
+    id=61 (Nirupam Vaid)  base_name: backup='Rishab Thakur'  current='Nirupam Vaid'
+    id=62 (Xavier Herenj)  roll: backup='EA25B10'  current='EA25D21'
+    id=62 (Xavier Herenj)  base_name: backup='Shiva Mallick'  current='Xavier Herenj'
+    id=64 (Prachi Oraon)  deactivation_month: backup=None  current='2025-10'
+    id=64 (Prachi Oraon)  roll: backup='EA25C14'  current='EA25D23'
+    id=64 (Prachi Oraon)  base_name: backup='Sewant Kumar Rai'  current='Prachi Oraon'
+    id=65 (Aansh Mandal V)  deactivation_month: backup=None  current='2025-07'
+    id=65 (Aansh Mandal V)  roll: backup='EA25C15'  current='EA25D24'
+    id=65 (Aansh Mandal V)  base_name: backup='Nirupam Vaid'  current='Aansh Mandal V'
+    id=66 (Rainy Alicia)  deactivation_month: backup=None  current='2025-07'
+    id=66 (Rainy Alicia)  roll: backup='EA25D16'  current='EA25A11'
+    id=66 (Rainy Alicia)  base_name: backup='Ankita Jha'  current='Rainy Alicia'
+    id=67 (Ishika Lakra)  active: backup=True  current=False
+    id=67 (Ishika Lakra)  deactivation_month: backup=None  current='2025-07'
+    id=67 (Ishika Lakra)  roll: backup='EA25D22'  current='EA25B12'
+    id=67 (Ishika Lakra)  base_name: backup='Mahek Mahato'  current='Ishika Lakra'
+    id=68 (Mahek Mahato)  active: backup=False  current=True
+    id=68 (Mahek Mahato)  roll: backup='EA25D23'  current='EA25D22'
+    id=68 (Mahek Mahato)  base_name: backup='Prachi Oraon'  current='Mahek Mahato'
+    id=69 (Jayson Tirkey)  active: backup=True  current=False
+    id=69 (Jayson Tirkey)  deactivation_month: backup=None  current='2025-09'
+    id=69 (Jayson Tirkey)  roll: backup='EA25D24'  current='EA25A12'
+    id=69 (Jayson Tirkey)  base_name: backup='Aansh Mandal (DWI)'  current='Jayson Tirkey'
+    id=70 (Joya Tirkey)  deactivation_month: backup=None  current='2025-09'
+    id=70 (Joya Tirkey)  roll: backup='EA25A11'  current='EA25C16'
+    id=70 (Joya Tirkey)  base_name: backup='Rainy Alicia Minj'  current='Joya Tirkey'
+    id=71 (Alen Ghartimagar)  active: backup=False  current=True
+    id=71 (Alen Ghartimagar)  roll: backup='EA25B12'  current='EA25C17'
+    id=71 (Alen Ghartimagar)  base_name: backup='Ishika Lakra'  current='Alen Ghartimagar'
+    id=73 (Samarth Patel)  active: backup=False  current=True
+    id=73 (Samarth Patel)  roll: backup='EA25A12'  current='EA25C19'
+    id=73 (Samarth Patel)  base_name: backup='Jayson Tirkey'  current='Samarth Patel'
+    id=74 (Aansh Mandal V)  active: backup=False  current=True
+    id=74 (Aansh Mandal V)  roll: backup='EA25C16'  current='EA25D24'
+    id=74 (Aansh Mandal V)  base_name: backup='Joya Tirkey'  current='Aansh Mandal V'
+    id=75 (Suryanarayan Pradhan)  active: backup=True  current=False
+    id=75 (Suryanarayan Pradhan)  deactivation_month: backup=None  current='2025-11'
+    id=75 (Suryanarayan Pradhan)  roll: backup='EA25C17'  current='EA25Z02'
+    id=75 (Suryanarayan Pradhan)  base_name: backup='Alen Ghartimagar'  current='Suryanarayan Pradhan'
+    id=76 (Afreen Khatun)  roll: backup='EA25C18'  current='EA25A13'
+    id=76 (Afreen Khatun)  base_name: backup='N Riya Kumari'  current='Afreen Khatun'
+    id=77 (Rehmetun Khatun V)  roll: backup='EA25C19'  current='EA25B13'
+    id=77 (Rehmetun Khatun V)  base_name: backup='Samarth Patel(CITC)'  current='Rehmetun Khatun V'
+    id=78 (Rishi Trivedi)  active: backup=False  current=True
+    id=78 (Rishi Trivedi)  roll: backup='EA25Z02'  current='EA25C20'
+    id=78 (Rishi Trivedi)  base_name: backup='Suryanarayan Pradhan'  current='Rishi Trivedi'
+    id=79 (Aditya Sharma)  active: backup=True  current=False
+    id=79 (Aditya Sharma)  deactivation_month: backup=None  current='2026-01'
+    id=79 (Aditya Sharma)  roll: backup='EA25A13'  current='EA25A14'
+    id=79 (Aditya Sharma)  base_name: backup='Afreen Khatun'  current='Aditya Sharma'
+    id=80 (Prem Oraon)  roll: backup='EA25B13'  current='EA25B14'
+    id=80 (Prem Oraon)  base_name: backup='Rehmetun Khatun (ECJ)'  current='Prem Oraon'
+    id=81 (Sristi Kumari)  roll: backup='EA25C20'  current='EA25C21'
+    id=81 (Sristi Kumari)  base_name: backup='Rishi Trivedi'  current='Sristi Kumari'
+    id=82 (Piyush Rajak)  active: backup=False  current=True
+    id=82 (Piyush Rajak)  roll: backup='EA25A14'  current='EA25C22'
+    id=82 (Piyush Rajak)  base_name: backup='Aditya Sharma'  current='Piyush Rajak'
+    id=83 (Abhinav Khati)  roll: backup='EA25B14'  current='EA25C23'
+    id=83 (Abhinav Khati)  base_name: backup='Prem Oraon'  current='Abhinav Khati'
+    id=84 (Ansh Kumar Singh)  roll: backup='EA25C21'  current='EA25A15'
+    id=84 (Ansh Kumar Singh)  base_name: backup='Sristi Kumari'  current='Ansh Kumar Singh'
+    id=85 (N Riya Kumari)  roll: backup='EA25C22'  current='EA25C18'
+    id=85 (N Riya Kumari)  base_name: backup='Piyush Rajak'  current='N Riya Kumari'
+    id=86 (Rishabh Kumar Singh)  roll: backup='EA25C23'  current='EA26C24'
+    id=86 (Rishabh Kumar Singh)  base_name: backup='Abhinav Khati (CR) (PP)'  current='Rishabh Kumar Singh'
+    id=87 (Riya Singh)  roll: backup='EA25A15'  current='EA26D27'
+    id=87 (Riya Singh)  base_name: backup='Ansh Kumar Singh'  current='Riya Singh'
+
+  Scores in BACKUP range NOT in current (12):
+    studentId=16 (Sahil Yadav)  date=2026-03-27  pts=-30
+    studentId=19 (Jay Kumar Yadav (CR))  date=2026-03-27  pts=0
+    studentId=24 (Tanmay Biswas)  date=2026-03-27  pts=-30
+    studentId=40 (Roshan Paswan (PP))  date=2026-03-27  pts=-30
+    studentId=41 (Aamna Khatoon)  date=2026-03-27  pts=-30
+    studentId=56 (Reeyansh Lama (CoL) (SC))  date=2026-03-27  pts=-30
+    studentId=57 (Aditya Singh)  date=2026-03-27  pts=0
+    studentId=67 (Mahek Mahato)  date=2026-03-27  pts=-30
+    studentId=75 (Alen Ghartimagar)  date=2026-03-27  pts=-30
+    studentId=76 (N Riya Kumari)  date=2026-03-27  pts=-30
+    studentId=89 (Nandani Gupta)  date=2026-03-27  pts=-30
+    studentId=90 (Shankar Pradhan (CI))  date=2026-03-27  pts=-30
+
+  Scores in CURRENT range NOT in backup (12):
+    studentId=2 (Jay Kumar Yadav)  date=2026-03-27  pts=0
+    studentId=3 (Nandani Gupta V)  date=2026-03-27  pts=-30
+    studentId=4 (Sahil Yadav V)  date=2026-03-27  pts=-30
+    studentId=18 (Tanmay Biswas)  date=2026-03-27  pts=-30
+    studentId=27 (Reeyansh Lama V)  date=2026-03-27  pts=-30
+    studentId=35 (Roshan Paswan V)  date=2026-03-27  pts=-30
+    studentId=37 (Shankar Pradhan V)  date=2026-03-27  pts=-30
+    studentId=46 (Aamna Khatoon)  date=2026-03-27  pts=-30
+    studentId=54 (Aditya Singh V)  date=2026-03-27  pts=0
+    studentId=68 (Mahek Mahato)  date=2026-03-27  pts=-30
+    studentId=71 (Alen Ghartimagar)  date=2026-03-27  pts=-30
+    studentId=85 (N Riya Kumari)  date=2026-03-27  pts=-30
+
+======================================================================
+SQLITE BACKUP: ea_tutorial_20260401_221505.db
+  Tables: ['users', 'quizzes', 'activity_logs', 'student_profiles', 'notes', 'quiz_questions', 'quiz_answers', 'student_points', 'student_leaderboard', 'monthly_points_summary', 'sqlite_stat1', 'offline_snapshot', 'user_access_windows', 'device_sessions', 'account_actions', 'join_codes', 'student_transfers', 'proposals', 'score_adjustment_actions', 'proposal_votes', 'proposal_messages']
+  Could not locate scoreboard_data. Showing table row counts:
+    users: 8 rows
+      columns: ['id', 'login_id', 'password_hash', 'role', 'is_active', 'first_login', 'created_at', 'last_login', 'last_login_ip', 'password_changed_at']
+      sample: {'id': 1, 'login_id': 'Admin', 'password_hash': 'pbkdf2:sha256:600000$agVgi1q6B00938mF$8df6aff8e80ff774261abcf54bd4626f1cfc97d6a0…', 'role': 'admin', 'is_active': 1, 'first_login': 0, 'created_at': '2025-12-08 04:58:45.601222', 'last_login': '2026-03-30 11:04:21.597583', 'last_login_ip': '192.168.0.183', 'password_changed_at': '2026-02-14 07:17:20.271154'}
+      sample: {'id': 2, 'login_id': 'Teacher', 'password_hash': 'pbkdf2:sha256:600000$Vx5PcsXQ9ziGN3E8$bc7b2dec5ea1133065096aa901c198a61b22fbe97e…', 'role': 'teacher', 'is_active': 1, 'first_login': 0, 'created_at': '2025-12-08 04:58:45.601225', 'last_login': '2026-03-03 13:02:45.617389', 'last_login_ip': '192.168.0.61', 'password_changed_at': '2026-02-14 07:17:20.823153'}
+      sample: {'id': 3, 'login_id': 'EA24C01', 'password_hash': 'pbkdf2:sha256:600000$nbv7kzqbWPVHl3Ix$e2119aec21228a5faf571a8e7aaabad953045e07c2…', 'role': 'student', 'is_active': 1, 'first_login': 0, 'created_at': '2025-12-08 04:58:46.243497', 'last_login': None, 'last_login_ip': None, 'password_changed_at': '2025-12-08 04:58:45.821122'}
+    quizzes: 2 rows
+      columns: ['id', 'title', 'description', 'subject', 'class_level', 'duration_minutes', 'total_points', 'passing_score', 'is_active', 'allow_retake', 'show_results', 'created_at', 'updated_at']
+      sample: {'id': 1, 'title': 'Mathematics - Algebra Basics', 'description': 'Test your knowledge on basic algebra concepts including variables, expressions, …', 'subject': 'Mathematics', 'class_level': 'Class 9', 'duration_minutes': 30, 'total_points': 100, 'passing_score': 40, 'is_active': 1, 'allow_retake': 1, 'show_results': 1, 'created_at': '2025-12-08 04:58:46.254970', 'updated_at': '2025-12-08 04:58:46.254973'}
+      sample: {'id': 2, 'title': 'Science - Basic Physics', 'description': 'Test your understanding of basic physics concepts and laws.', 'subject': 'Science', 'class_level': 'Class 10', 'duration_minutes': 45, 'total_points': 100, 'passing_score': 50, 'is_active': 1, 'allow_retake': 1, 'show_results': 1, 'created_at': '2025-12-08 04:58:46.262851', 'updated_at': '2025-12-08 04:58:46.262854'}
+    activity_logs: 246 rows
+      columns: ['id', 'user_id', 'action', 'action_type', 'details', 'ip_address', 'timestamp']
+      sample: {'id': 1, 'user_id': 1, 'action': 'Admin login successful', 'action_type': 'login', 'details': 'IP: 127.0.0.1', 'ip_address': '127.0.0.1', 'timestamp': '2025-12-08 06:05:14.086762'}
+      sample: {'id': 2, 'user_id': 1, 'action': 'Admin login successful', 'action_type': 'login', 'details': 'IP: 127.0.0.1', 'ip_address': '127.0.0.1', 'timestamp': '2025-12-08 06:32:29.207626'}
+      sample: {'id': 3, 'user_id': 1, 'action': 'Admin logout', 'action_type': 'logout', 'details': 'IP: 127.0.0.1', 'ip_address': '127.0.0.1', 'timestamp': '2025-12-08 07:41:14.452618'}
+    student_profiles: 4 rows
+      columns: ['id', 'user_id', 'first_name', 'second_name', 'third_name', 'date_of_birth', 'gender', 'religion', 'nationality', 'school_name', 'class_name', 'section', 'roll_number', 'contact_number_1', 'contact_number_2', 'email', 'village_area', 'post_office', 'district', 'state', 'pin_code', 'hobbies', 'improvement_areas', 'father_name', 'mother_name', 'guardian_name', 'guardian_contact', 'blood_group', 'aadhar_number', 'created_at', 'updated_at']
+      sample: {'id': 1, 'user_id': 2, 'first_name': 'Rajesh', 'second_name': 'Kumar', 'third_name': 'Singh', 'date_of_birth': '1990-05-15', 'gender': 'Male', 'religion': 'Hindu', 'nationality': 'India', 'school_name': 'Delhi Public School', 'class_name': 'Faculty', 'section': 'N/A', 'roll_number': None, 'contact_number_1': '9876543210', 'contact_number_2': '9876543211', 'email': 'teacher@dps.com', 'village_area': 'Delhi', 'post_office': 'Delhi', 'district': 'Delhi', 'state': 'Delhi', 'pin_code': '110001', 'hobbies': 'Teaching, Mentoring', 'improvement_areas': 'Technology, Online Teaching', 'father_name': None, 'mother_name': None, 'guardian_name': None, 'guardian_contact': None, 'blood_group': None, 'aadhar_number': None, 'created_at': '2025-12-08 04:58:45.605705', 'updated_at': '2025-12-08 04:58:45.605707'}
+      sample: {'id': 2, 'user_id': 3, 'first_name': 'Amit', 'second_name': 'Sharma', 'third_name': 'Singh', 'date_of_birth': '2008-03-20', 'gender': 'Male', 'religion': 'Hindu', 'nationality': 'India', 'school_name': 'Delhi Public School', 'class_name': 'Class 10', 'section': 'A', 'roll_number': None, 'contact_number_1': '9111111111', 'contact_number_2': '', 'email': 'ea24c01@school.local', 'village_area': 'Delhi', 'post_office': 'Delhi', 'district': 'Delhi', 'state': 'Delhi', 'pin_code': '110001', 'hobbies': 'Cricket, Reading', 'improvement_areas': 'Mathematics, English', 'father_name': None, 'mother_name': None, 'guardian_name': None, 'guardian_contact': None, 'blood_group': 'O+', 'aadhar_number': '123456789012', 'created_at': '2025-12-08 04:58:46.247982', 'updated_at': '2025-12-08 04:58:46.247985'}
+      sample: {'id': 3, 'user_id': 4, 'first_name': 'Priya', 'second_name': 'Verma', 'third_name': 'Gupta', 'date_of_birth': '2008-07-10', 'gender': 'Female', 'religion': 'Hindu', 'nationality': 'India', 'school_name': 'Delhi Public School', 'class_name': 'Class 10', 'section': 'B', 'roll_number': None, 'contact_number_1': '9222222222', 'contact_number_2': '', 'email': 'ea24d02@school.local', 'village_area': 'Delhi', 'post_office': 'Delhi', 'district': 'Delhi', 'state': 'Delhi', 'pin_code': '110001', 'hobbies': 'Cricket, Reading', 'improvement_areas': 'Mathematics, English', 'father_name': None, 'mother_name': None, 'guardian_name': None, 'guardian_contact': None, 'blood_group': 'O+', 'aadhar_number': '123456789012', 'created_at': '2025-12-08 04:58:46.247986', 'updated_at': '2025-12-08 04:58:46.247987'}
+    notes: 0 rows
+      columns: ['id', 'title', 'description', 'subject', 'class_level', 'file_path', 'file_size', 'uploaded_by', 'is_approved', 'total_pages', 'language', 'tags', 'download_count', 'created_at', 'updated_at']
+    quiz_questions: 7 rows
+      columns: ['id', 'quiz_id', 'question_text', 'question_type', 'points', 'order', 'option_a', 'option_b', 'option_c', 'option_d', 'correct_answer', 'explanation']
+      sample: {'id': 1, 'quiz_id': 1, 'question_text': 'What is the value of x if 2x + 5 = 15?', 'question_type': 'multiple_choice', 'points': 10, 'order': None, 'option_a': '2', 'option_b': '5', 'option_c': '10', 'option_d': '15', 'correct_answer': 'B', 'explanation': 'Solving: 2x + 5 = 15 -> 2x = 10 -> x = 5'}
+      sample: {'id': 2, 'quiz_id': 1, 'question_text': 'Simplify: 3a + 2a - a', 'question_type': 'multiple_choice', 'points': 10, 'order': None, 'option_a': '4a', 'option_b': '5a', 'option_c': '6a', 'option_d': '2a', 'correct_answer': 'A', 'explanation': '3a + 2a - a = 5a - a = 4a'}
+      sample: {'id': 3, 'quiz_id': 1, 'question_text': 'Is -5 < -3? (True or False)', 'question_type': 'true_false', 'points': 10, 'order': None, 'option_a': 'True', 'option_b': 'False', 'option_c': None, 'option_d': None, 'correct_answer': 'True', 'explanation': 'On a number line, -5 is to the left of -3, so -5 < -3'}
+    quiz_answers: 0 rows
+      columns: ['id', 'quiz_id', 'question_id', 'user_id', 'student_answer', 'is_correct', 'points_earned', 'submitted_at']
+    student_points: 0 rows
+      columns: ['id', 'student_id', 'date_recorded', 'points', 'stars', 'vetos', 'notes', 'recorded_by', 'created_at', 'updated_at']
+    student_leaderboard: 0 rows
+      columns: ['id', 'student_id', 'year', 'month', 'total_points', 'total_stars', 'total_vetos', 'rank', 'days_active', 'last_updated']
+    monthly_points_summary: 0 rows
+      columns: ['id', 'student_id', 'date_month', 'year', 'month', 'summary_data', 'total_points', 'updated_at']
+    sqlite_stat1: 12 rows
+      columns: ['tbl', 'idx', 'stat']
+      sample: {'tbl': 'quiz_questions', 'idx': None, 'stat': '7'}
+      sample: {'tbl': 'student_profiles', 'idx': 'idx_student_profile_class', 'stat': '4 2'}
+      sample: {'tbl': 'student_profiles', 'idx': 'idx_student_profile_roll', 'stat': '4 4'}
+    offline_snapshot: 1 rows
+      columns: ['id', 'data_json', 'updated_at', 'student_count']
+      sample: {'id': 1, 'data_json': '{"_app_schema_version": 2, "appeals": [], "attendance": [{"created_at": "2026-02…', 'updated_at': '2026-02-28T22:07:24.967720+05:30', 'student_count': 92}
+    user_access_windows: 1 rows
+      columns: ['id', 'user_id', 'month_from', 'month_to', 'set_by', 'updated_at']
+      sample: {'id': 1, 'user_id': 2, 'month_from': '2026-01', 'month_to': '2026-03', 'set_by': 1, 'updated_at': '2026-03-03 05:38:59.571579'}
+    device_sessions: 2 rows
+      columns: ['id', 'user_id', 'login_id', 'role', 'device_id', 'device_name', 'os', 'browser', 'ip', 'last_seen', 'status']
+      sample: {'id': 1, 'user_id': 2, 'login_id': 'Teacher', 'role': 'teacher', 'device_id': None, 'device_name': 'Device / Browser', 'os': '', 'browser': '', 'ip': '192.168.0.61', 'last_seen': '2026-03-03 13:02:45.650950', 'status': 'online'}
+      sample: {'id': 2, 'user_id': 1, 'login_id': 'Admin', 'role': 'admin', 'device_id': None, 'device_name': 'Device / Browser', 'os': '', 'browser': '', 'ip': '192.168.0.183', 'last_seen': '2026-03-30 11:04:21.608966', 'status': 'online'}
+    account_actions: 0 rows
+      columns: ['id', 'target_user_id', 'action', 'reason', 'by_user_id', 'created_at']
+    join_codes: 0 rows
+      columns: ['id', 'code_hash', 'active', 'expires_at', 'created_by', 'created_at']
+    student_transfers: 0 rows
+      columns: ['id', 'from_student_id', 'to_student_id', 'transfer_type', 'amount', 'created_at', 'lock_until']
+    proposals: 0 rows
+      columns: ['id', 'title', 'body', 'scope', 'created_by', 'open_at', 'close_at', 'status', 'created_at', 'updated_at']
+    score_adjustment_actions: 0 rows
+      columns: ['id', 'actor_user_id', 'actor_login_id', 'actor_role', 'target_student_id', 'target_date', 'delta_points', 'mode', 'reason', 'created_at']
+    proposal_votes: 0 rows
+      columns: ['id', 'proposal_id', 'voter_user_id', 'choice', 'created_at']
+    proposal_messages: 0 rows
+      columns: ['id', 'proposal_id', 'user_id', 'login_id', 'role', 'message', 'created_at']
+
+======================================================================
+SQLITE BACKUP: ea_tutorial_20260404_221507.db
+  Tables: ['users', 'quizzes', 'activity_logs', 'student_profiles', 'notes', 'quiz_questions', 'quiz_answers', 'student_points', 'student_leaderboard', 'monthly_points_summary', 'sqlite_stat1', 'offline_snapshot', 'user_access_windows', 'device_sessions', 'account_actions', 'join_codes', 'student_transfers', 'proposals', 'score_adjustment_actions', 'proposal_votes', 'proposal_messages']
+  Could not locate scoreboard_data. Showing table row counts:
+    users: 8 rows
+      columns: ['id', 'login_id', 'password_hash', 'role', 'is_active', 'first_login', 'created_at', 'last_login', 'last_login_ip', 'password_changed_at']
+      sample: {'id': 1, 'login_id': 'Admin', 'password_hash': 'pbkdf2:sha256:600000$agVgi1q6B00938mF$8df6aff8e80ff774261abcf54bd4626f1cfc97d6a0…', 'role': 'admin', 'is_active': 1, 'first_login': 0, 'created_at': '2025-12-08 04:58:45.601222', 'last_login': '2026-04-01 17:11:22.450803', 'last_login_ip': '192.168.0.183', 'password_changed_at': '2026-02-14 07:17:20.271154'}
+      sample: {'id': 2, 'login_id': 'Teacher', 'password_hash': 'pbkdf2:sha256:600000$Vx5PcsXQ9ziGN3E8$bc7b2dec5ea1133065096aa901c198a61b22fbe97e…', 'role': 'teacher', 'is_active': 1, 'first_login': 0, 'created_at': '2025-12-08 04:58:45.601225', 'last_login': '2026-04-04 08:24:09.937567', 'last_login_ip': '192.168.0.201', 'password_changed_at': '2026-02-14 07:17:20.823153'}
+      sample: {'id': 3, 'login_id': 'EA24C01', 'password_hash': 'pbkdf2:sha256:600000$nbv7kzqbWPVHl3Ix$e2119aec21228a5faf571a8e7aaabad953045e07c2…', 'role': 'student', 'is_active': 1, 'first_login': 0, 'created_at': '2025-12-08 04:58:46.243497', 'last_login': None, 'last_login_ip': None, 'password_changed_at': '2025-12-08 04:58:45.821122'}
+    quizzes: 2 rows
+      columns: ['id', 'title', 'description', 'subject', 'class_level', 'duration_minutes', 'total_points', 'passing_score', 'is_active', 'allow_retake', 'show_results', 'created_at', 'updated_at']
+      sample: {'id': 1, 'title': 'Mathematics - Algebra Basics', 'description': 'Test your knowledge on basic algebra concepts including variables, expressions, …', 'subject': 'Mathematics', 'class_level': 'Class 9', 'duration_minutes': 30, 'total_points': 100, 'passing_score': 40, 'is_active': 1, 'allow_retake': 1, 'show_results': 1, 'created_at': '2025-12-08 04:58:46.254970', 'updated_at': '2025-12-08 04:58:46.254973'}
+      sample: {'id': 2, 'title': 'Science - Basic Physics', 'description': 'Test your understanding of basic physics concepts and laws.', 'subject': 'Science', 'class_level': 'Class 10', 'duration_minutes': 45, 'total_points': 100, 'passing_score': 50, 'is_active': 1, 'allow_retake': 1, 'show_results': 1, 'created_at': '2025-12-08 04:58:46.262851', 'updated_at': '2025-12-08 04:58:46.262854'}
+    activity_logs: 259 rows
+      columns: ['id', 'user_id', 'action', 'action_type', 'details', 'ip_address', 'timestamp']
+      sample: {'id': 1, 'user_id': 1, 'action': 'Admin login successful', 'action_type': 'login', 'details': 'IP: 127.0.0.1', 'ip_address': '127.0.0.1', 'timestamp': '2025-12-08 06:05:14.086762'}
+      sample: {'id': 2, 'user_id': 1, 'action': 'Admin login successful', 'action_type': 'login', 'details': 'IP: 127.0.0.1', 'ip_address': '127.0.0.1', 'timestamp': '2025-12-08 06:32:29.207626'}
+      sample: {'id': 3, 'user_id': 1, 'action': 'Admin logout', 'action_type': 'logout', 'details': 'IP: 127.0.0.1', 'ip_address': '127.0.0.1', 'timestamp': '2025-12-08 07:41:14.452618'}
+    student_profiles: 4 rows
+      columns: ['id', 'user_id', 'first_name', 'second_name', 'third_name', 'date_of_birth', 'gender', 'religion', 'nationality', 'school_name', 'class_name', 'section', 'roll_number', 'contact_number_1', 'contact_number_2', 'email', 'village_area', 'post_office', 'district', 'state', 'pin_code', 'hobbies', 'improvement_areas', 'father_name', 'mother_name', 'guardian_name', 'guardian_contact', 'blood_group', 'aadhar_number', 'created_at', 'updated_at']
+      sample: {'id': 1, 'user_id': 2, 'first_name': 'Rajesh', 'second_name': 'Kumar', 'third_name': 'Singh', 'date_of_birth': '1990-05-15', 'gender': 'Male', 'religion': 'Hindu', 'nationality': 'India', 'school_name': 'Delhi Public School', 'class_name': 'Faculty', 'section': 'N/A', 'roll_number': None, 'contact_number_1': '9876543210', 'contact_number_2': '9876543211', 'email': 'teacher@dps.com', 'village_area': 'Delhi', 'post_office': 'Delhi', 'district': 'Delhi', 'state': 'Delhi', 'pin_code': '110001', 'hobbies': 'Teaching, Mentoring', 'improvement_areas': 'Technology, Online Teaching', 'father_name': None, 'mother_name': None, 'guardian_name': None, 'guardian_contact': None, 'blood_group': None, 'aadhar_number': None, 'created_at': '2025-12-08 04:58:45.605705', 'updated_at': '2025-12-08 04:58:45.605707'}
+      sample: {'id': 2, 'user_id': 3, 'first_name': 'Amit', 'second_name': 'Sharma', 'third_name': 'Singh', 'date_of_birth': '2008-03-20', 'gender': 'Male', 'religion': 'Hindu', 'nationality': 'India', 'school_name': 'Delhi Public School', 'class_name': 'Class 10', 'section': 'A', 'roll_number': None, 'contact_number_1': '9111111111', 'contact_number_2': '', 'email': 'ea24c01@school.local', 'village_area': 'Delhi', 'post_office': 'Delhi', 'district': 'Delhi', 'state': 'Delhi', 'pin_code': '110001', 'hobbies': 'Cricket, Reading', 'improvement_areas': 'Mathematics, English', 'father_name': None, 'mother_name': None, 'guardian_name': None, 'guardian_contact': None, 'blood_group': 'O+', 'aadhar_number': '123456789012', 'created_at': '2025-12-08 04:58:46.247982', 'updated_at': '2025-12-08 04:58:46.247985'}
+      sample: {'id': 3, 'user_id': 4, 'first_name': 'Priya', 'second_name': 'Verma', 'third_name': 'Gupta', 'date_of_birth': '2008-07-10', 'gender': 'Female', 'religion': 'Hindu', 'nationality': 'India', 'school_name': 'Delhi Public School', 'class_name': 'Class 10', 'section': 'B', 'roll_number': None, 'contact_number_1': '9222222222', 'contact_number_2': '', 'email': 'ea24d02@school.local', 'village_area': 'Delhi', 'post_office': 'Delhi', 'district': 'Delhi', 'state': 'Delhi', 'pin_code': '110001', 'hobbies': 'Cricket, Reading', 'improvement_areas': 'Mathematics, English', 'father_name': None, 'mother_name': None, 'guardian_name': None, 'guardian_contact': None, 'blood_group': 'O+', 'aadhar_number': '123456789012', 'created_at': '2025-12-08 04:58:46.247986', 'updated_at': '2025-12-08 04:58:46.247987'}
+    notes: 0 rows
+      columns: ['id', 'title', 'description', 'subject', 'class_level', 'file_path', 'file_size', 'uploaded_by', 'is_approved', 'total_pages', 'language', 'tags', 'download_count', 'created_at', 'updated_at']
+    quiz_questions: 7 rows
+      columns: ['id', 'quiz_id', 'question_text', 'question_type', 'points', 'order', 'option_a', 'option_b', 'option_c', 'option_d', 'correct_answer', 'explanation']
+      sample: {'id': 1, 'quiz_id': 1, 'question_text': 'What is the value of x if 2x + 5 = 15?', 'question_type': 'multiple_choice', 'points': 10, 'order': None, 'option_a': '2', 'option_b': '5', 'option_c': '10', 'option_d': '15', 'correct_answer': 'B', 'explanation': 'Solving: 2x + 5 = 15 -> 2x = 10 -> x = 5'}
+      sample: {'id': 2, 'quiz_id': 1, 'question_text': 'Simplify: 3a + 2a - a', 'question_type': 'multiple_choice', 'points': 10, 'order': None, 'option_a': '4a', 'option_b': '5a', 'option_c': '6a', 'option_d': '2a', 'correct_answer': 'A', 'explanation': '3a + 2a - a = 5a - a = 4a'}
+      sample: {'id': 3, 'quiz_id': 1, 'question_text': 'Is -5 < -3? (True or False)', 'question_type': 'true_false', 'points': 10, 'order': None, 'option_a': 'True', 'option_b': 'False', 'option_c': None, 'option_d': None, 'correct_answer': 'True', 'explanation': 'On a number line, -5 is to the left of -3, so -5 < -3'}
+    quiz_answers: 0 rows
+      columns: ['id', 'quiz_id', 'question_id', 'user_id', 'student_answer', 'is_correct', 'points_earned', 'submitted_at']
+    student_points: 0 rows
+      columns: ['id', 'student_id', 'date_recorded', 'points', 'stars', 'vetos', 'notes', 'recorded_by', 'created_at', 'updated_at']
+    student_leaderboard: 0 rows
+      columns: ['id', 'student_id', 'year', 'month', 'total_points', 'total_stars', 'total_vetos', 'rank', 'days_active', 'last_updated']
+    monthly_points_summary: 0 rows
+      columns: ['id', 'student_id', 'date_month', 'year', 'month', 'summary_data', 'total_points', 'updated_at']
+    sqlite_stat1: 12 rows
+      columns: ['tbl', 'idx', 'stat']
+      sample: {'tbl': 'quiz_questions', 'idx': None, 'stat': '7'}
+      sample: {'tbl': 'student_profiles', 'idx': 'idx_student_profile_class', 'stat': '4 2'}
+      sample: {'tbl': 'student_profiles', 'idx': 'idx_student_profile_roll', 'stat': '4 4'}
+    offline_snapshot: 1 rows
+      columns: ['id', 'data_json', 'updated_at', 'student_count']
+      sample: {'id': 1, 'data_json': '{"_app_schema_version": 2, "appeals": [], "attendance": [{"created_at": "2026-02…', 'updated_at': '2026-02-28T22:07:24.967720+05:30', 'student_count': 92}
+    user_access_windows: 1 rows
+      columns: ['id', 'user_id', 'month_from', 'month_to', 'set_by', 'updated_at']
+      sample: {'id': 1, 'user_id': 2, 'month_from': '2026-01', 'month_to': '2026-03', 'set_by': 1, 'updated_at': '2026-03-03 05:38:59.571579'}
+    device_sessions: 2 rows
+      columns: ['id', 'user_id', 'login_id', 'role', 'device_id', 'device_name', 'os', 'browser', 'ip', 'last_seen', 'status']
+      sample: {'id': 1, 'user_id': 2, 'login_id': 'Teacher', 'role': 'teacher', 'device_id': None, 'device_name': 'Device / Browser', 'os': '', 'browser': '', 'ip': '192.168.0.201', 'last_seen': '2026-04-04 09:32:21.479607', 'status': 'offline'}
+      sample: {'id': 2, 'user_id': 1, 'login_id': 'Admin', 'role': 'admin', 'device_id': None, 'device_name': 'Device / Browser', 'os': '', 'browser': '', 'ip': '192.168.0.183', 'last_seen': '2026-04-03 16:20:55.693122', 'status': 'offline'}
+    account_actions: 0 rows
+      columns: ['id', 'target_user_id', 'action', 'reason', 'by_user_id', 'created_at']
+    join_codes: 0 rows
+      columns: ['id', 'code_hash', 'active', 'expires_at', 'created_by', 'created_at']
+    student_transfers: 0 rows
+      columns: ['id', 'from_student_id', 'to_student_id', 'transfer_type', 'amount', 'created_at', 'lock_until']
+    proposals: 0 rows
+      columns: ['id', 'title', 'body', 'scope', 'created_by', 'open_at', 'close_at', 'status', 'created_at', 'updated_at']
+    score_adjustment_actions: 0 rows
+      columns: ['id', 'actor_user_id', 'actor_login_id', 'actor_role', 'target_student_id', 'target_date', 'delta_points', 'mode', 'reason', 'created_at']
+    proposal_votes: 0 rows
+      columns: ['id', 'proposal_id', 'voter_user_id', 'choice', 'created_at']
+    proposal_messages: 0 rows
+      columns: ['id', 'proposal_id', 'user_id', 'login_id', 'role', 'message', 'created_at']
+
+======================================================================
+DONE.

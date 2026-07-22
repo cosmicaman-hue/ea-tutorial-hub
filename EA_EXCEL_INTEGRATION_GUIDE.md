@@ -24,7 +24,7 @@ Feb 2026 Sheet Structure:
 Column A: Roll No.         (EA24A01)
 Column B: Class            (4)
 Column C: Fees             (500)
-Column D: Student Name     (Ayush Gupta** (CR) (Vv))
+Column D: Student Name     (Ayush Gupta** (GR) (Vv))
 Column E: 2026-02-01       (Scores)
 Column F: 2026-02-02       (Scores)
 ... (up to ~30 columns for each day of month)
@@ -103,7 +103,7 @@ Workflow:
 | A | Roll Number | EA24A01 |
 | B | Class/Grade | 4 |
 | C | Fees | 500 |
-| D | Student Name | Ayush Gupta** (CR) |
+| D | Student Name | Ayush Gupta** (GR) |
 | E onwards | Daily Scores | 45, 30, 50, etc |
 
 ### Score Organization

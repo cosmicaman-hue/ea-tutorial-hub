@@ -3,9 +3,9 @@
 {% block title %}Register - EA Tutorial Hub{% endblock %}
 
 {% block content %}
-<div class="container mt-5">
+<div class="container mt-3 mt-md-5" style="max-width:480px">
     <div class="row justify-content-center">
-        <div class="col-md-6">
+        <div class="col-12 col-md-10">
             <div class="card shadow">
                 <div class="card-header bg-success text-white">
                     <h3 class="card-title mb-0">
@@ -17,24 +17,24 @@
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                         <div class="mb-3">
                             <label for="join_code" class="form-label">Join Code <span class="text-danger">*</span></label>
-                            <input type="text" class="form-control" id="join_code" name="join_code" placeholder="Get this from your Admin" required autocomplete="off">
+                            <input type="text" class="form-control" id="join_code" name="join_code" placeholder="Get this from your Admin" required autocomplete="off" style="font-size:16px">
                             <small class="form-text text-muted">Required to create an account. Ask your Admin for the code.</small>
                         </div>
                         <div class="mb-3">
                             <label for="login_id" class="form-label">Login ID (Roll Number)</label>
-                            <input type="text" class="form-control" id="login_id" name="login_id" placeholder="e.g., EA24A01" required>
-                            <small class="form-text text-muted">Format: EA + 2 digits (24+) + A/B/C/D/E/F/T/Z + 2 digits (01-99)</small>
+                            <input type="text" class="form-control" id="login_id" name="login_id" placeholder="e.g., EA24A01" required style="font-size:16px">
+                            <small class="form-text text-muted">Format: EA + 2 digits (24+) + A/B/C/D/E/F/G/H/T/Z + 2 digits (01-99)</small>
                         </div>
                         <div class="mb-3">
                             <label for="password" class="form-label">Password</label>
-                            <input type="password" class="form-control" id="password" name="password" minlength="6" required>
+                            <input type="password" class="form-control" id="password" name="password" minlength="6" required style="font-size:16px">
                             <small class="form-text text-muted">Minimum 6 characters</small>
                         </div>
                         <div class="mb-3">
                             <label for="confirm_password" class="form-label">Confirm Password</label>
-                            <input type="password" class="form-control" id="confirm_password" name="confirm_password" minlength="6" required>
+                            <input type="password" class="form-control" id="confirm_password" name="confirm_password" minlength="6" required style="font-size:16px">
                         </div>
-                        <button type="submit" class="btn btn-success w-100">
+                        <button type="submit" class="btn btn-success w-100" style="min-height:44px">
                             <i class="fas fa-user-plus"></i> Create Account
                         </button>
                     </form>

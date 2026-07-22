@@ -1,15 +1,15 @@
 import os
 import json
-import re
 import urllib.request
 import urllib.error
 import atexit
 from datetime import datetime
 from pathlib import Path
-from app import create_app, db
+from app import app, db
 from app.models import User, StudentProfile, ActivityLog
-
-app = create_app()
+from app.utils.data_paths import get_data_path
+from app.utils.file_operations import atomic_write_json
+from app.utils.sync_config import get_sync_peers, is_full_ledger_snapshot, resolve_sync_shared_key
 _SERVER_LOCK_FD = None
 
 
@@ -20,7 +20,7 @@ def _env_flag(name, default='0'):
 def create_startup_restore_point(flask_app, keep=200):
     """Write a startup restore snapshot of offline scoreboard data."""
     instance_dir = Path(flask_app.instance_path)
-    source = instance_dir / 'offline_scoreboard_data.json'
+    source = Path(get_data_path())
     if not source.exists():
         return
     restore_dir = instance_dir / 'startup_restore_points'
@@ -29,7 +29,7 @@ def create_startup_restore_point(flask_app, keep=200):
     target = restore_dir / f'offline_scoreboard_startup_{stamp}.json'
     try:
         data = json.loads(source.read_text(encoding='utf-8'))
-        target.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding='utf-8')
+        atomic_write_json(target, data, indent=2)
     except Exception:
         return
 
@@ -96,19 +96,6 @@ def acquire_single_instance_lock(flask_app):
     return True
 
 
-def _parse_sync_peers():
-    raw = os.getenv('SYNC_PEERS', '') or os.getenv('SYNC_PEER', '')
-    peers = []
-    for token in re.split(r'[,;\s]+', str(raw).strip()):
-        item = token.strip()
-        if not item:
-            continue
-        if not re.match(r'^https?://', item, re.I):
-            item = f'http://{item}'
-        peers.append(item.rstrip('/'))
-    return list(dict.fromkeys(peers))
-
-
 def _load_json_file(path_obj):
     try:
         return json.loads(path_obj.read_text(encoding='utf-8'))
@@ -136,12 +123,12 @@ def maybe_bootstrap_backup_from_master(flask_app):
     if str(os.getenv('EA_BACKUP_BOOTSTRAP', '1')).strip().lower() in ('0', 'false', 'no', 'off'):
         return
 
-    peers = _parse_sync_peers()
+    peers = get_sync_peers()
     if not peers:
         return
 
     instance_dir = Path(flask_app.instance_path)
-    local_path = instance_dir / 'offline_scoreboard_data.json'
+    local_path = Path(get_data_path())
     local_data = _load_json_file(local_path) if local_path.exists() else None
     local_count = _student_count(local_data)
     local_stamp = str((local_data or {}).get('server_updated_at') or (local_data or {}).get('updated_at') or '')
@@ -149,14 +136,23 @@ def maybe_bootstrap_backup_from_master(flask_app):
     best_remote = None
     best_stamp = ''
     best_count = 0
+    # Authenticate as a replication peer: unauthenticated GETs receive a
+    # sanitized recent-months view which must NEVER replace a full local ledger.
+    sync_key = resolve_sync_shared_key()
     for peer in peers:
         url = f'{peer}/scoreboard/offline-data'
         try:
-            req = urllib.request.Request(url, method='GET')
+            req = urllib.request.Request(url, method='GET', headers={
+                'X-EA-Replicated': '1',
+                'X-EA-Sync-Key': sync_key,
+            })
             with urllib.request.urlopen(req, timeout=4) as resp:
                 payload = json.loads(resp.read().decode('utf-8'))
             remote = payload.get('data', {}) if isinstance(payload, dict) else {}
             if not isinstance(remote, dict):
+                continue
+            # Hard safety: refuse sanitized/month-clipped payloads as bootstrap sources.
+            if not is_full_ledger_snapshot(remote):
                 continue
             remote_count = _student_count(remote)
             remote_stamp = str(payload.get('updated_at') or remote.get('server_updated_at') or remote.get('updated_at') or '')
@@ -192,7 +188,7 @@ def maybe_bootstrap_backup_from_master(flask_app):
         except Exception:
             pass
     try:
-        local_path.write_text(json.dumps(best_remote, ensure_ascii=False, indent=2), encoding='utf-8')
+        atomic_write_json(local_path, best_remote, indent=2)
     except Exception:
         return
 

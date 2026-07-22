@@ -1,0 +1,1198 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Excel Academy</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Arvo:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #faf8f3;
+            --surface: #ffffff;
+            --surface-2: #f4f0e8;
+            --text: #243447;
+            --muted: #5f6b7a;
+            --primary: #1a4d2e;
+            --secondary: #f7931e;
+            --accent: #c4314b;
+            --gold: #d4af37;
+            --line: rgba(36,52,71,.12);
+            --shadow: 0 14px 34px rgba(26, 77, 46, .10);
+        }
+        * { box-sizing: border-box; }
+        html { scroll-behavior: smooth; }
+        body {
+            margin: 0;
+            font-family: "Lora", Georgia, serif;
+            background:
+                radial-gradient(circle at top, rgba(26,77,46,.10), transparent 35%),
+                linear-gradient(180deg, #fdfbf7 0%, var(--bg) 100%);
+            color: var(--text);
+            overflow-x: hidden;
+        }
+        a { color: inherit; }
+        .site-header {
+            position: sticky;
+            top: 0;
+            z-index: 50;
+            backdrop-filter: blur(10px);
+            background: rgba(250,248,243,.88);
+            border-bottom: 1px solid var(--line);
+        }
+        .topbar {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 11px 16px;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            text-decoration: none;
+        }
+        .brand-mark {
+            width: 42px;
+            height: 42px;
+            border-radius: 12px;
+            display: grid;
+            place-items: center;
+            color: white;
+            background: linear-gradient(135deg, var(--primary), #0d2818);
+            box-shadow: var(--shadow);
+            font-size: 20px;
+        }
+        .brand-text strong {
+            display: block;
+            letter-spacing: 1px;
+            font-family: "Poppins", "Segoe UI", sans-serif;
+        }
+        .tabs {
+            border-top: 1px solid var(--line);
+            background: rgba(244,240,232,.72);
+            display: flex;
+            justify-content: center;
+        }
+        .tab-btn {
+            flex: 1;
+            max-width: 180px;
+            border: none;
+            border-bottom: 3px solid transparent;
+            background: transparent;
+            color: var(--muted);
+            padding: 11px 8px;
+            font-size: 14px;
+            font-family: "Poppins", "Segoe UI", sans-serif;
+            font-weight: 500;
+            cursor: pointer;
+            letter-spacing: .2px;
+            transition: color .2s ease, border-color .2s ease, background .2s ease;
+        }
+        .tab-btn::after { display: none; }
+        .tab-btn:hover {
+            color: var(--primary);
+            background: rgba(26,77,46,.05);
+        }
+        .tab-btn.active {
+            color: var(--primary);
+            font-weight: 700;
+            border-bottom: 3px solid var(--primary);
+            background: rgba(26,77,46,.04);
+        }
+        .page {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 22px 16px 40px;
+        }
+        .panel { display: none; }
+        .panel.active { display: block; }
+        .hero {
+            background: linear-gradient(135deg, var(--primary) 0%, #0d2818 100%);
+            color: white;
+            padding: 76px 22px;
+            text-align: center;
+            border-radius: 28px;
+            overflow: hidden;
+            position: relative;
+            box-shadow: var(--shadow);
+        }
+        .hero::before {
+            content: '';
+            position: absolute;
+            inset: -20%;
+            background:
+                radial-gradient(circle at 20% 50%, rgba(247,147,30,.12) 0%, transparent 40%),
+                radial-gradient(circle at 80% 80%, rgba(212,175,55,.12) 0%, transparent 40%);
+            pointer-events: none;
+        }
+        .hero-content { position: relative; z-index: 1; }
+        .logo {
+            margin: 0 0 12px;
+            font-size: clamp(2.2rem, 5vw, 4rem);
+            letter-spacing: 2px;
+            font-family: "Playfair Display", Georgia, serif;
+        }
+        .tagline {
+            margin: 0;
+            font-size: clamp(1rem, 2vw, 1.3rem);
+            color: rgba(255,255,255,.90);
+            font-family: "Poppins", "Segoe UI", sans-serif;
+        }
+        .section {
+            margin-top: 26px;
+            background: rgba(255,255,255,.82);
+            border: 1px solid var(--line);
+            border-radius: 24px;
+            padding: 28px;
+            box-shadow: var(--shadow);
+        }
+        .intro { text-align: center; }
+        .intro h2 {
+            margin: 0 0 14px;
+            color: var(--primary);
+            font-size: clamp(1.7rem, 4vw, 2.5rem);
+            font-family: "Playfair Display", Georgia, serif;
+        }
+        .intro p {
+            margin: 0 auto;
+            max-width: 860px;
+            line-height: 1.9;
+            color: var(--text);
+            font-size: 1.05rem;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 18px;
+        }
+        .card {
+            background: white;
+            border-radius: 18px;
+            padding: 22px;
+            border: 1px solid var(--line);
+            box-shadow: 0 8px 24px rgba(36,52,71,.06);
+            transition: transform .3s ease, box-shadow .3s ease, border-color .3s ease;
+        }
+        .card:hover {
+            transform: translateY(-6px);
+            box-shadow: 0 16px 34px rgba(36,52,71,.10);
+            border-color: rgba(247,147,30,.35);
+        }
+        .card h3, .card h4 { margin: 0 0 10px; color: var(--primary); }
+        .card p { margin: 0; color: var(--muted); line-height: 1.8; }
+        .feature-icon {
+            font-size: 2rem;
+            margin-bottom: 14px;
+            display: inline-block;
+            animation: floaty 4s ease-in-out infinite;
+        }
+        .highlight {
+            background: linear-gradient(135deg, var(--secondary) 0%, #e67e00 100%);
+            color: white;
+        }
+        .highlight h3, .highlight p { color: white; }
+        .values {
+            background: linear-gradient(135deg, rgba(26,77,46,.05), rgba(247,147,30,.06));
+        }
+        .cta {
+            text-align: center;
+            background: linear-gradient(135deg, var(--primary), #0d2818);
+            color: white;
+        }
+        .cta-button {
+            display: inline-block;
+            margin-top: 14px;
+            padding: 14px 26px;
+            border-radius: 999px;
+            text-decoration: none;
+            color: white;
+            background: var(--secondary);
+            box-shadow: 0 10px 24px rgba(247,147,30,.3);
+            transition: transform .2s ease, box-shadow .2s ease, background .2s ease;
+        }
+        .cta-button:hover {
+            transform: translateY(-2px);
+            background: var(--gold);
+            box-shadow: 0 14px 28px rgba(212,175,55,.35);
+        }
+        .panel-shell {
+            background: rgba(255,255,255,.80);
+            border: 1px solid var(--line);
+            border-radius: 24px;
+            box-shadow: var(--shadow);
+            overflow: hidden;
+        }
+        .login-gate {
+            text-align: center;
+            padding: 60px 24px;
+            max-width: 440px;
+            margin: 0 auto;
+        }
+        .login-gate-icon { font-size: 48px; margin-bottom: 16px; }
+        .login-gate h2 { color: var(--primary); margin: 0 0 8px; }
+        .login-gate p { margin: 4px 0; color: var(--text); }
+        body.dark .login-gate h2 { color: var(--primary); }
+        body.dark .login-gate p { color: var(--text); }
+        .controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+            padding: 16px;
+            background: rgba(244,240,232,.85);
+            border-bottom: 1px solid var(--line);
+        }
+        /* ── AUTH BAR (shown when logged in) ── */
+        .auth-bar {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 16px;
+            background: rgba(26,77,46,.06);
+            border-bottom: 1px solid var(--line);
+            font-size: 13px;
+            color: var(--muted);
+            font-family: "Poppins", "Segoe UI", sans-serif;
+        }
+        .auth-bar .auth-spacer { flex: 1; }
+        .auth-bar .logout-btn {
+            border: 1px solid var(--line);
+            border-radius: 999px;
+            padding: 6px 14px;
+            background: white;
+            color: var(--accent);
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: inherit;
+            transition: background .2s, color .2s;
+        }
+        .auth-bar .logout-btn:hover { background: var(--accent); color: white; }
+        body.dark .auth-bar { background: rgba(34,197,94,.06); }
+        body.dark .auth-bar .logout-btn { background: #111; color: var(--accent); border-color: rgba(255,255,255,.14); }
+        body.dark .auth-bar .logout-btn:hover { background: var(--accent); color: #000; }
+        /* ── LOGIN MODAL ── */
+        .login-modal-overlay {
+            position: fixed; inset: 0; z-index: 100;
+            background: rgba(10,20,30,.55);
+            backdrop-filter: blur(4px);
+            display: none;
+            align-items: center; justify-content: center;
+            padding: 20px;
+            animation: modalFade .2s ease;
+        }
+        .login-modal-overlay.open { display: flex; }
+        @keyframes modalFade { from { opacity: 0; } to { opacity: 1; } }
+        .login-modal {
+            background: var(--surface);
+            border: 1px solid var(--line);
+            border-radius: 20px;
+            box-shadow: 0 24px 60px rgba(0,0,0,.30);
+            width: 100%; max-width: 380px;
+            padding: 28px 26px 24px;
+            text-align: center;
+            animation: modalRise .25s ease;
+        }
+        @keyframes modalRise { from { transform: translateY(18px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        .login-modal-icon { font-size: 42px; margin-bottom: 10px; }
+        .login-modal h2 { margin: 0 0 4px; color: var(--primary); font-family: "Playfair Display", Georgia, serif; }
+        .login-modal p { margin: 0 0 18px; color: var(--muted); font-size: 13px; }
+        .login-modal label {
+            display: block; text-align: left;
+            font-size: 12px; font-weight: 600; color: var(--muted);
+            margin: 12px 0 4px; text-transform: uppercase; letter-spacing: .5px;
+            font-family: "Poppins", "Segoe UI", sans-serif;
+        }
+        .login-modal input {
+            width: 100%;
+            background: var(--surface-2);
+            color: var(--text);
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            padding: 11px 13px;
+            font-size: 15px;
+            transition: border-color .2s, box-shadow .2s;
+            font-family: inherit;
+        }
+        .login-modal input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(26,77,46,.12);
+        }
+        .login-modal-actions { display: flex; gap: 10px; margin-top: 20px; }
+        .login-modal-actions button {
+            flex: 1;
+            padding: 12px;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            border: 1px solid var(--line);
+            font-family: "Poppins", "Segoe UI", sans-serif;
+            transition: background .2s, color .2s, border-color .2s;
+        }
+        .login-modal .btn-cancel { background: var(--surface-2); color: var(--muted); }
+        .login-modal .btn-cancel:hover { background: var(--line); }
+        .login-modal .btn-submit {
+            background: var(--primary); color: white; border-color: transparent;
+        }
+        .login-modal .btn-submit:hover { background: #0d2818; }
+        .login-modal .btn-submit:disabled { opacity: .6; cursor: wait; }
+        .login-error {
+            color: var(--accent); font-size: 12px; margin-top: 12px;
+            min-height: 16px; font-family: "Poppins", "Segoe UI", sans-serif;
+        }
+        body.dark .login-modal { background: #0a0a0a; border-color: rgba(34,197,94,.18); box-shadow: 0 24px 60px rgba(0,0,0,.6); }
+        body.dark .login-modal h2 { color: var(--primary); }
+        body.dark .login-modal input { background: #111; border-color: rgba(255,255,255,.12); }
+        body.dark .login-modal .btn-cancel { background: #111; color: var(--muted); }
+        body.dark .login-modal .btn-submit { background: var(--primary); color: #000; }
+        body.dark .login-modal .btn-submit:hover { background: #16a34a; }
+        select, button {
+            background: white;
+            color: var(--text);
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            padding: 9px 12px;
+            font-size: 14px;
+        }
+        button { cursor: pointer; }
+        .meta { margin-left: auto; color: var(--muted); font-size: 12px; }
+        .scroll { overflow-x: visible; }
+        .scoreboard-table {
+            width: 100%;
+            table-layout: fixed;
+            border-collapse: collapse;
+            background: white;
+        }
+        .scoreboard-table th, .scoreboard-table td {
+            padding: 10px 12px;
+            border-bottom: 1px solid var(--line);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        th { text-align: left; color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .5px; }
+        td:last-child, th:last-child { text-align: right; }
+        .scoreboard-table { font-family: 'Rockwell', 'Rockwell Nova', 'Arvo', Georgia, serif; }
+        .rank { width: 36px; text-align: center; }
+        .col-roll { width: 16%; }
+        .col-name { width: 43%; }
+        .col-class { width: 12%; }
+        .col-total { width: 16%; }
+        td.col-total { font-size: 1.05em; font-weight: 700; }
+        td.col-name { font-size: 1.02em; font-weight: 500; }
+        .pos { color: #15803d; font-weight: 700; }
+        .neg { color: #b91c1c; font-weight: 700; }
+        .empty { text-align: center; color: var(--muted); padding: 30px; }
+        /* ── SCOREBOARD ROW GRADIENTS ── */
+        .sr-1 { background: linear-gradient(105deg,rgba(255,200,0,.34) 0%,rgba(255,235,100,.16) 50%,transparent 100%); }
+        .sr-1 td:first-child { border-left: 5px solid #f59e0b; }
+        .sr-1 td { font-weight: 600; }
+        .sr-1 td.col-total { color: #a16207 !important; text-shadow: 0 0 10px rgba(245,158,11,.22); }
+        .sr-2 { background: linear-gradient(105deg,rgba(148,163,184,.28) 0%,rgba(203,213,225,.12) 50%,transparent 100%); }
+        .sr-2 td:first-child { border-left: 5px solid #94a3b8; }
+        .sr-2 td { font-weight: 600; }
+        .sr-2 td.col-total { color: #475569 !important; }
+        .sr-3 { background: linear-gradient(105deg,rgba(194,108,0,.28) 0%,rgba(234,148,60,.11) 50%,transparent 100%); }
+        .sr-3 td:first-child { border-left: 5px solid #d97706; }
+        .sr-3 td { font-weight: 600; }
+        .sr-3 td.col-total { color: #92400e !important; }
+        .sr-b4 { background: linear-gradient(105deg,rgba(16,185,129,.18) 0%,rgba(52,211,153,.07) 55%,transparent 100%); }
+        .sr-b4 td:first-child { border-left: 4px solid #10b981; }
+        .sr-b5 { background: linear-gradient(105deg,rgba(6,182,212,.15) 0%,rgba(103,232,249,.05) 55%,transparent 100%); }
+        .sr-b5 td:first-child { border-left: 4px solid #06b6d4; }
+        .sr-b6 { background: linear-gradient(105deg,rgba(139,92,246,.14) 0%,rgba(167,139,250,.05) 55%,transparent 100%); }
+        .sr-b6 td:first-child { border-left: 3px solid #8b5cf6; }
+        .sr-b7 { background: linear-gradient(105deg,rgba(59,130,246,.11) 0%,rgba(147,197,253,.04) 55%,transparent 100%); }
+        .sr-b7 td:first-child { border-left: 2px solid rgba(59,130,246,.55); }
+        .sr-b8 { background: linear-gradient(105deg,rgba(100,116,139,.07) 0%,transparent 100%); }
+        .sr-b8 td:first-child { border-left: 1px solid rgba(100,116,139,.30); }
+        /* Rows 4-15 — same weight as base */
+        .sr-b4 td, .sr-b5 td, .sr-b6 td { font-weight: 500; }
+        .info-wrap { padding: 16px; display: grid; gap: 12px; }
+        .info-item {
+            border: 1px solid var(--line);
+            border-radius: 14px;
+            padding: 14px;
+            background: white;
+        }
+        .info-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 8px;
+        }
+        .chip {
+            background: var(--surface-2);
+            border: 1px solid var(--line);
+            border-radius: 999px;
+            color: var(--muted);
+            font-size: 11px;
+            padding: 4px 9px;
+        }
+        .info-boxes { display: grid; gap: 8px; margin-top: 8px; }
+        .info-box {
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            padding: 10px 12px;
+            background: #fbfaf7;
+        }
+        .info-attachment { margin-top: 10px; }
+        .info-attachment img {
+            max-width: 100%;
+            height: auto;
+            border: 1px solid var(--line);
+            border-radius: 8px;
+        }
+        .info-attachment a {
+            color: #0f766e;
+            text-decoration: none;
+            border-bottom: 1px dashed rgba(15,118,110,.45);
+        }
+        .info-table th, .info-table td { font-size: 13px; text-align: left; }
+        footer {
+            text-align: center;
+            color: var(--muted);
+            padding: 18px 16px 28px;
+        }
+        .panel {
+            opacity: 0;
+            transform: translateY(12px);
+            pointer-events: none;
+            transition: opacity .22s ease, transform .22s ease;
+        }
+        .panel.active {
+            opacity: 1;
+            transform: translateY(0);
+            pointer-events: auto;
+        }
+        .home-enter {
+            animation: homeRise .6s ease both;
+        }
+        @keyframes homeRise {
+            from { opacity: 0; transform: translateY(18px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes floaty {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-5px); }
+        }
+        @media (max-width: 900px) {
+            .scoreboard-table th, .scoreboard-table td {
+                padding: 8px 10px;
+                font-size: 13px;
+            }
+            .rank { width: 34px; }
+            .col-roll { width: 17%; }
+            .col-name { width: 40%; }
+            .col-class { width: 12%; }
+            .col-total { width: 14%; }
+        }
+        @media (max-width: 640px) {
+            .controls {
+                gap: 8px;
+                padding: 12px;
+            }
+            select, button {
+                padding: 8px 10px;
+                font-size: 13px;
+                border-radius: 9px;
+            }
+            .meta {
+                width: 100%;
+                margin-left: 0;
+                order: 10;
+            }
+            .scoreboard-table th, .scoreboard-table td {
+                padding: 7px 8px;
+                font-size: 12px;
+                letter-spacing: 0;
+            }
+            .rank { width: 30px; }
+            .col-roll { width: 17%; }
+            .col-name { width: 37%; }
+            .col-class { width: 12%; }
+            .col-total { width: 14%; }
+            .scoreboard-table th {
+                font-size: 11px;
+            }
+        }
+        @media (max-width: 420px) {
+            .page { padding-left: 10px; padding-right: 10px; }
+            .scoreboard-table th, .scoreboard-table td {
+                padding: 6px 5px;
+                font-size: 11px;
+            }
+            .rank { width: 26px; }
+            .col-roll { width: 16%; }
+            .col-name { width: 38%; }
+            .col-class { width: 11%; }
+            .col-total { width: 13%; }
+        }
+        .appear {
+            opacity: 0;
+            transform: translateY(20px);
+            transition: opacity .7s ease, transform .7s ease;
+        }
+        .appear.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        /* ── PLANNER VIEW STYLES ── */
+        .planner-container { margin: 16px 0; background: #fff; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; font-family: "Poppins", "Segoe UI", sans-serif; }
+        .planner-grid { width: 100%; border-collapse: collapse; table-layout: fixed; background: #fff; }
+        .planner-grid th, .planner-grid td { border: 1px solid var(--line); vertical-align: top; padding: 6px; position: relative; }
+        .planner-grid th { background: var(--surface-2); color: var(--primary); font-size: 11px; font-weight: 700; text-transform: uppercase; padding: 10px 4px; }
+        .planner-day-num { font-size: 11px; font-weight: 700; color: var(--secondary); display: block; margin-bottom: 2px; }
+        .planner-day-text { font-size: 12px; color: var(--text); line-height: 1.4; min-height: 48px; word-break: break-all; white-space: pre-wrap; font-family: "Lora", serif; }
+        
+        .planner-weekly-row { display: flex; border-bottom: 1px solid var(--line); background: #fff; }
+        .planner-weekly-row:last-child { border-bottom: none; }
+        .planner-weekly-label { width: 70px; background: var(--surface-2); display: flex; flex-direction: column; align-items: center; justify-content: center; border-right: 1px solid var(--line); padding: 12px; }
+        .planner-weekly-day { font-weight: 700; font-size: 14px; color: var(--primary); text-transform: uppercase; }
+        .planner-weekly-date { font-size: 10px; color: var(--muted); }
+        .planner-weekly-content { flex: 1; padding: 12px; }
+        .planner-time-block { margin-bottom: 8px; display: flex; align-items: flex-start; gap: 10px; }
+        .planner-time-tag { font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--muted); width: 45px; margin-top: 3px; border: 1px solid var(--line); border-radius: 4px; text-align: center; }
+        .planner-time-text { flex: 1; font-size: 14px; color: var(--text); line-height: 1.5; font-family: "Lora", serif; }
+        
+        .planner-meta { display: grid; grid-template-columns: 1fr 1fr; gap: 0; border-bottom: 1px solid var(--line); }
+        .planner-meta-card { background: var(--surface-2); padding: 12px; border-right: 1px solid var(--line); }
+        .planner-meta-card:last-child { border-right: none; }
+        .planner-meta-hdr { font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--accent); margin-bottom: 4px; display: flex; align-items: center; gap: 4px; }
+        .planner-meta-txt { font-size: 13px; color: var(--text); line-height: 1.5; white-space: pre-wrap; font-family: "Lora", serif; }
+        
+        @media (max-width: 768px) {
+            .planner-grid th { font-size: 9px; padding: 4px 2px; }
+            .planner-day-text { font-size: 11px; min-height: 36px; }
+            .planner-meta { grid-template-columns: 1fr; }
+            .planner-meta-card { border-right: none; border-bottom: 1px solid var(--line); }
+            .planner-meta-card:last-child { border-bottom: none; }
+        }
+
+        /* ── HEADER CONTROLS (ZOOM + THEME) ── */
+        .header-controls { margin-left: auto; display: flex; align-items: center; gap: 6px; }
+        .ctrl-btn {
+            width: 34px; height: 34px; border-radius: 50%;
+            border: 1px solid var(--line);
+            background: var(--surface); color: var(--text);
+            font-size: 15px; line-height: 1; cursor: pointer;
+            display: grid; place-items: center; padding: 0;
+            transition: background .2s, color .2s, border-color .2s, box-shadow .2s;
+            font-family: "Poppins", system-ui, sans-serif;
+        }
+        .ctrl-btn:hover { background: var(--primary); color: white; border-color: transparent; }
+        #themeToggle { font-size: 17px; }
+        .login-link {
+            width: auto !important; border-radius: 999px !important; padding: 0 16px !important;
+            font-size: 13px !important; font-weight: 600; gap: 5px; display: inline-flex !important;
+            align-items: center; text-decoration: none; background: var(--secondary); color: white;
+            border-color: transparent; box-shadow: 0 4px 12px rgba(247,147,30,.3);
+        }
+        .login-link:hover { background: var(--gold) !important; color: white !important; box-shadow: 0 6px 16px rgba(212,175,55,.4); }
+
+        /* ── AMOLED DARK THEME ── */
+        body.dark {
+            --bg: #000000; --surface: #0a0a0a; --surface-2: #111111;
+            --text: #f1f5f9; --muted: #94a3b8;
+            --primary: #22c55e; --secondary: #fb923c; --accent: #f43f5e;
+            --gold: #fbbf24; --line: rgba(255,255,255,.09);
+            --shadow: 0 14px 40px rgba(34,197,94,.10);
+            background: #000000;
+        }
+        body.dark .site-header {
+            background: rgba(0,0,0,.97);
+            border-bottom-color: rgba(34,197,94,.20);
+        }
+        body.dark .tabs {
+            background: #060606;
+            border-top-color: rgba(34,197,94,.14);
+        }
+        body.dark .tab-btn { background: transparent; border-color: transparent; color: var(--muted); }
+        body.dark .tab-btn:hover { background: rgba(34,197,94,.06); color: var(--primary); }
+        body.dark .tab-btn.active { background: rgba(34,197,94,.09); color: var(--primary); border-bottom-color: var(--primary); }
+        body.dark select,
+        body.dark button:not(.tab-btn):not(.ctrl-btn) {
+            background: #111; color: var(--text); border-color: rgba(255,255,255,.14);
+        }
+        body.dark .ctrl-btn { background: #111; border-color: rgba(255,255,255,.14); color: var(--text); }
+        body.dark .ctrl-btn:hover {
+            background: var(--primary); color: #000; border-color: transparent;
+            box-shadow: 0 0 16px rgba(34,197,94,.45);
+        }
+        body.dark .login-link { background: var(--secondary); color: white; }
+        body.dark .hero {
+            background: linear-gradient(135deg, #071a0e 0%, #000 100%);
+            border: 1px solid rgba(34,197,94,.18);
+            box-shadow: 0 0 60px rgba(34,197,94,.07);
+        }
+        body.dark .section { background: rgba(8,8,8,.96); border-color: rgba(255,255,255,.07); }
+        body.dark .card { background: #090909; border-color: rgba(255,255,255,.08); }
+        body.dark .card:hover { border-color: rgba(34,197,94,.40); box-shadow: 0 16px 40px rgba(34,197,94,.12); }
+        body.dark .highlight { background: linear-gradient(135deg, #7c2d00 0%, #431a00 100%); }
+        body.dark .cta { background: linear-gradient(135deg, #071a0e 0%, #000 100%); }
+        body.dark .panel-shell { background: #050505; border-color: rgba(34,197,94,.16); }
+        body.dark .controls { background: #0a0a0a; border-bottom-color: rgba(255,255,255,.07); }
+        body.dark .scoreboard-table { background: #000; }
+        body.dark .scoreboard-table th,
+        body.dark .scoreboard-table td { border-bottom-color: rgba(255,255,255,.06); }
+        body.dark .info-item { background: #080808; border-color: rgba(255,255,255,.08); }
+        body.dark .info-box { background: #040404; border-color: rgba(255,255,255,.07); }
+        body.dark .chip { background: #111; border-color: rgba(255,255,255,.11); }
+        body.dark footer { border-top: 1px solid rgba(255,255,255,.06); }
+        /* Dark row gradients — AMOLED neon glow */
+        body.dark .sr-1 { background: linear-gradient(105deg,rgba(251,191,36,.30) 0%,rgba(253,224,71,.10) 50%,transparent 100%); }
+        body.dark .sr-1 td.col-total { color: #fbbf24 !important; text-shadow: 0 0 20px rgba(251,191,36,.65); }
+        body.dark .sr-2 { background: linear-gradient(105deg,rgba(148,163,184,.22) 0%,rgba(226,232,240,.07) 50%,transparent 100%); }
+        body.dark .sr-2 td.col-total { color: #cbd5e1 !important; text-shadow: 0 0 14px rgba(203,213,225,.45); }
+        body.dark .sr-3 { background: linear-gradient(105deg,rgba(249,115,22,.26) 0%,rgba(251,146,60,.09) 50%,transparent 100%); }
+        body.dark .sr-3 td.col-total { color: #fb923c !important; text-shadow: 0 0 16px rgba(249,115,22,.55); }
+        body.dark .sr-b4 { background: linear-gradient(105deg,rgba(16,185,129,.24) 0%,rgba(52,211,153,.08) 55%,transparent 100%); }
+        body.dark .sr-b5 { background: linear-gradient(105deg,rgba(6,182,212,.20) 0%,rgba(34,211,238,.07) 55%,transparent 100%); }
+        body.dark .sr-b6 { background: linear-gradient(105deg,rgba(139,92,246,.20) 0%,rgba(196,181,253,.07) 55%,transparent 100%); }
+        body.dark .sr-b7 { background: linear-gradient(105deg,rgba(59,130,246,.17) 0%,rgba(147,197,253,.06) 55%,transparent 100%); }
+        body.dark .sr-b8 { background: linear-gradient(105deg,rgba(100,116,139,.11) 0%,transparent 100%); }
+        /* Dark planner */
+        body.dark .planner-container { background: #080808; border-color: rgba(255,255,255,.08); }
+        body.dark .planner-grid { background: #080808; }
+        body.dark .planner-grid th { background: #111; }
+        body.dark .planner-grid th, body.dark .planner-grid td { border-color: rgba(255,255,255,.07); }
+        body.dark .planner-weekly-row { background: #080808; border-bottom-color: rgba(255,255,255,.07); }
+        body.dark .planner-weekly-label { background: #111; border-right-color: rgba(255,255,255,.07); }
+        body.dark .planner-meta-card { background: #111; border-color: rgba(255,255,255,.07); }
+    </style>
+</head>
+<body>
+<script>(function(){if(localStorage.getItem('ea_theme')==='dark')document.body.classList.add('dark');})()</script>
+    <header class="site-header">
+        <div class="topbar">
+            <a class="brand" href="#home">
+                <div class="brand-mark">EA</div>
+                <div class="brand-text">
+                    <strong>EXCEL ACADEMY</strong>
+                </div>
+            </a>
+            <div class="header-controls">
+                <button id="headerLoginBtn" class="ctrl-btn login-link" type="button" title="Login to access scoreboard">🔐 Login</button>
+                <button id="zoomOut" class="ctrl-btn" type="button" title="Zoom out" aria-label="Zoom out">−</button>
+                <button id="zoomIn" class="ctrl-btn" type="button" title="Zoom in" aria-label="Zoom in">+</button>
+                <button id="themeToggle" class="ctrl-btn" type="button" title="Toggle theme" aria-label="Toggle dark mode">🌙</button>
+            </div>
+        </div>
+        <nav class="tabs" aria-label="Primary">
+            <button id="tabHome" class="tab-btn active" type="button">Home</button>
+            <button id="tabScoreboard" class="tab-btn" type="button">Scoreboard</button>
+            <button id="tabInfo" class="tab-btn" type="button">Information</button>
+        </nav>
+    </header>
+
+    <main class="page">
+        <section id="homePanel" class="panel active">
+            <div class="hero">
+                <div class="hero-content">
+                    <h1 class="logo">EXCEL ACADEMY</h1>
+                    <p class="tagline">Nurturing Tomorrow's Leaders Through Holistic Education</p>
+                </div>
+            </div>
+
+            <div class="section intro appear">
+                <h2>Beyond Academics</h2>
+                <p>
+                    At Excel Academy, we believe that true education transcends textbooks and examinations.
+                    Our holistic approach cultivates well-rounded individuals who excel not just academically,
+                    but also in character, leadership, critical thinking, and social responsibility.
+                </p>
+            </div>
+
+            <div class="section appear">
+                <div class="grid">
+                    <article class="card">
+                        <div class="feature-icon">🏆</div>
+                        <h3>Leadership Development</h3>
+                        <p>Students take on meaningful responsibilities that build accountability, teamwork, and decision-making skills.</p>
+                    </article>
+                    <article class="card">
+                        <div class="feature-icon">📚</div>
+                        <h3>Multi-Board Curriculum</h3>
+                        <p>We support CBSE, ICSE, and State Board learners with application-based learning and board exam preparation.</p>
+                    </article>
+                    <article class="card">
+                        <div class="feature-icon">💻</div>
+                        <h3>Technology-Powered Learning</h3>
+                        <p>From digital assessments to student database systems, we use technology to personalize education.</p>
+                    </article>
+                    <article class="card">
+                        <div class="feature-icon">⚽</div>
+                        <h3>Sports & Wellness</h3>
+                        <p>Weekly activities promote physical fitness, teamwork, discipline, and overall well-being.</p>
+                    </article>
+                    <article class="card">
+                        <div class="feature-icon">🗣️</div>
+                        <h3>Communication & Debate</h3>
+                        <p>Structured speaking activities help students develop confidence, clarity, and persuasive expression.</p>
+                    </article>
+                    <article class="card">
+                        <div class="feature-icon">📊</div>
+                        <h3>Progress Tracking</h3>
+                        <p>Our scoring framework supports regular evaluation, feedback, and healthy academic competition.</p>
+                    </article>
+                </div>
+            </div>
+
+            <div class="section highlight appear">
+                <h3>Our Educational Philosophy</h3>
+                <p>
+                    We go beyond rote memorization to cultivate critical thinkers and problem solvers.
+                    Students learn to understand concepts deeply, question intelligently, and apply knowledge creatively.
+                </p>
+            </div>
+
+            <div class="section values appear">
+                <h2 style="text-align:center; margin-top:0; color:var(--primary);">Our Core Values</h2>
+                <div class="grid">
+                    <div class="card"><div class="feature-icon">💡</div><h4>Innovation</h4><p>Creative teaching methods and technology.</p></div>
+                    <div class="card"><div class="feature-icon">🤝</div><h4>Integrity</h4><p>Honesty, ethics, and strong character.</p></div>
+                    <div class="card"><div class="feature-icon">🌍</div><h4>Responsibility</h4><p>Eco-consciousness and social awareness.</p></div>
+                    <div class="card"><div class="feature-icon">⭐</div><h4>Excellence</h4><p>High standards in everything we do.</p></div>
+                    <div class="card"><div class="feature-icon">❤️</div><h4>Compassion</h4><p>Empathy, kindness, and inclusivity.</p></div>
+                    <div class="card"><div class="feature-icon">🚀</div><h4>Growth Mindset</h4><p>Curiosity and lifelong learning.</p></div>
+                </div>
+            </div>
+
+            <div class="section card appear">
+                <div class="feature-icon">♻️</div>
+                <h3>Commitment to Sustainability</h3>
+                <p>
+                    Excel Academy is committed to environmental responsibility and eco-conscious practices that prepare students to be responsible global citizens.
+                </p>
+            </div>
+
+            <div class="section cta appear">
+                <h2 style="margin-top:0;">Join the Excel Academy Family</h2>
+                <p>Where Every Child's Potential Becomes Reality</p>
+                <a href="#scoreboardPanel" class="cta-button" id="goScoreboard">🔐 Login to View Scoreboard</a>
+            </div>
+        </section>
+
+        <section id="scoreboardPanel" class="panel panel-shell">
+            <div class="login-gate" id="scoreboardGate">
+                <div class="login-gate-icon">🔒</div>
+                <h2>Login Required</h2>
+                <p>The scoreboard is only available to logged-in users.</p>
+                <p style="font-size:0.85rem;color:var(--muted);margin-bottom:18px;">Please log in to view student scores and rankings.</p>
+                <button type="button" class="cta-button" id="scoreboardLoginLink">🔐 Login to View Scoreboard</button>
+            </div>
+            <div id="scoreboardContent" hidden>
+                <div class="auth-bar">
+                    <span id="scoreboardAuthUser"></span>
+                    <span class="auth-spacer"></span>
+                    <button type="button" class="logout-btn" data-logout>Logout</button>
+                </div>
+                <div class="controls">
+                    <label for="monthSelect">Month</label>
+                    <select id="monthSelect"></select>
+                    <span class="meta" id="scoreboardMeta"></span>
+                </div>
+                <div class="scroll">
+                    <table class="scoreboard-table">
+                        <thead>
+                            <tr>
+                                <th class="rank">#</th>
+                                <th class="col-roll">Roll</th>
+                                <th class="col-name">Name</th>
+                                <th class="col-class">Class</th>
+                                <th class="col-total">Total</th>
+                            </tr>
+                        </thead>
+                        <tbody id="scoreboardBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <section id="infoPanel" class="panel panel-shell">
+            <div class="login-gate" id="infoGate">
+                <div class="login-gate-icon">🔒</div>
+                <h2>Login Required</h2>
+                <p>Information is only available to logged-in users.</p>
+                <p style="font-size:0.85rem;color:var(--muted);margin-bottom:18px;">Please log in to view school information and announcements.</p>
+                <button type="button" class="cta-button" id="infoLoginLink">🔐 Login to View Information</button>
+            </div>
+            <div id="infoContent" hidden>
+                <div class="auth-bar">
+                    <span id="infoAuthUser"></span>
+                    <span class="auth-spacer"></span>
+                    <button type="button" class="logout-btn" data-logout>Logout</button>
+                </div>
+                <div class="info-wrap" id="infoBody"></div>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <div>© 2026 Excel Academy</div>
+        <div style="margin-top:6px;">Public site hosted on Cloudflare</div>
+    </footer>
+
+    <!-- ── LOGIN MODAL ── -->
+    <div class="login-modal-overlay" id="loginModal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="loginModalTitle">
+        <div class="login-modal">
+            <div class="login-modal-icon">🔐</div>
+            <h2 id="loginModalTitle">Login</h2>
+            <p>Enter your roll number and password to view the scoreboard.</p>
+            <form id="loginForm" autocomplete="off">
+                <label for="loginRoll">Roll No.</label>
+                <input type="text" id="loginRoll" placeholder="e.g. EA24B15" autocapitalize="characters" spellcheck="false" required>
+                <label for="loginPass">Password</label>
+                <input type="password" id="loginPass" placeholder="Password" required>
+                <div class="login-error" id="loginError"></div>
+                <div class="login-modal-actions">
+                    <button type="button" class="btn-cancel" id="loginCancel">Cancel</button>
+                    <button type="submit" class="btn-submit" id="loginSubmit">Login</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // ════════════════════════════════════════════════════════════
+        // CLIENT-SIDE LOGIN GATE (soft gate — see README.md)
+        // Credentials verified against ./credentials.json (salted SHA-256).
+        // On success the Scoreboard and Information tabs render from
+        // ./scores.json. No server / SPA routing required.
+        // ════════════════════════════════════════════════════════════
+        const AUTH_KEY = 'ea_public_auth';
+        const CREDENTIALS_URL = './credentials.json';
+        const SCORES_URL = './scores.json';
+
+        const tabHome = document.getElementById('tabHome');
+        const tabScoreboard = document.getElementById('tabScoreboard');
+        const tabInfo = document.getElementById('tabInfo');
+        const homePanel = document.getElementById('homePanel');
+        const scoreboardPanel = document.getElementById('scoreboardPanel');
+        const infoPanel = document.getElementById('infoPanel');
+
+        const loginModal = document.getElementById('loginModal');
+        const loginForm = document.getElementById('loginForm');
+        const loginRoll = document.getElementById('loginRoll');
+        const loginPass = document.getElementById('loginPass');
+        const loginError = document.getElementById('loginError');
+        const loginSubmit = document.getElementById('loginSubmit');
+        const headerLoginBtn = document.getElementById('headerLoginBtn');
+
+        let scoresData = null;        // cached scores.json payload
+        let credentialsCache = null;  // cached credentials.json payload
+        let activeTab = 'home';
+
+        // ── Auth state ──
+        function getAuth() {
+            try { return JSON.parse(localStorage.getItem(AUTH_KEY) || 'null'); } catch(e) { return null; }
+        }
+        function isLoggedIn() { return !!getAuth(); }
+
+        function setAuth(roll) {
+            try { localStorage.setItem(AUTH_KEY, JSON.stringify({ roll: roll, ts: Date.now() })); } catch(e) {}
+        }
+        function clearAuth() {
+            try { localStorage.removeItem(AUTH_KEY); } catch(e) {}
+        }
+
+        // SHA-256 of a UTF-8 string → hex. Matches scripts/generate_credentials.py.
+        async function sha256Hex(text) {
+            const buf = new TextEncoder().encode(text);
+            const digest = await crypto.subtle.digest('SHA-256', buf);
+            return Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
+        }
+
+        async function loadCredentials() {
+            if (credentialsCache) return credentialsCache;
+            const res = await fetch(CREDENTIALS_URL, { cache: 'no-store' });
+            if (!res.ok) throw new Error('credentials file unavailable');
+            credentialsCache = await res.json();
+            return credentialsCache;
+        }
+
+        async function loadScores() {
+            if (scoresData) return scoresData;
+            const res = await fetch(SCORES_URL, { cache: 'no-store' });
+            if (!res.ok) throw new Error('scoreboard data unavailable');
+            scoresData = await res.json();
+            return scoresData;
+        }
+
+        // ── Login modal ──
+        function openLoginModal() {
+            loginError.textContent = '';
+            loginForm.reset();
+            loginModal.classList.add('open');
+            loginModal.setAttribute('aria-hidden', 'false');
+            setTimeout(() => loginRoll.focus(), 50);
+        }
+        function closeLoginModal() {
+            loginModal.classList.remove('open');
+            loginModal.setAttribute('aria-hidden', 'true');
+        }
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            loginError.textContent = '';
+            loginSubmit.disabled = true;
+            const roll = loginRoll.value.trim().toUpperCase();
+            const pass = loginPass.value;
+            if (!roll || !pass) {
+                loginError.textContent = 'Please enter both roll number and password.';
+                loginSubmit.disabled = false;
+                return;
+            }
+            if (!window.crypto || !crypto.subtle) {
+                loginError.textContent = 'Login requires a secure context (https).';
+                loginSubmit.disabled = false;
+                return;
+            }
+            try {
+                const creds = await loadCredentials();
+                const list = (creds && creds.credentials) || [];
+                const entry = list.find(c => String(c.roll || '').toUpperCase() === roll);
+                if (!entry) {
+                    loginError.textContent = 'Invalid roll number or password.';
+                    loginSubmit.disabled = false;
+                    return;
+                }
+                const computed = await sha256Hex(entry.salt + pass);
+                if (computed.toLowerCase() !== String(entry.hash || '').toLowerCase()) {
+                    loginError.textContent = 'Invalid roll number or password.';
+                    loginSubmit.disabled = false;
+                    return;
+                }
+                setAuth(roll);
+                closeLoginModal();
+                loginSubmit.disabled = false;
+                applyAuthState();
+                // Open the panel the user was trying to reach
+                setActiveTab(activeTab === 'home' ? 'scoreboard' : activeTab);
+                if (activeTab === 'scoreboard') scoreboardPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            } catch (err) {
+                loginError.textContent = 'Login failed: ' + (err.message || 'unknown error');
+                loginSubmit.disabled = false;
+            }
+        });
+        document.getElementById('loginCancel').addEventListener('click', closeLoginModal);
+        loginModal.addEventListener('click', (e) => { if (e.target === loginModal) closeLoginModal(); });
+        document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && loginModal.classList.contains('open')) closeLoginModal(); });
+
+        // ── Logout ──
+        function logout() {
+            clearAuth();
+            applyAuthState();
+            setActiveTab('home');
+        }
+        headerLoginBtn.addEventListener('click', () => {
+            if (isLoggedIn()) { logout(); } else { openLoginModal(); }
+        });
+        document.querySelectorAll('[data-logout]').forEach(btn => btn.addEventListener('click', logout));
+
+        // ── Apply auth state to UI ──
+        function applyAuthState() {
+            const auth = getAuth();
+            const loggedIn = !!auth;
+            headerLoginBtn.textContent = loggedIn ? '🚪 Logout' : '🔐 Login';
+            headerLoginBtn.title = loggedIn ? 'Logout' : 'Login to access scoreboard';
+
+            const sbGate = document.getElementById('scoreboardGate');
+            const sbContent = document.getElementById('scoreboardContent');
+            const infoGate = document.getElementById('infoGate');
+            const infoContent = document.getElementById('infoContent');
+            sbGate.hidden = loggedIn;
+            sbContent.hidden = !loggedIn;
+            infoGate.hidden = loggedIn;
+            infoContent.hidden = !loggedIn;
+
+            if (loggedIn) {
+                document.getElementById('scoreboardAuthUser').textContent = 'Signed in: ' + auth.roll;
+                document.getElementById('infoAuthUser').textContent = 'Signed in: ' + auth.roll;
+                if (scoresData) { renderScoreboard(scoresData); renderInfo(scoresData); }
+            }
+        }
+
+        // ── Scoreboard rendering ──
+        function rankClass(rank) {
+            if (rank === 1) return 'sr-1';
+            if (rank === 2) return 'sr-2';
+            if (rank === 3) return 'sr-3';
+            if (rank === 4) return 'sr-b4';
+            if (rank === 5) return 'sr-b5';
+            if (rank === 6) return 'sr-b6';
+            if (rank === 7) return 'sr-b7';
+            return 'sr-b8';
+        }
+        function fmtTotal(total) {
+            const n = Number(total || 0);
+            const cls = n < 0 ? 'neg' : 'pos';
+            const sign = n > 0 ? '+' : '';
+            return '<td class="col-total ' + cls + '">' + sign + n + '</td>';
+        }
+        function escapeHtml(s) {
+            return String(s == null ? '' : s).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+        }
+        function renderScoreboardTable(month) {
+            const body = document.getElementById('scoreboardBody');
+            const rows = (scoresData && scoresData.scoreboard && scoresData.scoreboard[month]) || [];
+            if (!rows.length) {
+                body.innerHTML = '<tr><td colspan="5" class="empty">No scores for this month.</td></tr>';
+                return;
+            }
+            body.innerHTML = rows.map(r => {
+                const cls = rankClass(Number(r.rank) || 0);
+                const name = r.masked ? '<span style="color:var(--muted)">—</span>' : escapeHtml(r.name);
+                const klass = r.masked ? '' : escapeHtml(r.class);
+                return '<tr class="' + cls + '">'
+                    + '<td class="rank">' + escapeHtml(r.rank) + '</td>'
+                    + '<td class="col-roll">' + escapeHtml(r.roll) + '</td>'
+                    + '<td class="col-name">' + name + '</td>'
+                    + '<td class="col-class">' + klass + '</td>'
+                    + fmtTotal(r.total) + '</tr>';
+            }).join('');
+        }
+        function renderScoreboard(data) {
+            scoresData = data;
+            const months = (data && data.months) || [];
+            const sel = document.getElementById('monthSelect');
+            sel.innerHTML = months.map(m => '<option value="' + escapeHtml(m) + '">' + escapeHtml(m) + '</option>').join('');
+            const meta = document.getElementById('scoreboardMeta');
+            if (data && data.updated_at) {
+                const d = new Date(data.updated_at);
+                meta.textContent = 'Updated ' + (isNaN(d) ? data.updated_at : d.toLocaleString());
+            } else {
+                meta.textContent = '';
+            }
+            if (months.length) {
+                renderScoreboardTable(months[0]);
+                sel.onchange = () => renderScoreboardTable(sel.value);
+            } else {
+                document.getElementById('scoreboardBody').innerHTML = '<tr><td colspan="5" class="empty">No scoreboard data available.</td></tr>';
+            }
+        }
+
+        // ── Information rendering ──
+        function renderInfo(data) {
+            scoresData = data;
+            const wrap = document.getElementById('infoBody');
+            const items = (data && data.public_information) || [];
+            if (!items.length) {
+                wrap.innerHTML = '<div class="empty" style="padding:30px;text-align:center;color:var(--muted);">No information published yet.</div>';
+                return;
+            }
+            wrap.innerHTML = items.map(item => {
+                const chips = [];
+                if (item.category && item.category !== 'general') chips.push('<span class="chip">' + escapeHtml(item.category) + '</span>');
+                if (item.audience) chips.push('<span class="chip">' + escapeHtml(item.audience) + '</span>');
+                if (item.period_label) chips.push('<span class="chip">' + escapeHtml(item.period_label) + '</span>');
+                let body = '';
+                if (item.layout === 'table' && item.table_columns && item.table_columns.length) {
+                    const head = '<tr>' + item.table_columns.map(c => '<th>' + escapeHtml(c) + '</th>').join('') + '</tr>';
+                    const rows = (item.table_rows || []).map(row =>
+                        '<tr>' + row.map(cell => '<td>' + escapeHtml(cell) + '</td>').join('') + '</tr>'
+                    ).join('');
+                    body = '<div class="info-boxes"><div class="info-box"><table class="info-table"><thead>' + head + '</thead><tbody>' + rows + '</tbody></table></div></div>';
+                } else if (item.content) {
+                    body = '<div class="info-boxes"><div class="info-box">' + escapeHtml(item.content).replace(/\n/g, '<br>') + '</div></div>';
+                }
+                let attach = '';
+                if (item.attachment && item.attachment.data_url) {
+                    const a = item.attachment;
+                    if (a.mime && a.mime.indexOf('image/') === 0) {
+                        attach = '<div class="info-attachment"><img src="' + a.data_url + '" alt="' + escapeHtml(a.name || '') + '"></div>';
+                    } else if (a.mime === 'application/pdf') {
+                        attach = '<div class="info-attachment"><a href="' + a.data_url + '" target="_blank" rel="noopener">📄 ' + escapeHtml(a.name || 'View attachment') + '</a></div>';
+                    }
+                }
+                return '<div class="info-item">'
+                    + '<div class="info-head"><h4>' + escapeHtml(item.title || 'Information') + '</h4>' + (chips.length ? '<div>' + chips.join('') + '</div>' : '') + '</div>'
+                    + body + attach + '</div>';
+            }).join('');
+        }
+
+        // ── Tabs ──
+        function setActiveTab(tabKey) {
+            activeTab = tabKey;
+            const isHome = tabKey === 'home';
+            const isScoreboard = tabKey === 'scoreboard';
+            tabHome.classList.toggle('active', isHome);
+            tabScoreboard.classList.toggle('active', isScoreboard);
+            tabInfo.classList.toggle('active', tabKey === 'info');
+            homePanel.classList.toggle('active', isHome);
+            scoreboardPanel.classList.toggle('active', isScoreboard);
+            infoPanel.classList.toggle('active', tabKey === 'info');
+            if (isHome) {
+                document.querySelectorAll('.appear').forEach((el, idx) => {
+                    el.classList.remove('visible');
+                    requestAnimationFrame(() => setTimeout(() => el.classList.add('visible'), 60 + idx * 70));
+                });
+            }
+            // Preload data when an authenticated user opens a locked tab
+            if (isLoggedIn() && (isScoreboard || tabKey === 'info')) {
+                loadScores().then(d => { renderScoreboard(d); renderInfo(d); }).catch(() => {});
+            }
+        }
+        tabHome.addEventListener('click', () => setActiveTab('home'));
+        tabScoreboard.addEventListener('click', () => {
+            if (!isLoggedIn()) { openLoginModal(); return; }
+            setActiveTab('scoreboard');
+        });
+        tabInfo.addEventListener('click', () => {
+            if (!isLoggedIn()) { openLoginModal(); return; }
+            setActiveTab('info');
+        });
+        document.getElementById('goScoreboard').addEventListener('click', (e) => {
+            e.preventDefault();
+            if (!isLoggedIn()) { openLoginModal(); return; }
+            setActiveTab('scoreboard');
+            scoreboardPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
+        document.getElementById('scoreboardLoginLink').addEventListener('click', openLoginModal);
+        document.getElementById('infoLoginLink').addEventListener('click', openLoginModal);
+
+        // ── Init ──
+        setActiveTab('home');
+        applyAuthState();
+        requestAnimationFrame(() => {
+            document.querySelectorAll('.appear').forEach((el, idx) => {
+                setTimeout(() => el.classList.add('visible'), 120 + idx * 75);
+            });
+        });
+        // If already authenticated from a previous session, preload the data
+        if (isLoggedIn()) {
+            loadScores().then(d => { renderScoreboard(d); renderInfo(d); }).catch(() => {});
+        }
+
+        // ── ZOOM ──
+        let zoomLevel = parseFloat(localStorage.getItem('ea_zoom') || '1');
+        function applyZoom() {
+            document.querySelector('.page').style.zoom = zoomLevel;
+            localStorage.setItem('ea_zoom', String(zoomLevel));
+        }
+        document.getElementById('zoomIn').addEventListener('click', () => {
+            if (zoomLevel < 1.4) { zoomLevel = Math.round((zoomLevel + 0.1) * 10) / 10; applyZoom(); }
+        });
+        document.getElementById('zoomOut').addEventListener('click', () => {
+            if (zoomLevel > 0.6) { zoomLevel = Math.round((zoomLevel - 0.1) * 10) / 10; applyZoom(); }
+        });
+        applyZoom();
+
+        // ── DARK / LIGHT THEME ──
+        let isDark = localStorage.getItem('ea_theme') === 'dark';
+        const themeBtn = document.getElementById('themeToggle');
+        function applyTheme() {
+            document.body.classList.toggle('dark', isDark);
+            themeBtn.textContent = isDark ? '☀️' : '🌙';
+            localStorage.setItem('ea_theme', isDark ? 'dark' : 'light');
+        }
+        themeBtn.addEventListener('click', () => { isDark = !isDark; applyTheme(); });
+        applyTheme();
+    </script>
+</body>
+</html>

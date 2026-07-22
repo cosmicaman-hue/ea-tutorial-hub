@@ -8,13 +8,15 @@ import json
 from pathlib import Path
 from typing import Dict, Optional, Tuple
 from datetime import datetime
+from app.utils.data_paths import get_data_path
+import app.utils.score_balance as _score_balance
 
 
 class StarCalculator:
     """Unified star calculation with single formula"""
     
-    def __init__(self, data_path: Path = Path('instance/offline_scoreboard_data.json')):
-        self.data_path = data_path
+    def __init__(self, data_path: Optional[Path] = None):
+        self.data_path = Path(data_path) if data_path else Path(get_data_path())
         self.data = None
         self._load_data()
     
@@ -116,17 +118,13 @@ class StarCalculator:
     
     def calculate_available_stars(self, student_id: int, month_key: str) -> int:
         """
-        Calculate available stars using unified formula.
-        Formula: available = carry_in + awards - usage
+        Calculate available stars using the authoritative formula from score_balance.
+        Formula: available = max(carry + awards - used, global_stars)
         
-        This is the single source of truth for star calculations.
+        Delegates to score_balance.compute_star_balance() which is the single
+        source of truth shared with scoreboard.py routes.
         """
-        carry_in = self.get_student_carry_in_stars(student_id, month_key)
-        awards = self.get_student_month_awards(student_id, month_key)
-        usage = self.get_student_month_usage(student_id, month_key)
-        
-        available = carry_in + awards - usage
-        return max(0, available)
+        return _score_balance.compute_star_balance(self.data, student_id, month_key)
     
     def validate_star_entry(self, student_id: int, stars: int, month_key: str) -> Tuple[bool, str]:
         """
@@ -157,12 +155,8 @@ class StarCalculator:
     def get_star_bonus(self, student_id: int, date: str, month_key: str) -> int:
         """
         Calculate star bonus for normal star usage.
-        Bonus: +100 per normal star use if day's score >= -50
-        
-        Rules:
-        - Only applies to normal usage (not disciplinary)
-        - Only if day's score >= -50
-        - +100 per normal star use
+        Bonus: +100 per normal star use if day's score > -50 (applies from Feb 2026 onwards).
+        Normal usage also erases negative day scores (handled in scoreboard calc).
         """
         try:
             # Find the score for this date
@@ -185,19 +179,16 @@ class StarCalculator:
                 # Get normal usage (not disciplinary, not transfer)
                 star_delta = int(score.get('stars', 0))
                 if star_delta < 0:
-                    # Check if this is normal usage
                     normal = int(score.get('star_usage_normal', 0))
-                    disciplinary = int(score.get('star_usage_disciplinary', 0))
                     is_transfer = score.get('star_transfer_out') or score.get('star_transfer_in')
                     
-                    # Only count as normal usage if not disciplinary and not transfer
-                    if normal > 0 and disciplinary == 0 and not is_transfer:
+                    if normal > 0 and not is_transfer:
                         normal_usage = normal
                 
                 break
             
-            # Calculate bonus
-            if day_score >= -50 and normal_usage > 0:
+            # Calculate bonus — only for scores > -50 (positives and mild negatives)
+            if day_score > -50 and normal_usage > 0:
                 return 100 * normal_usage
             
             return 0
@@ -220,7 +211,7 @@ class StarCalculator:
             'awards': awards,
             'usage': usage,
             'available': available,
-            'formula': f"{carry_in} + {awards} - {usage} = {available}"
+            'formula': f"max({carry_in} + {awards} - {usage}, global_stars) = {available}"
         }
     
     def _find_student(self, student_id: int) -> Optional[Dict]:

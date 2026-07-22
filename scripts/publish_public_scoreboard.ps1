@@ -45,8 +45,12 @@ $paths = @(
     "$siteRel\index.html",
     "$siteRel\README.md",
     "$siteRel\_headers",
-    "$siteRel\scores.json"
+    "$siteRel\scores.json",
+    "$siteRel\offline_scoreboard.html",
+    "$siteRel\static\css\offline-scoreboard.css"
 )
+# Filter to only paths that exist
+$paths = $paths | Where-Object { Test-Path -LiteralPath (Join-Path $repoRoot $_) }
 
 git -C $repoRoot add -- $paths
 git -C $repoRoot diff --cached --quiet -- $paths

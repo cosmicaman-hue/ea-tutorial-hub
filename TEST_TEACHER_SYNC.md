@@ -276,7 +276,7 @@ console.log(window.syncEventSource.readyState); // 0=connecting, 1=open
 - Resource requests (team)
 - Notification history
 - Election teacher votes
-- Pending CR requests
+- Pending GR requests
 
 ### Teacher Cannot Modify (Protected)
 - Student roster (via direct scores)

@@ -3,9 +3,9 @@
 {% block title %}Login - EA Tutorial Hub{% endblock %}
 
 {% block content %}
-<div class="container mt-5">
+<div class="container mt-3 mt-md-5" style="max-width:480px">
     <div class="row justify-content-center">
-        <div class="col-md-6">
+        <div class="col-12 col-md-10">
             <div class="card shadow">
                 <div class="card-header bg-primary text-white">
                     <h3 class="card-title mb-0">
@@ -13,21 +13,25 @@
                     </h3>
                 </div>
                 <div class="card-body">
-                    <form method="POST" action="{{ url_for('auth.login') }}">
+                    <form method="POST" action="{{ url_for('auth.login') }}" id="loginForm">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                         {% if request.args.get('next') %}
                         <input type="hidden" name="next" value="{{ request.args.get('next') }}">
                         {% endif %}
+                        <input type="hidden" name="device_id" id="device_id_field" value="">
+                        <input type="hidden" name="device_name" id="device_name_field" value="">
+                        <input type="hidden" name="device_os" id="device_os_field" value="">
+                        <input type="hidden" name="device_browser" id="device_browser_field" value="">
                         <div class="mb-3">
                             <label for="login_id" class="form-label">Login ID</label>
-                            <input type="text" class="form-control" id="login_id" name="login_id" placeholder="e.g., EA24A01" required>
-                            <small class="form-text text-muted">Format: EA + 2 digits (24+) + A/B/C/D/E/F/T/Z + 2 digits (01-99)</small>
+                            <input type="text" class="form-control" id="login_id" name="login_id" placeholder="e.g., EA24A01" required style="font-size:16px">
+                            <small class="form-text text-muted">Format: EA + 2 digits (24+) + A/B/C/D/E/F/G/H/T/Z + 2 digits (01-99)</small>
                         </div>
                         <div class="mb-3">
                             <label for="password" class="form-label">Password</label>
-                            <input type="password" class="form-control" id="password" name="password" required>
+                            <input type="password" class="form-control" id="password" name="password" required style="font-size:16px">
                         </div>
-                        <button type="submit" class="btn btn-primary w-100">
+                        <button type="submit" class="btn btn-primary w-100" style="min-height:44px">
                             <i class="fas fa-sign-in-alt"></i> Login
                         </button>
                     </form>
@@ -39,4 +43,55 @@
         </div>
     </div>
 </div>
+<script>
+(function() {
+    var form = document.getElementById('loginForm');
+    if (!form) return;
+    function getOrCreateUUID() {
+        var key = 'ea_device_uuid';
+        var id = localStorage.getItem(key);
+        if (!id) {
+            id = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                var r = Math.random() * 16 | 0;
+                return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+            });
+            localStorage.setItem(key, id);
+        }
+        return id;
+    }
+    function parseDeviceInfo() {
+        var ua = navigator.userAgent || '';
+        var os = 'Unknown';
+        if (/Windows NT/.test(ua)) os = 'Windows';
+        else if (/Android/.test(ua)) os = 'Android';
+        else if (/iPhone|iPad|iPod/.test(ua)) os = 'iOS';
+        else if (/Mac OS X/.test(ua)) os = 'macOS';
+        else if (/Linux/.test(ua)) os = 'Linux';
+        var browser = 'Unknown';
+        if (/Edg\//.test(ua)) browser = 'Edge';
+        else if (/OPR\//.test(ua)) browser = 'Opera';
+        else if (/Chrome\//.test(ua)) browser = 'Chrome';
+        else if (/Firefox\//.test(ua)) browser = 'Firefox';
+        else if (/Safari\//.test(ua)) browser = 'Safari';
+        var deviceName = 'Unknown Device';
+        if (/iPhone/.test(ua)) deviceName = 'iPhone';
+        else if (/iPad/.test(ua)) deviceName = 'iPad';
+        else if (/Android/.test(ua)) {
+            var m = ua.match(/;\s*([^;()]+)\sBuild\//);
+            deviceName = m ? m[1].trim() : 'Android Device';
+        }
+        else if (/Windows/.test(ua)) deviceName = 'Windows PC';
+        else if (/Mac OS X/.test(ua)) deviceName = 'Mac';
+        else if (/Linux/.test(ua)) deviceName = 'Linux PC';
+        return { os: os, browser: browser, deviceName: deviceName };
+    }
+    form.addEventListener('submit', function() {
+        var info = parseDeviceInfo();
+        document.getElementById('device_id_field').value = getOrCreateUUID();
+        document.getElementById('device_name_field').value = info.deviceName;
+        document.getElementById('device_os_field').value = info.os;
+        document.getElementById('device_browser_field').value = info.browser;
+    });
+})();
+</script>
 {% endblock %}

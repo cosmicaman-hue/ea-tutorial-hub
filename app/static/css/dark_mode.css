@@ -1,4 +1,16 @@
 
+/* ── Global: option elements in dark mode (Windows/Chrome fix) ── */
+body:not(.light-mode) select option,
+body:not(.light-mode) optgroup {
+    background-color: #374151;
+    color: #f9fafb;
+}
+body:not(.light-mode) select option:checked,
+body:not(.light-mode) select option:hover {
+    background-color: #4b5563;
+    color: #fff;
+}
+
 /* ── Dark mode: filter section (default = dark, no class set) ── */
 body:not(.light-mode) .filter-section {
     background: #1f2937;
@@ -183,12 +195,12 @@ body.light-mode {
                                                         background: rgba(14,165,233,0.10) !important;
                                                         border-color: rgba(14,165,233,0.28) !important; }
         body.light-mode #scoreboardTable .post-holder-name { color: #92400e !important; text-shadow: none !important; }
-        body.light-mode .meta-star        { color: #92400e !important;
-                                            background: linear-gradient(135deg, rgba(250,204,21,0.22), rgba(245,158,11,0.30)) !important;
-                                            border-color: rgba(245,158,11,0.40) !important; }
-        body.light-mode .meta-veto        { color: #991b1b !important;
-                                            background: linear-gradient(135deg, rgba(248,113,113,0.15), rgba(239,68,68,0.25)) !important;
-                                            border-color: rgba(239,68,68,0.35) !important; }
+        body.light-mode .meta-star        { color: #7f1d1d !important;
+                                            background: linear-gradient(135deg, rgba(185,28,28,0.12), rgba(185,28,28,0.24)) !important;
+                                            border-color: rgba(248,113,113,0.40) !important; }
+        body.light-mode .meta-veto        { color: #1e3a8a !important;
+                                            background: linear-gradient(135deg, rgba(30,58,138,0.10), rgba(30,58,138,0.22)) !important;
+                                            border-color: rgba(96,165,250,0.40) !important; }
         body.light-mode .designation-chip { color: #1e40af !important;
                                             background: linear-gradient(135deg, rgba(96,165,250,0.18), rgba(99,102,241,0.25)) !important;
                                             border-color: rgba(96,165,250,0.38) !important; }
@@ -277,39 +289,51 @@ body.light-mode {
         body.light-mode .scoreboard-scroll { background-color: #f5f0e8 !important; }
         body.light-mode .scoreboard-scroll-top { background: rgba(232,224,210,0.7); border-color: rgba(180,160,135,0.22); }
 
-        /* ── General modal & card text: inherit dark text so near-white hardcodes are overridden ── */
-        body.light-mode .modal-content { color: #0f172a; background: var(--bg-elevated); }
+            /* ── General modal & card text: inherit dark text so near-white hardcodes are overridden ── */
+            body.light-mode .modal-content { color: #0f172a; background: var(--bg-elevated); }
 
-        /* ── Record Score badges in light mode — near-white text → dark on cream bg ── */
-        body.light-mode .stored-score-badge {
-            background: linear-gradient(135deg, rgba(22,163,74,0.18), rgba(22,163,74,0.30)) !important;
-            color: #14532d !important;
-            border-color: rgba(22,163,74,0.55) !important;
-            box-shadow: 0 0 6px rgba(22,163,74,0.20) !important;
-        }
-        body.light-mode .stored-star-badge {
-            background: linear-gradient(135deg, rgba(202,138,4,0.18), rgba(202,138,4,0.30)) !important;
-            color: #78350f !important;
-            border-color: rgba(202,138,4,0.55) !important;
-            box-shadow: 0 0 6px rgba(202,138,4,0.20) !important;
-        }
-        body.light-mode .stored-veto-badge {
-            background: linear-gradient(135deg, rgba(37,99,235,0.14), rgba(37,99,235,0.24)) !important;
-            color: #1e3a8a !important;
-            border-color: rgba(37,99,235,0.45) !important;
-            box-shadow: 0 0 6px rgba(37,99,235,0.18) !important;
-        }
-        body.light-mode #recordStudentsTable .score-cell.positive {
-            color: #15803d !important;
-            text-shadow: 0 1px 4px rgba(21,128,61,0.18) !important;
-        }
-        body.light-mode #recordStudentsTable .score-cell.negative {
-            text-shadow: 0 1px 4px rgba(185,28,28,0.18) !important;
-        }
+            /* ── Record Score badges in light mode — near-white text → dark on cream bg ── */
+            body.light-mode .stored-score-badge {
+                background: linear-gradient(135deg, rgba(124,29,130,0.14), rgba(124,29,130,0.26)) !important;
+                color: #4a0e4e !important;
+                border-color: rgba(124,29,130,0.50) !important;
+                box-shadow: 0 0 6px rgba(124,29,130,0.18) !important;
+            }
+            body.light-mode .stored-star-badge {
+                background: linear-gradient(135deg, rgba(185,28,28,0.14), rgba(185,28,28,0.26)) !important;
+                color: #7f1d1d !important;
+                border-color: rgba(185,28,28,0.50) !important;
+                box-shadow: 0 0 6px rgba(185,28,28,0.18) !important;
+            }
+            body.light-mode .stored-veto-badge {
+                background: linear-gradient(135deg, rgba(30,58,138,0.12), rgba(30,58,138,0.22)) !important;
+                color: #0f172a !important;
+                border-color: rgba(30,58,138,0.45) !important;
+                box-shadow: 0 0 6px rgba(30,58,138,0.15) !important;
+            }
+            body.light-mode #recordStudentsTable .score-cell.positive {
+                color: #15803d !important;
+                text-shadow: 0 1px 4px rgba(21,128,61,0.18) !important;
+            }
+            body.light-mode #recordStudentsTable .score-cell.negative {
+                text-shadow: 0 1px 4px rgba(185,28,28,0.18) !important;
+            }
 
-        /* ── Attendance table status row text (near-white on transparent bg = invisible) ── */
-        body.light-mode #attendanceTable tbody tr.attendance-status-present td { color: #14532d !important; }
-        body.light-mode #attendanceTable tbody tr.attendance-status-absent  td { color: #7f1d1d !important; }
+            /* Points transfer emoji light-mode overrides */
+            body.light-mode .pts-transfer-emoji.pts-transfer-in {
+                color: #1d4ed8 !important;
+                filter: drop-shadow(0 0 2px rgba(29,78,216,0.3)) !important;
+            }
+            body.light-mode .pts-transfer-emoji.pts-transfer-out {
+                color: #c2410c !important;
+                filter: drop-shadow(0 0 2px rgba(194,65,12,0.3)) !important;
+            }
+            body.light-mode .score-cell.pts-transfer-in {
+                box-shadow: inset 2px 0 0 rgba(29,78,216,0.5) !important;
+            }
+            body.light-mode .score-cell.pts-transfer-out {
+                box-shadow: inset -2px 0 0 rgba(194,65,12,0.5) !important;
+            }
         body.light-mode #attendanceTable tbody tr.attendance-status-leave   td { color: #78350f !important; }
         body.light-mode #attendanceTable tbody tr.attendance-status-late    td { color: #064e3b !important; }
         body.light-mode #attendanceTable tbody tr.attendance-status-present select,
@@ -364,6 +388,17 @@ body.light-mode {
         body.light-mode .rule-icon-btn.rework      { color: #c2410c !important; }
         body.light-mode .rule-icon-btn.comment     { color: #7c3aed !important; }
         body.light-mode .rule-icon-btn.delete      { color: #dc2626 !important; border-color: rgba(220,38,38,0.4) !important; }
+        body.light-mode .rules-detail-head          { background: linear-gradient(135deg, #f0f9ff, #eff6ff) !important; border-color: rgba(37,99,235,0.22) !important; }
+        body.light-mode .rules-detail-head h3       { color: #0f172a !important; }
+        body.light-mode .rules-table-wrap           { border-color: rgba(100,116,139,0.22) !important; }
+        body.light-mode .rules-table thead th       { background: rgba(241,245,249,0.95) !important; color: #1e293b !important; border-color: rgba(100,116,139,0.22) !important; }
+        body.light-mode .rules-table tbody td       { color: #374151 !important; border-color: rgba(100,116,139,0.12) !important; }
+        body.light-mode .rule-tr-repealed           { opacity: 0.5; }
+        body.light-mode .rule-tr-review             { background: rgba(245,158,11,0.06) !important; }
+        body.light-mode .rule-votes                 { background: rgba(241,245,249,0.9) !important; color: #374151 !important; border-color: rgba(100,116,139,0.2) !important; }
+        body.light-mode .rule-comments-wrap         { background: linear-gradient(145deg, #ffffff, #f1f5f9) !important; border-color: rgba(100,116,139,0.18) !important; }
+        body.light-mode .rule-comment               { background: rgba(241,245,249,0.8) !important; border-color: rgba(100,116,139,0.15) !important; color: #374151 !important; }
+        body.light-mode .rules-empty-state          { color: #64748b !important; }
 
         /* ── Vote / result modal ── */
         body.light-mode .result-modal-content      { background: linear-gradient(135deg, #f0f9ff, #eff6ff) !important; border-color: rgba(37,99,235,0.25) !important; }
@@ -375,5 +410,266 @@ body.light-mode {
         /* ── Stat cards (Students tab top summary) ── */
         body.light-mode .stat-card                 { background: linear-gradient(145deg, rgba(37,99,235,0.12), rgba(16,185,129,0.10)) !important; border: 1px solid rgba(37,99,235,0.22) !important; box-shadow: 0 4px 14px rgba(0,0,0,0.08) !important; color: #0f172a !important; }
         body.light-mode .stat-card h4              { color: #475569 !important; opacity: 1 !important; }
-        body.light-mode .stat-card .value          { color: #1e3a5f !important; }
-        body.light-mode .stat-card .top-scorer-name { color: #92400e !important; text-shadow: none !important; }
+
+/* ═══════════════════════════════════════════════════════════════
+   NOTEBOOKS CHECK MODULE — Dark mode overrides
+   Dark mode is the DEFAULT (body without .light-mode class)
+   Selectors match the actual HTML classes in notebook/index.html.
+   ═══════════════════════════════════════════════════════════════ */
+
+body:not(.light-mode) .nb-page h1 { color: #a5b4fc; }
+body:not(.light-mode) .nb-page h3 { color: #a5b4fc; }
+
+/* Outer tab nav */
+body:not(.light-mode) .nb-tabs { border-color: #374151; }
+body:not(.light-mode) .nb-tab { color: #d1d5db; }
+body:not(.light-mode) .nb-tab:hover { background: #1f2937; color: #e5e7eb; }
+body:not(.light-mode) .nb-tab.active { color: #667eea; border-bottom-color: #667eea; }
+
+/* Type pills */
+body:not(.light-mode) .type-pill { background: #1f2937; color: #a5b4fc; border-color: #667eea; }
+body:not(.light-mode) .type-pill.active { background: #667eea; color: #fff; }
+body:not(.light-mode) .type-pill:hover:not(.active) { background: #374151; }
+
+/* Selector dropdowns & date input */
+body:not(.light-mode) .selector-row label { color: #9ca3af; }
+body:not(.light-mode) .selector-row select,
+body:not(.light-mode) .selector-row input[type="date"] {
+    background: #374151; color: #f9fafb; border-color: #4b5563;
+}
+body:not(.light-mode) .selector-row select:focus,
+body:not(.light-mode) .selector-row input[type="date"]:focus { border-color: #667eea; }
+
+/* Subject table — dark backgrounds on td cells (robust against display:flex on tr) */
+body:not(.light-mode) .nb-table { background: #1a2230; box-shadow: 0 2px 10px rgba(0,0,0,.35); }
+body:not(.light-mode) .nb-table tbody tr.subject-row td {
+    background: #1a2230 !important;
+    color: #e2e8f0 !important;
+}
+body:not(.light-mode) .nb-table tbody tr.subject-row:nth-child(even) td {
+    background: #18222f !important;
+}
+body:not(.light-mode) .nb-table tbody tr.subject-row:hover td {
+    background: #1e2d3f !important;
+}
+body:not(.light-mode) .nb-table td:first-child { color: #f3f4f6 !important; }
+
+/* Grade select dropdown */
+body:not(.light-mode) .grade-select {
+    background: #374151; color: #f9fafb; border-color: #4b5563;
+}
+body:not(.light-mode) .grade-select:focus { border-color: #667eea; }
+body:not(.light-mode) .grade-select:disabled { background: #1a2230; color: #4b5563; }
+
+/* Remarks input */
+body:not(.light-mode) .remarks-input {
+    background: #374151; color: #f9fafb; border-color: #4b5563;
+}
+body:not(.light-mode) .remarks-input:focus { border-color: #667eea; }
+
+/* Points badge */
+body:not(.light-mode) .pts-badge { background: #2d3748; color: #d1d5db; border-color: #4b5563; }
+body:not(.light-mode) .pts-positive { color: #4ade80; }
+body:not(.light-mode) .pts-negative { color: #f87171; }
+body:not(.light-mode) .pts-neutral { color: #9ca3af; }
+
+/* Totals bar */
+body:not(.light-mode) .totals-bar { background: #1a2230; border-color: #374151; }
+body:not(.light-mode) .totals-bar .label { color: #9ca3af; }
+body:not(.light-mode) .totals-bar .pts-display { color: #f3f4f6; }
+body:not(.light-mode) .totals-bar .checked-display { color: #9ca3af; }
+body:not(.light-mode) .cap-warning { color: #fbbf24 !important; }
+body:not(.light-mode) .limit-hint { color: #6b7280 !important; }
+
+/* Completed all bar */
+body:not(.light-mode) .all-completed-bar {
+    background: #1f2937; border-color: #374151; color: #d1d5db;
+}
+body:not(.light-mode) .all-completed-bar label { color: #a5b4fc; }
+body:not(.light-mode) .all-completed-bar small { color: #6b7280; }
+body:not(.light-mode) .all-completed-bar input[type="checkbox"] { accent-color: #667eea; }
+
+/* Consolidated remarks */
+body:not(.light-mode) .consol-section label { color: #d1d5db; }
+body:not(.light-mode) .consol-textarea {
+    background: #374151; color: #f9fafb; border-color: #4b5563;
+}
+body:not(.light-mode) .consol-textarea:focus { border-color: #667eea; }
+
+/* Save button */
+body:not(.light-mode) .btn-save-nb { background: linear-gradient(135deg, #667eea, #764ba2); }
+body:not(.light-mode) .btn-save-nb:disabled { opacity: .4; }
+
+/* Next student button */
+body:not(.light-mode) .nb-btn-next {
+    background: #1f2937; color: #a5b4fc; border-color: #4b5563;
+}
+body:not(.light-mode) .nb-btn-next:hover:not(:disabled) {
+    background: #374151; border-color: #667eea; color: #c7d2fe;
+}
+
+/* Last check indicator */
+body:not(.light-mode) .nb-last-check {
+    background: #1f2937; border-color: #374151; color: #d1d5db;
+}
+body:not(.light-mode) .nb-last-check .lc-label { color: #6b7280; }
+body:not(.light-mode) .nb-last-check .lc-date { color: #a5b4fc; }
+
+/* Exempt row */
+body:not(.light-mode) .nb-table tr.exempt-row td { background: #111827 !important; color: #4b5563; }
+body:not(.light-mode) .exempt-label { background: #374151 !important; color: #9ca3af !important; }
+body:not(.light-mode) .btn-exempt-sub { border-color: #4b5563; color: #9ca3af; }
+body:not(.light-mode) .btn-exempt-sub:hover { background: #374151; color: #f87171; border-color: #f87171; }
+body:not(.light-mode) .btn-unexempt { border-color: #667eea; color: #a5b4fc; }
+body:not(.light-mode) .btn-unexempt:hover { background: #667eea; color: #fff; }
+
+/* Records tab */
+body:not(.light-mode) .filter-row select,
+body:not(.light-mode) .filter-row input { background: #374151; color: #f9fafb; border-color: #4b5563; }
+body:not(.light-mode) .filter-row label { color: #9ca3af; }
+body:not(.light-mode) .records-table { background: #1a2230; }
+body:not(.light-mode) .records-table th {
+    background: #1a2230; color: #9ca3af; border-color: #374151;
+}
+body:not(.light-mode) .records-table td { background: #1a2230; border-color: #1f2937; color: #e2e8f0; }
+body:not(.light-mode) .records-table tbody tr:hover td { background: #243044; }
+body:not(.light-mode) .badge-school { background: #1e3a5f; color: #93c5fd; }
+body:not(.light-mode) .badge-tuition { background: #4a1020; color: #fca5a5; }
+body:not(.light-mode) .btn-view-detail { border-color: #667eea; color: #a5b4fc; }
+body:not(.light-mode) .btn-view-detail:hover { background: #667eea; color: #fff; }
+body:not(.light-mode) .btn-del-record { border-color: #dc3545; color: #fca5a5; }
+body:not(.light-mode) .btn-del-record:hover { background: #dc3545; color: #fff; }
+
+/* Notifications tab */
+body:not(.light-mode) .notif-filters select { background: #374151; color: #f9fafb; border-color: #4b5563; }
+body:not(.light-mode) .notif-card.severity-never { background: #2a2010; border-left-color: #ffc107; }
+body:not(.light-mode) .notif-card.severity-full  { background: #2a1010; border-left-color: #dc3545; }
+body:not(.light-mode) .notif-card.severity-partial { background: #2a1d0a; border-left-color: #ff9800; }
+body:not(.light-mode) .notif-card .notif-icon { color: #d1d5db; }
+body:not(.light-mode) .notif-card .notif-name { color: #f3f4f6; }
+body:not(.light-mode) .notif-card .notif-name small { color: #9ca3af !important; }
+body:not(.light-mode) .notif-card .notif-meta { color: #9ca3af; }
+body:not(.light-mode) .notif-card .notif-subjects { color: #fca5a5; }
+body:not(.light-mode) .notif-card.severity-never .notif-badge { background: #92400e; color: #fde68a; }
+
+/* Subject Settings tab */
+body:not(.light-mode) .settings-card { background: #1a2230; border-color: #374151; }
+body:not(.light-mode) .settings-card h6 { color: #a5b4fc; }
+body:not(.light-mode) .settings-card label { color: #d1d5db; }
+body:not(.light-mode) .subject-row { border-color: #2d3748; }
+body:not(.light-mode) .subject-row .sub-name { color: #e2e8f0; }
+body:not(.light-mode) .sub-inactive { color: #4b5563; }
+body:not(.light-mode) .btn-toggle-sub { border-color: #4b5563; color: #d1d5db; }
+body:not(.light-mode) .btn-toggle-sub:hover { background: #374151; }
+body:not(.light-mode) .btn-del-sub { border-color: #f87171; color: #f87171; }
+
+/* Score settings card */
+body:not(.light-mode) .score-settings-card { background: #1a2230; border-color: #374151; }
+body:not(.light-mode) .score-settings-card h6 { color: #a5b4fc; }
+body:not(.light-mode) .score-settings-card label { color: #d1d5db; }
+body:not(.light-mode) .score-limits-input {
+    background: #374151; color: #f9fafb; border-color: #4b5563;
+}
+body:not(.light-mode) .score-limits-input:focus { border-color: #667eea; }
+body:not(.light-mode) .score-limits-input:read-only { background: #1a2230; color: #4b5563; }
+body:not(.light-mode) .score-formula-hint { color: #6b7280; }
+body:not(.light-mode) .btn-save-limits { background: #667eea; }
+body:not(.light-mode) .limits-saved-msg { color: #4ade80; }
+
+/* Form controls inside settings */
+body:not(.light-mode) .settings-card .form-select,
+body:not(.light-mode) .settings-card .form-control {
+    background: #374151; color: #f9fafb; border-color: #4b5563;
+}
+
+/* Detail modal */
+body:not(.light-mode) .nb-modal { background: #1a2230; color: #e2e8f0; }
+body:not(.light-mode) .nb-modal h4 { color: #f3f4f6; }
+body:not(.light-mode) .nb-modal .close-modal { color: #9ca3af; }
+body:not(.light-mode) .nb-modal .close-modal:hover { color: #f9fafb; }
+body:not(.light-mode) .detail-table th { background: #374151; color: #d1d5db; }
+body:not(.light-mode) .detail-table td { border-color: #374151; color: #e2e8f0; }
+
+/* Alerts */
+body:not(.light-mode) .nb-alert.success { background: #064e3b; color: #a7f3d0; border-color: #065f46; }
+body:not(.light-mode) .nb-alert.error   { background: #4a1010; color: #fca5a5; border-color: #7f1d1d; }
+
+/* Default subject warning */
+body:not(.light-mode) #defaultSubjectWarning {
+    background: #2d2410 !important; color: #fde68a !important; border-color: #92400e !important;
+}
+
+/* Empty state */
+body:not(.light-mode) .empty-state { color: #4b5563; }
+body:not(.light-mode) .empty-state i { color: #374151; }
+
+/* Summary sub-tab */
+body:not(.light-mode) .nb-summary-grid { gap: 14px; }
+body:not(.light-mode) .nb-stat-card {
+    background: #1a2230; border-color: #374151; color: #e2e8f0;
+}
+body:not(.light-mode) .nb-stat-card .stat-label { color: #9ca3af; }
+body:not(.light-mode) .nb-stat-card .stat-value { color: #f3f4f6; }
+body:not(.light-mode) .nb-stat-card .stat-icon { color: #4b5563; }
+body:not(.light-mode) .nb-grade-dist { background: #1a2230; border-color: #374151; }
+body:not(.light-mode) .nb-grade-dist h6 { color: #a5b4fc; }
+body:not(.light-mode) .nb-dist-bar-bg { background: #374151; }
+body:not(.light-mode) .nb-dist-bar-fill { opacity: .85; }
+body:not(.light-mode) .nb-dist-label { color: #d1d5db; }
+body:not(.light-mode) .nb-dist-count { color: #9ca3af; }
+body:not(.light-mode) .nb-recent-list { background: #1a2230; border-color: #374151; }
+body:not(.light-mode) .nb-recent-list h6 { color: #a5b4fc; }
+body:not(.light-mode) .nb-recent-item { border-color: #2d3748; }
+body:not(.light-mode) .nb-recent-item .ri-name { color: #f3f4f6; }
+body:not(.light-mode) .nb-recent-item .ri-meta { color: #9ca3af; }
+
+/* Keyboard hint */
+body:not(.light-mode) .nb-kb-hint { background: #1f2937; border-color: #374151; color: #6b7280; }
+body:not(.light-mode) .nb-kb-hint kbd { background: #374151; color: #d1d5db; border-color: #4b5563; }
+
+/* ═══════════════════════════════════════════════════════════════
+   DARK MODE — Mobile-specific adjustments
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Mobile topbar theme button */
+body:not(.light-mode) .mobile-topbar-btn { color: #94a3b8; }
+body:not(.light-mode) .mobile-topbar-btn:hover { color: #e2e8f0; }
+
+/* Table scroll indicator gradient — dark variant */
+@media (max-width: 768px) {
+    body:not(.light-mode) .table-wrapper::after {
+        background: linear-gradient(to right, transparent, rgba(255,255,255,.06));
+    }
+}
+
+/* Mobile overlay — darker for dark mode */
+body:not(.light-mode) .sidebar-overlay {
+    background: rgba(0, 0, 0, 0.6);
+}
+
+/* Touch-active states for dark mode on mobile */
+@media (hover: none) {
+    body:not(.light-mode) .scoreboard-table tbody tr:hover {
+        background-color: transparent;
+    }
+    body:not(.light-mode) .sidebar-link:hover {
+        background: none;
+        border-left-color: transparent;
+    }
+    body:not(.light-mode) .sidebar-link.active {
+        background: rgba(102, 126, 234, 0.25);
+        border-left-color: var(--sidebar-accent);
+    }
+}
+
+/* Notebook dark mode mobile adjustments */
+@media (max-width: 768px) {
+    body:not(.light-mode) .nb-modal { background: #1a2230; }
+    body:not(.light-mode) .type-pill { background: #1e293b; color: #94a3b8; border-color: #4b5563; }
+    body:not(.light-mode) .type-pill.active { background: #667eea; color: #fff; border-color: #667eea; }
+    body:not(.light-mode) .nb-tab { color: #9ca3af; }
+    body:not(.light-mode) .nb-tab.active { color: #667eea; border-bottom-color: #667eea; }
+}
+
+body.light-mode .stat-card .value          { color: #1e3a5f !important; }
+body.light-mode .stat-card .top-scorer-name { color: #92400e !important; text-shadow: none !important; }

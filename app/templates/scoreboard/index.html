@@ -42,10 +42,14 @@
                 <option value="B">B</option>
                 <option value="C">C</option>
                 <option value="D">D</option>
+                <option value="E">E</option>
+                <option value="F">F</option>
+                <option value="G">G</option>
+                <option value="H">H</option>
             </select>
         </div>
-        <button class="btn-action btn-import" id="applyFiltersBtn" onclick="applyFilters()" style="margin-left: auto;">🔍 Apply Filters</button>
-        <button class="btn-action" id="clearFiltersBtn" onclick="clearFilters()" style="display: none;">❌ Clear Filters</button>
+        <button class="btn-action btn-import" id="applyFiltersBtn" onclick="applyFilters()" style="margin-left: auto;">🔍 Apply</button>
+        <button class="btn-action" id="clearFiltersBtn" onclick="clearFilters()" style="display: none;">❌ Clear</button>
     </div>
     
     <!-- Month Tabs -->
@@ -64,7 +68,7 @@
     
     <!-- Scoreboard Table + Side Panel -->
     <div class="scoreboard-layout">
-        <div class="table-wrapper">
+        <div class="table-wrapper" id="tableWrapper">
             <table class="scoreboard-table">
                 <thead id="tableHeader"></thead>
                 <tbody id="tableBody"></tbody>
@@ -930,8 +934,65 @@
             </div>
         `;
         
+        // Notebook history section (loaded async after modal opens)
+        formHTML += `
+            <hr style="margin:20px 0;">
+            <h4 style="display:flex;align-items:center;gap:8px">
+                <i class="fas fa-book-open" style="color:#667eea"></i> Notebook Check History
+            </h4>
+            <div id="profileNbHistory" style="font-size:.85rem;color:#888;padding:8px 0">
+                <i class="fas fa-spinner fa-spin"></i> Loading…
+            </div>
+        `;
+
         document.getElementById('profileFormContent').innerHTML = formHTML;
         openModal('profileModal');
+
+        // Load notebook history asynchronously
+        fetch(`/notebooks/api/student-history/${encodeURIComponent(student.roll_number)}`)
+            .then(r => r.json())
+            .then(data => {
+                const wrap = document.getElementById('profileNbHistory');
+                if (!wrap) return;
+                const history = data.history || [];
+                if (!history.length) {
+                    wrap.innerHTML = '<span style="color:#aaa">No notebook checks recorded yet.</span>';
+                    return;
+                }
+                let html = '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:.82rem">'
+                    + '<thead><tr style="background:#f3f4f6">'
+                    + '<th style="padding:6px 8px;text-align:left;font-weight:700">Date</th>'
+                    + '<th style="padding:6px 8px;text-align:left;font-weight:700">Type</th>'
+                    + '<th style="padding:6px 8px;text-align:center;font-weight:700">Subjects</th>'
+                    + '<th style="padding:6px 8px;text-align:center;font-weight:700">Points</th>'
+                    + '<th style="padding:6px 8px;text-align:left;font-weight:700">Remarks</th>'
+                    + '</tr></thead><tbody>';
+                history.forEach(c => {
+                    const checked = c.subject_checks.filter(s => s.is_checked).length;
+                    const total   = c.subject_checks.length;
+                    const pts     = c.total_points;
+                    const ptsColor = pts > 0 ? '#28a745' : pts < 0 ? '#dc3545' : '#555';
+                    const typeBadge = c.notebook_type === 'school'
+                        ? '<span style="background:#e3f2fd;color:#1565c0;padding:2px 7px;border-radius:10px;font-weight:700">School</span>'
+                        : '<span style="background:#fce4ec;color:#c62828;padding:2px 7px;border-radius:10px;font-weight:700">Tuition</span>';
+                    const rem = c.consolidated_remarks
+                        ? c.consolidated_remarks.slice(0, 40) + (c.consolidated_remarks.length > 40 ? '…' : '')
+                        : '<span style="color:#ccc">—</span>';
+                    html += `<tr style="border-bottom:1px solid #f0f0f0">
+                        <td style="padding:5px 8px">${c.date_checked}</td>
+                        <td style="padding:5px 8px">${typeBadge}</td>
+                        <td style="padding:5px 8px;text-align:center">${checked}/${total}</td>
+                        <td style="padding:5px 8px;text-align:center;font-weight:800;color:${ptsColor}">${pts>=0?'+':''}${pts}</td>
+                        <td style="padding:5px 8px">${rem}</td>
+                    </tr>`;
+                });
+                html += '</tbody></table></div>';
+                wrap.innerHTML = html;
+            })
+            .catch(() => {
+                const wrap = document.getElementById('profileNbHistory');
+                if (wrap) wrap.innerHTML = '<span style="color:#aaa">Could not load notebook history.</span>';
+            });
     }
     
     async function submitProfileForm(event) {
@@ -1061,6 +1122,15 @@
             if (event.target === modal) {
                 modal.classList.remove('show');
             }
+        });
+    }
+
+    // Table scroll indicator — fade the shadow when scrolled to end
+    const tableWrapper = document.getElementById('tableWrapper');
+    if (tableWrapper) {
+        tableWrapper.addEventListener('scroll', function() {
+            const atEnd = this.scrollLeft + this.clientWidth >= this.scrollWidth - 10;
+            this.classList.toggle('scrolled-end', atEnd);
         });
     }
 </script>

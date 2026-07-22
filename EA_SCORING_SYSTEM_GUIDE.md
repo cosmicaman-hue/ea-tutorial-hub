@@ -26,7 +26,7 @@ The **EXCEL ACADEMY LEADERSHIP BOARD** is a comprehensive offline-first student 
 {
   id: timestamp,                      // Unique identifier
   roll: "EA24A01",                   // Roll number
-  name: "Ayush Gupta** (CR) (Vv)",  // Student name with badges
+  name: "Ayush Gupta** (GR) (Vv)",  // Student name with badges
   class: 4,                          // Class/Grade (3, 4, or 5)
   fees: 500                          // Fee amount
 }
@@ -103,7 +103,7 @@ Student management interface.
 - Quick edit capability
 
 **Sample Students Included:**
-- EA24A01: Ayush Gupta** (CR) (Vv)
+- EA24A01: Ayush Gupta** (GR) (Vv)
 - EA24A03: Ayat Parveen
 - EA24A04: Tanu Sinha**
 - And 5 more...
@@ -212,7 +212,7 @@ Indicated with asterisks in student name:
 | `*` | Single badge | Abdul Arman* |
 | `**` | Double badge | Ayush Gupta** |
 | `***` | Triple badge | Aditya Singh*** |
-| `(CR)` | Class Representative | Ayush Gupta (CR) |
+| `(CR)` | Group Representative | Ayush Gupta (GR) |
 | `(CoL)` | Coordinator Leader | Abdul Arman (CoL) |
 | `(RM)` | Resource Manager | Leadership (RM) |
 | `(V)` | Verified | Ayush Gupta (V) |

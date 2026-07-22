@@ -12,9 +12,30 @@ from app.models import (
     JoinCode,
     UserAccessWindow,
     StudentTransfer,
+    PublicSiteCredential,
 )
 from app.utils.syllabus_helpers import merge_syllabus_catalog_superset, merge_syllabus_tracking_superset
+from app.utils.file_operations import atomic_write_json as _shared_atomic_write_json
+from app.utils.sync_config import (
+    get_sync_peers,
+    is_full_ledger_snapshot,
+    is_private_peer_url,
+    normalize_peer_urls,
+    resolve_sync_shared_key,
+)
+from app.utils.sync_payloads import payload_for_external_replication
+from app.config.constants import SCOREBOARD_DEFAULT_LEADERSHIP, SCOREBOARD_DEFAULT_PARTIES
 import app.utils.score_balance as _score_balance
+from app.utils.data_paths import (
+    get_storage_root,
+    get_data_path as _shared_data_path,
+    get_backup_dir as _shared_backup_dir,
+    load_json_data_cached as _cached_load_json_data,
+    invalidate_data_cache as _invalidate_data_cache,
+    prime_data_cache as _prime_data_cache,
+    get_serialized_response as _get_serialized_response,
+    store_serialized_response as _store_serialized_response,
+)
 from datetime import datetime, date, timedelta, timezone
 from dateutil.relativedelta import relativedelta
 import calendar
@@ -22,10 +43,11 @@ from werkzeug.utils import secure_filename
 import os
 import json
 import re
+import hashlib
+import secrets
 import tempfile
 import shutil
 import glob
-import ipaddress
 import subprocess
 import urllib.request
 import urllib.error
@@ -35,75 +57,44 @@ from zoneinfo import ZoneInfo
 from queue import Queue, Empty
 import threading
 import time
+import math
+import functools
 
 points_bp = Blueprint('points', __name__, url_prefix='/scoreboard')
 _sync_subscribers = []
 _sync_lock = threading.Lock()
 
-DEFAULT_PARTIES = [
-    {"id": 1, "code": "MAP", "power": 15},
-    {"id": 2, "code": "BWP", "power": 27},
-    {"id": 3, "code": "ESP", "power": 30},
-    {"id": 4, "code": "MRP", "power": 23},
-    {"id": 5, "code": "SSP", "power": 57},
-    {"id": 6, "code": "NJP", "power": 15},
-]
-
-DEFAULT_LEADERSHIP = [
-    {"id": 1, "post": "LEADER (L)", "holder": "HARSH MALLICK"},
-    {"id": 2, "post": "LEADER OF OPPOSITION (LoP)", "holder": ""},
-    {"id": 3, "post": "CO-LEADER (CoL)", "holder": "REEYANSH LAMA"},
-    {"id": 4, "post": "CODING & IT CAPTAIN (CITC)", "holder": "SAMARTH PATEL"},
-    {"id": 5, "post": "DISCIPLINE & WELFARE IN-CHARGE (DWI)", "holder": "AANSH MANDAL"},
-    {"id": 6, "post": "RESOURCE MANAGER (RM)", "holder": "RIYA SINGH"},
-    {"id": 7, "post": "SPORTS CAPTAIN (SC)", "holder": "REEYANSH LAMA"},
-    {"id": 8, "post": "ENGLISH CAPTAIN- SENIOR (ECS)", "holder": "ABDUL ARMAN"},
-    {"id": 9, "post": "CULTURE & CREATIVE ARTS IN-CHARGE (CCAI)", "holder": "SAKSHI"},
-    {"id": 10, "post": "CLEANLINESS IN-CHARGE (CI)", "holder": "SHANKAR PRADHAN"},
-    {"id": 11, "post": "ENGLISH CAPTAIN- JUNIOR (ECJ)", "holder": "REHMATUN KHATUN"},
-    {"id": 12, "post": "WELCOME & COMMUNICATION IN-CHARGE (WCI)", "holder": "SHOMIYA XALXO"},
-    {"id": 13, "post": "LEADER", "holder": ""},
-    {"id": 14, "post": "LEADER OF OPPOSITION", "holder": ""},
-]
+# Serializes read-merge-write cycles on the offline JSON ledger within this
+# process. Waitress serves with multiple threads; without this lock, two
+# concurrent mutating requests could each load the ledger, merge independently,
+# and the last writer would silently discard the other's merge (lost update).
+# RLock so a request already holding the lock can call _save_offline_data
+# (which also acquires it) without deadlocking.
+_LEDGER_WRITE_LOCK = threading.RLock()
 
 
-_storage_root_cache = ''
+def _ledger_write_guard(view):
+    """Route decorator: serialize ledger-mutating requests. Plain GETs skip the lock."""
+    @functools.wraps(view)
+    def _wrapped(*args, **kwargs):
+        if request.method == 'GET':
+            return view(*args, **kwargs)
+        with _LEDGER_WRITE_LOCK:
+            return view(*args, **kwargs)
+    return _wrapped
+
+# NOTE: DEFAULT_PARTIES also defined in app/config/constants.py (without 'name' field).
+# This version is the operational one used by the scoreboard routes.
+DEFAULT_PARTIES = [dict(party) for party in SCOREBOARD_DEFAULT_PARTIES]
+
+# NOTE: DEFAULT_LEADERSHIP also defined in app/config/constants.py (without holder names).
+# This version is the operational one with actual holder assignments.
+DEFAULT_LEADERSHIP = [dict(post) for post in SCOREBOARD_DEFAULT_LEADERSHIP]
 
 
 def _storage_root_path():
-    """
-    Choose a durable storage root.
-    Priority:
-    1) EA_STORAGE_ROOT (explicit override)
-    2) RENDER_DISK_PATH/ea_tutorial_hub (Render persistent disk)
-    3) /var/data/ea_tutorial_hub (common Render mount)
-    4) Flask instance_path (fallback)
-    """
-    global _storage_root_cache
-    if _storage_root_cache:
-        return _storage_root_cache
-    candidates = []
-    explicit = str(os.getenv('EA_STORAGE_ROOT', '') or '').strip()
-    if explicit:
-        candidates.append(explicit)
-    render_disk = str(os.getenv('RENDER_DISK_PATH', '') or '').strip()
-    if not render_disk:
-        render_disk = str(os.getenv('RENDER_DISK_MOUNT_PATH', '') or '').strip()
-    if render_disk:
-        candidates.append(os.path.join(render_disk, 'ea_tutorial_hub'))
-    candidates.append('/var/data/ea_tutorial_hub')
-    candidates.append(current_app.instance_path)
-
-    for root in candidates:
-        try:
-            os.makedirs(root, exist_ok=True)
-            if os.path.isdir(root):
-                _storage_root_cache = root
-                return root
-        except Exception:
-            continue
-    _storage_root_cache = current_app.instance_path
-    return _storage_root_cache
+    """Thin wrapper — logic lives in app.utils.data_paths (single source of truth)."""
+    return get_storage_root()
 
 
 def _legacy_instance_file(name):
@@ -115,11 +106,13 @@ def _politics_file_path():
 
 
 def _offline_data_path():
-    return os.path.join(_storage_root_path(), 'offline_scoreboard_data.json')
+    """Thin wrapper — logic lives in app.utils.data_paths (single source of truth)."""
+    return _shared_data_path()
 
 
 def _offline_backup_dir():
-    return os.path.join(_storage_root_path(), 'offline_scoreboard_backups')
+    """Thin wrapper — logic lives in app.utils.data_paths (single source of truth)."""
+    return _shared_backup_dir()
 
 def _offline_hourly_backup_dir():
     return os.path.join(_storage_root_path(), 'offline_scoreboard_hourly_backups')
@@ -179,6 +172,15 @@ def _safe_int(value, default=0):
         if value in (None, ''):
             return default
         return int(value)
+    except Exception:
+        return default
+
+
+def _safe_float(value, default=0.0):
+    try:
+        if value in (None, ''):
+            return default
+        return float(value)
     except Exception:
         return default
 
@@ -308,17 +310,23 @@ def _sanitize_client_public_snapshot(snapshot, payload):
         for idx, row in enumerate(rows):
             if not isinstance(row, dict):
                 continue
-            rank = _safe_int(row.get('rank'), idx + 1)
-            masked = rank > top_full
             safe_rows.append({
-                'rank': rank,
                 'roll': _roll_key(row.get('roll') or '-'),
-                'name': _clean_public_name(row.get('name') or '') if not masked else '',
-                'class': str(row.get('class') or '').strip() if not masked else '',
+                'name': _clean_public_name(row.get('name') or ''),
+                'class': str(row.get('class') or '').strip(),
                 'total': _safe_int(row.get('total')),
-                'masked': masked,
             })
-        safe_rows.sort(key=lambda item: _safe_int(item.get('rank'), 0))
+        # Always re-sort by total descending (client rank field is unreliable when
+        # the cache was stale at publish time — totals are the ground truth).
+        safe_rows.sort(key=lambda item: (-_safe_int(item.get('total'), 0), str(item.get('roll') or '')))
+        for i, item in enumerate(safe_rows):
+            rank = i + 1
+            masked = rank > top_full
+            item['rank'] = rank
+            item['masked'] = masked
+            if masked:
+                item['name'] = ''
+                item['class'] = ''
         scoreboard[month] = safe_rows
     return {
         'updated_at': str(snapshot.get('updated_at') or payload.get('server_updated_at') or _server_now_iso()),
@@ -463,7 +471,7 @@ def _build_public_month_rows(payload, month):
         if note.startswith('excel_total_score') or note.startswith('excel_total_from_dates'):
             sid = _safe_int(score.get('studentId'))
             if sid > 0 and sid in totals:
-                excel_total_by_sid[sid] = excel_total_by_sid.get(sid, 0) + _safe_int(score.get('points'))
+                excel_total_by_sid[sid] = excel_total_by_sid.get(sid, 0) + _safe_float(score.get('points'))
     if excel_total_by_sid:
         for sid in totals.keys():
             totals[sid] = excel_total_by_sid.get(sid, 0)
@@ -474,7 +482,7 @@ def _build_public_month_rows(payload, month):
                 'roll': _roll_key(student.get('roll')),
                 'name': str(student.get('base_name') or student.get('name') or '').strip() or '-',
                 'classVal': student.get('class') or '-',
-                'total': total or 0,
+                'total': round(total, 2) or 0,
             })
         return sorted(rows, key=lambda item: (-item['total'], item['roll']))
 
@@ -492,7 +500,7 @@ def _build_public_month_rows(payload, month):
             continue
 
         note = str(score.get('notes') or '').strip().lower()
-        points = _safe_int(score.get('points'))
+        points = _safe_float(score.get('points'))
         if is_historical:
             is_excel_total = note.startswith('excel_total_score') or note.startswith('excel_total_from_dates')
             is_excel_daily = note.startswith('excel_daily_score')
@@ -534,25 +542,37 @@ def _build_public_month_rows(payload, month):
                     date_disc = per_date_star_disciplinary.setdefault(sid, {})
                     date_disc[score_date] = date_disc.get(score_date, 0) + disciplinary
 
-    for sid, date_map in per_date_star_disciplinary.items():
-        if sid not in totals:
-            continue
-        date_scores = per_date_score.get(sid, {})
-        for score_date in date_map.keys():
-            erased_score = _safe_int(date_scores.get(score_date))
-            if erased_score != 0:
-                totals[sid] = totals.get(sid, 0) - erased_score
-                date_scores[score_date] = 0
+    if apply_star_bonus:
+        for sid, date_map in per_date_star_disciplinary.items():
+            if sid not in totals:
+                continue
+            date_scores = per_date_score.get(sid, {})
+            normal_map = per_date_star_normal.get(sid, {})
+            for score_date, disc_uses in date_map.items():
+                normal_uses = max(0, _safe_int(normal_map.get(score_date)))
+                if normal_uses > 0:
+                    continue
+                day_score = _safe_int(date_scores.get(score_date))
+                if day_score < 0:
+                    halved = day_score
+                    for _ in range(disc_uses):
+                        halved = math.floor(halved / 2)
+                    totals[sid] = totals.get(sid, 0) - (day_score - halved)
+                    date_scores[score_date] = halved
 
     if apply_star_bonus:
         for sid, date_map in per_date_star_normal.items():
             if sid not in totals:
                 continue
             date_scores = per_date_score.get(sid, {})
-            disciplinary_map = per_date_star_disciplinary.get(sid, {})
             for score_date, normal_uses in date_map.items():
-                disc_uses = max(0, _safe_int(disciplinary_map.get(score_date)))
-                if disc_uses <= 0 and _safe_int(date_scores.get(score_date)) >= -50 and normal_uses > 0:
+                if normal_uses <= 0:
+                    continue
+                day_score = _safe_int(date_scores.get(score_date))
+                if day_score < 0:
+                    totals[sid] = totals.get(sid, 0) - day_score
+                    date_scores[score_date] = 0
+                if day_score > -50:
                     totals[sid] = totals.get(sid, 0) + (100 * normal_uses)
 
     attendance_latest = {}
@@ -573,7 +593,9 @@ def _build_public_month_rows(payload, month):
     for attendance in attendance_latest.values():
         sid = _safe_int(attendance.get('studentId'))
         if sid in totals:
-            totals[sid] = totals.get(sid, 0) + _attendance_penalty(_norm_attendance_status(attendance.get('status')))
+            # GCB-immune students are not subject to absence/late penalties.
+            if not (by_id.get(sid) or {}).get('gcb'):
+                totals[sid] = totals.get(sid, 0) + _attendance_penalty(_norm_attendance_status(attendance.get('status')))
 
     if is_historical:
         for sid in hist_has:
@@ -632,8 +654,111 @@ def _public_site_dir():
     return os.path.join(_project_root_path(), 'public_site')
 
 
+def _sync_spa_to_public_site(site_dir):
+    """Copy offline_scoreboard.html and CSS into public_site/ for Cloudflare Pages hosting.
+    Injects the <meta name="ea-backend-url"> tag with the tunnel origin so the SPA
+    operates in cross-origin mode when served from Cloudflare Pages."""
+    import shutil
+    repo_root = _project_root_path()
+    spa_src = os.path.join(repo_root, 'app', 'static', 'offline_scoreboard.html')
+    css_src = os.path.join(repo_root, 'app', 'static', 'css', 'offline-scoreboard.css')
+    spa_dst = os.path.join(site_dir, 'offline_scoreboard.html')
+    css_dst_dir = os.path.join(site_dir, 'static', 'css')
+    css_dst = os.path.join(css_dst_dir, 'offline-scoreboard.css')
+    copied = []
+
+    if os.path.isfile(spa_src):
+        with open(spa_src, 'r', encoding='utf-8') as f:
+            html = f.read()
+        tunnel_origin = str(os.getenv('EA_TUNNEL_ORIGIN', '') or '').strip()
+        if tunnel_origin:
+            tunnel_url = tunnel_origin if tunnel_origin.startswith('http') else f'https://{tunnel_origin}'
+            meta_tag = f'<meta name="ea-backend-url" content="{tunnel_url}">'
+            if 'ea-backend-url' not in html:
+                html = html.replace('<head>', f'<head>\n    {meta_tag}', 1)
+            else:
+                import re
+                html = re.sub(
+                    r'<meta\s+name="ea-backend-url"\s+content="[^"]*"\s*/?>',
+                    meta_tag, html, count=1
+                )
+        os.makedirs(site_dir, exist_ok=True)
+        with open(spa_dst, 'w', encoding='utf-8') as f:
+            f.write(html)
+        copied.append(spa_dst)
+
+    if os.path.isfile(css_src):
+        os.makedirs(css_dst_dir, exist_ok=True)
+        shutil.copy2(css_src, css_dst)
+        copied.append(css_dst)
+
+    return copied
+
+
 def _public_site_scores_path():
     return os.path.join(_public_site_dir(), 'scores.json')
+
+
+def _public_site_credentials_path():
+    return os.path.join(_public_site_dir(), 'credentials.json')
+
+
+def _hash_public_credential(password):
+    """Salted SHA-256 of a password (UTF-8), matching the browser's Web Crypto
+    SHA-256(salt + password) and scripts/generate_credentials.py exactly.
+    Returns (salt_hex, hash_hex)."""
+    salt = secrets.token_hex(8)
+    digest = hashlib.sha256((salt + str(password)).encode('utf-8')).hexdigest()
+    return salt, digest
+
+
+def _normalize_roll(roll):
+    return str(roll or '').strip().upper()
+
+
+def _student_rolls_from_ledger():
+    """Best-effort extraction of student roll numbers from the offline ledger,
+    used to populate the admin datalist and to drive bulk-set operations."""
+    try:
+        data = _load_offline_data() or {}
+    except Exception:
+        data = {}
+    rolls = []
+    seen = set()
+    students = data.get('students') if isinstance(data, dict) else None
+    if isinstance(students, list):
+        for s in students:
+            if isinstance(s, dict):
+                roll = str(s.get('roll') or s.get('roll_number') or '').strip().upper()
+                if roll and roll not in seen:
+                    seen.add(roll)
+                    rolls.append(roll)
+    return rolls
+
+
+def _build_public_credentials_payload():
+    """Read active PublicSiteCredential rows and build the
+    public_site/credentials.json payload. DB is the single source of truth."""
+    try:
+        rows = (
+            PublicSiteCredential.query
+            .filter(PublicSiteCredential.active.is_(True))
+            .order_by(PublicSiteCredential.roll.asc())
+            .all()
+        )
+    except Exception as exc:
+        current_app.logger.warning('Failed to load public credentials: %s', exc)
+        return {'credentials': []}
+    return {
+        'credentials': [
+            {
+                'roll': str(r.roll or '').upper(),
+                'salt': str(r.salt or ''),
+                'hash': str(r.hash or ''),
+            }
+            for r in rows
+        ]
+    }
 
 
 def _auto_push_public_site_enabled():
@@ -663,9 +788,75 @@ def _safe_commit_stamp():
         return datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
 
+def _resync_students_from_veto_tracking(payload):
+    """
+    Before publishing, sync VETO counts on each student record from the
+    authoritative veto_tracking.students map. This prevents a stale client-side
+    students[] array from overwriting the server's VETO ledger in the published
+    public_site/scores.json (which is then committed to git and seen by peers).
+    Stars are intentionally not touched — student.stars is authoritative and
+    should not be modified by publish.
+    """
+    if not isinstance(payload, dict):
+        return
+    veto_tracking = payload.get('veto_tracking') or {}
+    tracked = veto_tracking.get('students') or {}
+    if not isinstance(tracked, dict) or not tracked:
+        return
+    current_month = _server_now_iso()[:7]
+    roll_to_sid = {
+        s.get('roll'): _parse_int_safe(s.get('id'), 0)
+        for s in (payload.get('students') or [])
+        if s.get('roll') and _parse_int_safe(s.get('id'), 0) > 0
+    }
+    for student in payload.get('students') or []:
+        if not isinstance(student, dict):
+            continue
+        roll = str(student.get('roll') or '').strip()
+        if not roll or roll not in tracked:
+            continue
+        entry = tracked[roll] or {}
+        try:
+            ind = int(entry.get('individual_vetos', 0) or 0)
+            role = int(entry.get('role_vetos', 0) or 0)
+        except (TypeError, ValueError):
+            continue
+
+        # Use month-specific consumed vetos, NOT cumulative used_vetos from
+        # veto_tracking (which totals usage across ALL months and would
+        # permanently reduce current-month balances with historical usage).
+        sid = roll_to_sid.get(roll, 0)
+        month_used = _get_student_month_consumed_vetos(payload, sid, current_month) if sid else 0
+
+        # Deduct used vetoes using the same priority logic (individual first, then role)
+        remaining = month_used
+        ind_rem = ind
+        role_rem = role
+
+        take_ind = min(ind_rem, remaining)
+        ind_rem -= take_ind
+        remaining -= take_ind
+
+        if remaining > 0:
+            take_role = min(role_rem, remaining)
+            role_rem -= take_role
+            remaining -= take_role
+
+        student['veto_count'] = ind_rem
+        student['role_veto_count'] = role_rem
+        student['used_veto_count'] = month_used
+
+
 def _publish_public_site_snapshot(payload, push=None, public_snapshot=None):
     site_dir = _public_site_dir()
     scores_path = _public_site_scores_path()
+    # Align students[] VETO counts with authoritative veto_tracking before any
+    # downstream transform — prevents stale client state from leaking into the
+    # published snapshot.
+    try:
+        _resync_students_from_veto_tracking(payload)
+    except Exception as _resync_err:
+        current_app.logger.warning(f"Pre-publish VETO resync failed: {_resync_err}")
     # Prefer the browser-generated public snapshot when it is structurally sane.
     # The LAN UI already computes month-aware totals and historical identity
     # resolution, so this keeps the public site aligned with what admins see
@@ -686,10 +877,29 @@ def _publish_public_site_snapshot(payload, push=None, public_snapshot=None):
     os.makedirs(site_dir, exist_ok=True)
     _atomic_write_json(scores_path, public_payload)
 
+    # Credentials.json: DB is the single source of truth. Always (re)write from
+    # active PublicSiteCredential rows so revocations propagate on publish.
+    # If no active credentials exist, write an empty list (site locks until the
+    # admin configures credentials via the Admin Control Panel).
+    credentials_path = _public_site_credentials_path()
+    credentials_payload = _build_public_credentials_payload()
+    try:
+        _atomic_write_json(credentials_path, credentials_payload)
+    except Exception as creds_err:
+        current_app.logger.warning(f"credentials.json write failed: {creds_err}")
+    credentials_count = len(credentials_payload.get('credentials') or [])
+
+    try:
+        _sync_spa_to_public_site(site_dir)
+    except Exception as spa_err:
+        current_app.logger.warning(f"SPA sync to public_site failed: {spa_err}")
+
     result = {
         'status': 'ok',
         'site_dir': site_dir,
         'scores_path': scores_path,
+        'credentials_path': credentials_path,
+        'credentials_count': credentials_count,
         'updated_at': public_payload.get('updated_at'),
         'pushed': False,
     }
@@ -712,7 +922,11 @@ def _publish_public_site_snapshot(payload, push=None, public_snapshot=None):
     rel_index = os.path.relpath(os.path.join(site_dir, 'index.html'), repo_root)
     rel_readme = os.path.relpath(os.path.join(site_dir, 'README.md'), repo_root)
     rel_headers = os.path.relpath(os.path.join(site_dir, '_headers'), repo_root)
-    tracked_paths = [path for path in [rel_index, rel_readme, rel_headers, rel_scores] if os.path.exists(os.path.join(repo_root, path))]
+    rel_creds = os.path.relpath(os.path.join(site_dir, 'credentials.json'), repo_root)
+    rel_spa = os.path.relpath(os.path.join(site_dir, 'offline_scoreboard.html'), repo_root)
+    rel_css = os.path.relpath(os.path.join(site_dir, 'static', 'css', 'offline-scoreboard.css'), repo_root)
+    candidate_paths = [rel_index, rel_readme, rel_headers, rel_scores, rel_creds, rel_spa, rel_css]
+    tracked_paths = [path for path in candidate_paths if os.path.exists(os.path.join(repo_root, path))]
     commit_stamp = _safe_commit_stamp()
 
     try:
@@ -740,84 +954,14 @@ def _publish_public_site_snapshot(payload, push=None, public_snapshot=None):
     return result
 
 
-def _get_sync_peers():
-    raw = os.getenv('SYNC_PEERS', '') or os.getenv('SYNC_PEER', '')
-    if not raw:
-        return []
-    peers = []
-    for token in re.split(r'[,;\s]+', raw.strip()):
-        item = token.strip()
-        if not item:
-            continue
-        if not re.match(r'^https?://', item, re.I):
-            item = f'http://{item}'
-        item = item.rstrip('/')
-        peers.append(item)
-    return list(dict.fromkeys(peers))
-
-
 def _normalize_peer_list(raw_values):
-    peers = []
     if not isinstance(raw_values, list):
-        return peers
-    for token in raw_values:
-        item = str(token or '').strip()
-        if not item:
-            continue
-        if not re.match(r'^https?://', item, re.I):
-            item = f'http://{item}'
-        item = item.rstrip('/')
-        peers.append(item)
-    return peers
-
-
-def _resolve_sync_shared_key():
-    """
-    Resolve replication key with a safe fallback.
-    Priority:
-    1) SYNC_SHARED_KEY (explicit)
-    2) SECRET_KEY (deployment default fallback)
-    """
-    explicit = str(os.getenv('SYNC_SHARED_KEY', '') or '').strip()
-    if explicit:
-        return explicit
-    secret_fallback = str(os.getenv('SECRET_KEY', '') or '').strip()
-    if secret_fallback:
-        return secret_fallback
-    # Safe default for environments where local master forgot to set SYNC_SHARED_KEY.
-    return 'EA_SYNC_KEY_917511_2026'
-
-
-def _payload_for_external_replication(payload):
-    """Strip local-only modules before mirroring to WAN/cloud systems."""
-    if not isinstance(payload, dict):
-        return {}
-    external = dict(payload)
-    external.pop('fee_records', None)
-    return external
-
-
-def _is_private_sync_peer(peer_url):
-    if not peer_url:
-        return False
-    try:
-        hostname = urllib.parse.urlparse(str(peer_url)).hostname or ''
-    except Exception:
-        hostname = ''
-    host = str(hostname or '').strip().lower()
-    if not host:
-        return False
-    if host in ('localhost', '127.0.0.1', '::1'):
-        return True
-    try:
-        addr = ipaddress.ip_address(host)
-        return addr.is_private or addr.is_loopback
-    except ValueError:
-        return host.endswith('.local') or host.endswith('.lan')
+        return []
+    return normalize_peer_urls(raw_values)
 
 
 def _forward_offline_data_to_peers(payload, extra_peers=None):
-    peers = _get_sync_peers() + _normalize_peer_list(extra_peers or [])
+    peers = get_sync_peers() + _normalize_peer_list(extra_peers or [])
     peers = list(dict.fromkeys(peers))
     if not peers:
         return
@@ -840,13 +984,13 @@ def _forward_offline_data_to_peers(payload, extra_peers=None):
         }
     else:
         base_flags = {}
-    shared_key = _resolve_sync_shared_key()
+    shared_key = resolve_sync_shared_key()
     for peer in peers:
         if peer.rstrip('/') == current_origin:
             continue
         # Preserve the fees module on LAN peers so offline/backup nodes stay
         # consistent; only strip it for non-private WAN/cloud mirrors.
-        peer_payload = payload if _is_private_sync_peer(peer) else _payload_for_external_replication(payload)
+        peer_payload = payload if is_private_peer_url(peer) else payload_for_external_replication(payload)
         body = json.dumps({'data': peer_payload, **base_flags}).encode('utf-8')
         target_url = f'{peer}/scoreboard/offline-data'
         req = urllib.request.Request(
@@ -967,7 +1111,6 @@ def _supabase_fetch_snapshot(timeout_sec=12):
         row = rows[0] if isinstance(rows[0], dict) else {}
         data = row.get('data')
         if isinstance(data, dict):
-            data.pop('fee_records', None)
             return data, 'supabase'
     except Exception as exc:
         current_app.logger.warning('Supabase fetch snapshot exception: %s', exc)
@@ -982,7 +1125,7 @@ def _supabase_push_snapshot(payload, reason='snapshot_save', timeout_sec=15):
         return False
 
     # Exclude fees module data from Supabase mirror by requirement.
-    mirror_payload = _payload_for_external_replication(payload)
+    mirror_payload = payload_for_external_replication(payload)
 
     stamp = str(mirror_payload.get('server_updated_at') or mirror_payload.get('updated_at') or '').strip()
     global _supabase_last_pushed_stamp
@@ -1078,7 +1221,6 @@ def _gist_fetch_snapshot(timeout_sec=15):
         if content:
             data = json.loads(content)
             if isinstance(data, dict):
-                data.pop('fee_records', None)
                 return data, 'gist'
     except Exception as exc:
         current_app.logger.warning('Gist fetch snapshot exception: %s', exc)
@@ -1091,7 +1233,7 @@ def _gist_push_snapshot(payload, reason='snapshot_save', timeout_sec=20):
         return False
     if not isinstance(payload, dict):
         return False
-    mirror_payload = _payload_for_external_replication(payload)
+    mirror_payload = payload_for_external_replication(payload)
     stamp = str(mirror_payload.get('server_updated_at') or mirror_payload.get('updated_at') or '').strip()
     global _gist_last_pushed_stamp
     with _gist_push_lock:
@@ -1135,8 +1277,8 @@ def _gist_push_snapshot_async(payload, reason='snapshot_save'):
 
 def _do_peer_sync_cycle(app):
     """One bidirectional sync cycle with all configured peers."""
-    peers = _get_sync_peers()
-    shared_key = _resolve_sync_shared_key()
+    peers = get_sync_peers()
+    shared_key = resolve_sync_shared_key()
     if not peers or not shared_key:
         return
 
@@ -1153,6 +1295,7 @@ def _do_peer_sync_cycle(app):
                     method='GET',
                     headers={
                         'Cache-Control': 'no-store',
+                        'X-EA-Replicated': '1',
                         'X-EA-Sync-Key': shared_key,
                     }
                 )
@@ -1161,6 +1304,12 @@ def _do_peer_sync_cycle(app):
                 peer_parsed = json.loads(peer_body.decode('utf-8', errors='replace'))
                 peer_data = peer_parsed.get('data') if isinstance(peer_parsed, dict) else None
                 if not isinstance(peer_data, dict):
+                    continue
+                # Hard safety: never merge a sanitized/month-clipped view (served to
+                # unauthenticated callers) into a full local ledger — it would drop
+                # historical months and private collections.
+                if not is_full_ledger_snapshot(peer_data):
+                    app.logger.warning('[BgSync] Peer %s returned a sanitized snapshot (key mismatch?) — skipping.', peer)
                     continue
 
                 peer_stamp = _payload_sync_stamp(peer_data) or 0.0
@@ -1176,7 +1325,7 @@ def _do_peer_sync_cycle(app):
                         # Push whenever snapshots differ by stamp/count.
                         if (abs(local_stamp - peer_stamp) > 1) or (local_count != peer_count):
                             body = json.dumps({
-                                'data': _payload_for_external_replication(local_data),
+                                'data': payload_for_external_replication(local_data),
                                 'authoritative_master_push': True,
                                 'force_replace': True
                             }).encode('utf-8')
@@ -1219,6 +1368,14 @@ def _do_peer_sync_cycle(app):
                             local_data.get('appeals', []),
                             peer_data.get('appeals', [])
                         )
+                        merged['postholder_tickets'] = _merge_postholder_tickets(
+                            local_data.get('postholder_tickets', {}),
+                            peer_data.get('postholder_tickets', {})
+                        )
+                        merged['postholder_ticket_log'] = _merge_postholder_ticket_log(
+                            local_data.get('postholder_ticket_log', []),
+                            peer_data.get('postholder_ticket_log', [])
+                        )
 
                         # Update timestamp only if peer is genuinely newer
                         if peer_stamp > local_stamp:
@@ -1248,7 +1405,7 @@ def _do_peer_sync_cycle(app):
 
                 elif local_stamp > peer_stamp + 30 and local_count >= min_students:
                     # Local is newer -> push to peer
-                    body = json.dumps({'data': _payload_for_external_replication(local_data)}).encode('utf-8')
+                    body = json.dumps({'data': payload_for_external_replication(local_data)}).encode('utf-8')
                     post_req = urllib.request.Request(
                         f'{peer}/scoreboard/offline-data',
                         data=body,
@@ -1279,7 +1436,7 @@ def start_peer_sync_background(app):
         return
     if str(os.getenv('EA_MASTER_MODE', '')).strip() != '1':
         return
-    if not _get_sync_peers():
+    if not get_sync_peers():
         return
     _peer_sync_thread_started = True
 
@@ -1300,27 +1457,22 @@ def start_peer_sync_background(app):
 
 
 def _atomic_write_json(path, payload):
-    target_dir = os.path.dirname(path)
-    os.makedirs(target_dir, exist_ok=True)
     # Use dir=target_dir so the temp file is on the same filesystem as the
     # target.  Without this, tempfile.mkstemp() uses /tmp which is a separate
     # mount on Render/Docker, causing os.replace() to raise:
     #   [Errno 18] Invalid cross-device link
-    fd, temp_path = tempfile.mkstemp(dir=target_dir, prefix='offline_scoreboard_', suffix='.json')
-    try:
-        with os.fdopen(fd, 'w', encoding='utf-8') as f:
-            json.dump(payload, f, ensure_ascii=False, indent=2)
-        os.replace(temp_path, path)
-    finally:
-        try:
-            if os.path.exists(temp_path):
-                os.remove(temp_path)
-        except Exception:
-            pass
+    _shared_atomic_write_json(path, payload, separators=(',', ':'))
 
 
 def _backup_offline_file(path, keep=50):
     if not os.path.exists(path):
+        return
+    # Skip per-save backup when an hourly backup for the current hour already
+    # exists — the hourly backup provides the same safety net without the
+    # overhead of shutil.copy2 + directory listing on every save.
+    hour_key = datetime.now().strftime('%Y%m%d_%H')
+    hourly_path = os.path.join(_offline_hourly_backup_dir(), f'offline_scoreboard_hourly_{hour_key}.json')
+    if os.path.exists(hourly_path):
         return
     os.makedirs(_offline_backup_dir(), exist_ok=True)
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
@@ -1344,13 +1496,19 @@ def _backup_offline_hourly_immutable(payload, keep=24 * 30):
     """
     Create one immutable snapshot per hour (local server time).
     This is append-only per hour and protects against rapid accidental overwrites.
+    Uses shutil.copy2 from the just-written main file (22ms) instead of
+    _atomic_write_json (1.1s) since the main file is already atomically written.
     """
     os.makedirs(_offline_hourly_backup_dir(), exist_ok=True)
     hour_key = datetime.now().strftime('%Y%m%d_%H')
     backup_name = f'offline_scoreboard_hourly_{hour_key}.json'
     backup_path = os.path.join(_offline_hourly_backup_dir(), backup_name)
     if not os.path.exists(backup_path):
-        _atomic_write_json(backup_path, payload)
+        main_path = _offline_data_path()
+        if os.path.exists(main_path):
+            shutil.copy2(main_path, backup_path)
+        else:
+            _atomic_write_json(backup_path, payload)
 
     backups = sorted(
         [os.path.join(_offline_hourly_backup_dir(), f) for f in os.listdir(_offline_hourly_backup_dir()) if f.endswith('.json')],
@@ -1384,6 +1542,20 @@ def _load_latest_offline_backup():
 
 
 def _load_offline_data():
+    """
+    Load the offline scoreboard JSON, using an in-memory mtime cache.
+
+    PERFORMANCE: the offline data file is typically 4+ MB. Re-parsing it on
+    every request is the biggest source of server latency. The cache is keyed
+    on (path, mtime_ns, size) and invalidated automatically when the file
+    changes on disk. Every mutation path goes through _save_offline_data(),
+    which re-primes the cache with the new payload.
+
+    CAVEAT: the returned dict is the shared cached object. Callers that mutate
+    it MUST eventually call _save_offline_data(data) — the save primes the
+    cache with the mutated dict, keeping cache == disk. Don't mutate and then
+    discard; that will leave stale state in the cache until the next write.
+    """
     path = _offline_data_path()
     legacy_path = _legacy_instance_file('offline_scoreboard_data.json')
     if (not os.path.exists(path)) and os.path.exists(legacy_path):
@@ -1396,6 +1568,15 @@ def _load_offline_data():
     # timestamp comparison.  Using datetime.now() here caused Render to reject local
     # pushes with 409 because the seed appeared "newer" than real data.
     _SEED_STAMP = "2026-02-26T00:00:00+00:00"
+
+    # ── FAST PATH: mtime-cached load (avoids re-parsing 4+ MB per request) ──
+    if os.path.exists(path):
+        cached = _cached_load_json_data()
+        if cached is not None and _student_count(cached) > 0:
+            return cached
+        # Cache returned None (read/parse failure) or snapshot is empty.
+        # Fall through to recovery logic below.
+
     if not os.path.exists(path):
         data = _load_latest_offline_backup()
         if not data:
@@ -1403,9 +1584,9 @@ def _load_offline_data():
             if isinstance(gist_data, dict):
                 data = gist_data
         if data:
-            data = _merge_fee_records_from_local_sources(data)
             try:
                 _atomic_write_json(path, data)
+                _invalidate_data_cache()
             except Exception:
                 pass
             return data
@@ -1416,6 +1597,7 @@ def _load_offline_data():
             payload['updated_at'] = _SEED_STAMP
             try:
                 _atomic_write_json(path, payload)
+                _invalidate_data_cache()
             except Exception:
                 pass
             return payload
@@ -1426,7 +1608,7 @@ def _load_offline_data():
             data = json.load(f)
             if _student_count(data) == 0:
                 raise ValueError('Empty offline snapshot')
-            return _merge_fee_records_from_local_sources(data)
+            return data
     except Exception:
         data = _load_latest_offline_backup()
         if not data:
@@ -1434,9 +1616,9 @@ def _load_offline_data():
             if isinstance(gist_data, dict):
                 data = gist_data
         if data:
-            data = _merge_fee_records_from_local_sources(data)
             try:
                 _atomic_write_json(path, data)
+                _invalidate_data_cache()
             except Exception:
                 pass
             return data
@@ -1446,6 +1628,7 @@ def _load_offline_data():
             payload['updated_at'] = _SEED_STAMP
             try:
                 _atomic_write_json(path, payload)
+                _invalidate_data_cache()
             except Exception:
                 pass
             return payload
@@ -1484,10 +1667,24 @@ def _broadcast_sync_event(updated_at, source='server'):
 
 
 def _save_offline_data(payload):
+    with _LEDGER_WRITE_LOCK:
+        return _save_offline_data_locked(payload)
+
+
+def _save_offline_data_locked(payload):
     path = _offline_data_path()
     if isinstance(payload, dict):
+        # Never persist client-view markers into the canonical ledger. These mark
+        # sanitized/clipped GET responses; if a client merged one into its local
+        # data and pushed it back, replication peers would refuse the server
+        # snapshot forever (they treat these keys as "not a full ledger").
+        payload.pop('sync_scope', None)
+        payload.pop('allowed_months', None)
         # Monotonic server-side version for optimistic sync checks.
-        current = _load_offline_data() or {}
+        # Read server_version from the shared cache directly instead of calling
+        # _load_offline_data() (which has recovery/seed fallback logic that's
+        # unnecessary here and adds overhead).
+        current = _cached_load_json_data() or {}
         prev_ver = _parse_int_safe(current.get('server_version'), 0)
         next_ver = max(prev_ver + 1, _parse_int_safe(payload.get('server_version'), 0) or 0)
         payload['server_version'] = next_ver if next_ver > 0 else 1
@@ -1495,6 +1692,12 @@ def _save_offline_data(payload):
             payload['updated_at'] = payload.get('server_updated_at') or _server_now_iso()
     _backup_offline_file(path)
     _atomic_write_json(path, payload)
+    # Prime the shared cache with the just-saved payload so the next read
+    # (immediate refetch from frontend after save) is a cache hit.
+    if isinstance(payload, dict):
+        _prime_data_cache(payload)
+    else:
+        _invalidate_data_cache()
     _backup_offline_hourly_immutable(payload)
     _gist_push_snapshot_async(payload, reason='save_offline_data')
     return payload
@@ -1542,6 +1745,22 @@ def _parse_sync_stamp(value):
         return datetime.fromisoformat(text).timestamp()
     except Exception:
         return 0.0
+
+
+def _get_last_history_stamp(row):
+    """Return the most recent history entry timestamp for a score row."""
+    if not isinstance(row, dict):
+        return 0.0
+    history = row.get('history')
+    if not isinstance(history, list) or not history:
+        return 0.0
+    max_stamp = 0.0
+    for entry in history:
+        if isinstance(entry, dict):
+            ts = _parse_sync_stamp(entry.get('timestamp', ''))
+            if ts > max_stamp:
+                max_stamp = ts
+    return max_stamp
 
 
 def _payload_sync_stamp(payload):
@@ -1738,7 +1957,14 @@ def _fetch_peer_offline_payload(base_url, timeout_sec=2.5):
         return None
     peer = str(base_url).rstrip('/')
     url = f'{peer}/scoreboard/offline-data'
-    req = urllib.request.Request(url, method='GET', headers={'Cache-Control': 'no-store'})
+    # Authenticate as a replication peer so the remote serves the FULL snapshot
+    # (unauthenticated GETs now receive a sanitized public view — see
+    # _sanitize_anonymous_snapshot — which must never be persisted as a backup).
+    headers = {'Cache-Control': 'no-store', 'X-EA-Replicated': '1'}
+    shared_key = resolve_sync_shared_key()
+    if shared_key:
+        headers['X-EA-Sync-Key'] = shared_key
+    req = urllib.request.Request(url, method='GET', headers=headers)
     try:
         with urllib.request.urlopen(req, timeout=timeout_sec) as resp:
             body = resp.read()
@@ -1753,11 +1979,17 @@ def _fetch_peer_offline_payload(base_url, timeout_sec=2.5):
     if not isinstance(parsed, dict):
         return None
     data = parsed.get('data')
-    return data if isinstance(data, dict) else None
+    if not isinstance(data, dict):
+        return None
+    # Never accept sanitized/clipped payloads as recovery snapshots — they are
+    # month-filtered views, not the full ledger. Persisting one would destroy data.
+    if not is_full_ledger_snapshot(data):
+        return None
+    return data
 
 
 def _best_peer_snapshot(min_students=25, timeout_sec=2.5):
-    peers = _get_sync_peers()
+    peers = get_sync_peers()
     best = None
     best_stamp = 0.0
     best_count = 0
@@ -1794,10 +2026,21 @@ def _recover_tiny_roster_if_needed(payload, min_students=25):
 
     if recovered and not _is_tiny_roster(recovered, min_students):
         recovered = dict(recovered)
-        recovered['fee_records'] = _merge_fee_records_superset(
-            payload.get('fee_records', []),
-            recovered.get('fee_records', []),
-        )
+        # Prefer local fee_records if recovered snapshot has none (protects against stale cloud copy).
+        if not recovered.get('fee_records') and payload.get('fee_records'):
+            recovered['fee_records'] = payload['fee_records']
+        # CRITICAL: Merge students instead of raw overwrite so structural visibility
+        # fields (active_from_month, deactivation_month) set locally are never dropped.
+        if isinstance(payload.get('students'), list) and isinstance(recovered.get('students'), list):
+            recovered['students'] = _merge_students_preserve_active(
+                payload.get('students', []),
+                recovered.get('students', [])
+            )
+        if isinstance(payload.get('month_roster_profiles'), dict) and isinstance(recovered.get('month_roster_profiles'), dict):
+            recovered['month_roster_profiles'] = _merge_month_roster_profiles_superset(
+                payload.get('month_roster_profiles', {}),
+                recovered.get('month_roster_profiles', {})
+            )
         try:
             _save_offline_data(recovered)
         except Exception:
@@ -1861,10 +2104,23 @@ def _recover_stale_snapshot_if_needed(payload, min_students=25, min_newer_second
 
     if best_payload and best_stamp >= (local_stamp + float(min_newer_seconds or 0)):
         best_payload = dict(best_payload)
-        best_payload['fee_records'] = _merge_fee_records_superset(
-            payload.get('fee_records', []),
-            best_payload.get('fee_records', []),
-        )
+        # Prefer local fee_records if recovered snapshot has none (protects against stale cloud copy).
+        if not best_payload.get('fee_records') and payload.get('fee_records'):
+            best_payload['fee_records'] = payload['fee_records']
+        # CRITICAL: Merge students instead of raw overwrite so structural visibility
+        # fields (active_from_month, deactivation_month) set locally are never
+        # dropped by a peer snapshot that lacks them.
+        if isinstance(payload.get('students'), list) and isinstance(best_payload.get('students'), list):
+            best_payload['students'] = _merge_students_preserve_active(
+                payload.get('students', []),
+                best_payload.get('students', [])
+            )
+        # Superset-merge month rosters so local roster additions are preserved.
+        if isinstance(payload.get('month_roster_profiles'), dict) and isinstance(best_payload.get('month_roster_profiles'), dict):
+            best_payload['month_roster_profiles'] = _merge_month_roster_profiles_superset(
+                payload.get('month_roster_profiles', {}),
+                best_payload.get('month_roster_profiles', {})
+            )
         try:
             _save_offline_data(best_payload)
         except Exception:
@@ -1924,6 +2180,13 @@ def _parse_int_safe(value, default=0):
         return default
 
 
+def _parse_float_safe(value, default=0.0):
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
 def _normalize_holder_status(value):
     text = str(value or '').strip().lower()
     if text == 'suspended':
@@ -1941,11 +2204,14 @@ def _leadership_role_type(post_name):
     text = _normalize_post_text(post_name)
     if not text:
         return ''
-    if 'leader of opposition' in text or '(lop)' in text:
+    # Check for opposition / lop
+    if re.search(r'\b(leader of opposition|opposition leader|lop)\b', text) or '(lop)' in text:
         return 'lop'
-    if 'co-leader' in text or 'co leader' in text or '(col)' in text:
+    # Check for co-leader / co leader / col
+    if re.search(r'\b(co-leader|co-leaders|co leader|co leaders|col)\b', text) or '(col)' in text:
         return 'co_leader'
-    if ('leader' in text or '(l)' in text) and 'opposition' not in text:
+    # Check for leader / l
+    if (re.search(r'\b(leader|l)\b', text) or '(l)' in text) and not re.search(r'\b(opposition|co-leader|co-leaders|co leader|co leaders|col)\b', text):
         return 'leader'
     return ''
 
@@ -1958,8 +2224,10 @@ def _leadership_veto_quota(post_name):
         return 3
     if role_type == 'lop':
         return 2
+    
     text = str(post_name or '').strip().lower()
-    if 'discipline' in text and 'welfare' in text:
+    # Check for discipline and welfare or dwi
+    if ('discipline' in text and 'welfare' in text) or re.search(r'\bdwi\b', text) or '(dwi)' in text:
         return 1
     return 0
 
@@ -2099,12 +2367,189 @@ def _reconcile_role_veto_monthly(data, month_key=None, date_key=None):
         student['role_veto_count'] = grant
 
 
+def _get_student_month_consumed_vetos(data, student_id, month):
+    sid = _parse_int_safe(student_id, 0)
+    if sid <= 0 or not isinstance(data, dict):
+        return 0
+    scores = data.get('scores', []) or []
+    consumed = 0
+    for score in scores:
+        if not isinstance(score, dict):
+            continue
+        if _parse_int_safe(score.get('studentId'), 0) != sid:
+            continue
+        if score.get('month') != month:
+            continue
+        
+        # 1. Negative vetos delta in scores
+        v_val = _parse_int_safe(score.get('vetos'), 0)
+        if v_val < 0:
+            consumed += abs(v_val)
+            
+        # 2. Check notes for display-only veto usage
+        notes = str(score.get('notes', '') or '')
+        parts = [p.strip() for p in notes.split('|') if p.strip()]
+        display_only = 0
+        for part in parts:
+            if re.match(r'^1V used to select (.+?) post for (.+)$', part, re.IGNORECASE):
+                display_only += 1
+        if '[veto shield]' in notes.lower():
+            display_only += 1
+            
+        # Add display-only if it was not already accounted for by negative vetos field
+        if v_val >= 0:
+            consumed += display_only
+            
+    return consumed
+
+
+def _get_student_total_used_vetos_from_scores(data, student_id):
+    sid = _parse_int_safe(student_id, 0)
+    if sid <= 0 or not isinstance(data, dict):
+        return 0
+    scores = data.get('scores', []) or []
+    consumed = 0
+    for score in scores:
+        if not isinstance(score, dict):
+            continue
+        if _parse_int_safe(score.get('studentId'), 0) != sid:
+            continue
+        
+        # 1. Negative vetos delta in scores
+        v_val = _parse_int_safe(score.get('vetos'), 0)
+        if v_val < 0:
+            consumed += abs(v_val)
+            
+        # 2. Check notes for display-only veto usage
+        notes = str(score.get('notes', '') or '')
+        parts = [p.strip() for p in notes.split('|') if p.strip()]
+        display_only = 0
+        for part in parts:
+            if re.match(r'^1V used to select (.+?) post for (.+)$', part, re.IGNORECASE):
+                display_only += 1
+        if '[veto shield]' in notes.lower():
+            display_only += 1
+            
+        # Add display-only if it was not already accounted for by negative vetos field
+        if v_val >= 0:
+            consumed += display_only
+            
+    return consumed
+
+
+def _reconcile_veto_tracking_from_data(data):
+    """
+    Reconciles the veto_tracking ledger with the actual scores and log entries.
+    - Adds star-to-veto conversions to student's individual_vetos.
+    - Updates used_vetos and remaining_vetos based on both ledger and scores.
+    """
+    if not isinstance(data, dict):
+        return
+        
+    if 'veto_tracking' not in data or not isinstance(data.get('veto_tracking'), dict):
+        data['veto_tracking'] = {
+            'hardened': True,
+            'initialized_at': _server_now_iso(),
+            'version': 2,
+            'students': {},
+            'usage_log': [],
+            'last_reset': _server_now_iso()
+        }
+        
+    veto_tracking = data['veto_tracking']
+    students_map = veto_tracking.setdefault('students', {})
+    usage_log = veto_tracking.setdefault('usage_log', [])
+    
+    # 1. Define initial individual veto allocations (standard from setup)
+    #    Updated 2026-07: EA24A01→EA24B15 and EA24C02→EA24D33 after roll changes
+    initial_allocations = {
+        'EA24B15': 1, # Ayush Gupta (was EA24A01, changed 2026-04)
+        'EA24B09': 1, # Abdul Arman
+        'EA25A07': 1, # Vishes Xalxo
+        'EA24C28': 1, # Pari Gupta
+        'EA24A05': 1, # Rashi
+        'EA24D33': 3, # Sahil Yadav (was EA24C02, changed 2026-04)
+        'EA24D32': 1, # Sakshi
+        'EA24D15': 3, # Reeyansh Lama
+        'EA24D25': 1, # Nandani Gupta
+    }
+    
+    # 1b. Compute conversion gains from usage_log (deduplicated by timestamp)
+    #     This is computed BEFORE writing students_map so individual_vetos can be
+    #     set as initial_allocations + conversions in a single pass, making the
+    #     function fully idempotent (no accumulation across calls).
+    seen_conversion_ts = set()
+    conversion_gains = {}
+    for entry in usage_log:
+        if not isinstance(entry, dict):
+            continue
+        if entry.get('action') == 'star_to_veto_converted':
+            ts = entry.get('timestamp')
+            if ts and ts in seen_conversion_ts:
+                continue
+            roll = entry.get('roll')
+            gained = _parse_int_safe(entry.get('vetos_gained'), 0)
+            if roll and gained > 0:
+                conversion_gains[roll] = conversion_gains.get(roll, 0) + gained
+            if ts:
+                seen_conversion_ts.add(ts)
+
+    # Reset/ensure everyone in veto_tracking has their base allocations and current role allocations
+    # ALWAYS reset individual_vetos = initial_allocations + conversion_gains.
+    # This makes the function idempotent: running it N times produces the same
+    # result as running it once. Previous versions preserved existing
+    # individual_vetos which caused unbounded inflation on repeated calls.
+    for student in data.get('students', []):
+        roll = student.get('roll')
+        if not roll:
+            continue
+        role_vc = max(0, _parse_int_safe(student.get('role_veto_count'), 0))
+        base_alloc = initial_allocations.get(roll, 0)
+        conv_gain = conversion_gains.get(roll, 0)
+        ind_vetos = base_alloc + conv_gain
+        students_map[roll] = {
+            'name': student.get('name', 'Unknown'),
+            'individual_vetos': ind_vetos,
+            'role_vetos': role_vc,
+            'total_vetos': ind_vetos + role_vc,
+            'used_vetos': 0,
+            'remaining_vetos': ind_vetos + role_vc
+        }
+            
+    # 2b. Remove stale roll entries from students_map that are no longer in the
+    #     current student list (e.g. after a roll change). This prevents old
+    #     inflated entries from persisting and being looked up by stale rolls.
+    current_rolls = {s.get('roll') for s in data.get('students', []) if s.get('roll')}
+    stale_rolls = [r for r in list(students_map.keys()) if r not in current_rolls]
+    for r in stale_rolls:
+        del students_map[r]
+
+    # 3. Update used_vetos and remaining_vetos from actual score entries
+    roll_to_sid = {s.get('roll'): s.get('id') for s in data.get('students', []) if s.get('roll') and s.get('id')}
+    for roll, s_data in students_map.items():
+        sid = roll_to_sid.get(roll)
+        used_from_scores = _get_student_total_used_vetos_from_scores(data, sid) if sid else 0
+        used_from_ledger = _parse_int_safe(s_data.get('used_vetos'), 0)
+        
+        total_used = max(used_from_ledger, used_from_scores)
+        s_data['used_vetos'] = total_used
+        s_data['total_vetos'] = s_data.get('individual_vetos', 0) + s_data.get('role_vetos', 0)
+        s_data['remaining_vetos'] = max(0, s_data['total_vetos'] - total_used)
+
+
 def _reconcile_veto_counters_from_scores(data, month_key=None):
     if not isinstance(data, dict):
         return
     month = str(month_key or _server_now_iso()[:7]).strip()
     if not re.match(r'^\d{4}-\d{2}$', month):
         month = _server_now_iso()[:7]
+
+    # Reconcile veto_tracking ledger first to ensure it's up to date
+    try:
+        _reconcile_veto_tracking_from_data(data)
+    except Exception as e:
+        current_app.logger.warning(f"Failed to reconcile veto_tracking from data: {e}")
+
     grants = {}
     if isinstance(data.get('role_veto_monthly'), dict):
         grants = data['role_veto_monthly'].get(month, {}) or {}
@@ -2162,6 +2607,49 @@ def _reconcile_veto_counters_from_scores(data, month_key=None):
             if student.get('role_veto_count', 0) != 0:
                 student['role_veto_count'] = 0
 
+    # Deduct spent vetoes in THIS month only from veto_count and role_veto_count
+    # Priority: individual veto_count first, then role_veto_count (matching spendStudentVetoPower)
+    # CRITICAL: Use month-specific consumed vetos, NOT the cumulative used_vetos from
+    # veto_tracking (which totals usage across ALL months and would permanently
+    # reduce current-month balances with historical usage).
+    veto_tracking = data.get('veto_tracking', {})
+    tracked = veto_tracking.get('students') or {}
+    roll_to_sid_for_month = {
+        s.get('roll'): _parse_int_safe(s.get('id'), 0)
+        for s in students if s.get('roll') and _parse_int_safe(s.get('id'), 0) > 0
+    }
+    for student in students:
+        roll = student.get('roll')
+        if not roll or roll not in tracked:
+            continue
+        entry = tracked[roll]
+        sid = roll_to_sid_for_month.get(roll, 0)
+
+        # Month-specific used vetos (only counts vetos spent in this target month)
+        month_used = _get_student_month_consumed_vetos(data, sid, month) if sid else 0
+        remaining = month_used
+        ind_rem = _parse_int_safe(entry.get('individual_vetos'), 0)
+        role_rem = _parse_int_safe(entry.get('role_vetos'), 0)
+
+        take_ind = min(ind_rem, remaining)
+        ind_rem -= take_ind
+        remaining -= take_ind
+
+        if remaining > 0:
+            take_role = min(role_rem, remaining)
+            role_rem -= take_role
+            remaining -= take_role
+
+        old_vc = _parse_int_safe(student.get('veto_count'), 0)
+        old_rvc = _parse_int_safe(student.get('role_veto_count'), 0)
+        if old_vc != ind_rem or old_rvc != role_rem:
+            student['veto_count'] = ind_rem
+            student['role_veto_count'] = role_rem
+            student['used_veto_count'] = month_used
+            # Update timestamp so client merge logic (timestamp-based) accepts
+            # the server's corrected veto counts over locally inflated values.
+            student['updated_at'] = _server_now_iso()
+
 
 def _compute_student_star_balance(data, student_id, month_key):
     """Thin wrapper — logic lives in app.utils.score_balance (Step 5 module split)."""
@@ -2183,6 +2671,13 @@ def _merge_teacher_scores(existing_data, incoming_data):
 
     existing_students = existing_data.get('students', []) or []
     incoming_students = incoming_data.get('students', []) or []
+
+    # Build set of student IDs that have GCB immunity (score floor -20).
+    gcb_student_ids = {
+        _parse_int_safe(s.get('id'), 0)
+        for s in existing_students
+        if isinstance(s, dict) and s.get('gcb')
+    }
 
     existing_id_by_roll = {}
     existing_id_set = set()
@@ -2241,10 +2736,22 @@ def _merge_teacher_scores(existing_data, incoming_data):
         approved_stars = _parse_int_safe(existing_score.get('stars')) if isinstance(existing_score, dict) else 0
         approved_vetos = _parse_int_safe(existing_score.get('vetos')) if isinstance(existing_score, dict) else 0
         month_key = str(incoming.get('month') or '').strip() or date_key[:7]
+        raw_points = _parse_float_safe(incoming.get('points'))
+        
+        clamped_points = raw_points
+                
+        # Teacher can input a maximum of 50 points
+        if clamped_points > 50:
+            clamped_points = 50
+                
+        # Apply GCB student immunity minimum score floor (-20)
+        if target_sid in gcb_student_ids:
+            clamped_points = max(-20, clamped_points)
+
         normalized_score = {
             'studentId': target_sid,
             'date': date_key,
-            'points': _parse_int_safe(incoming.get('points')),
+            'points': clamped_points,
             'stars': approved_stars,
             'vetos': approved_vetos,
             'month': month_key,
@@ -2515,6 +3022,17 @@ def _merge_month_roster_profiles_superset(existing_rp, incoming_rp):
                         merged_profile['class'] = existing_profile.get('class')
                     if existing_profile.get('class_updated_at'):
                         merged_profile['class_updated_at'] = existing_profile.get('class_updated_at')
+                # Preserve name from the side with the newer name stamp.
+                def _rp_name_stamp(row):
+                    if not isinstance(row, dict):
+                        return 0.0
+                    return _parse_sync_stamp(row.get('name_updated_at') or row.get('updated_at') or row.get('created_at') or '')
+                if _rp_name_stamp(existing_profile) > _rp_name_stamp(p) and existing_profile.get('base_name'):
+                    merged_profile['base_name'] = existing_profile.get('base_name')
+                    merged_profile['name'] = existing_profile.get('base_name')
+                elif _rp_name_stamp(p) > _rp_name_stamp(existing_profile) and p.get('base_name'):
+                    merged_profile['base_name'] = p.get('base_name')
+                    merged_profile['name'] = p.get('base_name')
                 by_roll[roll] = merged_profile
         merged[month] = list(by_roll.values())
     return merged
@@ -2602,6 +3120,98 @@ def _preserve_locked_historical_window(existing_payload, incoming_payload):
     return incoming
 
 
+def _apply_admin_historical_score_ops(payload, ops, actor_login_id='Admin'):
+    """Apply explicit admin score ops for locked historical months only.
+
+    This keeps the historical lock guard in place for generic sync payloads while
+    allowing controlled Record Score operations (add/edit/delete) to pass through.
+    """
+    if not isinstance(payload, dict):
+        return payload
+    if not isinstance(ops, list) or not ops:
+        return payload
+
+    locked_months = _locked_month_keys(payload)
+    if not locked_months:
+        return payload
+
+    # GCB-immune students have a -20 score floor.
+    gcb_student_ids = {
+        _parse_int_safe(s.get('id'), 0)
+        for s in (payload.get('students', []) or [])
+        if isinstance(s, dict) and s.get('gcb')
+    }
+
+    scores = payload.get('scores', [])
+    if not isinstance(scores, list):
+        scores = []
+
+    by_key = {}
+    max_id = 0
+    for row in scores:
+        if not isinstance(row, dict):
+            continue
+        sid = _parse_int_safe(row.get('studentId'), 0)
+        date_key = str(row.get('date') or '').strip()[:10]
+        month_key = str(row.get('month') or date_key[:7]).strip()
+        if sid <= 0 or not re.match(r'^\d{4}-\d{2}-\d{2}$', date_key) or not re.match(r'^\d{4}-\d{2}$', month_key):
+            continue
+        key = (sid, date_key, month_key)
+        by_key[key] = dict(row)
+        max_id = max(max_id, _parse_int_safe(row.get('id'), 0))
+
+    now_iso = _server_now_iso()
+    for raw in ops[:200]:
+        if not isinstance(raw, dict):
+            continue
+        op_type = str(raw.get('type') or 'upsert').strip().lower()
+        sid = _parse_int_safe(raw.get('studentId'), 0)
+        date_key = str(raw.get('date') or '').strip()[:10]
+        month_key = str(raw.get('month') or date_key[:7]).strip()
+        if sid <= 0 or not re.match(r'^\d{4}-\d{2}-\d{2}$', date_key) or not re.match(r'^\d{4}-\d{2}$', month_key):
+            continue
+        if month_key not in locked_months:
+            continue
+
+        key = (sid, date_key, month_key)
+        if op_type == 'delete':
+            by_key.pop(key, None)
+            continue
+
+        existing = by_key.get(key, {})
+        row = dict(existing)
+        if _parse_int_safe(row.get('id'), 0) <= 0:
+            max_id += 1
+            row['id'] = max_id
+            row['created_at'] = now_iso
+
+        row['studentId'] = sid
+        row['date'] = date_key
+        row['month'] = month_key
+        raw_pts = _parse_int_safe(raw.get('points'), 0)
+        row['points'] = max(-20, raw_pts) if sid in gcb_student_ids else raw_pts
+        row['stars'] = _parse_int_safe(raw.get('stars'), 0)
+        row['vetos'] = _parse_int_safe(raw.get('vetos'), 0)
+        row['notes'] = str(raw.get('notes') or '').strip()
+        row['recordedBy'] = str(raw.get('recordedBy') or actor_login_id or row.get('recordedBy') or 'Admin').strip()
+        row['star_usage_normal'] = max(0, _parse_int_safe(raw.get('star_usage_normal'), _parse_int_safe(row.get('star_usage_normal'), 0)))
+        row['star_usage_disciplinary'] = max(0, _parse_int_safe(raw.get('star_usage_disciplinary'), _parse_int_safe(row.get('star_usage_disciplinary'), 0)))
+        row['updated_at'] = now_iso
+
+        history_entry = raw.get('history_entry')
+        if isinstance(history_entry, dict):
+            row_history = row.get('history')
+            if not isinstance(row_history, list):
+                row_history = []
+            row_history.append(dict(history_entry))
+            row['history'] = row_history
+
+        by_key[key] = row
+
+    payload['scores'] = list(by_key.values())
+    return payload
+
+
 def _merge_students_preserve_active(existing_students, incoming_students):
     """Merge student lists, never downgrading active:True→False without a genuinely newer timestamp.
     This protects against sync-induced corruption where a peer device pushes stale active:false flags."""
@@ -2671,8 +3281,33 @@ def _merge_students_preserve_active(existing_students, incoming_students):
             if existing.get('class_updated_at'):
                 merged_s['class_updated_at'] = existing.get('class_updated_at')
 
+        # Preserve name from the record with the newer name timestamp.
+        def _name_stamp(row):
+            return _parse_sync_stamp(row.get('name_updated_at') or row.get('updated_at') or row.get('created_at') or '')
+        if _name_stamp(existing) > _name_stamp(incoming) and existing.get('base_name'):
+            merged_s['base_name'] = existing.get('base_name')
+            merged_s['name'] = existing.get('base_name')
+            merged_s['raw_name'] = existing.get('raw_name') or existing.get('base_name')
+            if existing.get('name_updated_at'):
+                merged_s['name_updated_at'] = existing.get('name_updated_at')
+        elif _name_stamp(incoming) > _name_stamp(existing) and incoming.get('base_name'):
+            merged_s['base_name'] = incoming.get('base_name')
+            merged_s['name'] = incoming.get('base_name')
+            merged_s['raw_name'] = incoming.get('raw_name') or incoming.get('base_name')
+            if incoming.get('name_updated_at'):
+                merged_s['name_updated_at'] = incoming.get('name_updated_at')
+
         if existing.get('active') is not False and merged_s.get('active') is False:
             merged_s['active'] = existing.get('active', True)
+
+        # Preserve structural visibility fields: never drop active_from_month or
+        # deactivation_month once set on either side.  These control whether a
+        # student appears in historical months and roll-change visibility checks.
+        for _vis_field in ('active_from_month', 'deactivation_month'):
+            _existing_val = str(existing.get(_vis_field) or '').strip()
+            _merged_val = str(merged_s.get(_vis_field) or '').strip()
+            if _existing_val and not _merged_val:
+                merged_s[_vis_field] = _existing_val
 
         roll_value = _normalize_roll_value(merged_s.get('roll'))
         if roll_value:
@@ -2807,7 +3442,7 @@ def _merge_scores_superset(existing_scores, incoming_scores):
         normalized['studentId'] = sid
         normalized['date'] = date_key
         normalized['month'] = month_key
-        normalized['points'] = _parse_int_safe(score.get('points'))
+        normalized['points'] = round(_parse_float_safe(score.get('points')), 2)
         normalized['stars'] = _parse_int_safe(score.get('stars'))
         normalized['vetos'] = _parse_int_safe(score.get('vetos'))
         key = (str(sid), date_key, month_key)
@@ -2826,10 +3461,24 @@ def _merge_scores_superset(existing_scores, incoming_scores):
             continue
         if key in merged:
             prev = merged[key]
+            prev_points = _parse_float_safe(prev.get('points'))
+            prev_stars = _parse_int_safe(prev.get('stars'))
+            prev_vetos = _parse_int_safe(prev.get('vetos'))
+            
+            # History-aware merge: updated_at can be bumped by sync operations,
+            # but history entries record actual user edits. If prev has a more
+            # recent history entry than incoming, prev is more authoritative.
+            prev_hist_stamp = _get_last_history_stamp(prev)
+            next_hist_stamp = _get_last_history_stamp(normalized)
+            
+            # Perform standard timestamp and ID tiebreaker updates
             prev_stamp = _parse_sync_stamp(prev.get('updated_at', ''))
             next_stamp = _parse_sync_stamp(normalized.get('updated_at', ''))
             if next_stamp > prev_stamp:
-                merged[key] = normalized
+                if prev_hist_stamp > next_hist_stamp:
+                    pass  # Local has a more recent user edit — keep prev
+                else:
+                    merged[key] = normalized
             elif next_stamp == prev_stamp and _parse_int_safe(normalized.get('id')) > _parse_int_safe(prev.get('id')):
                 # Same age (or both missing updated_at): keep the higher-id record as tiebreaker.
                 merged[key] = normalized
@@ -3159,12 +3808,8 @@ def _clip_payload_to_allowed_months(payload, allowed_months):
             _month_key_from_date_like(row.get('month') or row.get('date') or row.get('created_at'))
         )
     ]
-    data['fee_records'] = [
-        row for row in (payload.get('fee_records') or [])
-        if isinstance(row, dict) and _in_allowed(
-            _month_key_from_date_like(row.get('month') or row.get('start_date') or row.get('updated_at'))
-        )
-    ]
+    # fee_records are per-student (not per-month), pass through unfiltered.
+    data['fee_records'] = list(payload.get('fee_records') or [])
 
     month_students = payload.get('month_students', {}) if isinstance(payload.get('month_students'), dict) else {}
     month_profiles = payload.get('month_roster_profiles', {}) if isinstance(payload.get('month_roster_profiles'), dict) else {}
@@ -3177,6 +3822,42 @@ def _clip_payload_to_allowed_months(payload, allowed_months):
         if _month_key_from_date_like(mk) in allowed
     }
     data['allowed_months'] = sorted(list(allowed))
+    return data
+
+
+def _sanitize_anonymous_snapshot(payload):
+    """
+    Public/display-safe view of the ledger for UNAUTHENTICATED GET /offline-data.
+    Keeps the recent scoreboard months renderable (students, scores, parties,
+    leadership) but strips private data: fees, appeals, resource money trails,
+    activity log, notifications, proposals and per-student personal profile
+    fields. The payload is marked with sync_scope='anonymous-public' so peers
+    and backup bootstraps refuse to persist it as a full snapshot.
+    """
+    months = set(_recent_public_month_window())
+    data = _clip_payload_to_allowed_months(payload, months)
+    data['fee_records'] = []
+    data['appeals'] = []
+    data['resource_requests'] = []
+    data['resource_transactions'] = []
+    data['resource_advantage_deductions'] = []
+    data['activity_log'] = []
+    data['notification_history'] = []
+    data['proposals'] = []
+    data['proposal_votes'] = []
+    data['proposal_messages'] = []
+    data['score_adjustment_actions'] = []
+    data['_sync_ops'] = []
+    safe_students = []
+    for s in (data.get('students') or []):
+        if not isinstance(s, dict):
+            continue
+        s = dict(s)
+        s.pop('profile_data', None)
+        s.pop('remarks', None)
+        safe_students.append(s)
+    data['students'] = safe_students
+    data['sync_scope'] = 'anonymous-public'
     return data
 
 
@@ -3246,7 +3927,7 @@ def _upsert_score_delta(snapshot, student_id, date_key, month_key, delta_points=
         }
         scores.append(target)
 
-    target['points'] = _parse_int_safe(target.get('points'), 0) + _parse_int_safe(delta_points, 0)
+    target['points'] = round(_parse_float_safe(target.get('points'), 0) + _parse_float_safe(delta_points, 0), 2)
     target['stars'] = _parse_int_safe(target.get('stars'), 0) + _parse_int_safe(delta_stars, 0)
     existing_note = str(target.get('notes') or '').strip()
     if note:
@@ -3414,6 +4095,15 @@ def _append_activity_log_entries(target_data, actor_login_id, actor_role, incomi
                 row_count += 1
                 if row_count >= row_cap:
                     break
+        if row_count < row_cap:
+            for row in incoming_payload.get('resource_transactions', []) or []:
+                if not isinstance(row, dict):
+                    continue
+                detail = f"type={str(row.get('type') or '').strip().lower()}, item={str(row.get('item_name') or '').strip()}, cost={_parse_int_safe(row.get('total_cost'))}, pts={_parse_int_safe(row.get('points_used'))}"
+                _add('resources', 'transaction_create', row, detail)
+                row_count += 1
+                if row_count >= row_cap:
+                    break
         if row_count >= row_cap:
             _add('system', 'log_truncated', {}, f'Captured first {row_cap} row-level changes in this request')
     else:
@@ -3476,60 +4166,137 @@ def _query_activity_log_rows(payload, user_filter='', class_filter='', student_f
 def _calculate_election_results(election_data, student_votes, teacher_votes):
     """Calculates the winner of an election.
 
+    Uses the same weighted-vote formula as the frontend:
+    - Student votes are weighted by each voter's votePower (stored on the vote record).
+    - Teacher vote power = (highest_student_vote_power + bonus) / 2,
+      where bonus comes from app_settings.teacher_vote_bonus (default 5).
+    - A winner must pass three thresholds: average weight, clear lead, and majority weight.
+
     Args:
-        election_data (dict): The election data.
-        student_votes (list): A list of student votes.
-        teacher_votes (list): A list of teacher votes.
+        election_data (dict): The full offline data dict (must contain 'students'
+            and optionally 'app_settings').
+        student_votes (list): A list of student vote records for a single post.
+        teacher_votes (list): A list of teacher vote records for a single post.
 
     Returns:
-        dict: A dictionary containing the winner and other election results.
-              Returns a null result if there is a tie or thresholds are not met.
+        dict: A dictionary containing the winner, tie flag, candidate vote totals,
+              and threshold metadata.  Returns a null result if there is a tie or
+              thresholds are not met.
     """
-    # Get the highest student vote power.
+    # --- Read configurable bonus from app_settings (matches frontend default) ---
+    app_settings = election_data.get('app_settings') or {}
+    bonus = 0
+    try:
+        bonus = int(app_settings.get('teacher_vote_bonus', 5))
+    except (TypeError, ValueError):
+        bonus = 5
+    bonus = max(0, bonus)
+
+    # --- Compute highest student vote power ---
+    # The frontend computes vote power from total scores via computeVotePower.
+    # Vote records store votePower at cast time, so we use the stored value.
     highest_student_vote_power = 0
+    for vote in student_votes:
+        vp = _parse_float_safe(vote.get('votePower'), 0)
+        if vp > highest_student_vote_power:
+            highest_student_vote_power = vp
+
+    # Also check student objects as a fallback (for cases where votes don't have votePower)
     for student in election_data.get('students', []):
-        if student.get('vote_power', 0) > highest_student_vote_power:
-            highest_student_vote_power = student.get('vote_power', 0)
+        vp = _parse_float_safe(student.get('vote_power'), 0)
+        if vp > highest_student_vote_power:
+            highest_student_vote_power = vp
 
-    # Calculate teacher vote power.
-    teacher_vote_power = highest_student_vote_power + 1
+    # --- Teacher vote power: (highest + bonus) / 2 (matches frontend getTeacherVotePower) ---
+    teacher_vote_power = (highest_student_vote_power + bonus) / 2.0
 
-    # Calculate the total votes for each candidate.
-    candidate_votes = {}
+    # --- Calculate weighted votes for each candidate ---
+    candidate_votes = {}  # candidate_id -> total composite weight
     for vote in student_votes:
         candidate_id = vote.get('candidateId')
-        if candidate_id:
-            if candidate_id not in candidate_votes:
-                candidate_votes[candidate_id] = 0
-            candidate_votes[candidate_id] += 1
+        if not candidate_id:
+            continue
+        # Use stored votePower, fall back to 1 if missing
+        weight = _parse_float_safe(vote.get('votePower'), 1)
+        if weight <= 0:
+            weight = 1
+        candidate_votes[candidate_id] = candidate_votes.get(candidate_id, 0) + weight
 
     for vote in teacher_votes:
         candidate_id = vote.get('candidateId')
-        if candidate_id:
-            if candidate_id not in candidate_votes:
-                candidate_votes[candidate_id] = 0
-            candidate_votes[candidate_id] += teacher_vote_power
+        if not candidate_id:
+            continue
+        candidate_votes[candidate_id] = candidate_votes.get(candidate_id, 0) + teacher_vote_power
 
-    # Find the winner.
-    winner = None
-    max_votes = 0
-    for candidate_id, votes in candidate_votes.items():
-        if votes > max_votes:
-            max_votes = votes
-            winner = candidate_id
+    if not candidate_votes:
+        return {'winner': None, 'tie': False, 'candidate_votes': {}, 'nullified': True,
+                'runoff': False, 'reason': 'No candidate votes'}
 
-    # Check for ties.
-    tie = False
-    for candidate_id, votes in candidate_votes.items():
-        if votes == max_votes and candidate_id != winner:
-            tie = True
-            break
+    # --- Sort candidates by composite weight (descending) ---
+    sorted_candidates = sorted(candidate_votes.items(), key=lambda x: x[1], reverse=True)
+    winner_id, top_weight = sorted_candidates[0]
+    second_weight = sorted_candidates[1][1] if len(sorted_candidates) > 1 else 0
 
-    # If there is a tie, the election is nullified.
+    # --- Check for tie (no clear lead) ---
+    eps = 0.0001
+    tie = len(sorted_candidates) > 1 and abs(top_weight - second_weight) < eps
+
     if tie:
-        return {'winner': None, 'tie': True}
+        return {'winner': None, 'tie': True, 'candidate_votes': candidate_votes,
+                'nullified': False, 'runoff': False, 'reason': 'Tie — no clear lead'}
 
-    return {'winner': winner, 'tie': False, 'candidate_votes': candidate_votes}
+    # --- Threshold checks (matches frontend _concludeStudentAndReveal logic) ---
+    # Count eligible student voters for threshold computation
+    eligible_voter_ids = set()
+    for vote in student_votes:
+        voter_id = vote.get('voterStudentId')
+        if voter_id:
+            eligible_voter_ids.add(voter_id)
+
+    # Total eligible weight = sum of votePower across all eligible voters who cast a vote
+    # (frontend uses all eligible voters, but backend only has vote records)
+    total_eligible_weight = 0
+    seen_voters = set()
+    for vote in student_votes:
+        voter_id = vote.get('voterStudentId')
+        if voter_id and voter_id not in seen_voters:
+            seen_voters.add(voter_id)
+            total_eligible_weight += _parse_float_safe(vote.get('votePower'), 1)
+
+    # Add teacher eligible weight
+    teacher_ids = set()
+    for vote in teacher_votes:
+        tid = vote.get('teacherId')
+        if tid:
+            teacher_ids.add(tid)
+    total_teacher_weight = len(teacher_ids) * teacher_vote_power
+    total_eligible_weight += total_teacher_weight
+
+    avg_threshold = total_eligible_weight / 2.0 if (len(seen_voters) + len(teacher_ids)) > 0 else 0
+    majority_threshold = total_eligible_weight / 2.0
+
+    passes_avg = top_weight >= avg_threshold
+    passes_majority = top_weight >= majority_threshold
+    clear_lead = top_weight > second_weight
+
+    if not passes_avg or not passes_majority:
+        if clear_lead and passes_avg:
+            return {'winner': None, 'tie': False, 'candidate_votes': candidate_votes,
+                    'nullified': False, 'runoff': True,
+                    'reason': 'Runoff required — clear lead but no majority',
+                    'top_weight': top_weight, 'second_weight': second_weight,
+                    'avg_threshold': avg_threshold,
+                    'majority_threshold': majority_threshold}
+        reason = 'Did not meet average threshold' if not passes_avg else 'Combined majority not reached'
+        return {'winner': None, 'tie': False, 'candidate_votes': candidate_votes,
+                'nullified': True, 'runoff': False, 'reason': reason,
+                'top_weight': top_weight, 'avg_threshold': avg_threshold,
+                'majority_threshold': majority_threshold}
+
+    return {'winner': winner_id, 'tie': False, 'candidate_votes': candidate_votes,
+            'top_weight': top_weight, 'second_weight': second_weight,
+            'avg_threshold': avg_threshold, 'majority_threshold': majority_threshold,
+            'teacher_vote_power': teacher_vote_power}
 
 
 def _merge_election_votes_superset(existing_votes, incoming_votes, mode='party'):
@@ -3601,8 +4368,14 @@ def _merge_election_votes_superset(existing_votes, incoming_votes, mode='party')
             prev_stamp = _parse_sync_stamp(prev.get('timestamp') or prev.get('updated_at') or prev.get('created_at'))
             next_stamp = _parse_sync_stamp(normalized.get('timestamp') or normalized.get('updated_at') or normalized.get('created_at'))
             if next_stamp >= prev_stamp:
+                current_app.logger.warning(
+                    'Duplicate vote key overwritten during sync: key=%s mode=%s '
+                    'prev_candidate=%s next_candidate=%s prev_stamp=%s next_stamp=%s',
+                    key, mode,
+                    prev.get('candidateId'), normalized.get('candidateId'),
+                    prev_stamp, next_stamp
+                )
                 merged[key] = normalized
-
 
     return list(merged.values())
 
@@ -4147,6 +4920,46 @@ def _merge_parties_superset(existing_parties, incoming_parties):
     return list(merged.values())
 
 
+def _merge_postholder_tickets(existing_tickets, incoming_tickets):
+    """Merge postholder ticket balances keyed by studentId.
+    Take the max of each ticket type so grants are never lost."""
+    merged = {}
+    local = existing_tickets if isinstance(existing_tickets, dict) else {}
+    remote = incoming_tickets if isinstance(incoming_tickets, dict) else {}
+    all_keys = set(list(local.keys()) + list(remote.keys()))
+    for key in all_keys:
+        lt = local.get(key) or {}
+        rt = remote.get(key) or {}
+        half = max(_parse_int_safe(lt.get('half_tickets'), 0), _parse_int_safe(rt.get('half_tickets'), 0))
+        erase = max(_parse_int_safe(lt.get('erase_tickets'), 0), _parse_int_safe(rt.get('erase_tickets'), 0))
+        if half > 0 or erase > 0:
+            merged[key] = {'half_tickets': half, 'erase_tickets': erase}
+    return merged
+
+
+def _merge_postholder_ticket_log(existing_log, incoming_log):
+    """Merge postholder ticket log entries by id; never drop entries, prefer newer by timestamp."""
+    merged = {}
+    for arr in [existing_log or [], incoming_log or []]:
+        for entry in arr:
+            if not isinstance(entry, dict):
+                continue
+            eid = int(entry.get('id') or 0)
+            if not eid:
+                continue
+            prev = merged.get(eid)
+            if not prev:
+                merged[eid] = dict(entry)
+                continue
+            prev_stamp = _parse_sync_stamp(prev.get('timestamp'))
+            new_stamp = _parse_sync_stamp(entry.get('timestamp'))
+            if prev_stamp > new_stamp:
+                merged[eid] = {**entry, **prev}
+            else:
+                merged[eid] = {**prev, **entry}
+    return list(merged.values())
+
+
 def _merge_pending_cr_requests_superset(existing_reqs, incoming_reqs):
     """Merge pending CR requests by id.
     Never downgrade a resolved (approved/rejected) request back to pending.
@@ -4198,7 +5011,7 @@ def _merge_pending_cr_requests_teacher(existing_reqs, incoming_reqs, teacher_log
         elected_on = str(raw.get('elected_on') or '').strip()[:10]
         if not group or student_id <= 0:
             continue
-        post = str(raw.get('post') or f'CR - Group {group}').strip() or f'CR - Group {group}'
+        post = str(raw.get('post') or f'GR - Group {group}').strip() or f'GR - Group {group}'
         note = str(raw.get('note') or '').strip()[:250]
         sanitized_new.append({
             'id': rid,
@@ -4801,8 +5614,7 @@ def _save_politics_data(data):
         'parties': _normalize_parties(data.get('parties', [])),
         'leadership': _normalize_leadership(data.get('leadership', []))
     }
-    with open(_politics_file_path(), 'w', encoding='utf-8') as f:
-        json.dump(payload, f, ensure_ascii=False, indent=2)
+    _shared_atomic_write_json(_politics_file_path(), payload, indent=2)
     return payload
 
 
@@ -4853,117 +5665,9 @@ def _extract_party_and_leadership(ws):
     return parties, leadership
 
 
-FEB26_SEED = json.loads(r'''
-{
-  "students": [
-    { "id": 1, "roll": "EA24A01", "name": "Ayush Gupta** (CR) (Vv)", "class": 4, "fees": 500, "total_score": 0, "rank": 28, "vote_power": 1 },
-    { "id": 2, "roll": "EA24A03", "name": "Ayat Parveen", "class": 4, "fees": 800, "total_score": 0, "rank": 28, "vote_power": 1 },
-    { "id": 3, "roll": "EA24A04", "name": "Tanu Sinha**", "class": 4, "fees": 600, "total_score": 60, "rank": 20, "vote_power": 4 },
-    { "id": 4, "roll": "EA24A05", "name": "Rashi (v)", "class": 3, "fees": 500, "total_score": 0, "rank": 28, "vote_power": 1 },
-    { "id": 5, "roll": "EA25A07", "name": "Vishes Xalxo***(v)", "class": 3, "fees": 500, "total_score": 0, "rank": 28, "vote_power": 1 },
-    { "id": 6, "roll": "EA25A13", "name": "Afreen Khatun", "class": 3, "fees": 600, "total_score": 0, "rank": 28, "vote_power": 1 },
-    { "id": 7, "roll": "EA25A15", "name": "Ansh Kumar Singh", "class": 2, "fees": 0, "total_score": 0, "rank": 28, "vote_power": 1 },
-    { "id": 8, "roll": "EA24B01", "name": "Pari Gupta****** (v)", "class": 6, "fees": 0, "total_score": 0, "rank": 28, "vote_power": 1 },
-    { "id": 9, "roll": "EA24B03", "name": "Deep Das*", "class": 6, "fees": 1000, "total_score": 97, "rank": 12, "vote_power": 6 },
-    { "id": 10, "roll": "EA24B09", "name": "Abdul Arman**** (ECS) (PP)", "class": 5, "fees": 1000, "total_score": 79, "rank": 16, "vote_power": 5 },
-    { "id": 11, "roll": "EA25B05", "name": "Rajveer Thakur", "class": 6, "fees": 800, "total_score": 0, "rank": 28, "vote_power": 1 },
-    { "id": 12, "roll": "EA25B06", "name": "Jay Arya***", "class": 5, "fees": 800, "total_score": 139, "rank": 6, "vote_power": 8 },
-    { "id": 13, "roll": "EA25B10", "name": "Shiva Mallick (v)", "class": 5, "fees": 1000, "total_score": 160, "rank": 3, "vote_power": 9 },
-    { "id": 14, "roll": "EA25B13", "name": "Rehmetun Khatun (ECJ)", "class": 6, "fees": 1200, "total_score": 0, "rank": 28, "vote_power": 1 },
-    { "id": 15, "roll": "EA25B14", "name": "Prem Oraon*****", "class": 6, "fees": 800, "total_score": 0, "rank": 28, "vote_power": 1 },
-    { "id": 16, "roll": "EA24C02", "name": "Sahil Yadav****************** (vvv)", "class": 8, "fees": 0, "total_score": 94, "rank": 13, "vote_power": 6 },
-    { "id": 17, "roll": "EA24C03", "name": "Abhik Mallik", "class": 8, "fees": 1000, "total_score": 41, "rank": 25, "vote_power": 3 },
-    { "id": 18, "roll": "EA24C06", "name": "Sakshi*** (v) (CCAI)", "class": 8, "fees": 1500, "total_score": 0, "rank": 28, "vote_power": 1 },
-    { "id": 19, "roll": "EA25C07", "name": "Khushi Paswan** (v)", "class": 8, "fees": 500, "total_score": 72, "rank": 17, "vote_power": 4 },
-    { "id": 20, "roll": "EA25C09", "name": "Shomiya Xalxo*** (WCI) (PP)", "class": 7, "fees": 1000, "total_score": 182, "rank": 2, "vote_power": 10 },
-    { "id": 21, "roll": "EA25C10", "name": "Adarsh Arya*", "class": 8, "fees": 1200, "total_score": 1, "rank": 27, "vote_power": 1 },
-    { "id": 22, "roll": "EA25C11", "name": "Sourav Das*", "class": 8, "fees": 1200, "total_score": 0, "rank": 28, "vote_power": 1 },
-    { "id": 23, "roll": "EA25C12", "name": "Shubham Singha (PP)", "class": 8, "fees": 1200, "total_score": 47, "rank": 22, "vote_power": 3 },
-    { "id": 24, "roll": "EA25C15", "name": "Nirupam Vaid*", "class": 8, "fees": 1500, "total_score": 35, "rank": 26, "vote_power": 2 },
-    { "id": 25, "roll": "EA25C17", "name": "Alen Ghartimagar", "class": 8, "fees": 1500, "total_score": 63, "rank": 19, "vote_power": 4 },
-    { "id": 26, "roll": "EA25C18", "name": "N Riya Kumari", "class": 8, "fees": 1500, "total_score": 118, "rank": 9, "vote_power": 7 },
-    { "id": 27, "roll": "EA25C19", "name": "Samarth Patel*(CITC)", "class": 8, "fees": 1500, "total_score": 153, "rank": 5, "vote_power": 9 },
-    { "id": 28, "roll": "EA25C20", "name": "Rishi Trivedi", "class": 8, "fees": 1500, "total_score": 90, "rank": 15, "vote_power": 5 },
-    { "id": 29, "roll": "EA25C21", "name": "Sristi Kumari", "class": 7, "fees": 1500, "total_score": 0, "rank": 28, "vote_power": 1 },
-    { "id": 30, "roll": "EA25C22", "name": "Piyush Rajak", "class": 8, "fees": 1000, "total_score": 0, "rank": 28, "vote_power": 1 },
-    { "id": 31, "roll": "EA25C23", "name": "Abhinav Khati (CR) (PP)", "class": 7, "fees": 1200, "total_score": 0, "rank": 28, "vote_power": 1 },
-    { "id": 32, "roll": "EA26C24", "name": "Rishabh Kumar Singh", "class": 7, "fees": 0, "total_score": 42, "rank": 24, "vote_power": 3 },
-    { "id": 33, "roll": "EA24D01", "name": "Jay Kumar Yadav*** (CR) (V)", "class": 10, "fees": 0, "total_score": 187, "rank": 1, "vote_power": 10 },
-    { "id": 34, "roll": "EA24D06", "name": "Tanmay Biswas*", "class": 10, "fees": 2000, "total_score": 102, "rank": 11, "vote_power": 6 },
-    { "id": 35, "roll": "EA24D08", "name": "Sanjana Sutradhar (PP)", "class": 9, "fees": 1500, "total_score": 0, "rank": 28, "vote_power": 1 },
-    { "id": 36, "roll": "EA25D12", "name": "Roshan Paswan** (PP)", "class": 10, "fees": 2000, "total_score": 158, "rank": 4, "vote_power": 9 },
-    { "id": 37, "roll": "EA25D13", "name": "Aamna Khatoon*", "class": 10, "fees": 1500, "total_score": 105, "rank": 10, "vote_power": 6 },
-    { "id": 38, "roll": "EA24D15", "name": "Reeyansh Lama (VVvvv) (CoL) (SC)", "class": 9, "fees": 1500, "total_score": 122, "rank": 7, "vote_power": 7 },
-    { "id": 39, "roll": "EA25D17", "name": "Aditya Singh***", "class": 10, "fees": 2000, "total_score": 57, "rank": 21, "vote_power": 4 },
-    { "id": 40, "roll": "EA25D20", "name": "Harsh Mallik****** (VVV) (L)", "class": 9, "fees": 1500, "total_score": 43, "rank": 23, "vote_power": 3 },
-    { "id": 41, "roll": "EA25D21", "name": "Xavier Herenj***", "class": 9, "fees": 2000, "total_score": -30, "rank": 46, "vote_power": -1 },
-    { "id": 42, "roll": "EA25D22", "name": "Mahek Mahato*******", "class": 9, "fees": 2000, "total_score": 0, "rank": 28, "vote_power": 1 },
-    { "id": 43, "roll": "EA25D24", "name": "Aansh Mandal****** (DWI)", "class": 10, "fees": 2000, "total_score": 122, "rank": 7, "vote_power": 7 },
-    { "id": 44, "roll": "EA24D25", "name": "Nandani Gupta** (v)", "class": 9, "fees": 0, "total_score": 0, "rank": 28, "vote_power": 1 },
-    { "id": 45, "roll": "EA25D26", "name": "Shankar Pradhan (CI)", "class": 9, "fees": 2000, "total_score": 92, "rank": 14, "vote_power": 5 },
-    { "id": 46, "roll": "EA26D28", "name": "Riya Singh (RM)", "class": 9, "fees": 2000, "total_score": 70, "rank": 18, "vote_power": 4 }
-  ],
-  "scores": [
-    { "id": 1, "studentId": 3, "date": "2026-02-01", "points": 60, "month": "2026-02", "notes": "" },
-    { "id": 2, "studentId": 9, "date": "2026-02-01", "points": 97, "month": "2026-02", "notes": "" },
-    { "id": 3, "studentId": 10, "date": "2026-02-01", "points": 79, "month": "2026-02", "notes": "" },
-    { "id": 4, "studentId": 12, "date": "2026-02-01", "points": 79, "month": "2026-02", "notes": "" },
-    { "id": 5, "studentId": 12, "date": "2026-02-02", "points": 60, "month": "2026-02", "notes": "" },
-    { "id": 6, "studentId": 13, "date": "2026-02-01", "points": 60, "month": "2026-02", "notes": "" },
-    { "id": 7, "studentId": 13, "date": "2026-02-03", "points": 100, "month": "2026-02", "notes": "" },
-    { "id": 8, "studentId": 16, "date": "2026-02-01", "points": 94, "month": "2026-02", "notes": "" },
-    { "id": 9, "studentId": 17, "date": "2026-02-01", "points": 41, "month": "2026-02", "notes": "" },
-    { "id": 10, "studentId": 19, "date": "2026-02-01", "points": 72, "month": "2026-02", "notes": "" },
-    { "id": 11, "studentId": 20, "date": "2026-02-01", "points": 182, "month": "2026-02", "notes": "" },
-    { "id": 12, "studentId": 21, "date": "2026-02-01", "points": -99, "month": "2026-02", "notes": "" },
-    { "id": 13, "studentId": 21, "date": "2026-02-03", "points": 100, "month": "2026-02", "notes": "" },
-    { "id": 14, "studentId": 22, "date": "2026-02-01", "points": 0, "month": "2026-02", "notes": "" },
-    { "id": 15, "studentId": 23, "date": "2026-02-01", "points": 47, "month": "2026-02", "notes": "" },
-    { "id": 16, "studentId": 24, "date": "2026-02-01", "points": 35, "month": "2026-02", "notes": "" },
-    { "id": 17, "studentId": 25, "date": "2026-02-01", "points": 63, "month": "2026-02", "notes": "" },
-    { "id": 18, "studentId": 26, "date": "2026-02-01", "points": 118, "month": "2026-02", "notes": "" },
-    { "id": 19, "studentId": 27, "date": "2026-02-01", "points": 153, "month": "2026-02", "notes": "" },
-    { "id": 20, "studentId": 28, "date": "2026-02-01", "points": 90, "month": "2026-02", "notes": "" },
-    { "id": 21, "studentId": 32, "date": "2026-02-01", "points": 42, "month": "2026-02", "notes": "" },
-    { "id": 22, "studentId": 33, "date": "2026-02-01", "points": 187, "month": "2026-02", "notes": "" },
-    { "id": 23, "studentId": 34, "date": "2026-02-01", "points": 102, "month": "2026-02", "notes": "" },
-    { "id": 24, "studentId": 36, "date": "2026-02-01", "points": 158, "month": "2026-02", "notes": "" },
-    { "id": 25, "studentId": 37, "date": "2026-02-01", "points": 105, "month": "2026-02", "notes": "" },
-    { "id": 26, "studentId": 38, "date": "2026-02-01", "points": 122, "month": "2026-02", "notes": "" },
-    { "id": 27, "studentId": 39, "date": "2026-02-01", "points": 57, "month": "2026-02", "notes": "" },
-    { "id": 28, "studentId": 40, "date": "2026-02-01", "points": 43, "month": "2026-02", "notes": "" },
-    { "id": 29, "studentId": 41, "date": "2026-02-01", "points": -30, "month": "2026-02", "notes": "" },
-    { "id": 30, "studentId": 43, "date": "2026-02-01", "points": 122, "month": "2026-02", "notes": "" },
-    { "id": 31, "studentId": 45, "date": "2026-02-01", "points": 127, "month": "2026-02", "notes": "" },
-    { "id": 32, "studentId": 45, "date": "2026-02-02", "points": -35, "month": "2026-02", "notes": "" },
-    { "id": 33, "studentId": 46, "date": "2026-02-01", "points": 70, "month": "2026-02", "notes": "" }
-  ],
-  "parties": [
-    { "code": "MAP", "power": 15 },
-    { "code": "BWP", "power": 27 },
-    { "code": "ESP", "power": 30 },
-    { "code": "MRP", "power": 23 },
-    { "code": "SSP", "power": 57 },
-    { "code": "NJP", "power": 15 }
-  ],
-  "leadership": [
-    { "post": "LEADER (L)", "holder": "HARSH MALLICK" },
-    { "post": "LEADER OF OPPOSITION (LoP)", "holder": "" },
-    { "post": "CO-LEADER (CoL)", "holder": "REEYANSH LAMA" },
-    { "post": "CODING & IT CAPTAIN (CITC)", "holder": "SAMARTH PATEL" },
-    { "post": "DISCIPLINE & WELFARE IN-CHARGE (DWI)", "holder": "AANSH MANDAL" },
-    { "post": "RESOURCE MANAGER (RM)", "holder": "RIYA SINGH" },
-    { "post": "SPORTS CAPTAIN (SC)", "holder": "REEYANSH LAMA" },
-    { "post": "ENGLISH CAPTAIN- SENIOR (ECS)", "holder": "ABDUL ARMAN" },
-    { "post": "CULTURE & CREATIVE ARTS IN-CHARGE (CCAI)", "holder": "SAKSHI" },
-    { "post": "CLEANLINESS IN-CHARGE (CI)", "holder": "SHANKAR PRADHAN" },
-    { "post": "ENGLISH CAPTAIN- JUNIOR (ECJ)", "holder": "REHMATUN KHATUN" },
-    { "post": "WELCOME & COMMUNICATION IN-CHARGE (WCI)", "holder": "SHOMIYA XALXO" },
-    { "post": "LEADER", "holder": "" },
-    { "post": "LEADER OF OPPOSITION", "holder": "" }
-  ]
-}
-''')
+_seed_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'config', 'seed_data.json')
+with open(_seed_path, 'r', encoding='utf-8') as _seed_file:
+    FEB26_SEED = json.load(_seed_file)
 
 # ============== ROUTES ==============
 
@@ -5009,6 +5713,7 @@ def get_student_balances():
 
 
 @points_bp.route('/validate-action', methods=['POST'])
+@csrf.exempt  # JSON API endpoint — secured by @login_required
 @login_required
 def validate_action():
     """Server-side validation of a proposed star/VETO action.
@@ -5070,6 +5775,7 @@ def validate_action():
 @points_bp.route('/record-roll-change', methods=['POST'])
 @csrf.exempt  # Admin-only; CSRF exempt to allow in-app fetch with credentials
 @login_required
+@_ledger_write_guard
 def record_roll_change():
     """Record a student roll-number change and propagate it forward through history.
 
@@ -5167,9 +5873,10 @@ def record_roll_change():
     month_students = data.get('month_students', {}) or {}
     copied_months = []
     for month_key, profiles in month_profiles.items():
+        month_key_str = str(month_key or '').strip()
         if not isinstance(profiles, list):
             continue
-        if month_key < effective_month:
+        if month_key_str < effective_month:
             continue  # historical months keep the old roll — correct by design
         changed_profiles = False
         next_by_roll = {}
@@ -5194,7 +5901,8 @@ def record_roll_change():
 
     # 3b. Update month_students for months >= effective_month (roster list of rolls)
     for month_key, rolls in list(month_students.items()):
-        if month_key < effective_month:
+        month_key_str = str(month_key or '').strip()
+        if month_key_str < effective_month:
             continue
         if not isinstance(rolls, list):
             continue
@@ -5218,7 +5926,29 @@ def record_roll_change():
             month_students[month_key] = next_rolls
     data['month_students'] = month_students
 
-    # 3c. Update roll fields in leadership / CR tables to keep labels in sync
+    # 3c. Update month_student_extras roll keys for months >= effective_month.
+    month_student_extras = data.get('month_student_extras', {}) or {}
+    if isinstance(month_student_extras, dict):
+        for month_key, month_extras in list(month_student_extras.items()):
+            month_key_str = str(month_key or '').strip()
+            if month_key_str < effective_month:
+                continue
+            if not isinstance(month_extras, dict):
+                continue
+            next_extras = {}
+            local_changed = False
+            for key, value in month_extras.items():
+                normalized_key = _normalize_roll_value(key)
+                if normalized_key == old_roll:
+                    next_extras[new_roll] = value
+                    local_changed = True
+                else:
+                    next_extras[key] = value
+            if local_changed:
+                month_student_extras[month_key] = next_extras
+        data['month_student_extras'] = month_student_extras
+
+    # 3d. Update roll fields in leadership / CR tables to keep labels in sync
     def _swap_roll_field(items, field):
         if not isinstance(items, list):
             return
@@ -5232,8 +5962,18 @@ def record_roll_change():
     _swap_roll_field(data.get('leadership', []), 'roll')
     _swap_roll_field(data.get('class_reps', []), 'roll')
     _swap_roll_field(data.get('group_crs', []), 'roll')
+    _swap_roll_field(data.get('post_holder_history', []), 'roll')
+    _swap_roll_field(data.get('attendance', []), 'roll')
+    _swap_roll_field(data.get('appeals', []), 'student_roll')
+    _swap_roll_field(data.get('appeals', []), 'roll')
+    _swap_roll_field(data.get('resource_requests', []), 'student_roll')
+    _swap_roll_field(data.get('resource_requests', []), 'roll')
+    _swap_roll_field(data.get('resource_transactions', []), 'student_roll')
+    _swap_roll_field(data.get('resource_transactions', []), 'roll')
+    _swap_roll_field(data.get('resource_advantage_deductions', []), 'student_roll')
+    _swap_roll_field(data.get('resource_advantage_deductions', []), 'roll')
 
-    # 3d. Update party member rolls (if present)
+    # 3e. Update party member rolls (if present)
     if isinstance(data.get('parties'), list):
         for party in data['parties']:
             members = party.get('members') if isinstance(party, dict) else None
@@ -5304,10 +6044,31 @@ def get_roll_history():
     return resp
 
 
+# Content hash of offline_scoreboard.html — recomputed on first request after server start.
+_offline_html_hash = None
+
+
+def _get_offline_html_hash():
+    """Compute a short content hash for cache-busting the 2.4 MB HTML payload."""
+    global _offline_html_hash
+    if _offline_html_hash is not None:
+        return _offline_html_hash
+    try:
+        html_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'static', 'offline_scoreboard.html')
+        import hashlib
+        h = hashlib.md5(open(html_path, 'rb').read()).hexdigest()[:10]
+        _offline_html_hash = h
+    except Exception:
+        _offline_html_hash = '0'
+    return _offline_html_hash
+
+
 @points_bp.route('/offline')
 def offline_scoreboard():
-    """Serve offline scoreboard HTML"""
+    """Serve offline scoreboard HTML — no-store to prevent stale cached copies."""
     response = send_file('static/offline_scoreboard.html')
+    # NEVER cache the HTML shell — inline CSS/JS changes (sidebar toggle, etc.)
+    # must be picked up immediately. Data updates still go through /offline-data JSON sync.
     response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
     response.headers['Pragma'] = 'no-cache'
     response.headers['Expires'] = '0'
@@ -5333,6 +6094,255 @@ def seed_data():
     return response
 
 
+def _is_party_president_designation(designation):
+    if not designation:
+        return False
+    text = str(designation).strip().lower()
+    return text == 'party president' or text == 'pp'
+
+
+def _resolve_leadership_student(post, students):
+    if not post:
+        return None
+    # studentId check
+    student_id = post.get('studentId')
+    if student_id is not None:
+        try:
+            sid = int(student_id)
+            for s in students:
+                if int(s.get('id', 0)) == sid:
+                    return s
+        except ValueError:
+            pass
+    # roll check
+    roll = post.get('roll')
+    if roll:
+        roll_norm = str(roll).strip().upper()
+        for s in students:
+            if str(s.get('roll', '')).strip().upper() == roll_norm:
+                return s
+    # holder name check
+    holder = post.get('holder')
+    if holder:
+        holder_norm = str(holder).strip().upper()
+        for s in students:
+            name = s.get('name')
+            base_name = s.get('base_name')
+            if (name and str(name).strip().upper() == holder_norm) or (base_name and str(base_name).strip().upper() == holder_norm):
+                return s
+    return None
+
+
+def _get_student_group_jurisdiction(student_id, data):
+    try:
+        sid = int(student_id)
+    except (ValueError, TypeError):
+        return set()
+    students = data.get('students', [])
+    jurisdiction = set()
+    
+    # 1. Leadership
+    major_posts = ['leader', 'co-leader', 'leader of opposition', 'lop']
+    for post in data.get('leadership', []):
+        if post.get('status') == 'active':
+            resolved = _resolve_leadership_student(post, students)
+            if resolved and int(resolved.get('id', 0)) == sid:
+                p_name = str(post.get('post', '')).lower()
+                if any(mp in p_name for mp in major_posts):
+                    return {'A', 'B', 'C', 'D', 'H'}
+                    
+    # 2. Group CRs
+    for rep in data.get('group_crs', []):
+        try:
+            rep_sid = int(rep.get('studentId', 0))
+        except (ValueError, TypeError):
+            continue
+        if rep.get('status') == 'active' and rep_sid == sid and rep.get('group'):
+            jurisdiction.add(str(rep.get('group')).strip().upper())
+            
+    # 3. Class Reps
+    for rep in data.get('class_reps', []):
+        try:
+            rep_sid = int(rep.get('studentId', 0))
+        except (ValueError, TypeError):
+            continue
+        if rep.get('status') == 'active' and rep_sid == sid:
+            return {'A', 'B', 'C', 'D', 'H'}
+            
+    return jurisdiction
+
+
+def _validate_veto_jurisdictions(data):
+    # Retrieve students roster
+    students = data.get('students', [])
+    scores = data.get('scores', [])
+    
+    # Map student ID to student dict for convenience
+    student_map = {}
+    for s in students:
+        if 'id' in s:
+            try:
+                student_map[int(s['id'])] = s
+            except (ValueError, TypeError):
+                pass
+    
+    # We will search for all postholder veto usages.
+    # A postholder veto usage is a score entry where notes indicate a postholder veto action.
+    # Note formats:
+    # 1) "[VETO-Postholder] Removed penalty for Group X on current day"
+    # 2) "[VETO-Shield-Group X] Activated VETO shield for Group X postholders"
+    # Where X is the group letter (A, B, C, D, H)
+    
+    import re
+    penalty_regex = re.compile(r'\[VETO-Postholder\] Removed penalty for Group ([A-Z])', re.IGNORECASE)
+    shield_regex = re.compile(r'\[VETO-Shield-Group ([A-Z])\]', re.IGNORECASE)
+    
+    # Keep track of valid postholder actions by (date, group) to validate targets
+    valid_penalty_removals = set() # elements: (date, group)
+    valid_shields = set() # elements: (date, group)
+    
+    for score in scores:
+        notes = score.get('notes', '')
+        if not notes:
+            continue
+        
+        sid = score.get('studentId')
+        if sid is None:
+            continue
+        try:
+            sid = int(sid)
+        except (ValueError, TypeError):
+            continue
+            
+        date = score.get('date', '')
+        
+        # Check for postholder penalty removal
+        penalty_match = penalty_regex.search(notes)
+        if penalty_match:
+            group = penalty_match.group(1).upper()
+            jurisdiction = _get_student_group_jurisdiction(sid, data)
+            if group not in jurisdiction:
+                current_app.logger.warning(
+                    f"Validation failed: Student {sid} saved postholder veto for Group {group} "
+                    f"but jurisdiction is {jurisdiction}."
+                )
+                return False
+            valid_penalty_removals.add((date, group))
+            
+        # Check for postholder shield activation
+        shield_match = shield_regex.search(notes)
+        if shield_match:
+            group = shield_match.group(1).upper()
+            jurisdiction = _get_student_group_jurisdiction(sid, data)
+            if group not in jurisdiction:
+                current_app.logger.warning(
+                    f"Validation failed: Student {sid} activated veto shield for Group {group} "
+                    f"but jurisdiction is {jurisdiction}."
+                )
+                return False
+            valid_shields.add((date, group))
+
+    # Validate that no student has an unauthorized penalty removal
+    # A penalty removal note: "[VETO-Postholder-Penalty-Group G] Penalty removed"
+    # on date D.
+    target_penalty_regex = re.compile(r'\[VETO-Postholder-Penalty-Group ([A-Z])\] Penalty removed', re.IGNORECASE)
+    for score in scores:
+        notes = score.get('notes', '')
+        if not notes:
+            continue
+        target_match = target_penalty_regex.search(notes)
+        if target_match:
+            group = target_match.group(1).upper()
+            date = score.get('date', '')
+            if (date, group) not in valid_penalty_removals:
+                current_app.logger.warning(
+                    f"Validation failed: Unauthorized penalty removal for Group {group} on {date} "
+                    f"without a valid postholder veto usage."
+                )
+                return False
+
+    # Validate that no active shield in leadership/group_crs/class_reps/parties is active without a valid shield record
+    # Let's check leadership
+    for entry in data.get('leadership', []):
+        if entry.get('status') == 'active' and entry.get('veto_shield_active'):
+            date = entry.get('veto_shield_used_on', '')
+            resolved = _resolve_leadership_student(entry, students)
+            if resolved:
+                group = str(resolved.get('group', '')).strip().upper()
+                if group and (date, group) not in valid_shields:
+                    current_app.logger.warning(
+                        f"Validation failed: Active leadership shield for Group {group} on {date} "
+                        f"without a valid postholder veto shield activation."
+                    )
+                    return False
+                    
+    # Let's check group_crs
+    for entry in data.get('group_crs', []):
+        if entry.get('status') == 'active' and entry.get('veto_shield_active'):
+            date = entry.get('veto_shield_used_on', '')
+            sid = entry.get('studentId')
+            if sid is not None:
+                try:
+                    sid = int(sid)
+                    if sid in student_map:
+                        student = student_map[sid]
+                        group = str(student.get('group', '')).strip().upper()
+                        if group and (date, group) not in valid_shields:
+                            current_app.logger.warning(
+                                f"Validation failed: Active group CR shield for Group {group} on {date} "
+                                f"without a valid postholder veto shield activation."
+                            )
+                            return False
+                except (ValueError, TypeError):
+                    pass
+                    
+    # Let's check class_reps
+    for entry in data.get('class_reps', []):
+        if entry.get('status') == 'active' and entry.get('veto_shield_active'):
+            date = entry.get('veto_shield_used_on', '')
+            sid = entry.get('studentId')
+            if sid is not None:
+                try:
+                    sid = int(sid)
+                    if sid in student_map:
+                        student = student_map[sid]
+                        group = str(student.get('group', '')).strip().upper()
+                        if group and (date, group) not in valid_shields:
+                            current_app.logger.warning(
+                                f"Validation failed: Active class rep shield for Group {group} on {date} "
+                                f"without a valid postholder veto shield activation."
+                            )
+                            return False
+                except (ValueError, TypeError):
+                    pass
+
+    # Let's check parties president
+    for party in data.get('parties', []):
+        for member in party.get('members', []):
+            if member.get('status') == 'active' and member.get('veto_shield_active'):
+                # Check designation is party president
+                designation = str(member.get('designation', '')).lower()
+                if _is_party_president_designation(designation):
+                    date = member.get('veto_shield_used_on', '')
+                    sid = member.get('studentId')
+                    if sid is not None:
+                        try:
+                            sid = int(sid)
+                            if sid in student_map:
+                                student = student_map[sid]
+                                group = str(student.get('group', '')).strip().upper()
+                                if group and (date, group) not in valid_shields:
+                                    current_app.logger.warning(
+                                        f"Validation failed: Active party president shield for Group {group} on {date} "
+                                        f"without a valid postholder veto shield activation."
+                                    )
+                                    return False
+                        except (ValueError, TypeError):
+                            pass
+
+    return True
+
+
 def _is_valid_replication_request():
     """
     Validate peer replication requests with secure key comparison.
@@ -5347,7 +6357,7 @@ def _is_valid_replication_request():
     if request.headers.get('X-EA-Replicated') != '1':
         return False
 
-    expected_key = _resolve_sync_shared_key()
+    expected_key = resolve_sync_shared_key()
     provided_key = request.headers.get('X-EA-Sync-Key', '').strip()
 
     # Fail if no replication key source is configured.
@@ -5367,10 +6377,13 @@ def _is_valid_replication_request():
 @points_bp.route('/offline-data', methods=['GET', 'POST'])
 @csrf.exempt  # Required for peer-to-peer sync, but secured with sync key validation
 @limiter.limit("2000 per hour")  # LAN mode: allow frequent sync while preventing runaway abuse
+@_ledger_write_guard
 def offline_data():
     replicated_auth = _is_valid_replication_request()
     is_replicated = request.headers.get('X-EA-Replicated') == '1'
-    if request.method == 'POST' and not current_user.is_authenticated and not replicated_auth:
+    user, actor_role, actor_login_id = _get_request_user()
+
+    if request.method == 'POST' and not user and not replicated_auth:
         return jsonify({'success': False, 'error': 'Unauthorized'}), 401
     if request.method == 'POST' and str(os.getenv('EA_RESTORE_LOCK', '')).strip() == '1':
         return jsonify({'success': False, 'error': 'Restore lock enabled'}), 423
@@ -5394,13 +6407,39 @@ def offline_data():
                 return resp, 503
         data, _ = _recover_stale_snapshot_if_needed(data, min_students=min_students)
         if _ensure_score_timestamps(data):
+            # Defer the heavy write to a background thread — the in-memory
+            # cache already has the fix, so subsequent reads are correct.
+            # Blocking the GET response for a 1+ second write is unnecessary.
+            def _deferred_timestamp_save():
+                try:
+                    with app.app_context():
+                        _save_offline_data(data)
+                except Exception:
+                    try:
+                        current_app.logger.exception("Failed to persist score timestamp normalization (deferred)")
+                    except Exception:
+                        pass
             try:
-                _save_offline_data(data)
+                app = current_app._get_current_object()
+                threading.Thread(target=_deferred_timestamp_save, daemon=True).start()
             except Exception:
-                current_app.logger.exception("Failed to persist score timestamp normalization on GET")
+                try:
+                    _save_offline_data(data)
+                except Exception:
+                    current_app.logger.exception("Failed to persist score timestamp normalization on GET")
 
-        if current_user.is_authenticated and str(current_user.role or '').strip().lower() != 'admin':
-            allowed_months = _allowed_months_for_user(data, current_user)
+        is_authenticated = (user is not None)
+        is_admin = is_authenticated and str(actor_role or '').strip().lower() == 'admin'
+        anon_full_allowed = replicated_auth or str(os.getenv('EA_ALLOW_ANON_FULL_SYNC', '')).strip() == '1'
+        if not is_authenticated and not anon_full_allowed:
+            # Unauthenticated viewers (wall displays, logged-out SPA tabs) get a
+            # sanitized recent-months snapshot — never fees/appeals/logs/profile
+            # data. Replication peers authenticate via X-EA-Replicated +
+            # X-EA-Sync-Key and still receive the full ledger. Set
+            # EA_ALLOW_ANON_FULL_SYNC=1 to restore the legacy open behavior.
+            data = _sanitize_anonymous_snapshot(data)
+        elif is_authenticated and not is_admin:
+            allowed_months = _allowed_months_for_user(data, user)
             data = _clip_payload_to_allowed_months(data, allowed_months)
 
         updated_at = data.get('server_updated_at') or data.get('updated_at')
@@ -5412,7 +6451,67 @@ def offline_data():
                 # Bandwidth optimization for WAN: if client is already at/above this server stamp,
                 # avoid sending the full payload. SSE (offline-events) still provides realtime updates.
                 return ('', 204)
+
+            # Delta sync: send only scores added/modified since the client's last sync.
+            # This reduces a typical 34 MB full dump to <200 KB for incremental updates.
+            if server_stamp and since_stamp and server_stamp > since_stamp:
+                # Filter by updated_at FIRST so edits to old score rows are
+                # included in the delta (filtering by score date alone silently
+                # missed edits to historical rows — clients then kept stale values).
+                delta_scores = [
+                    s for s in data.get('scores', [])
+                    if isinstance(s, dict) and _parse_sync_stamp(s.get('updated_at') or s.get('created_at') or s.get('date') or '') and
+                       _parse_sync_stamp(s.get('updated_at') or s.get('created_at') or s.get('date') or '') >= since_stamp
+                ]
+                # If delta is small enough (<50% of total), send delta payload.
+                # Otherwise fall through to full sync for consistency.
+                total_scores = len(data.get('scores', []))
+                if 0 < len(delta_scores) < total_scores * 0.5:
+                    delta_out = {
+                        'delta': True,
+                        'since': since,
+                        'scores': delta_scores,
+                        'students': data.get('students', []),  # students array is small (~85 entries)
+                        'parties': data.get('parties', []),
+                        'leadership': data.get('leadership', []),
+                        'post_holder_history': data.get('post_holder_history', []),
+                        'veto_tracking': data.get('veto_tracking', {}),
+                        'server_updated_at': updated_at,
+                        'updated_at': updated_at,
+                        'server_version': data.get('server_version', 0),
+                        '_cache_bust_version': data.get('_cache_bust_version', ''),
+                    }
+                    # Include month_roster_profiles if changed (small dict)
+                    if data.get('month_roster_profiles'):
+                        delta_out['month_roster_profiles'] = data['month_roster_profiles']
+                    resp = jsonify({'data': delta_out, 'updated_at': updated_at})
+                    resp.headers['Cache-Control'] = 'no-store'
+                    return resp
         
+        # ── Serialized-response cache (admin full-sync only) ──────────────
+        # For admin users requesting a full sync (no ?since=), the response
+        # body is identical across consecutive GETs until a write changes the
+        # data.  Caching the pre-serialized bytes saves ~124ms per request.
+        cache_mtime = 0
+        cache_size = -1
+        cache_ver = -1
+        if is_admin and not since:
+            try:
+                path = _offline_data_path()
+                st = os.stat(path)
+                cache_mtime = getattr(st, 'st_mtime_ns', int(st.st_mtime * 1e9))
+                cache_size = st.st_size
+                cache_ver = _parse_int_safe(data.get('server_version'), 0)
+                cached_body, cached_etag = _get_serialized_response(cache_mtime, cache_size, cache_ver)
+                if cached_body is not None:
+                    resp = Response(cached_body, mimetype='application/json')
+                    resp.headers['Cache-Control'] = 'no-store'
+                    if cached_etag:
+                        resp.headers['ETag'] = cached_etag
+                    return resp
+            except Exception:
+                pass  # Fall through to normal serialization
+
         # DIAGNOSTIC FIX: Ensure attendance records are present in GET response
         attendance_records = data.get('attendance', [])
         if not attendance_records:
@@ -5430,19 +6529,30 @@ def offline_data():
         data_out['_sync_ops'] = []  # Clear pending sync ops
         resp = jsonify({'data': data_out, 'updated_at': updated_at})
         resp.headers['Cache-Control'] = 'no-store'
+
+        # Store the serialized response for future admin full-sync cache hits.
+        if is_admin and not since:
+            try:
+                body = resp.get_data()
+                etag = f'W/"{cache_ver}-{cache_size}"'
+                _store_serialized_response(cache_mtime, cache_size, cache_ver, body, etag)
+            except Exception:
+                pass
+
         return resp
 
     payload = request.get_json(silent=True) or {}
     data = payload.get('data', payload)
+    historical_score_ops = payload.get('historical_score_ops', []) if isinstance(payload, dict) else []
     request_peers = payload.get('peers', []) if isinstance(payload, dict) else []
     request_op_id = str(payload.get('op_id') or '').strip() if isinstance(payload, dict) else ''
     request_base_version = _parse_int_safe(payload.get('base_version'), 0) if isinstance(payload, dict) else 0
     if not isinstance(data, dict):
         return jsonify({'success': False, 'error': 'Invalid payload'}), 400
 
-    actor_login_id = current_user.login_id if current_user.is_authenticated else ''
-    if current_user.is_authenticated:
-        actor_role = current_user.role
+    actor_login_id = actor_login_id if user else ''
+    if user:
+        actor_role = actor_role
     elif replicated_auth:
         declared_role = payload.get('actor_role') if isinstance(payload, dict) else ''
         if not declared_role and isinstance(data, dict):
@@ -5533,10 +6643,10 @@ def offline_data():
     existing_stamp = _payload_sync_stamp(existing)
     if actor_role == 'teacher':
         data = _filter_teacher_payload_to_edit_window(data, actor_login_id or 'Teacher')
-        if current_user.is_authenticated:
+        if user:
             data = _clip_payload_to_allowed_months(
                 data,
-                _allowed_months_for_user(existing, current_user)
+                _allowed_months_for_user(existing, user)
             )
         merged = existing if existing else {}
         merged.setdefault('students', existing.get('students', []))
@@ -5559,6 +6669,12 @@ def offline_data():
         merged.setdefault('resource_transactions', existing.get('resource_transactions', []))
         merged.setdefault('syllabus_catalog', existing.get('syllabus_catalog', {}))
         merged.setdefault('syllabus_tracking', existing.get('syllabus_tracking', []))
+        if isinstance(data.get('syllabus_catalog'), dict):
+            merged['syllabus_catalog'] = merge_syllabus_catalog_superset(
+                existing.get('syllabus_catalog', {}),
+                data.get('syllabus_catalog', {}),
+                _parse_int_safe
+            )
         merged['scores'] = _merge_teacher_scores(existing, data)
         if isinstance(data.get('appeals'), list):
             merged['appeals'] = _merge_appeals_superset(existing.get('appeals', []), data.get('appeals', []))
@@ -5621,6 +6737,8 @@ def offline_data():
         _reconcile_role_veto_monthly(merged)
         _reconcile_veto_counters_from_scores(merged)
         _ensure_score_timestamps(merged)
+        if not _validate_veto_jurisdictions(merged):
+            return jsonify({'success': False, 'error': 'Veto jurisdiction validation failed'}), 400
         merged['updated_at'] = data.get('updated_at', existing.get('updated_at'))
         merged['server_updated_at'] = _server_now_iso()
         _record_sync_op(merged, request_op_id, actor_login_id or 'Teacher')
@@ -5635,10 +6753,10 @@ def offline_data():
         return jsonify({'success': True, 'updated_at': merged['server_updated_at'], 'server_version': _parse_int_safe(merged.get('server_version'), 0)})
 
     if actor_role == 'student':
-        if current_user.is_authenticated:
+        if user:
             data = _clip_payload_to_allowed_months(
                 data,
-                _allowed_months_for_user(existing, current_user)
+                _allowed_months_for_user(existing, user)
             )
         # Students can only:
         # - create resource requests for themselves (append-only, server builds canonical row)
@@ -5677,6 +6795,8 @@ def offline_data():
             source='student-sync'
         )
         _ensure_score_timestamps(merged)
+        if not _validate_veto_jurisdictions(merged):
+            return jsonify({'success': False, 'error': 'Veto jurisdiction validation failed'}), 400
         merged['server_updated_at'] = _server_now_iso()
         _record_sync_op(merged, request_op_id, actor_login_id or 'Student')
         _save_offline_data(merged)
@@ -5721,6 +6841,22 @@ def offline_data():
     # Patch-safety: if a client sends a partial payload (e.g. only fee/resource updates),
     # ensure we don't accidentally overwrite core tables like students/month roster.
     if isinstance(existing, dict):
+        # Preserve veto_tracking from existing if missing, or merge usage logs if present
+        if 'veto_tracking' not in data or not data.get('veto_tracking'):
+            data['veto_tracking'] = existing.get('veto_tracking', {})
+        elif 'veto_tracking' in existing and existing.get('veto_tracking'):
+            exist_vt = existing['veto_tracking']
+            incoming_vt = data['veto_tracking']
+            merged_log = list(exist_vt.get('usage_log', []))
+            exist_timestamps = {entry.get('timestamp') for entry in merged_log if entry.get('timestamp')}
+            for entry in incoming_vt.get('usage_log', []):
+                ts = entry.get('timestamp')
+                if ts and ts not in exist_timestamps:
+                    merged_log.append(entry)
+                    exist_timestamps.add(ts)
+            data['veto_tracking'] = dict(exist_vt)
+            data['veto_tracking']['usage_log'] = merged_log
+
         if 'students' not in data:
             data['students'] = existing.get('students', [])
         elif isinstance(data.get('students'), list) and isinstance(existing.get('students'), list):
@@ -5747,7 +6883,7 @@ def offline_data():
                 'class_reps',
                 'parties',
                 'post_holder_history',
-                'syllabus_tracking'
+                'postholder_ticket_log'
             ]
             for key in protected_list_tables:
                 incoming = data.get(key)
@@ -5755,13 +6891,24 @@ def offline_data():
                 if isinstance(existing_val, list) and existing_val and (not isinstance(incoming, list) or len(incoming) == 0):
                     data[key] = existing_val
             protected_object_tables = [
-                'syllabus_catalog'
+                'postholder_tickets'
             ]
             for key in protected_object_tables:
                 incoming = data.get(key)
                 existing_val = existing.get(key)
                 if isinstance(existing_val, dict) and existing_val and (not isinstance(incoming, dict) or len(incoming.keys()) == 0):
                     data[key] = existing_val
+
+            # Specific protection for leadership selection state:
+            # If the server has a populated candidates list, but incoming is empty or missing, retain existing server state.
+            existing_ls = existing.get('leadership_selection_state')
+            incoming_ls = data.get('leadership_selection_state')
+            if isinstance(existing_ls, dict):
+                existing_candidates = existing_ls.get('candidates', [])
+                if isinstance(existing_candidates, list) and len(existing_candidates) > 0:
+                    if not isinstance(incoming_ls, dict) or not isinstance(incoming_ls.get('candidates'), list) or len(incoming_ls.get('candidates')) == 0:
+                        data['leadership_selection_state'] = existing_ls
+                        current_app.logger.warning("[SYNC] Retained existing leadership_selection_state because incoming was empty/missing candidates.")
 
     if isinstance(existing, dict):
         data['scores'] = _merge_scores_superset(existing.get('scores', []), data.get('scores', []))
@@ -5869,13 +7016,37 @@ def offline_data():
             _parse_int_safe,
             _parse_sync_stamp
         )
+        data['post_holder_history'] = _merge_records_superset(
+            existing.get('post_holder_history', []),
+            data.get('post_holder_history', []),
+            key_fields=('id',),
+            ts_fields=('updated_at', 'created_at')
+        )
+        data['postholder_tickets'] = _merge_postholder_tickets(
+            existing.get('postholder_tickets', {}),
+            data.get('postholder_tickets', {})
+        )
+        data['postholder_ticket_log'] = _merge_postholder_ticket_log(
+            existing.get('postholder_ticket_log', []),
+            data.get('postholder_ticket_log', [])
+        )
 
     data = _preserve_locked_historical_window(existing, data)
+    admin_historical_ops_allowed = (
+        not is_replicated and
+        current_user.is_authenticated and
+        str(current_user.role or '').strip().lower() == 'admin' and
+        actor_role == 'admin'
+    )
+    if admin_historical_ops_allowed and isinstance(historical_score_ops, list) and historical_score_ops:
+        data = _apply_admin_historical_score_ops(data, historical_score_ops, actor_login_id or 'Admin')
 
     data = _enforce_current_month_roster_integrity(data, existing)
     _reconcile_role_veto_monthly(data)
     _reconcile_veto_counters_from_scores(data)
     _ensure_score_timestamps(data)
+    if not _validate_veto_jurisdictions(data):
+        return jsonify({'success': False, 'error': 'Veto jurisdiction validation failed'}), 400
     _append_activity_log_entries(
         data,
         actor_login_id or ('replica' if is_replicated else 'Admin'),
@@ -5965,7 +7136,7 @@ def offline_server_health():
     requested_urls = payload.get('urls', []) if isinstance(payload, dict) else []
     urls = _normalize_peer_list(requested_urls)
     if not urls:
-        urls = _get_sync_peers()
+        urls = get_sync_peers()
     current_base = (request.host_url or '').rstrip('/')
     if current_base and current_base not in urls:
         urls.insert(0, current_base)
@@ -6086,6 +7257,7 @@ def supabase_health():
 @points_bp.route('/offline-force-publish', methods=['POST'])
 @csrf.exempt
 @login_required
+@_ledger_write_guard
 def offline_force_publish():
     if current_user.role != 'admin':
         return jsonify({'success': False, 'error': 'Unauthorized'}), 403
@@ -6166,12 +7338,12 @@ def offline_force_publish():
     gist_result = {'status': 'skipped'}
     public_site_result = _publish_public_site_snapshot(data, push=auto_push_public_site)
 
-    peers = _get_sync_peers() + _normalize_peer_list(request_peers)
+    peers = get_sync_peers() + _normalize_peer_list(request_peers)
     peers = list(dict.fromkeys(peers))
     current_origin = (request.host_url or '').rstrip('/')
-    shared_key = _resolve_sync_shared_key()
+    shared_key = resolve_sync_shared_key()
     is_master = str(os.getenv('EA_MASTER_MODE', '')).strip() == '1'
-    peer_body_payload = {'data': _payload_for_external_replication(data)}
+    peer_body_payload = {'data': payload_for_external_replication(data)}
     if is_master:
         peer_body_payload['authoritative_master_push'] = True
         peer_body_payload['force_replace'] = True
@@ -6303,6 +7475,412 @@ def offline_backup():
     return send_file(temp_path, as_attachment=True, download_name=filename)
 
 
+def _validate_and_sanitize_fee_updates(updates):
+    import re
+    if not isinstance(updates, dict):
+        return {}
+    
+    sanitized = {}
+    
+    # 1. Base fee amount
+    if 'amount' in updates:
+        val = updates['amount']
+        if val is not None:
+            try:
+                sanitized['amount'] = float(val)
+            except (ValueError, TypeError):
+                sanitized['amount'] = 0.0
+        else:
+            sanitized['amount'] = None
+            
+    # 2. Structural fields
+    for field in ['start_date', 'last_paid_date', 'due_date']:
+        if field in updates:
+            val = str(updates[field] or '').strip()
+            if re.match(r'^\d{4}-\d{2}-\d{2}$', val) or not val or val == '-':
+                sanitized[field] = val if val != '-' else None
+                
+    # 3. Pending amount
+    if 'pending_amount' in updates:
+        val = updates['pending_amount']
+        try:
+            sanitized['pending_amount'] = float(val)
+        except (ValueError, TypeError):
+            sanitized['pending_amount'] = 0.0
+            
+    # 4. Payment history
+    if 'payment_history' in updates:
+        hist = updates['payment_history']
+        if isinstance(hist, list):
+            sanitized_hist = []
+            for item in hist:
+                if not isinstance(item, dict):
+                    continue
+                # Sanitize single transaction entry
+                sanitized_item = {
+                    'txn_id': str(item.get('txn_id') or '').strip(),
+                    'date': str(item.get('date') or item.get('paid_on') or '').strip(),
+                    'mode': str(item.get('mode') or 'cash').strip().lower(),
+                    'category': str(item.get('category') or 'tuition').strip().lower(),
+                    'note': str(item.get('note') or '').strip()[:500],
+                    'recorded_by': str(item.get('recorded_by') or '').strip()[:100],
+                    'status': str(item.get('status') or 'confirmed').strip().lower()
+                }
+                
+                # Check numeric amount
+                try:
+                    sanitized_item['amount'] = float(item.get('amount', 0))
+                except (ValueError, TypeError):
+                    sanitized_item['amount'] = 0.0
+                    
+                # Check reversal flags
+                if 'is_reversal' in item:
+                    sanitized_item['is_reversal'] = bool(item['is_reversal'])
+                if 'original_txn_id' in item:
+                    sanitized_item['original_txn_id'] = str(item['original_txn_id'] or '').strip()
+                    
+                sanitized_hist.append(sanitized_item)
+            sanitized['payment_history'] = sanitized_hist
+            
+    return sanitized
+
+
+def _sync_fee_records_to_sqlite(student_id, roll_number, student_name, payment_history):
+    from app.models.fees import FeeTransaction
+    from app import db
+    
+    if not isinstance(payment_history, list):
+        return
+        
+    for txn in payment_history:
+        if not isinstance(txn, dict):
+            continue
+        txn_id = txn.get('txn_id')
+        if not txn_id:
+            continue # Skip legacy records without unique transaction IDs
+            
+        existing = FeeTransaction.query.filter_by(txn_id=txn_id).first()
+        
+        # Get operator/recorder
+        recorded_by = txn.get('recorded_by') or txn.get('recordedBy')
+        if not recorded_by:
+            try:
+                recorded_by = current_user.login_id
+            except Exception:
+                recorded_by = 'Admin'
+                
+        # Handle decimal amount
+        try:
+            amount = float(txn.get('amount', 0))
+        except (ValueError, TypeError):
+            amount = 0.0
+            
+        is_reversal = bool(txn.get('is_reversal', False) or txn.get('status') == 'reversed' or 'reversal' in str(txn.get('note', '')).lower())
+        
+        if existing:
+            # Update fields in case they changed (e.g. status reversed)
+            existing.status = txn.get('status', 'confirmed')
+            existing.is_reversal = is_reversal
+            existing.note = txn.get('note')
+        else:
+            new_txn = FeeTransaction(
+                student_id=student_id,
+                roll_number=roll_number or f"ST{student_id}",
+                student_name=student_name or f"Student #{student_id}",
+                txn_id=txn_id,
+                date=txn.get('date') or txn.get('paid_on') or datetime.now().strftime('%Y-%m-%d'),
+                amount=amount,
+                mode=txn.get('mode') or 'cash',
+                category=txn.get('category') or 'tuition',
+                ref_no=txn.get('ref_no') or txn.get('refNo'),
+                note=txn.get('note'),
+                recorded_by=recorded_by,
+                status=txn.get('status', 'confirmed'),
+                is_reversal=is_reversal,
+                original_txn_id=txn.get('original_txn_id')
+            )
+            db.session.add(new_txn)
+            
+    try:
+        db.session.commit()
+    except Exception as exc:
+        db.session.rollback()
+        current_app.logger.error("Failed to commit fee transaction to SQLite: %s", exc)
+
+
+def _auto_generate_monthly_pdf_if_needed(month_key, db_data=None):
+    if not month_key:
+        return
+    from app.utils.data_paths import get_storage_root
+    pdf_dir = os.path.join(get_storage_root(), 'fee_reports')
+    os.makedirs(pdf_dir, exist_ok=True)
+    
+    pdf_path = os.path.join(pdf_dir, f"fee_report_{month_key}.pdf")
+    
+    if db_data is None:
+        db_data = _load_offline_data() or {}
+        
+    from app.utils.fee_pdf import generate_monthly_fee_report
+    try:
+        generate_monthly_fee_report(month_key, db_data, pdf_path)
+    except Exception as exc:
+        try:
+            current_app.logger.error("Auto PDF generation failed for month %s: %s", month_key, exc)
+        except Exception:
+            pass
+
+
+@points_bp.route('/fee-update', methods=['POST'])
+@csrf.exempt
+@login_required
+@limiter.limit("500 per hour")
+@_ledger_write_guard
+def fee_update():
+    """Directly update a student fee record, commit to SQLite database, and auto-generate PDF report.
+
+    Body JSON: { "studentId": <int>, "updates": { ... fee record fields ... } }
+    """
+    if current_user.role != 'admin':
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 403
+
+    req_data = request.get_json(force=True, silent=True) or {}
+    raw_sid = req_data.get('studentId')
+    updates = req_data.get('updates')
+
+    if raw_sid is None or not isinstance(updates, dict):
+        return jsonify({'success': False, 'error': 'Missing studentId or updates'}), 400
+
+    try:
+        sid = int(raw_sid)
+    except (TypeError, ValueError):
+        return jsonify({'success': False, 'error': 'Invalid studentId'}), 400
+
+    db_data = _load_offline_data()
+    if not db_data:
+        return jsonify({'success': False, 'error': 'Database not available'}), 503
+
+    # Verify student exists
+    students = db_data.get('students') or []
+    student = next((s for s in students if s.get('id') == sid), None)
+    if not student:
+        return jsonify({'success': False, 'error': 'Student not found'}), 404
+
+    # Sanitize and validate incoming updates
+    sanitized_updates = _validate_and_sanitize_fee_updates(updates)
+
+    fee_records = db_data.get('fee_records') or []
+    now_iso = _server_now_iso()
+
+    existing = next((r for r in fee_records if r.get('studentId') == sid), None)
+    if existing:
+        existing.update(sanitized_updates)
+        existing['studentId'] = sid
+        existing['updated_at'] = now_iso
+    else:
+        new_record = {'studentId': sid, 'created_at': now_iso, 'updated_at': now_iso}
+        new_record.update(sanitized_updates)
+        fee_records.append(new_record)
+
+    # Keep student.fees in sync for convenience
+    amount = sanitized_updates.get('amount')
+    if amount is not None:
+        student['fees'] = int(amount)
+
+    db_data['fee_records'] = fee_records
+    db_data['server_updated_at'] = now_iso
+    _save_offline_data(db_data)
+
+    # ACID Double-Write: Sync transaction history into local SQLite table
+    student_name = student.get('name') or student.get('base_name')
+    roll_number = student.get('roll')
+    history = sanitized_updates.get('payment_history') or (existing.get('payment_history') if existing else [])
+    if history:
+        _sync_fee_records_to_sqlite(sid, roll_number, student_name, history)
+
+    # Auto-generate Monthly PDF Report on payments/reversals
+    try:
+        if history:
+            # Detect month of latest transaction to update the corresponding report
+            sorted_hist = sorted(history, key=lambda h: str(h.get('date', '')))
+            if sorted_hist:
+                latest_date = sorted_hist[-1].get('date') or ''
+                if len(latest_date) >= 7:
+                    month_key = latest_date[:7]
+                    _auto_generate_monthly_pdf_if_needed(month_key, db_data)
+    except Exception:
+        pass
+
+    return jsonify({'success': True, 'studentId': sid})
+
+
+@points_bp.route('/api/fees/reconstruct', methods=['POST'])
+@csrf.exempt
+@login_required
+@_ledger_write_guard
+def reconstruct_fees_from_sqlite():
+    """Rebuild JSON fee records from the durable SQLite transactions ledger in case of system crash."""
+    if current_user.role != 'admin':
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 403
+        
+    from app.models.fees import FeeTransaction
+    db_data = _load_offline_data()
+    if not db_data:
+        return jsonify({'success': False, 'error': 'Database not available'}), 503
+        
+    try:
+        txns = FeeTransaction.query.all()
+    except Exception as exc:
+        return jsonify({'success': False, 'error': f"Failed to read from SQLite database: {exc}"}), 500
+        
+    # Group transactions by student ID
+    by_student = {}
+    for t in txns:
+        sid = t.student_id
+        if sid not in by_student:
+            by_student[sid] = []
+        by_student[sid].append(t)
+        
+    fee_records = db_data.get('fee_records') or []
+    fee_map = {r.get('studentId'): r for r in fee_records}
+    
+    rebuilt_records = []
+    students = db_data.get('students') or []
+    
+    for s in students:
+        sid = s.get('id')
+        if not sid:
+            continue
+            
+        student_txns = by_student.get(sid, [])
+        if not student_txns and sid not in fee_map:
+            continue
+            
+        # Compile payment history from transactions
+        history = []
+        for t in student_txns:
+            history.append({
+                'txn_id': t.txn_id,
+                'date': t.date,
+                'amount': t.amount,
+                'mode': t.mode,
+                'category': t.category,
+                'ref_no': t.ref_no,
+                'note': t.note,
+                'recorded_by': t.recorded_by,
+                'status': t.status,
+                'is_reversal': t.is_reversal,
+                'original_txn_id': t.original_txn_id
+            })
+            
+        # Reconstruct base record
+        existing = fee_map.get(sid) or {}
+        
+        # Sort history by date to find last paid date and next due date
+        sorted_hist = sorted(history, key=lambda h: str(h.get('date', '')))
+        last_paid = None
+        for h in reversed(sorted_hist):
+            if not h.get('is_reversal') and h.get('status') != 'reversed':
+                last_paid = h.get('date')
+                break
+                
+        # Keep existing structural fields like start_date, last_paid_date, due_date
+        rebuilt = {
+            'studentId': sid,
+            'amount': existing.get('amount') or s.get('fees', 0),
+            'start_date': existing.get('start_date') or s.get('created_at', '')[:10] or '2026-01-01',
+            'last_paid_date': last_paid or existing.get('last_paid_date'),
+            'due_date': existing.get('due_date'),
+            'pending_amount': existing.get('pending_amount') or 0.0,
+            'payment_history': history,
+            'created_at': existing.get('created_at') or _server_now_iso(),
+            'updated_at': _server_now_iso()
+        }
+        rebuilt_records.append(rebuilt)
+        
+    db_data['fee_records'] = rebuilt_records
+    db_data['server_updated_at'] = _server_now_iso()
+    _save_offline_data(db_data)
+    
+    return jsonify({
+        'success': True,
+        'message': f"Successfully reconstructed fee ledger for {len(rebuilt_records)} students from SQLite DB"
+    })
+
+
+@points_bp.route('/api/fees/reports', methods=['GET'])
+@login_required
+def list_fee_reports():
+    """List all generated monthly PDF fee reports from persistent storage."""
+    if current_user.role != 'admin':
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 403
+        
+    from app.utils.data_paths import get_storage_root
+    pdf_dir = os.path.join(get_storage_root(), 'fee_reports')
+    os.makedirs(pdf_dir, exist_ok=True)
+    
+    files = []
+    for f in os.listdir(pdf_dir):
+        if f.startswith('fee_report_') and f.endswith('.pdf'):
+            full_path = os.path.join(pdf_dir, f)
+            st = os.stat(full_path)
+            month = f.replace('fee_report_', '').replace('.pdf', '')
+            files.append({
+                'filename': f,
+                'month': month,
+                'size_kb': round(st.st_size / 1024, 1),
+                'created_at': datetime.fromtimestamp(st.st_mtime).strftime('%Y-%m-%d %H:%M:%S')
+            })
+            
+    files.sort(key=lambda item: item['month'], reverse=True)
+    return jsonify({'success': True, 'reports': files})
+
+
+@points_bp.route('/api/fees/reports/generate', methods=['POST'])
+@csrf.exempt
+@login_required
+def trigger_fee_report_generation():
+    """Trigger manual generation or regeneration of a monthly PDF report."""
+    import re
+    if current_user.role != 'admin':
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 403
+        
+    req_data = request.get_json(force=True, silent=True) or {}
+    month = req_data.get('month', '').strip()
+    if not month or not re.match(r'^\d{4}-\d{2}$', month):
+        return jsonify({'success': False, 'error': 'Invalid month format (YYYY-MM)'}), 400
+        
+    db_data = _load_offline_data()
+    if not db_data:
+        return jsonify({'success': False, 'error': 'Database not available'}), 503
+        
+    try:
+        _auto_generate_monthly_pdf_if_needed(month, db_data)
+        return jsonify({'success': True, 'month': month, 'filename': f"fee_report_{month}.pdf"})
+    except Exception as exc:
+        return jsonify({'success': False, 'error': f"Generation failed: {exc}"}), 500
+
+
+@points_bp.route('/api/fees/reports/download/<filename>', methods=['GET'])
+@login_required
+def download_fee_report(filename):
+    """Download a specific generated monthly PDF report."""
+    if current_user.role != 'admin':
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 403
+        
+    filename = os.path.basename(filename)
+    if not filename.startswith('fee_report_') or not filename.endswith('.pdf'):
+        return jsonify({'success': False, 'error': 'Invalid filename'}), 400
+        
+    from app.utils.data_paths import get_storage_root
+    pdf_dir = os.path.join(get_storage_root(), 'fee_reports')
+    pdf_path = os.path.join(pdf_dir, filename)
+    
+    if not os.path.exists(pdf_path):
+        return jsonify({'success': False, 'error': 'Report not found'}), 404
+        
+    return send_file(pdf_path, as_attachment=True, download_name=filename, mimetype='application/pdf')
+
+
 @points_bp.route('/offline-restore-points', methods=['GET'])
 @login_required
 def offline_restore_points():
@@ -6375,6 +7953,7 @@ def offline_restore_points():
 
 
 @points_bp.route('/offline-restore-point-lock', methods=['POST'])
+@csrf.exempt  # JSON API endpoint — secured by @login_required + admin role check
 @login_required
 def offline_restore_point_lock():
     if current_user.role != 'admin':
@@ -6408,7 +7987,9 @@ def offline_restore_point_lock():
 
 
 @points_bp.route('/offline-restore', methods=['POST'])
+@csrf.exempt  # JSON API endpoint — secured by @login_required + admin role check
 @login_required
+@_ledger_write_guard
 def offline_restore():
     if current_user.role != 'admin':
         return jsonify({'success': False, 'error': 'Unauthorized'}), 403
@@ -6501,15 +8082,46 @@ def offline_sw():
     return response
 
 
+def _get_request_user():
+    """
+    Resolve the user making the request from either the Flask-Login session
+    or custom headers: X-EA-Login-ID and X-EA-Login-Code.
+    Returns: (user_obj, role, login_id) or (None, None, None)
+    """
+    if current_user.is_authenticated:
+        return current_user, current_user.role, current_user.login_id
+    
+    login_id = request.headers.get('X-EA-Login-ID')
+    login_code = request.headers.get('X-EA-Login-Code')
+    
+    if login_id and login_code:
+        user = User.query.filter_by(login_id=login_id).first()
+        if user:
+            # Check login code validity
+            if user.login_code:
+                if user.login_code_expires_at and datetime.utcnow() > user.login_code_expires_at:
+                    return None, None, None
+                if str(login_code).strip().upper() == str(user.login_code).strip().upper():
+                    return user, user.role, user.login_id
+            else:
+                if user.check_password(login_code):
+                    return user, user.role, user.login_id
+    return None, None, None
+
+
 @points_bp.route('/session')
-@login_required
+@csrf.exempt
 def scoreboard_session():
-    role = (current_user.role or 'student').strip().lower()
+    user, role, login_id = _get_request_user()
+    if not user:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+        
+    role = (role or 'student').strip().lower()
     if role not in {'admin', 'teacher', 'student'}:
         role = 'student'
 
     response_data = {
-        'login_id': current_user.login_id,
+        'login_id': login_id,
         'role': role,
         'server_timezone': _get_server_timezone(),
         'server_time': _server_now_iso(),
@@ -6518,7 +8130,7 @@ def scoreboard_session():
 
     # For students, add their roll number to enable personalized filtering
     if role == 'student':
-        response_data['student_roll'] = current_user.login_id
+        response_data['student_roll'] = login_id
 
     return jsonify(response_data)
 
@@ -6560,6 +8172,7 @@ def device_checkin():
                .split(',')[0].strip())[:45],
         'device_id': _s(data.get('device_id'), 64),
         'device_name': _s(data.get('device_name'), 100),
+        'brand': _s(data.get('brand'), 50),
         'os': _s(data.get('os'), 80),
         'browser': _s(data.get('browser'), 80),
         'screen': _s(data.get('screen'), 20),
@@ -6584,7 +8197,89 @@ def device_checkin():
     except Exception as e:
         current_app.logger.error('device_checkin write error: %s', e)
 
+    # Also upsert DeviceSession row so the Control Panel reflects live status
+    try:
+        dev_id = _s(data.get('device_id'), 128) or None
+        q = DeviceSession.query.filter_by(user_id=current_user.id, login_id=current_user.login_id)
+        if dev_id:
+            q = q.filter_by(device_id=dev_id)
+        row = q.order_by(DeviceSession.last_seen.desc(), DeviceSession.id.desc()).first()
+        is_new = row is None
+        if is_new:
+            row = DeviceSession(
+                user_id=current_user.id,
+                login_id=current_user.login_id,
+                role=current_user.role or 'student',
+                device_id=dev_id,
+            )
+            db.session.add(row)
+        row.device_id = dev_id or row.device_id
+        _dn = _s(data.get('device_name'), 120)
+        _br = _s(data.get('brand'), 50)
+        # Combine brand + model for a readable device_name (e.g. "Samsung Galaxy S24")
+        if _dn and _br and _br.lower() not in _dn.lower():
+            row.device_name = f"{_br} {_dn}"[:120]
+        elif _dn:
+            row.device_name = _dn
+        row.os = _s(data.get('os'), 80) or row.os
+        row.browser = _s(data.get('browser'), 80) or row.browser
+        row.ip = entry['ip'] or row.ip
+        row.last_seen = datetime.utcnow()
+        row.status = 'online'
+        # Set login_at only on new sessions or when transitioning from offline→online
+        if is_new or str(row.status or '').lower() != 'online':
+            row.login_at = row.last_seen
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+
     return jsonify({'ok': True})
+
+
+@points_bp.route('/online-sessions', methods=['GET'])
+@csrf.exempt
+@login_required
+def online_sessions():
+    """Return currently-online sessions with login time and live duration.
+    Admin-only. Sessions not seen in 15 min are marked offline first."""
+    if current_user.role != 'admin':
+        return jsonify({'error': 'Unauthorized'}), 403
+    try:
+        cutoff = datetime.utcnow() - timedelta(minutes=15)
+        stale = DeviceSession.query.filter(
+            DeviceSession.status == 'online',
+            DeviceSession.last_seen < cutoff
+        ).all()
+        for s in stale:
+            s.status = 'offline'
+        if stale:
+            db.session.commit()
+    except Exception:
+        db.session.rollback()
+
+    now = datetime.utcnow()
+    rows = (
+        DeviceSession.query
+        .filter_by(status='online')
+        .order_by(DeviceSession.login_at.desc(), DeviceSession.last_seen.desc())
+        .all()
+    )
+    items = []
+    for s in rows:
+        login_at = s.login_at or s.last_seen
+        duration_sec = int((now - login_at).total_seconds()) if login_at else 0
+        items.append({
+            'login_id': s.login_id,
+            'role': s.role,
+            'device_name': s.device_name or '',
+            'os': s.os or '',
+            'browser': s.browser or '',
+            'ip': s.ip or '',
+            'login_at': login_at.isoformat() if login_at else '',
+            'last_seen': s.last_seen.isoformat() if s.last_seen else '',
+            'duration_sec': max(0, duration_sec),
+        })
+    return jsonify({'success': True, 'count': len(items), 'sessions': items})
 
 
 @points_bp.route('/device-log/clear', methods=['POST'])
@@ -6612,6 +8307,7 @@ def scoreboard_home():
 
 @points_bp.route('/party-data', methods=['GET', 'POST'])
 @login_required
+@_ledger_write_guard
 def party_data():
     """Get or update party system data"""
     data = _load_politics_data()
@@ -6650,6 +8346,7 @@ def party_data():
 
 @points_bp.route('/leadership-data', methods=['GET', 'POST'])
 @login_required
+@_ledger_write_guard
 def leadership_data():
     """Get or update leadership posts"""
     data = _load_politics_data()
@@ -6815,6 +8512,7 @@ def get_scoreboard_data():
 
 
 @points_bp.route('/proposals', methods=['GET', 'POST'])
+@csrf.exempt  # JSON API — secured by @login_required
 @login_required
 def proposals_data():
     data = _load_offline_data() or {}
@@ -6896,6 +8594,7 @@ def proposals_data():
 
 
 @points_bp.route('/proposals/<int:proposal_id>/vote', methods=['POST'])
+@csrf.exempt  # JSON API — secured by @login_required
 @login_required
 def proposal_vote(proposal_id):
     data = _load_offline_data() or {}
@@ -6949,6 +8648,7 @@ def proposal_vote(proposal_id):
 
 
 @points_bp.route('/proposals/<int:proposal_id>/messages', methods=['GET', 'POST'])
+@csrf.exempt  # JSON API — secured by @login_required
 @login_required
 def proposal_messages(proposal_id):
     data = _load_offline_data() or {}
@@ -7019,6 +8719,20 @@ def admin_control_panel_data():
     if str(current_user.role or '').strip().lower() != 'admin':
         return jsonify({'success': False, 'error': 'Unauthorized'}), 403
 
+    # Mark stale device sessions as offline (not seen in 15 min)
+    try:
+        cutoff = datetime.utcnow() - timedelta(minutes=15)
+        stale = DeviceSession.query.filter(
+            DeviceSession.status == 'online',
+            DeviceSession.last_seen < cutoff
+        ).all()
+        for s in stale:
+            s.status = 'offline'
+        if stale:
+            db.session.commit()
+    except Exception:
+        db.session.rollback()
+
     users = User.query.order_by(User.role.asc(), User.login_id.asc()).all()
     user_rows = []
     for user in users:
@@ -7058,6 +8772,7 @@ def admin_control_panel_data():
         'os': s.os,
         'browser': s.browser,
         'ip': s.ip,
+        'login_at': s.login_at.isoformat() if s.login_at else '',
         'last_seen': s.last_seen.isoformat() if s.last_seen else '',
         'status': s.status,
     } for s in sessions]
@@ -7090,12 +8805,36 @@ def admin_control_panel_data():
         'created_at': c.created_at.isoformat() if c.created_at else '',
     } for c in join_codes]
 
+    # Public site (Cloudflare) login credentials — admin-managed, published on
+    # Force Publish. Only metadata is exposed here (never salts/hashes).
+    pub_creds = []
+    try:
+        pub_rows = (
+            PublicSiteCredential.query
+            .order_by(PublicSiteCredential.roll.asc())
+            .all()
+        )
+        admin_id_map = {u.id: u.login_id for u in User.query.all()}
+        for r in pub_rows:
+            pub_creds.append({
+                'id': r.id,
+                'roll': str(r.roll or '').upper(),
+                'active': bool(r.active),
+                'set_by_login': admin_id_map.get(r.set_by, '') if r.set_by else '',
+                'set_at': r.set_at.isoformat() if r.set_at else '',
+            })
+    except Exception:
+        db.session.rollback()
+        current_app.logger.exception('Failed to load public site credentials')
+
     return jsonify({
         'success': True,
         'users': user_rows,
         'device_sessions': session_rows,
         'access_windows': window_rows,
         'join_codes': code_rows,
+        'public_credentials': pub_creds,
+        'student_rolls': _student_rolls_from_ledger(),
     })
 
 
@@ -7213,9 +8952,267 @@ def admin_set_access_window():
     return jsonify({'success': True, 'message': f'Window saved for {login_id}'})
 
 
+@points_bp.route('/admin/reset-login-codes', methods=['POST'])
+@csrf.exempt
+@login_required
+def admin_reset_login_codes():
+    if str(current_user.role or '').strip().lower() != 'admin':
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 403
+
+    import random
+    def _generate_random_code(length=6):
+        chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+        return ''.join(random.choice(chars) for _ in range(length))
+
+    def _get_current_month_end():
+        now = datetime.utcnow()
+        if now.month == 12:
+            next_month = datetime(now.year + 1, 1, 1)
+        else:
+            next_month = datetime(now.year, now.month + 1, 1)
+        return next_month - timedelta(seconds=1)
+
+    try:
+        users = User.query.filter(User.login_id != 'Admin').all()
+        expires_at = _get_current_month_end()
+        generated = []
+
+        for user in users:
+            code = _generate_random_code()
+            user.login_code = code
+            user.login_code_expires_at = expires_at
+            generated.append({
+                'login_id': user.login_id,
+                'role': user.role,
+                'code': code
+            })
+        
+        db.session.commit()
+        
+        # Log this admin activity
+        try:
+            from app.routes.auth import log_activity
+            log_activity(current_user.id, 'Regenerated monthly user login codes', 'admin_action', f'Updated {len(users)} users', request.remote_addr)
+        except Exception:
+            pass
+
+        return jsonify({
+            'success': True, 
+            'message': f'Successfully regenerated codes for {len(users)} users expiring at {expires_at.isoformat()}',
+            'expires_at': expires_at.isoformat(),
+            'codes': generated
+        })
+    except Exception as exc:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(exc)}), 500
+
+
+def _require_admin():
+    """Returns (ok, error_response). ok=True means caller is admin."""
+    if str(current_user.role or '').strip().lower() != 'admin':
+        return False, (jsonify({'success': False, 'error': 'Unauthorized'}), 403)
+    return True, None
+
+
+def _upsert_public_credential(roll, password, actor_id):
+    """Create or update a PublicSiteCredential row with a fresh salt+hash."""
+    roll = _normalize_roll(roll)
+    if not roll:
+        raise ValueError('roll is required')
+    if not str(password or ''):
+        raise ValueError('password is required')
+    salt, digest = _hash_public_credential(password)
+    row = PublicSiteCredential.query.filter_by(roll=roll).first()
+    if row:
+        row.salt = salt
+        row.hash = digest
+        row.active = True
+        row.set_by = actor_id
+        row.set_at = datetime.utcnow()
+    else:
+        row = PublicSiteCredential(
+            roll=roll, salt=salt, hash=digest, active=True,
+            set_by=actor_id, set_at=datetime.utcnow(),
+        )
+        db.session.add(row)
+    return row
+
+
+@points_bp.route('/admin/public-credential', methods=['POST'])
+@csrf.exempt  # JSON API endpoint secured by @login_required + admin role check
+@login_required
+def admin_set_public_credential():
+    ok, err = _require_admin()
+    if not ok:
+        return err
+    payload = request.get_json(silent=True) or {}
+    roll = _normalize_roll(payload.get('roll'))
+    password = str(payload.get('password') or '')
+    if not roll:
+        return jsonify({'success': False, 'error': 'roll is required'}), 400
+    if not password:
+        return jsonify({'success': False, 'error': 'password is required'}), 400
+    if len(password) < 4:
+        return jsonify({'success': False, 'error': 'password must be at least 4 characters'}), 400
+    try:
+        _upsert_public_credential(roll, password, _parse_int_safe(current_user.id, 0) or None)
+        db.session.commit()
+    except ValueError as ve:
+        return jsonify({'success': False, 'error': str(ve)}), 400
+    except Exception as exc:
+        db.session.rollback()
+        current_app.logger.exception('Failed to set public credential')
+        return jsonify({'success': False, 'error': str(exc)}), 500
+    return jsonify({'success': True, 'message': f'Credential set for {roll}'})
+
+
+@points_bp.route('/admin/public-credential/bulk', methods=['POST'])
+@csrf.exempt  # JSON API endpoint secured by @login_required + admin role check
+@login_required
+def admin_bulk_set_public_credentials():
+    ok, err = _require_admin()
+    if not ok:
+        return err
+    payload = request.get_json(silent=True) or {}
+    password = str(payload.get('password') or '')
+    rolls_raw = payload.get('rolls')
+    if not password:
+        return jsonify({'success': False, 'error': 'password is required'}), 400
+    if len(password) < 4:
+        return jsonify({'success': False, 'error': 'password must be at least 4 characters'}), 400
+    if rolls_raw is None or (isinstance(rolls_raw, str) and not rolls_raw.strip()):
+        rolls = _student_rolls_from_ledger()
+    elif isinstance(rolls_raw, list):
+        rolls = [_normalize_roll(r) for r in rolls_raw if str(r or '').strip()]
+    elif isinstance(rolls_raw, str):
+        rolls = [_normalize_roll(r) for r in re.split(r'[,\s]+', rolls_raw) if str(r or '').strip()]
+    else:
+        rolls = []
+    rolls = list(dict.fromkeys(rolls))  # de-dup, preserve order
+    if not rolls:
+        return jsonify({'success': False, 'error': 'No rolls provided and no students found in ledger'}), 400
+    actor_id = _parse_int_safe(current_user.id, 0) or None
+    saved = 0
+    failed = []
+    try:
+        for roll in rolls:
+            try:
+                _upsert_public_credential(roll, password, actor_id)
+                saved += 1
+            except Exception as row_err:
+                failed.append({'roll': roll, 'error': str(row_err)})
+        db.session.commit()
+    except Exception as exc:
+        db.session.rollback()
+        current_app.logger.exception('Bulk public credential set failed')
+        return jsonify({'success': False, 'error': str(exc)}), 500
+    return jsonify({
+        'success': True,
+        'message': f'Credentials set for {saved} student(s)',
+        'saved': saved,
+        'failed': failed,
+    })
+
+
+@points_bp.route('/admin/public-credential/toggle', methods=['POST'])
+@csrf.exempt  # JSON API endpoint secured by @login_required + admin role check
+@login_required
+def admin_toggle_public_credential():
+    ok, err = _require_admin()
+    if not ok:
+        return err
+    payload = request.get_json(silent=True) or {}
+    roll = _normalize_roll(payload.get('roll'))
+    active = bool(payload.get('active'))
+    if not roll:
+        return jsonify({'success': False, 'error': 'roll is required'}), 400
+    row = PublicSiteCredential.query.filter_by(roll=roll).first()
+    if not row:
+        return jsonify({'success': False, 'error': f'No credential for {roll}'}), 404
+    try:
+        row.active = active
+        row.set_at = datetime.utcnow()
+        db.session.commit()
+    except Exception as exc:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(exc)}), 500
+    state = 'enabled' if active else 'disabled'
+    return jsonify({'success': True, 'message': f'{roll} {state}'})
+
+
+@points_bp.route('/admin/public-credential/delete', methods=['POST'])
+@csrf.exempt  # JSON API endpoint secured by @login_required + admin role check
+@login_required
+def admin_delete_public_credential():
+    ok, err = _require_admin()
+    if not ok:
+        return err
+    payload = request.get_json(silent=True) or {}
+    roll = _normalize_roll(payload.get('roll'))
+    if not roll:
+        return jsonify({'success': False, 'error': 'roll is required'}), 400
+    row = PublicSiteCredential.query.filter_by(roll=roll).first()
+    if not row:
+        return jsonify({'success': False, 'error': f'No credential for {roll}'}), 404
+    try:
+        db.session.delete(row)
+        db.session.commit()
+    except Exception as exc:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(exc)}), 500
+    return jsonify({'success': True, 'message': f'Credential revoked for {roll}'})
+
+
+@points_bp.route('/auth/check-updates', methods=['GET', 'POST'])
+@csrf.exempt
+def auth_check_updates():
+    """
+    Background API to check for new scoreboard updates.
+    Accepts X-EA-Login-ID and X-EA-Login-Code in headers or JSON request for secure authentication.
+    """
+    login_id = request.headers.get('X-EA-Login-ID') or request.values.get('login_id')
+    login_code = request.headers.get('X-EA-Login-Code') or request.values.get('login_code')
+
+    if not login_id or not login_code:
+        if current_user.is_authenticated:
+            login_id = current_user.login_id
+        else:
+            return jsonify({'success': False, 'error': 'Credentials required'}), 401
+
+    user = User.query.filter_by(login_id=login_id).first()
+    if not user:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+
+    if user.login_code:
+        if user.login_code_expires_at and datetime.utcnow() > user.login_code_expires_at:
+            return jsonify({'success': False, 'error': 'Login code expired'}), 401
+        if str(login_code).strip().upper() != str(user.login_code).strip().upper():
+            return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+    else:
+        if not user.check_password(login_code):
+            return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+
+    data = _load_offline_data() or {}
+    server_updated_at = data.get('server_updated_at') or data.get('updated_at') or _server_now_iso()
+    
+    logs = data.get('activity_log') or []
+    latest_activity = "No recent activity"
+    if logs and isinstance(logs, list):
+        latest = logs[-1]
+        if isinstance(latest, dict):
+            latest_activity = f"{latest.get('action', '')}: {latest.get('detail', '')}"
+
+    return jsonify({
+        'success': True,
+        'server_updated_at': server_updated_at,
+        'latest_activity': latest_activity
+    })
+
+
 @points_bp.route('/student-transfers', methods=['GET', 'POST'])
 @csrf.exempt  # JSON API endpoint secured by @login_required + student role check
 @login_required
+@_ledger_write_guard
 def student_transfers():
     if str(current_user.role or '').strip().lower() != 'student':
         return jsonify({'success': False, 'error': 'Student role required'}), 403
@@ -7387,6 +9384,7 @@ def student_transfers():
 
 @points_bp.route('/add-points', methods=['POST'])
 @login_required
+@_ledger_write_guard
 def add_points():
     """Add points for a student"""
     if current_user.role != 'admin':
@@ -7451,10 +9449,11 @@ def add_points():
         # Sanitize notes (prevent XSS)
         notes = str(data.get('notes', ''))[:500]  # Limit to 500 chars
         
-        # Check if record exists
+        # Check if record exists (only manual entries; notebook entries have their own entry_type)
         record = StudentPoints.query.filter_by(
             student_id=student_id,
-            date_recorded=date_recorded
+            date_recorded=date_recorded,
+            entry_type='manual',
         ).first()
         
         if record:
@@ -7473,7 +9472,8 @@ def add_points():
                 stars=stars,
                 vetos=vetos,
                 notes=notes,
-                recorded_by=current_user.username
+                recorded_by=current_user.login_id,
+                entry_type='manual',
             )
             db.session.add(record)
         
@@ -7490,7 +9490,9 @@ def add_points():
 
 
 @points_bp.route('/leader-adjust-score', methods=['POST'])
+@csrf.exempt  # JSON API — secured by @login_required + role check
 @login_required
+@_ledger_write_guard
 def leader_adjust_score():
     """
     Leader rule:
@@ -7632,8 +9634,55 @@ def leader_adjust_score():
     })
 
 
+@points_bp.route('/award-gcb', methods=['POST'])
+@csrf.exempt
+@login_required
+@_ledger_write_guard
+def award_gcb():
+    """Award or revoke GCB (Good Conduct Badge) immunity for a student. Admin only.
+
+    GCB immunity means:
+    - Absence penalty is not applied to this student.
+    - Score entries cannot be saved below -20 for this student.
+    """
+    if current_user.role != 'admin':
+        return jsonify({'success': False, 'error': 'Admin access required'}), 403
+
+    payload = request.get_json(silent=True) or {}
+    student_id = _parse_int_safe(payload.get('student_id'), 0)
+    awarded = bool(payload.get('awarded', False))
+
+    if student_id <= 0:
+        return jsonify({'success': False, 'error': 'student_id required'}), 400
+
+    data = _load_offline_data() or {}
+    students = data.get('students', []) or []
+    target = None
+    for s in students:
+        if isinstance(s, dict) and _parse_int_safe(s.get('id'), 0) == student_id:
+            target = s
+            break
+    if target is None:
+        return jsonify({'success': False, 'error': 'Student not found'}), 404
+
+    target['gcb'] = awarded
+    now_iso = _server_now_iso()
+    data['server_updated_at'] = now_iso
+    _save_offline_data(data)
+    _broadcast_sync_event(now_iso, source='award-gcb')
+    _forward_offline_data_to_peers_async(data, [])
+    return jsonify({
+        'success': True,
+        'student_id': student_id,
+        'roll': target.get('roll', ''),
+        'gcb': awarded,
+        'updated_at': now_iso,
+    })
+
+
 @points_bp.route('/add-student', methods=['POST'])
 @login_required
+@_ledger_write_guard
 def add_student():
     """Add a new student"""
     if current_user.role != 'admin':
@@ -7686,6 +9735,7 @@ def add_student():
 
 @points_bp.route('/delete-student/<int:student_id>', methods=['DELETE'])
 @login_required
+@_ledger_write_guard
 def delete_student(student_id):
     """Delete a student"""
     if current_user.role != 'admin':
@@ -7708,6 +9758,7 @@ def delete_student(student_id):
 
 @points_bp.route('/update-profile/<int:student_id>', methods=['POST'])
 @login_required
+@_ledger_write_guard
 def update_profile(student_id):
     """Update student profile with extended fields"""
     # Security: Only admin and teacher can update profiles
@@ -7773,6 +9824,7 @@ def update_profile(student_id):
 
 @points_bp.route('/import-excel', methods=['POST'])
 @login_required
+@_ledger_write_guard
 def import_excel():
     """Import student data and scores from Excel file"""
     if current_user.role != 'admin':
@@ -7984,6 +10036,7 @@ def import_excel():
 
 @points_bp.route('/seed-feb26', methods=['POST'])
 @login_required
+@_ledger_write_guard
 def seed_feb26():
     """Seed database with Feb 26 sheet data"""
     if current_user.role != 'admin':
@@ -8236,7 +10289,9 @@ def _detect_excel_header_row(ws):
 # ============== REFINED IMPORT ENDPOINTS ==============
 
 @points_bp.route('/import-historical-data', methods=['POST'])
+@csrf.exempt  # JSON API — secured by @login_required + admin role check
 @login_required
+@_ledger_write_guard
 def import_historical_data():
     """
     Historical Excel import for months before Feb 2026.
@@ -8664,6 +10719,7 @@ def import_historical_data():
 
 @points_bp.route('/import-latest-roster', methods=['POST'])
 @login_required
+@_ledger_write_guard
 def import_latest_roster():
     """
     Import latest roster for CURRENT MONTH ONLY
@@ -8794,3 +10850,268 @@ def import_latest_roster():
         except:
             pass
         return jsonify({'success': False, 'error': str(e)}), 500
+
+
+# ── Points Transfer (admin/teacher-initiated) ──────────────────────────────
+@points_bp.route('/transfer-points', methods=['POST'])
+@csrf.exempt
+@login_required
+@_ledger_write_guard
+def transfer_points():
+    """Admin/teacher-initiated point transfer between two students.
+
+    Role-based limits:
+      Leader (L)          – up to 50 per transfer
+      Co-Leader (CoL)     – up to 40
+      Leadership posts    – up to 30
+      All CRs             – up to 30
+      All PPs / DPPs      – no hard cap (use available balance)
+      Normal students     – can only donate to their own PP/DPP
+    """
+    role = str(current_user.role or '').strip().lower()
+    if role not in ('admin', 'teacher'):
+        return jsonify({'success': False, 'error': 'Admin or teacher role required'}), 403
+
+    payload = request.get_json(silent=True) or {}
+    from_student_id = _parse_int_safe(payload.get('from_student_id'), 0)
+    to_student_id = _parse_int_safe(payload.get('to_student_id'), 0)
+    amount = _parse_int_safe(payload.get('amount'), 0)
+    reason = str(payload.get('reason') or '').strip()[:200]
+    transfer_date = str(payload.get('date') or '').strip()
+
+    if from_student_id <= 0 or to_student_id <= 0:
+        return jsonify({'success': False, 'error': 'Valid from/to student IDs required'}), 400
+    if from_student_id == to_student_id:
+        return jsonify({'success': False, 'error': 'Cannot transfer to self'}), 400
+    if amount <= 0:
+        return jsonify({'success': False, 'error': 'Amount must be positive'}), 400
+
+    now = datetime.utcnow()
+    now_iso = _server_now_iso()
+    now_date = _parse_date_key(now_iso) or date.today()
+    month_key = now_date.strftime('%Y-%m')
+
+    # Resolve transfer date (default to today)
+    t_date = _parse_date_key(transfer_date) if transfer_date else now_date
+    if not t_date:
+        t_date = now_date
+    t_date_iso = t_date.isoformat()
+    t_month = t_date.strftime('%Y-%m')
+
+    data = _load_offline_data() or {}
+    if not _is_month_allowed_for_user(data, current_user, t_month):
+        return jsonify({'success': False, 'error': 'No access to target month'}), 403
+
+    # Lookup students
+    students = data.get('students', []) or []
+    sender = next((s for s in students if _parse_int_safe(s.get('id'), 0) == from_student_id), None)
+    receiver = next((s for s in students if _parse_int_safe(s.get('id'), 0) == to_student_id), None)
+    if not sender:
+        return jsonify({'success': False, 'error': 'Sender not found'}), 404
+    if not receiver:
+        return jsonify({'success': False, 'error': 'Receiver not found'}), 404
+
+    # ── Determine sender's role for limit enforcement ─────────────────────
+    sender_limit = 0  # 0 means "no cap" (PP/DPP); will be set for others
+    sender_is_post_holder = False
+    sender_is_cr = False
+    sender_is_pp = False
+    sender_is_dpp = False
+    sender_party_code = ''
+    sender_leadership_type = ''
+
+    check_date = t_date
+
+    # Check leadership posts
+    for post in data.get('leadership', []) or []:
+        if _parse_int_safe(post.get('studentId'), 0) != from_student_id:
+            continue
+        if not _is_active_assignment(post, 'leadership', check_date):
+            continue
+        sender_is_post_holder = True
+        role_type = _leadership_role_type(post.get('post'))
+        if role_type == 'leader':
+            sender_leadership_type = 'leader'
+            sender_limit = 50
+        elif role_type == 'co_leader':
+            sender_leadership_type = 'co_leader'
+            sender_limit = 40
+        elif role_type == 'lop':
+            sender_leadership_type = 'lop'
+            sender_limit = 30
+        else:
+            # Other leadership posts (captains, in-charges)
+            sender_limit = 30
+        break
+
+    # Check CR posts
+    if not sender_is_post_holder:
+        for post in data.get('class_reps', []) or []:
+            if _parse_int_safe(post.get('studentId'), 0) == from_student_id and _is_active_assignment(post, 'class_rep', check_date):
+                sender_is_cr = True
+                sender_limit = 30
+                break
+        if not sender_is_cr:
+            for post in data.get('group_crs', []) or []:
+                if _parse_int_safe(post.get('studentId'), 0) == from_student_id and _is_active_assignment(post, 'group_cr', check_date):
+                    sender_is_cr = True
+                    sender_limit = 30
+                    break
+
+    # Check party membership (PP/DPP)
+    for party in data.get('parties', []) or []:
+        for member in party.get('members', []) or []:
+            if _parse_int_safe(member.get('studentId'), 0) != from_student_id:
+                continue
+            m_status = str(member.get('status') or 'active').strip().lower()
+            if m_status not in ('active', ''):
+                continue
+            sender_party_code = str(party.get('code') or '').strip().upper()
+            designation = str(member.get('designation') or '').strip().lower()
+            if designation in ('party president', 'pp'):
+                sender_is_pp = True
+                sender_limit = 0  # no cap
+            elif designation in ('deputy party president', 'dpp'):
+                sender_is_dpp = True
+                sender_limit = 0  # no cap
+            break
+        if sender_party_code:
+            break
+
+    is_sender_privileged = sender_is_post_holder or sender_is_cr or sender_is_pp or sender_is_dpp
+
+    # ── Permission checks ─────────────────────────────────────────────────
+    if not is_sender_privileged:
+        # Normal student: can only donate to their own PP/DPP
+        if not sender_party_code:
+            return jsonify({'success': False, 'error': 'Normal students can only transfer to their PP/DPP'}), 403
+        # Find sender's party PP/DPP
+        sender_party = next((p for p in data.get('parties', []) or [] if str(p.get('code', '')).strip().upper() == sender_party_code), None)
+        if not sender_party:
+            return jsonify({'success': False, 'error': 'Sender party not found'}), 404
+        pp_dpp_ids = set()
+        for member in sender_party.get('members', []) or []:
+            designation = str(member.get('designation') or '').strip().lower()
+            if designation in ('party president', 'pp', 'deputy party president', 'dpp'):
+                mid = _parse_int_safe(member.get('studentId'), 0)
+                if mid > 0:
+                    pp_dpp_ids.add(mid)
+        if to_student_id not in pp_dpp_ids:
+            return jsonify({'success': False, 'error': 'Normal students can only transfer to their PP/DPP'}), 403
+        sender_limit = 30  # normal student donation cap
+
+    elif sender_is_pp or sender_is_dpp:
+        # PP/DPP: can transfer between party members only
+        if not sender_party_code:
+            return jsonify({'success': False, 'error': 'PP/DPP party not found'}), 409
+        sender_party = next((p for p in data.get('parties', []) or [] if str(p.get('code', '')).strip().upper() == sender_party_code), None)
+        if not sender_party:
+            return jsonify({'success': False, 'error': 'Sender party not found'}), 404
+        party_member_ids = set()
+        for member in sender_party.get('members', []) or []:
+            mid = _parse_int_safe(member.get('studentId'), 0)
+            if mid > 0:
+                party_member_ids.add(mid)
+        if to_student_id not in party_member_ids:
+            return jsonify({'success': False, 'error': 'PP/DPP can only transfer within party members'}), 403
+    # else: post holder / CR / leader / co-leader can transfer to any student
+
+    # ── Enforce transfer limit ─────────────────────────────────────────────
+    if sender_limit > 0 and amount > sender_limit:
+        return jsonify({'success': False, 'error': f'Transfer exceeds limit of {sender_limit} for this role'}), 400
+
+    # ── Check sender balance ──────────────────────────────────────────────
+    sender_balance = _sum_points_for_student_month(data, from_student_id, t_month)
+    if sender_balance <= 0:
+        return jsonify({'success': False, 'error': 'Sender has no transferable points this month'}), 409
+    if amount > sender_balance:
+        return jsonify({'success': False, 'error': f'Transfer exceeds sender available balance ({sender_balance})'}), 409
+
+    # ── Execute transfer ──────────────────────────────────────────────────
+    from_roll = str(sender.get('roll') or '').strip()
+    to_roll = str(receiver.get('roll') or '').strip()
+    reason_part = f' — {reason}' if reason else ''
+    note_out = f'[PTS TRANSFER OUT -{amount} to {to_roll}]{reason_part}'
+    note_in = f'[PTS TRANSFER IN +{amount} from {from_roll}]{reason_part}'
+
+    _upsert_score_delta(data, from_student_id, t_date_iso, t_month,
+                        delta_points=-amount, delta_stars=0, note=note_out)
+    _upsert_score_delta(data, to_student_id, t_date_iso, t_month,
+                        delta_points=amount, delta_stars=0, note=note_in)
+
+    # Record in StudentTransfer table
+    transfer_row = StudentTransfer(
+        from_student_id=from_student_id,
+        to_student_id=to_student_id,
+        transfer_type='points',
+        amount=amount,
+        created_at=now,
+        lock_until=now + timedelta(hours=24),
+    )
+    try:
+        db.session.add(transfer_row)
+        db.session.commit()
+    except Exception as exc:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(exc)}), 500
+
+    _append_activity_log_entries(
+        data,
+        str(current_user.login_id or ''),
+        role,
+        {
+            'scores': [],
+            'activity_log': [{
+                'entity': 'points_transfer',
+                'action': 'create',
+                'detail': f'points:{amount} from {from_roll} to {to_roll}',
+                'month': t_month,
+                'date': t_date_iso,
+            }]
+        },
+        source='points-transfer'
+    )
+    _ensure_score_timestamps(data)
+    data['server_updated_at'] = now_iso
+    _save_offline_data(data)
+    _broadcast_sync_event(now_iso, source='points-transfer')
+    _forward_offline_data_to_peers_async(data, [])
+
+    return jsonify({
+        'success': True,
+        'message': f'Transferred {amount} point(s): {from_roll} -> {to_roll}',
+        'from_roll': from_roll,
+        'to_roll': to_roll,
+        'amount': amount,
+        'date': t_date_iso,
+        'updated_at': now_iso,
+    })
+
+
+# ── DEBUG: Temporary cache verification endpoint ────────────────────────────
+@points_bp.route('/__debug_cache_status')
+@login_required
+def _debug_cache_status():
+    """Debug endpoint: verify caching is working. Admin only."""
+    if current_user.role != 'admin':
+        abort(403)
+    from app.utils.data_paths import _data_cache
+    import time
+
+    # Measure load time
+    t1 = time.perf_counter()
+    data = _load_offline_data()
+    elapsed_ms = (time.perf_counter() - t1) * 1000
+
+    return jsonify({
+        'cache_status': {
+            'path': _data_cache.get('path'),
+            'mtime_ns': _data_cache.get('mtime_ns'),
+            'size_bytes': _data_cache.get('size'),
+            'has_data': _data_cache.get('data') is not None,
+        },
+        'last_load_ms': round(elapsed_ms, 2),
+        'students_count': len(data.get('students', [])),
+        'scores_count': len(data.get('scores', [])),
+        'active_file_path': _offline_data_path(),
+    })

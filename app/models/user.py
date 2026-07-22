@@ -17,6 +17,8 @@ class User(UserMixin, db.Model):
     last_login = db.Column(db.DateTime)
     last_login_ip = db.Column(db.String(50))
     password_changed_at = db.Column(db.DateTime)
+    login_code = db.Column(db.String(100), unique=True, nullable=True)
+    login_code_expires_at = db.Column(db.DateTime, nullable=True)
     
     # Relationships
     activity_logs = db.relationship('ActivityLog', backref='user_rel', cascade='all, delete-orphan')

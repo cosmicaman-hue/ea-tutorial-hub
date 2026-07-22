@@ -7,36 +7,49 @@ anywhere without circular-import risk — including scoreboard.py routes and
 future test files.
 
 Formula (mirrors offline_scoreboard.html JS):
-  Stars:  max(carry + awards - used, global_counter)
+  Stars:  current month:    student.stars   (authoritative ledger)
+          historical month: carry + awards - used  (from month profile)
   VETOs:  individual + role_grant + awards - used  (current month)
           carry + role_grant + awards - used        (historical months)
 """
-import re
+from datetime import datetime
+from app.utils.helpers import norm_roll as _norm_roll, safe_int as _safe_int, month_key as _month_key
 
 
-# ── Tiny shared utilities (re-implemented here to avoid circular imports) ──
-
-def _norm_roll(value):
-    """Normalise a roll-number string to uppercase stripped form."""
-    return str(value or '').strip().upper()
-
-
-def _safe_int(value, default=0):
-    """Parse an integer safely, returning default on failure."""
-    try:
-        return int(value)
-    except (TypeError, ValueError):
-        return default
+def _iter_month_profiles(data, month_key):
+    """Return the month profile rows for a month as a list."""
+    month = _month_key(month_key)
+    month_profiles = (data.get('month_roster_profiles', {}) or {}).get(month, {}) or {}
+    if isinstance(month_profiles, list):
+        return [row for row in month_profiles if isinstance(row, dict)]
+    if isinstance(month_profiles, dict):
+        return [row for row in month_profiles.values() if isinstance(row, dict)]
+    return []
 
 
-def _month_key(value):
-    """Extract YYYY-MM from any date-like string."""
-    text = str(value or '').strip()
-    if re.match(r'^\d{4}-\d{2}$', text):
-        return text
-    if len(text) >= 7 and re.match(r'^\d{4}-\d{2}', text[:7]):
-        return text[:7]
-    return ''
+def _find_month_profile(data, student_id, month_key):
+    """Return the best matching month profile for a student/month."""
+    sid = _safe_int(student_id, 0)
+    if sid <= 0:
+        return None
+
+    profiles = _iter_month_profiles(data, month_key)
+    if not profiles:
+        return None
+
+    for profile in profiles:
+        profile_sid = _safe_int(profile.get('studentId') or profile.get('student_id'), 0)
+        if profile_sid == sid:
+            return profile
+
+    roll_key = get_roll_for_month(data, sid, month_key)
+    if roll_key:
+        normalized_roll = _norm_roll(roll_key)
+        for profile in profiles:
+            if _norm_roll(profile.get('roll')) == normalized_roll:
+                return profile
+
+    return None
 
 
 # ── Roll-history resolution ────────────────────────────────────────────────
@@ -98,15 +111,25 @@ def get_roll_for_month(data, student_id, month_key):
 
 # ── Star balance ──────────────────────────────────────────────────────────
 
-def compute_star_balance(data, student_id, month_key):
+def compute_star_balance(data, student_id, month_key, current_month=None):
     """Authoritative available-star count for a student in a month.
 
     Formula:
-        available = max(profile_carry + month_awards - month_used, global_counter)
+        current month    → student.stars (global ledger — single source of truth)
+        historical month → max(0, profile_carry + month_awards - month_used)
 
-    The higher-of-global-or-profile logic ensures accumulated stars are never
-    invisible due to a stale/zero roster month_star_count — matching the JS
-    implementation in offline_scoreboard.html::getAvailableStarsForMonth().
+    The current-month branch makes `student.stars` authoritative so that
+    manual edits, deductions, and Star→VETO conversions are always reflected
+    in the displayed balance. Auto-recompute was removed in favor of this
+    ledger-only model; carry+awards-used is only used to render past months
+    where the ledger value (current) does not apply.
+
+    Parameters
+    ----------
+    data          : offline data dict
+    student_id    : int
+    month_key     : YYYY-MM to compute for
+    current_month : YYYY-MM treated as "current". Defaults to today's month.
     """
     sid = _safe_int(student_id, 0)
     students = data.get('students', []) or []
@@ -117,10 +140,16 @@ def compute_star_balance(data, student_id, month_key):
     month = _month_key(month_key)
     global_stars = max(0, _safe_int(student.get('stars'), 0))
 
-    month_profiles = data.get('month_roster_profiles', {}) or {}
-    profiles = month_profiles.get(month, {}) or {}
-    roll_key = get_roll_for_month(data, sid, month) or _norm_roll(student.get('roll'))
-    profile = profiles.get(roll_key) if isinstance(profiles, dict) else None
+    if not current_month:
+        current_month = datetime.now().strftime('%Y-%m')
+    current_month = _month_key(current_month) or current_month
+
+    # Current month (or caller did not specify a historical key) — the ledger
+    # is authoritative. Never dilute it with derived values.
+    if not month or month == current_month:
+        return global_stars
+
+    profile = _find_month_profile(data, sid, month)
 
     if profile and profile.get('month_star_count') is not None:
         carry = max(0, _safe_int(profile.get('month_star_count'), 0))
@@ -141,7 +170,7 @@ def compute_star_balance(data, student_id, month_key):
             and _month_key(r.get('month') or r.get('date')) == month
             and _safe_int(r.get('stars'), 0) < 0
         )
-        return max(0, max(carry + awards - used, global_stars))
+        return max(0, carry + awards - used)
 
     return global_stars
 
@@ -191,7 +220,10 @@ def compute_veto_balance(data, student_id, month_key, current_month):
 
     if month == current_month:
         role_veto = max(0, _safe_int(student.get('role_veto_count'), 0))
-        return max(0, individual + awards - used + role_veto)
+        # For the current month, veto_count and role_veto_count are live-decremented
+        # counters. Subtracting used (the score-entry negative delta) on top of this
+        # causes a double-deduction.
+        return max(0, individual + awards + role_veto)
 
     # Historical month — use the monthly role-grant snapshot
     role_veto_monthly = data.get('role_veto_monthly', {}) or {}
@@ -200,10 +232,7 @@ def compute_veto_balance(data, student_id, month_key, current_month):
         grants.get(str(sid)) if str(sid) in grants else grants.get(sid), 0
     ))
 
-    month_profiles = data.get('month_roster_profiles', {}) or {}
-    profiles = month_profiles.get(month, {}) or {}
-    roll_key = get_roll_for_month(data, sid, month) or _norm_roll(student.get('roll'))
-    profile = profiles.get(roll_key) if isinstance(profiles, dict) else None
+    profile = _find_month_profile(data, sid, month)
     carry = max(0, _safe_int((profile or {}).get('month_veto_count'), 0))
 
     return max(0, carry + role_grant + awards - used)

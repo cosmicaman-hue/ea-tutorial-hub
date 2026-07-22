@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>QuizSpark — AI Quiz App</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+Devanagari:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/katex.min.css" />
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/contrib/auto-render.min.js"
+    onload="renderMathInElement(document.body, {delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}]});"></script>
+</head>
+<body>
+  <!-- ===== SETUP SCREEN ===== -->
+  <div id="setupScreen" class="screen active">
+    <div class="setup-container">
+      <div class="logo-area">
+        <div class="logo-icon">⚡</div>
+        <h1>QuizSpark</h1>
+        <p class="tagline">AI-Powered Quiz Generator</p>
+        <!-- Mode Tabs -->
+        <div class="mode-tabs">
+          <button type="button" class="mode-tab active" data-mode="web">🌐 Web Quiz</button>
+          <button type="button" class="mode-tab" data-mode="study">📚 Study Quiz</button>
+        </div>
+      </div>
+
+      <form id="quizForm" class="quiz-form">
+        <!-- Topic / Category -->
+        <div class="form-group">
+          <label for="topicInput">
+            <span class="label-icon">📚</span> Category / Topic
+          </label>
+          <div class="topic-input-row">
+            <select id="categorySelect">
+              <option value="">— Select a category —</option>
+            </select>
+            <span class="or-divider">or</span>
+            <input type="text" id="customTopic" placeholder="Type custom topic…" maxlength="80" />
+          </div>
+          <small class="hint">Pick a preset category or type your own topic for AI search</small>
+        </div>
+
+        <!-- Sub-topic (dynamic) -->
+        <div class="form-group hidden" id="subtopicGroup">
+          <label for="subtopicSelect">
+            <span class="label-icon">🏷️</span> Sub-topic
+          </label>
+          <select id="subtopicSelect">
+            <option value="">— All sub-topics —</option>
+          </select>
+          <small class="hint">Narrow down to a specific area within this category</small>
+        </div>
+
+        <!-- Region -->
+        <div class="form-group">
+          <label>
+            <span class="label-icon">🗺️</span> Region
+          </label>
+          <div class="region-chips">
+            <button type="button" class="chip active" data-value="world">🌍 World</button>
+            <button type="button" class="chip" data-value="india">🇮🇳 India</button>
+          </div>
+          <small class="hint">Filter questions to India-specific or global content</small>
+        </div>
+
+        <!-- Number of Questions -->
+        <div class="form-group">
+          <label for="numQuestions">
+            <span class="label-icon">🔢</span> No. of Questions
+          </label>
+          <div class="num-slider-row">
+            <input type="range" id="numQuestions" min="3" max="50" value="10" />
+            <span id="numDisplay" class="num-badge">10</span>
+          </div>
+        </div>
+
+        <!-- Difficulty -->
+        <div class="form-group">
+          <label>
+            <span class="label-icon">🎯</span> Difficulty Level
+          </label>
+          <div class="difficulty-chips">
+            <button type="button" class="chip active" data-value="easy">Easy</button>
+            <button type="button" class="chip" data-value="medium">Medium</button>
+            <button type="button" class="chip" data-value="hard">Hard</button>
+            <button type="button" class="chip" data-value="mixed">Mixed</button>
+          </div>
+        </div>
+
+        <!-- Language -->
+        <div class="form-group">
+          <label>
+            <span class="label-icon">🌐</span> Language
+          </label>
+          <div class="lang-chips">
+            <button type="button" class="chip active" data-value="en">English</button>
+            <button type="button" class="chip" data-value="hi">हिन्दी (Hindi)</button>
+          </div>
+        </div>
+
+        <button type="submit" class="start-btn" id="startBtn">
+          <span class="btn-text">Start Quiz</span>
+          <span class="btn-arrow">→</span>
+        </button>
+
+        <button type="button" class="history-btn" id="historyBtn">
+          📂 Saved Quizzes
+        </button>
+
+        <button type="button" class="settings-btn" id="geminiSettingsBtn" title="Gemini API Key Settings">
+          ⚙️
+        </button>
+      </form>
+
+      <!-- ===== STUDY QUIZ PANEL ===== -->
+      <form id="studyQuizForm" class="quiz-form hidden">
+        <!-- Board -->
+        <div class="form-group">
+          <label><span class="label-icon">🏫</span> Board</label>
+          <div class="board-chips">
+            <button type="button" class="chip active" data-value="CBSE">CBSE</button>
+            <button type="button" class="chip" data-value="ICSE">ICSE</button>
+          </div>
+        </div>
+
+        <!-- Class -->
+        <div class="form-group">
+          <label for="classSelect"><span class="label-icon">🎓</span> Class</label>
+          <select id="classSelect">
+            <option value="4">Class 4</option>
+            <option value="5">Class 5</option>
+            <option value="6">Class 6</option>
+            <option value="7">Class 7</option>
+            <option value="8">Class 8</option>
+            <option value="9">Class 9</option>
+            <option value="10" selected>Class 10</option>
+            <option value="11">Class 11</option>
+            <option value="12">Class 12</option>
+          </select>
+        </div>
+
+        <!-- Subject -->
+        <div class="form-group">
+          <label for="subjectSelect"><span class="label-icon">📖</span> Subject</label>
+          <select id="subjectSelect"></select>
+        </div>
+
+        <!-- PDF Source -->
+        <div class="form-group">
+          <label><span class="label-icon">📂</span> Study Material (PDF)</label>
+          <div class="pdf-source-btns">
+            <button type="button" class="pdf-pick-btn" id="openDirBtn">📁 Open Folder</button>
+            <button type="button" class="pdf-pick-btn" id="pickFilesBtn">📄 Pick Files</button>
+          </div>
+          <input type="file" id="pdfFileInput" multiple accept=".pdf" class="hidden" />
+          <div id="pdfFileList" class="pdf-file-list hidden">
+            <div class="pdf-file-list-header">
+              <span id="pdfFileCount">0 PDFs selected</span>
+              <button type="button" id="clearPdfsBtn" class="clear-pdfs-btn">✕ Clear</button>
+            </div>
+            <ul id="pdfFileNameList"></ul>
+          </div>
+          <small class="hint">PDFs are parsed locally and cached — nothing is uploaded</small>
+        </div>
+
+        <!-- Number of Questions -->
+        <div class="form-group">
+          <label for="studyNumQuestions">
+            <span class="label-icon">🔢</span> No. of Questions
+          </label>
+          <div class="num-slider-row">
+            <input type="range" id="studyNumQuestions" min="10" max="50" value="20" />
+            <span id="studyNumDisplay" class="num-badge">20</span>
+          </div>
+        </div>
+
+        <!-- Difficulty -->
+        <div class="form-group">
+          <label><span class="label-icon">🎯</span> Difficulty Level</label>
+          <div class="study-difficulty-chips">
+            <button type="button" class="chip active" data-value="easy">Easy</button>
+            <button type="button" class="chip" data-value="medium">Medium</button>
+            <button type="button" class="chip" data-value="hard">Hard</button>
+            <button type="button" class="chip" data-value="mixed">Mixed</button>
+          </div>
+        </div>
+
+        <!-- Language -->
+        <div class="form-group">
+          <label><span class="label-icon">🌐</span> Language</label>
+          <div class="study-lang-chips">
+            <button type="button" class="chip active" data-value="en">English</button>
+            <button type="button" class="chip" data-value="hi">हिन्दी (Hindi)</button>
+          </div>
+        </div>
+
+        <button type="button" class="start-btn" id="studyStartBtn">
+          <span class="btn-text">📚 Generate Study Quiz</span>
+          <span class="btn-arrow">→</span>
+        </button>
+
+        <button type="button" class="history-btn" id="historyBtn2">
+          📂 Saved Quizzes
+        </button>
+
+        <button type="button" class="settings-btn" id="geminiSettingsBtn2" title="Gemini API Key Settings">
+          ⚙️
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ===== QUIZ SCREEN ===== -->
+  <div id="quizScreen" class="screen">
+    <div class="quiz-container">
+      <!-- Top bar -->
+      <div class="quiz-topbar">
+        <div class="quiz-progress">
+          <span id="qCurrent">1</span>/<span id="qTotal">10</span>
+        </div>
+        <div class="quiz-score-badge">
+          <span id="liveScore">0</span> ✅
+        </div>
+        <button id="quitBtn" class="quit-btn" title="Quit Quiz">✕</button>
+      </div>
+
+      <!-- Progress bar -->
+      <div class="progress-bar-track">
+        <div id="progressFill" class="progress-bar-fill" style="width:0%"></div>
+      </div>
+
+      <!-- Question card -->
+      <div class="question-card" id="questionCard">
+        <div class="question-category-badge" id="qCategoryBadge">Science</div>
+        <h2 id="questionText" class="question-text">Loading…</h2>
+
+        <div id="optionsContainer" class="options-container">
+          <!-- options injected by JS -->
+        </div>
+      </div>
+
+      <!-- Next button (hidden until answered) -->
+      <button id="nextBtn" class="next-btn hidden">
+        <span id="nextBtnText">Next Question</span>
+        <span class="btn-arrow">→</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- ===== RESULTS SCREEN ===== -->
+  <div id="resultsScreen" class="screen">
+    <div class="results-container">
+      <div class="results-header">
+        <div class="results-emoji" id="resultsEmoji">🎉</div>
+        <h1 id="resultsTitle">Great Job!</h1>
+        <p id="resultsSubtitle">You scored <strong id="finalScore">0</strong> out of <strong id="finalTotal">10</strong></p>
+      </div>
+
+      <div class="score-ring-container">
+        <svg class="score-ring" viewBox="0 0 120 120">
+          <circle class="ring-bg" cx="60" cy="60" r="52" />
+          <circle class="ring-fill" id="ringFill" cx="60" cy="60" r="52" />
+        </svg>
+        <div class="score-ring-text" id="scorePercent">0%</div>
+      </div>
+
+      <div id="reviewList" class="review-list">
+        <!-- review items injected by JS -->
+      </div>
+
+      <div class="results-actions">
+        <button id="saveBtn" class="action-btn accent">💾 Save Quiz</button>
+        <button id="retryBtn" class="action-btn primary">🔄 Play Again</button>
+        <button id="homeBtn" class="action-btn secondary">🏠 Home</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== SAVE DIALOG MODAL ===== -->
+  <div id="saveModal" class="modal-overlay hidden">
+    <div class="modal-card">
+      <h3>💾 Save This Quiz</h3>
+      <p class="modal-subtitle">Tag this quiz set for future reference</p>
+
+      <div class="form-group">
+        <label><span class="label-icon">📅</span> Date</label>
+        <input type="text" id="saveDate" readonly class="modal-input" />
+      </div>
+
+      <div class="form-group">
+        <label><span class="label-icon">👥</span> Save As</label>
+        <div class="save-as-chips">
+          <button type="button" class="chip active" data-value="class">Class</button>
+          <button type="button" class="chip" data-value="group">Group</button>
+          <button type="button" class="chip" data-value="personal">Personal</button>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="saveLabel"><span class="label-icon">🏷️</span> Label (e.g. "9A", "Group B")</label>
+        <input type="text" id="saveLabel" class="modal-input" placeholder="Enter class or group name…" maxlength="40" />
+      </div>
+
+      <div class="modal-actions">
+        <button id="saveConfirmBtn" class="action-btn accent">💾 Save</button>
+        <button id="saveCancelBtn" class="action-btn secondary">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== SAVED QUIZZES SCREEN ===== -->
+  <div id="historyScreen" class="screen">
+    <div class="history-container">
+      <div class="history-header">
+        <h2>📂 Saved Quizzes</h2>
+        <button id="historyBackBtn" class="quit-btn" title="Back">←</button>
+      </div>
+      <div id="historyList" class="history-list">
+        <!-- saved quiz cards injected by JS -->
+      </div>
+      <p id="historyEmpty" class="history-empty hidden">No saved quizzes yet. Complete a quiz and save it!</p>
+    </div>
+  </div>
+
+  <!-- ===== QUIZ DETAIL MODAL ===== -->
+  <div id="quizDetailModal" class="modal-overlay hidden">
+    <div class="modal-card modal-wide">
+      <div class="modal-topbar">
+        <h3 id="detailTitle">Quiz Details</h3>
+        <button id="detailCloseBtn" class="quit-btn" title="Close">✕</button>
+      </div>
+      <div id="detailMeta" class="detail-meta"></div>
+      <div id="detailReview" class="review-list"></div>
+      <div class="modal-actions">
+        <button id="detailDeleteBtn" class="action-btn danger-btn">🗑️ Delete</button>
+        <button id="detailCloseBtn2" class="action-btn secondary">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== LOADING OVERLAY ===== -->
+  <div id="loadingOverlay" class="loading-overlay hidden">
+    <div class="loading-content">
+      <div class="spinner"></div>
+      <p id="loadingMsg">Generating your quiz…</p>
+    </div>
+  </div>
+
+  <!-- ===== LLM SETTINGS MODAL ===== -->
+  <div id="geminiModal" class="modal-overlay hidden">
+    <div class="modal-card">
+      <h3>⚙️ AI Provider Settings</h3>
+      <p class="modal-subtitle">Set your preferred AI provider and API key for Study Quiz</p>
+
+      <div class="form-group">
+        <label><span class="label-icon">🤖</span> Active Provider</label>
+        <div class="llm-provider-chips">
+          <button type="button" class="chip active" data-llm="gemini">Gemini Flash</button>
+          <button type="button" class="chip" data-llm="groq">Groq Llama</button>
+          <button type="button" class="chip" data-llm="cohere">Cohere</button>
+        </div>
+        <small class="hint">If the active provider fails, others with keys are tried automatically</small>
+      </div>
+
+      <div class="form-group">
+        <label for="geminiKeyInput"><span class="label-icon">🔑</span> Google Gemini Key</label>
+        <input type="password" id="geminiKeyInput" class="modal-input" placeholder="Gemini API key…" />
+        <small class="hint">Free at <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a> — 15 req/min</small>
+      </div>
+
+      <div class="form-group">
+        <label for="groqKeyInput"><span class="label-icon">🔑</span> Groq Key</label>
+        <input type="password" id="groqKeyInput" class="modal-input" placeholder="Groq API key…" />
+        <small class="hint">Free at <a href="https://console.groq.com/keys" target="_blank" rel="noopener">console.groq.com</a> — 30 req/min, ultra-fast</small>
+      </div>
+
+      <div class="form-group">
+        <label for="cohereKeyInput"><span class="label-icon">🔑</span> Cohere Key</label>
+        <input type="password" id="cohereKeyInput" class="modal-input" placeholder="Cohere API key…" />
+        <small class="hint">Free at <a href="https://dashboard.cohere.com/api-keys" target="_blank" rel="noopener">dashboard.cohere.com</a> — 20 req/min</small>
+      </div>
+
+      <div class="modal-actions">
+        <button id="geminiSaveBtn" class="action-btn accent">💾 Save All</button>
+        <button id="geminiCancelBtn" class="action-btn secondary">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+  <script src="study-quiz.js"></script>
+</body>
+</html>

@@ -7,11 +7,407 @@
     --danger-color: #dc3545;
     --info-color: #17a2b8;
     --warning-color: #ffc107;
+    --sidebar-width: 240px;
+    --sidebar-collapsed-width: 64px;
+    --sidebar-bg: #1e293b;
+    --sidebar-text: #94a3b8;
+    --sidebar-text-hover: #f1f5f9;
+    --sidebar-accent: #667eea;
+    --sidebar-border: rgba(255, 255, 255, 0.08);
+    --sidebar-transition: 0.16s cubic-bezier(0.4, 0, 0.2, 1);
+    /* Asymmetric curves: smooth ease-out on open, crisp snap on close */
+    --sb-open:  200ms cubic-bezier(0.16, 1, 0.3, 1);
+    --sb-close: 140ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+html { height: 100%; }
+
+*, *::before, *::after {
+    overflow-wrap: break-word;
+    word-wrap: break-word;
 }
 
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     background-color: #f8f9fa;
+    display: flex;
+    min-height: 100vh;
+    overflow-x: hidden;
+}
+
+/* ============================================
+   SIDEBAR
+   ============================================ */
+.app-sidebar {
+    width: var(--sidebar-width);
+    position: fixed;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    background: var(--sidebar-bg);
+    color: var(--sidebar-text);
+    display: flex;
+    flex-direction: column;
+    z-index: 1050;
+    transition: width var(--sb-open), box-shadow 200ms ease;
+    overflow: hidden;
+    box-shadow: 2px 0 10px rgba(0, 0, 0, 0.2);
+    transform: translate3d(0, 0, 0);
+    backface-visibility: hidden;
+    contain: layout style;
+}
+
+body.sidebar-collapsed .app-sidebar {
+    width: var(--sidebar-collapsed-width);
+    box-shadow: 1px 0 8px rgba(0, 0, 0, 0.15);
+}
+
+/* Closing: swap to sharp snap curve */
+body.sb-closing .app-sidebar {
+    transition: width var(--sb-close), box-shadow 160ms ease;
+}
+
+/* Header */
+.sidebar-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 8px 0 16px;
+    min-height: 60px;
+    border-bottom: 1px solid var(--sidebar-border);
+    flex-shrink: 0;
+}
+
+.sidebar-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #f1f5f9;
+    font-weight: 700;
+    font-size: 0.88rem;
+    letter-spacing: 0.4px;
+    overflow: hidden;
+    white-space: nowrap;
+}
+
+.sidebar-brand i {
+    font-size: 1.15rem;
+    color: var(--sidebar-accent);
+    flex-shrink: 0;
+    width: 20px;
+    text-align: center;
+}
+
+.sidebar-brand-text {
+    transition: opacity var(--sb-open), max-width var(--sb-open), transform var(--sb-open);
+    max-width: 160px;
+    overflow: hidden;
+    transform: translateX(0) translateZ(0);
+    transform-origin: left center;
+}
+
+body.sidebar-collapsed .sidebar-brand-text {
+    opacity: 0;
+    max-width: 0;
+    transform: translateX(-10px) translateZ(0);
+}
+
+body.sb-closing .sidebar-brand-text {
+    transition: opacity var(--sb-close), max-width var(--sb-close), transform var(--sb-close);
+}
+
+/* Collapse button */
+.sidebar-collapse-btn {
+    background: none;
+    border: none;
+    color: var(--sidebar-text);
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 6px;
+    flex-shrink: 0;
+    line-height: 1;
+    transition: color 0.2s, background 0.2s, transform var(--sb-open);
+}
+
+.sidebar-collapse-btn:hover {
+    color: var(--sidebar-text-hover);
+    background: rgba(255, 255, 255, 0.08);
+}
+
+body.sidebar-collapsed .sidebar-collapse-btn {
+    transform: rotate(180deg);
+}
+
+/* Nav */
+.sidebar-nav {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 10px 0;
+}
+
+.sidebar-nav ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+/* Links */
+.sidebar-link {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 16px;
+    color: var(--sidebar-text) !important;
+    text-decoration: none !important;
+    white-space: nowrap;
+    border: none;
+    border-left: 3px solid transparent;
+    background: none;
+    width: 100%;
+    font-size: 0.875rem;
+    font-family: inherit;
+    cursor: pointer;
+    text-align: left;
+    transition: color 0.2s, background 0.2s, border-color 0.2s, padding var(--sb-open), gap var(--sb-open);
+    transform: translateZ(0);
+    backface-visibility: hidden;
+}
+
+.sidebar-link i {
+    font-size: 1rem;
+    width: 20px;
+    text-align: center;
+    flex-shrink: 0;
+}
+
+.sidebar-link-text {
+    transition: opacity var(--sb-open), max-width var(--sb-open), transform var(--sb-open);
+    max-width: 160px;
+    overflow: hidden;
+    transform: translateX(0) translateZ(0);
+    transform-origin: left center;
+}
+
+body.sidebar-collapsed .sidebar-link-text {
+    opacity: 0;
+    max-width: 0;
+    transform: translateX(-8px) translateZ(0);
+}
+
+body.sb-closing .sidebar-link-text {
+    transition: opacity var(--sb-close), max-width var(--sb-close), transform var(--sb-close);
+}
+
+.sidebar-link:hover {
+    color: var(--sidebar-text-hover) !important;
+    background: rgba(255, 255, 255, 0.06);
+    border-left-color: rgba(102, 126, 234, 0.5);
+}
+
+.sidebar-link.active {
+    color: #fff !important;
+    background: rgba(102, 126, 234, 0.18);
+    border-left-color: var(--sidebar-accent);
+}
+
+.sidebar-link.active i {
+    color: var(--sidebar-accent);
+}
+
+/* Footer */
+.sidebar-footer {
+    border-top: 1px solid var(--sidebar-border);
+    padding: 8px 0;
+    flex-shrink: 0;
+}
+
+.sidebar-user {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 16px;
+    color: var(--sidebar-text);
+    white-space: nowrap;
+    font-size: 0.82rem;
+    border-bottom: 1px solid var(--sidebar-border);
+    margin-bottom: 4px;
+    overflow: hidden;
+}
+
+.sidebar-user i {
+    width: 20px;
+    text-align: center;
+    flex-shrink: 0;
+    font-size: 1.1rem;
+    color: var(--sidebar-accent);
+}
+
+/* Override dark_mode.css themeToggleBtn styles inside sidebar */
+.app-sidebar #themeToggleBtn {
+    padding: 10px 16px !important;
+    border: none !important;
+    border-left: 3px solid transparent !important;
+    border-radius: 0 !important;
+    font-size: 0.875rem !important;
+    color: var(--sidebar-text) !important;
+    gap: 12px !important;
+}
+
+.app-sidebar #themeToggleBtn:hover {
+    color: var(--sidebar-text-hover) !important;
+    background: rgba(255, 255, 255, 0.06) !important;
+    border-left-color: rgba(102, 126, 234, 0.5) !important;
+}
+
+/* Main content wrapper */
+.main-content-wrapper {
+    margin-left: var(--sidebar-width);
+    transition: margin-left var(--sb-open), width var(--sb-open);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    overflow-x: hidden;
+    width: calc(100% - var(--sidebar-width));
+    transform: translateZ(0);
+    contain: layout style;
+}
+
+body.sidebar-collapsed .main-content-wrapper {
+    margin-left: var(--sidebar-collapsed-width);
+    width: calc(100% - var(--sidebar-collapsed-width));
+}
+
+body.sb-closing .main-content-wrapper {
+    transition: margin-left var(--sb-close), width var(--sb-close);
+}
+
+.main-content-wrapper.no-sidebar {
+    margin-left: 0;
+    width: 100%;
+}
+
+.content-area {
+    flex: 1;
+    min-height: calc(100vh - 140px);
+}
+
+/* Mobile topbar */
+.mobile-topbar {
+    display: none;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 16px;
+    background: var(--sidebar-bg);
+    color: #f1f5f9;
+    font-weight: 700;
+    font-size: 1rem;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1030;
+}
+
+.mobile-menu-btn {
+    background: none;
+    border: none;
+    color: #f1f5f9;
+    font-size: 1.2rem;
+    cursor: pointer;
+    padding: 4px 8px;
+    line-height: 1;
+    pointer-events: auto;
+    position: relative;
+    z-index: 2;
+    -webkit-tap-highlight-color: rgba(255,255,255,0.15);
+}
+
+.mobile-menu-btn:active {
+    background: rgba(255,255,255,0.15);
+    border-radius: 6px;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   MOBILE SIDEBAR — JS toggles .mobile-open / .active classes
+   Inline JS in base.html handles open/close; CSS only controls display.
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Hidden checkbox (kept for accessibility) */
+#sidebarCheckbox { display: none; }
+
+/* Sidebar overlay (mobile) */
+.sidebar-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 1040;
+    cursor: pointer;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 200ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.sidebar-overlay.active {
+    opacity: 1;
+    pointer-events: auto;
+}
+.sidebar-overlay.closing {
+    opacity: 0;
+    pointer-events: none;
+}
+
+/* Close button inside sidebar (mobile only) */
+.sidebar-close-btn {
+    display: none;
+    background: none;
+    border: none;
+    color: var(--sidebar-text, #94a3b8);
+    font-size: 1.3rem;
+    cursor: pointer;
+    padding: 6px 10px;
+    line-height: 1;
+    min-width: 44px;
+    min-height: 44px;
+    align-items: center;
+    justify-content: center;
+}
+
+/* ── Mobile responsive ── */
+@media (max-width: 768px) {
+    /* Sidebar hidden by default; JS adds .mobile-open to show */
+    .app-sidebar {
+        display: flex !important;
+        width: var(--sidebar-width) !important;
+        position: fixed;
+        z-index: 1050;
+        transform: translateX(-100%);
+        visibility: hidden;
+        transition: transform 280ms cubic-bezier(0.16, 1, 0.3, 1), visibility 0s 280ms;
+        will-change: transform;
+    }
+    .app-sidebar.mobile-open {
+        transform: translateX(0);
+        visibility: visible;
+        transition: transform 320ms cubic-bezier(0.34, 1.2, 0.64, 1), visibility 0s;
+    }
+
+    .sidebar-close-btn { display: flex; }
+    .sidebar-collapse-btn { display: none; }
+
+    .main-content-wrapper {
+        margin-left: 0 !important;
+        width: 100% !important;
+    }
+
+    .mobile-topbar {
+        display: flex;
+    }
+}
+
+@media (min-width: 769px) {
+    .sidebar-overlay { opacity: 0 !important; pointer-events: none !important; }
+    .sidebar-close-btn { display: none !important; }
 }
 
 /* Navbar */
@@ -51,7 +447,7 @@ body {
 .btn {
     border-radius: 6px;
     font-weight: 500;
-    transition: all 0.3s ease;
+    transition: transform 0.3s ease, background 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
 }
 
 .btn-primary {
@@ -69,7 +465,7 @@ body {
 .form-control, .form-select {
     border-radius: 6px;
     border: 1px solid #e0e0e0;
-    transition: all 0.3s ease;
+    transition: border-color 0.3s ease, box-shadow 0.3s ease, background-color 0.3s ease;
 }
 
 .form-control:focus, .form-select:focus {
@@ -113,7 +509,7 @@ footer {
 }
 
 .question-link {
-    transition: all 0.2s;
+    transition: background-color 0.2s, border-color 0.2s;
 }
 
 .question-link:hover {
@@ -203,7 +599,7 @@ footer {
 /* Responsive */
 @media (max-width: 768px) {
     .container-fluid {
-        padding: 10px;
+        padding: min(12px, 3vw);
     }
 
     .card {
@@ -212,6 +608,17 @@ footer {
 
     .timer {
         font-size: 1.2rem;
+    }
+
+    /* Flexible Buttons & Chips */
+    .month-tab, .control-chip, .btn, .btn-primary {
+        white-space: normal !important;
+    }
+
+    /* Dynamic Stacking for Review Items */
+    .review-item .status-badge, .review-item .badge, .review-item .your-ans {
+        position: static !important;
+        display: inline-block;
     }
 }
 
@@ -278,7 +685,7 @@ footer {
     border-radius: 8px;
     padding: 30px;
     text-align: center;
-    transition: all 0.3s ease;
+    transition: background-color 0.3s ease, border-color 0.3s ease;
     cursor: pointer;
 }
 
@@ -296,7 +703,7 @@ footer {
         flex-direction: column;
         height: 100%;
         gap: 20px;
-        padding: 20px;
+        padding: min(12px, 3vw);
     }
     
     .filter-section {
@@ -345,7 +752,7 @@ footer {
         background: white;
         cursor: pointer;
         white-space: nowrap;
-        transition: all 0.3s;
+        transition: border-color 0.3s, color 0.3s, background-color 0.3s;
     }
     
     .month-tab:hover {
@@ -388,7 +795,7 @@ footer {
         background: white;
         cursor: pointer;
         font-weight: 500;
-        transition: all 0.3s;
+        transition: background 0.3s, border-color 0.3s, color 0.3s;
         font-size: 0.9rem;
     }
     
@@ -606,10 +1013,10 @@ footer {
         display: none;
         position: fixed;
         z-index: 1000;
-        left: 0;
-        top: 0;
-        width: 100%;
-        height: 100%;
+        inset: 0;
+        width: 100vw;
+        height: 100vh;
+        height: 100dvh;
         background-color: rgba(0, 0, 0, 0.4);
     }
     
@@ -627,7 +1034,9 @@ footer {
         width: 90%;
         max-width: 600px;
         max-height: 90vh;
+        max-height: 90dvh;
         overflow-y: auto;
+        margin: auto;
     }
     
     .modal-header {
@@ -825,6 +1234,7 @@ footer {
         padding: 16px;
         width: 97%;
         max-height: 95vh;
+        max-height: 95dvh;
     }
 
     .form-actions {
@@ -860,5 +1270,396 @@ footer {
 
     .side-card {
         padding: 10px;
+    }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   SMARTPHONE-OPTIMISED RESPONSIVE OVERRIDES
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── Touch-friendly base ── */
+@media (max-width: 768px) {
+    /* Prevent iOS zoom on input focus (minimum 16px font) */
+    input[type="text"],
+    input[type="number"],
+    input[type="date"],
+    input[type="tel"],
+    input[type="email"],
+    input[type="password"],
+    input[type="search"],
+    select,
+    textarea {
+        font-size: 16px !important;
+    }
+
+    /* Larger tap targets for interactive elements */
+    .btn, .btn-action, .month-tab {
+        min-height: 44px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    /* Side tabs: keep flex:1 behaviour, just enlarge tap target */
+    .side-tab {
+        min-height: 44px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    /* Sidebar collapse & mobile menu: touch-friendly but don't override display */
+    .sidebar-collapse-btn,
+    .mobile-menu-btn {
+        min-width: 44px;
+        min-height: 44px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        touch-action: manipulation;
+    }
+
+    /* Ensure sidebar links and overlay respond to taps immediately */
+    .sidebar-link,
+    .sidebar-overlay,
+    .mobile-topbar-btn {
+        touch-action: manipulation;
+    }
+
+    /* Sidebar full-width on mobile with safe-area padding */
+    .app-sidebar {
+        width: 280px !important;
+        padding-bottom: env(safe-area-inset-bottom, 0);
+    }
+
+    /* Mobile topbar safe-area */
+    .mobile-topbar {
+        padding-top: env(safe-area-inset-top, 0);
+        padding-left: max(16px, env(safe-area-inset-left, 0));
+        padding-right: max(16px, env(safe-area-inset-right, 0));
+    }
+
+    /* Footer safe-area */
+    footer {
+        padding-bottom: env(safe-area-inset-bottom, 0);
+    }
+
+    /* Card hover — disable transform on touch (prevents sticky hover) */
+    .card:hover {
+        transform: none;
+    }
+
+    /* Scoreboard table: compact header */
+    .scoreboard-table th {
+        padding: 8px 4px;
+        font-size: 0.78rem;
+    }
+    .scoreboard-table td {
+        padding: 7px 4px;
+        font-size: 0.8rem;
+    }
+
+    /* Filter section: stack vertically */
+    .filter-section {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+        padding: 12px;
+    }
+    .filter-section .btn-action {
+        margin-left: 0 !important;
+        width: 100%;
+    }
+
+    /* Month tabs: scrollable with momentum */
+    .month-tabs {
+        gap: 6px;
+        padding: 8px 0;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+    }
+    .month-tab {
+        padding: 8px 14px;
+        font-size: 0.82rem;
+    }
+
+    /* Actions bar: full-width search */
+    .actions-bar {
+        flex-direction: column;
+        gap: 8px;
+    }
+    .search-box {
+        width: 100%;
+        min-width: unset;
+    }
+    .admin-actions {
+        width: 100%;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 6px;
+    }
+    .admin-actions .btn-action {
+        width: 100%;
+        text-align: center;
+    }
+
+    /* Scoreboard layout: single column */
+    .scoreboard-layout {
+        grid-template-columns: 1fr;
+        gap: 14px;
+    }
+    .side-panel {
+        position: static;
+    }
+    .side-card {
+        padding: 12px;
+    }
+    .side-table {
+        font-size: 0.82rem;
+    }
+    .side-form input {
+        font-size: 16px;
+    }
+
+    /* Modal: full-screen-ish on mobile */
+    .modal-content {
+        width: 96%;
+        max-width: none;
+        max-height: 92vh;
+        padding: 16px;
+        border-radius: 12px;
+        margin: auto;
+    }
+    .modal-header h2 {
+        font-size: 1.1rem;
+    }
+    .close-btn {
+        min-width: 44px;
+        min-height: 44px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    /* Form rows: single column */
+    .form-row {
+        grid-template-columns: 1fr;
+        gap: 10px;
+    }
+
+    /* Form inputs: touch-friendly */
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+        padding: 10px 12px;
+        font-size: 16px;
+    }
+    .form-group label {
+        font-size: 0.88rem;
+    }
+
+    /* Delete button: larger tap target */
+    .delete-btn {
+        padding: 6px 12px;
+        font-size: 0.82rem;
+        min-height: 36px;
+    }
+
+    /* Rank badge: slightly smaller on mobile */
+    .rank-badge {
+        padding: 3px 6px;
+        font-size: 0.78rem;
+    }
+
+    /* Score cell: compact */
+    .score-cell {
+        font-size: 0.8rem;
+    }
+
+    /* Student name: prevent overflow */
+    .student-name {
+        display: inline-block;
+        max-width: 120px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    /* Content area: reduce padding but keep tabs tappable */
+    .content-area {
+        padding: 52px 8px 0;
+    }
+
+    /* Scoreboard container: tighter */
+    .scoreboard-container {
+        padding: 10px;
+        gap: 10px;
+    }
+
+    /* Table wrapper: scroll indicator */
+    .table-wrapper {
+        position: relative;
+        -webkit-overflow-scrolling: touch;
+    }
+    .table-wrapper::after {
+        content: '';
+        position: absolute;
+        top: 0; right: 0; bottom: 0;
+        width: 30px;
+        background: linear-gradient(to right, transparent, rgba(0,0,0,.06));
+        pointer-events: none;
+        opacity: 1;
+        transition: opacity .3s;
+    }
+    .table-wrapper.scrolled-end::after {
+        opacity: 0;
+    }
+}
+
+/* ── Extra-small phones (≤400px) ── */
+@media (max-width: 400px) {
+    .sidebar-brand-text,
+    .sidebar-link-text {
+        font-size: 0.82rem;
+    }
+
+    .mobile-brand {
+        font-size: 0.88rem;
+        letter-spacing: 0.5px;
+    }
+
+    .scoreboard-table th,
+    .scoreboard-table td {
+        padding: 5px 3px;
+        font-size: 0.72rem;
+    }
+
+    .student-name {
+        max-width: 90px;
+    }
+
+    .filter-section {
+        padding: 10px 8px;
+    }
+
+    .month-tab {
+        padding: 6px 10px;
+        font-size: 0.76rem;
+    }
+
+    .modal-content {
+        padding: 12px;
+        width: 98%;
+        border-radius: 8px;
+        max-height: 92vh;
+        max-height: 92dvh;
+    }
+
+    .side-card {
+        padding: 10px;
+    }
+
+    .admin-actions {
+        grid-template-columns: 1fr;
+    }
+
+    footer .container p { font-size: 0.75rem; }
+    footer .container small { font-size: 0.68rem; }
+}
+
+/* ── Landscape phone ── */
+@media (max-width: 768px) and (orientation: landscape) {
+    .mobile-topbar {
+        padding-top: 4px;
+        padding-bottom: 4px;
+        min-height: 44px;
+    }
+
+    .scoreboard-container {
+        padding: 6px;
+        gap: 6px;
+    }
+
+    .modal-content {
+        max-height: 85vh;
+        max-height: 85dvh;
+    }
+}
+
+/* ── Desktop enhancements (>768px) ── */
+@media (min-width: 769px) {
+    /* Hover effects only on non-touch */
+    @media (hover: hover) {
+        .card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+        }
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+    }
+
+    /* Sidebar collapse state */
+    body.sidebar-collapsed .app-sidebar {
+        width: var(--sidebar-collapsed-width);
+    }
+
+    body.sidebar-collapsed .main-content-wrapper {
+        margin-left: var(--sidebar-collapsed-width);
+        width: calc(100% - var(--sidebar-collapsed-width));
+    }
+
+    /* Collapsed nav items: center icons with smooth layout transition */
+    body.sidebar-collapsed .sidebar-link {
+        padding: 10px 0;
+        justify-content: center;
+        gap: 0;
+        transition: color 0.2s, background 0.2s, border-color 0.2s, padding var(--sb-close), gap var(--sb-close);
+    }
+}
+
+/* ── PWA / Standalone mode (no browser chrome) ── */
+@media (display-mode: standalone) {
+    .mobile-topbar {
+        padding-top: max(env(safe-area-inset-top, 0), 8px);
+    }
+    footer {
+        padding-bottom: max(env(safe-area-inset-bottom, 0), 12px);
+    }
+}
+
+/* ── Touch-active states (remove sticky hover on mobile) ── */
+@media (hover: none) {
+    .card:hover {
+        transform: none;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    }
+    .btn-primary:hover {
+        transform: none;
+        box-shadow: none;
+    }
+    .scoreboard-table tbody tr:hover {
+        background-color: transparent;
+    }
+    .sidebar-link:hover {
+        background: none;
+        border-left-color: transparent;
+    }
+    .sidebar-link.active {
+        background: rgba(102, 126, 234, 0.18);
+        border-left-color: var(--sidebar-accent);
+    }
+}
+
+/* ── Reduced motion: disable sidebar transitions ── */
+@media (prefers-reduced-motion: reduce) {
+    .app-sidebar,
+    .main-content-wrapper,
+    .sidebar-brand-text,
+    .sidebar-link-text,
+    .sidebar-collapse-btn,
+    .sidebar-link,
+    .sidebar-overlay {
+        transition-duration: 0.01ms !important;
     }
 }

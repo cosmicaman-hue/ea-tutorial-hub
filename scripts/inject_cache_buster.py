@@ -6,10 +6,17 @@ when server data is updated by admin scripts.
 """
 
 import json
+import sys
 from pathlib import Path
 from datetime import datetime
 
-DATA_FILE = Path('instance/offline_scoreboard_data.json')
+# Allow importing app.utils when run as a script from project root
+_project_root = str(Path(__file__).resolve().parent.parent)
+if _project_root not in sys.path:
+    sys.path.insert(0, _project_root)
+from app.utils.data_paths import get_data_path
+
+DATA_FILE = Path(get_data_path())
 
 def inject_cache_buster():
     """Add cache-bust timestamp to trigger localStorage refresh in browser."""

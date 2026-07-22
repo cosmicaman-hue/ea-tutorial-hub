@@ -2,7 +2,9 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>EA Live Scoreboard</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.ico">
     <link rel="apple-touch-icon" href="/apple-touch-icon.png">
@@ -63,6 +65,24 @@
             text-align: center;
         }
         body.light .header { background: linear-gradient(135deg, #1e3a5f 0%, #1d4ed8 50%, #1e3a5f 100%); }
+
+        /* Ambient glow layer */
+        .header::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(900px circle at 20% 20%, rgba(148,163,184,0.22), transparent 40%),
+                        radial-gradient(1100px circle at 80% 10%, rgba(56,189,248,0.18), transparent 45%),
+                        radial-gradient(900px circle at 50% 80%, rgba(16,185,129,0.18), transparent 55%);
+            opacity: 0.6;
+            pointer-events: none;
+            z-index: 0;
+            animation: floatGlow 12s ease-in-out infinite alternate;
+        }
+        @keyframes floatGlow {
+            from { transform: translateY(0); }
+            to   { transform: translateY(-12px); }
+        }
 
         /* Grid drift */
         .hdr-grid {
@@ -130,6 +150,7 @@
             font-size: clamp(22px, 5vw, 46px);
             font-weight: 900;
             letter-spacing: clamp(3px, 1.5vw, 12px);
+            word-spacing: clamp(15px, 4vw, 40px);
             background: linear-gradient(90deg, #94a3b8 0%, #7dd3fc 25%, #ffffff 50%, #7dd3fc 75%, #94a3b8 100%);
             background-size: 200% auto;
             -webkit-background-clip: text;
@@ -306,10 +327,60 @@
 
         /* ── RESPONSIVE ── */
         @media (max-width: 600px) {
+            .header { padding: 20px 12px 18px; }
             .header h1 { letter-spacing: 3px; }
+            .header-sub { font-size: 11px; letter-spacing: 1px; }
             .hdr-ring, .hdr-ring-2 { display: none; }
+            .header::after { opacity: 0.35; }
             .hdr-orb { filter: blur(36px); }
-            .controls-bar { gap: 8px; }
+            .hdr-meteor { display: none; }
+            .hdr-scan { display: none; }
+            .controls-bar {
+                gap: 6px;
+                flex-wrap: wrap;
+                padding: 0 10px;
+            }
+            .controls-bar label { font-size: 12px; }
+            select { font-size: 14px; padding: 8px 10px; min-width: 110px; }
+            .btn { font-size: 13px; padding: 8px 14px; min-height: 44px; }
+            .btn-icon { min-height: 44px; min-width: 44px; }
+            .sync-pill { font-size: 11px; padding: 3px 8px; }
+            .login-pill { font-size: 11px; padding: 3px 8px; }
+            .wrap { padding: 0 8px; margin: 10px auto 24px; }
+            table { min-width: 400px; }
+            thead th { padding: 8px 8px; font-size: 10px; }
+            td { padding: 8px 8px; font-size: 13px; }
+            .rank-cell { width: 50px; }
+            .rank-badge { width: 28px; height: 28px; font-size: 11px; }
+            .score-cell { font-size: 13px; }
+            .roll-cell { font-size: 12px; }
+            .footer { font-size: 11px; padding: 14px 8px; }
+            /* Safe-area for notched phones */
+            .header { padding-top: max(20px, env(safe-area-inset-top, 0)); }
+            .footer { padding-bottom: max(14px, env(safe-area-inset-bottom, 0)); }
+        }
+        /* Extra-small phones */
+        @media (max-width: 380px) {
+            .header h1 { font-size: 18px; letter-spacing: 2px; }
+            table { min-width: 340px; }
+            td { padding: 6px 5px; font-size: 12px; }
+            thead th { padding: 6px 5px; font-size: 9px; }
+            .controls-bar { gap: 4px; }
+        }
+        /* Landscape phone */
+        @media (max-width: 600px) and (orientation: landscape) {
+            .header { padding: 10px 12px 8px; }
+            .header h1 { font-size: 20px; }
+        }
+        /* Touch: remove sticky hover */
+        @media (hover: none) {
+            tbody tr:hover td { background: transparent; }
+            body.light tbody tr:hover td { background: transparent; }
+        }
+        /* PWA standalone */
+        @media (display-mode: standalone) {
+            .header { padding-top: max(20px, env(safe-area-inset-top, 0)); }
+            .footer { padding-bottom: max(14px, env(safe-area-inset-bottom, 0)); }
         }
     </style>
 </head>
@@ -523,27 +594,41 @@
                 }
             });
 
-            // Disciplinary star usage erases that day's awarded score from totals.
-            perDateStarDisc.forEach((dateMap, sid) => {
-                if (!totals.has(sid)) return;
-                const dateScores = perDateScore.get(sid) || {};
-                Object.keys(dateMap).forEach(date => {
-                    const erasedScore = parseInt(dateScores[date], 10) || 0;
-                    if (erasedScore !== 0) {
-                        totals.set(sid, (totals.get(sid) || 0) - erasedScore);
-                        dateScores[date] = 0;
-                    }
+            // Disciplinary star usage: halves negative score per disciplinary star (floor),
+            // only when no normal star on same day.
+            if (applyStarBonus) {
+                perDateStarDisc.forEach((dateMap, sid) => {
+                    if (!totals.has(sid)) return;
+                    const dateScores = perDateScore.get(sid) || {};
+                    const normalMap = perDateStarNorm.get(sid) || {};
+                    Object.entries(dateMap).forEach(([date, discUses]) => {
+                        const normalUses = Math.max(0, parseInt(normalMap[date], 10) || 0);
+                        if (normalUses > 0) return;
+                        const dayScore = parseInt(dateScores[date], 10) || 0;
+                        if (dayScore < 0) {
+                            let halved = dayScore;
+                            for (let i = 0; i < discUses; i++) { halved = Math.floor(halved / 2); }
+                            totals.set(sid, (totals.get(sid) || 0) - (dayScore - halved));
+                            dateScores[date] = halved;
+                        }
+                    });
                 });
-            });
+            }
 
-            // Apply star +100 bonus per normal star use where that day's score >= -50
+            // Apply star +100 bonus per normal star use.
+            // Normal erases negative score, bonus if original day score > -50, no discUses guard.
             if (applyStarBonus) {
                 perDateStarNorm.forEach((dateMap, sid) => {
                     if (!totals.has(sid)) return;
                     const dateScores = perDateScore.get(sid) || {};
                     Object.entries(dateMap).forEach(([date, normalUses]) => {
-                        const discUses = Math.max(0, parseInt((perDateStarDisc.get(sid) || {})[date], 10) || 0);
-                        if (discUses <= 0 && (dateScores[date] || 0) >= -50 && normalUses > 0)
+                        if (normalUses <= 0) return;
+                        const dayScore = parseInt(dateScores[date], 10) || 0;
+                        if (dayScore < 0) {
+                            totals.set(sid, (totals.get(sid) || 0) - dayScore);
+                            dateScores[date] = 0;
+                        }
+                        if (dayScore > -50)
                             totals.set(sid, (totals.get(sid) || 0) + (100 * normalUses));
                     });
                 });

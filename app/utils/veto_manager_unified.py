@@ -10,6 +10,8 @@ from pathlib import Path
 from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 from dataclasses import dataclass, asdict
+from app.utils.data_paths import get_data_path
+from app.utils.file_operations import SafeFileWriter
 
 
 @dataclass
@@ -50,8 +52,8 @@ class UnifiedVetoManager:
     - All operations are atomic and thread-safe
     """
     
-    def __init__(self, data_path: Path = Path('instance/offline_scoreboard_data.json')):
-        self.data_path = data_path
+    def __init__(self, data_path: Optional[Path] = None):
+        self.data_path = Path(data_path) if data_path else Path(get_data_path())
         self.balances: Dict[str, VetoBalance] = {}
         self._lock = threading.Lock()
         self._load_from_hardened_data()
@@ -117,17 +119,44 @@ class UnifiedVetoManager:
                     roll = student.get('roll', '')
                     if roll in self.balances:
                         balance = self.balances[roll]
-                        # Sync individual and role VETOs
-                        student['veto_count'] = balance.individual_vetos
-                        student['role_veto_count'] = balance.role_vetos
+                        # Deduct used vetoes using the same priority logic (individual first, then role)
+                        remaining = balance.used_vetos
+                        ind_rem = balance.individual_vetos
+                        role_rem = balance.role_vetos
+                        
+                        take_ind = min(ind_rem, remaining)
+                        ind_rem -= take_ind
+                        remaining -= take_ind
+                        
+                        if remaining > 0:
+                            take_role = min(role_rem, remaining)
+                            role_rem -= take_role
+                            remaining -= take_role
+                            
+                        student['veto_count'] = ind_rem
+                        student['role_veto_count'] = role_rem
                         student['used_veto_count'] = balance.used_vetos
                 
-                # Write atomically
-                with open(self.data_path, 'w', encoding='utf-8') as f:
-                    json.dump(data, f, indent=2, ensure_ascii=False)
-                
+                # Write atomically using SafeFileWriter (temp file + rename)
+                success = SafeFileWriter.write_json(Path(self.data_path), data, backup=True)
+
                 if operation_name:
-                    print(f"✓ {operation_name} - Data saved atomically")
+                    if success:
+                        print(f"✓ {operation_name} - Data saved atomically")
+                    else:
+                        print(f"❌ {operation_name} - Failed to save data")
+
+                # Post-write consistency check: log drift but never auto-repair.
+                # Auto-repair was how stale state used to overwrite valid edits.
+                if success:
+                    try:
+                        ok, issues = self.verify_consistency()
+                        if not ok:
+                            print(f"⚠️ [veto_manager] post-save drift after '{operation_name}':")
+                            for issue in issues[:10]:
+                                print(f"   - {issue}")
+                    except Exception as check_err:
+                        print(f"⚠️ [veto_manager] consistency check failed: {check_err}")
                     
         except Exception as e:
             print(f"❌ Error saving VETO data: {e}")

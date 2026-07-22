@@ -14,7 +14,8 @@ VETO_QUOTAS = {
     'LEADER': 5,
     'CO-LEADER': 3,
     'LEADER OF OPPOSITION': 2,
-    'CR': 2,  # Class Representative
+    'GR': 2,  # Group Representative
+    'CR': 2,  # Class Representative (fallback)
     'DEFAULT': 0
 }
 
@@ -66,7 +67,7 @@ PASSWORD_REQUIREMENTS = {
 
 # Session configuration
 SESSION_CONFIG = {
-    'LIFETIME': timedelta(hours=8),  # Session expires after 8 hours
+    'LIFETIME': timedelta(days=7),  # Session expires after 7 days (matches app/__init__.py)
     'PERMANENT': True,
     'REFRESH_EACH_REQUEST': True
 }
@@ -143,6 +144,11 @@ DEFAULT_PARTIES = [
     {'id': 6, 'code': 'NJP', 'name': 'National Justice Party', 'power': 15}
 ]
 
+SCOREBOARD_DEFAULT_PARTIES = [
+    {key: value for key, value in party.items() if key != 'name'}
+    for party in DEFAULT_PARTIES
+]
+
 # Party validation limits
 PARTY_LIMITS = {
     'MIN_POWER': 0,
@@ -169,6 +175,23 @@ DEFAULT_LEADERSHIP = [
     {'id': 10, 'post': 'CI', 'holder': None, 'status': 'vacant', 'vetoQuota': 0, 'tenureMonths': 1},
     {'id': 11, 'post': 'ECJ', 'holder': None, 'status': 'vacant', 'vetoQuota': 0, 'tenureMonths': 1},
     {'id': 12, 'post': 'WCI', 'holder': None, 'status': 'vacant', 'vetoQuota': 0, 'tenureMonths': 1}
+]
+
+SCOREBOARD_DEFAULT_LEADERSHIP = [
+    {'id': 1, 'post': 'LEADER (L)', 'holder': 'HARSH MALLICK'},
+    {'id': 2, 'post': 'LEADER OF OPPOSITION (LoP)', 'holder': ''},
+    {'id': 3, 'post': 'CO-LEADER (CoL)', 'holder': 'REEYANSH LAMA'},
+    {'id': 4, 'post': 'CODING & IT CAPTAIN (CITC)', 'holder': 'SAMARTH PATEL'},
+    {'id': 5, 'post': 'DISCIPLINE & WELFARE IN-CHARGE (DWI)', 'holder': 'AANSH MANDAL'},
+    {'id': 6, 'post': 'RESOURCE MANAGER (RM)', 'holder': 'RIYA SINGH'},
+    {'id': 7, 'post': 'SPORTS CAPTAIN (SC)', 'holder': 'REEYANSH LAMA'},
+    {'id': 8, 'post': 'ENGLISH CAPTAIN- SENIOR (ECS)', 'holder': 'ABDUL ARMAN'},
+    {'id': 9, 'post': 'CULTURE & CREATIVE ARTS IN-CHARGE (CCAI)', 'holder': 'SAKSHI'},
+    {'id': 10, 'post': 'CLEANLINESS IN-CHARGE (CI)', 'holder': 'SHANKAR PRADHAN'},
+    {'id': 11, 'post': 'ENGLISH CAPTAIN- JUNIOR (ECJ)', 'holder': 'REHMATUN KHATUN'},
+    {'id': 12, 'post': 'WELCOME & COMMUNICATION IN-CHARGE (WCI)', 'holder': 'SHOMIYA XALXO'},
+    {'id': 13, 'post': 'LEADER', 'holder': ''},
+    {'id': 14, 'post': 'LEADER OF OPPOSITION', 'holder': ''},
 ]
 
 # Leadership validation limits

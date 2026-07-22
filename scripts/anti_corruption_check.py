@@ -17,59 +17,118 @@ THE SOLUTION:
 
 import json
 import hashlib
+import sys
 from pathlib import Path
 from datetime import datetime
 
-DATA_FILE = Path('instance/offline_scoreboard_data.json')
+# Allow importing app.utils when run as a script from project root
+_project_root = str(Path(__file__).resolve().parent.parent)
+if _project_root not in sys.path:
+    sys.path.insert(0, _project_root)
+from app.utils.data_paths import get_data_path
+
+DATA_FILE = Path(get_data_path())
 
 def calculate_veto_hash(data):
     """Calculate hash of all VETO values to detect corruption."""
     try:
         veto_tracking = data.get('veto_tracking', {})
         students_veto = veto_tracking.get('students', {})
-        
+
         # Build string of all VETO allocations
         veto_string = ""
         for roll in sorted(students_veto.keys()):
             veto_data = students_veto[roll]
             total = veto_data.get('total_vetos', 0)
             veto_string += f"{roll}:{total};"
-        
+
         return hashlib.sha256(veto_string.encode()).hexdigest()
     except:
         return None
 
+
+def calculate_star_hash(data):
+    """
+    Hash all star-related state (student.stars + per-month month_star_count).
+    Any drift between runs that is not the result of an explicit admin action
+    is a signal that stale cached data has been synced back over good state.
+    """
+    try:
+        parts = []
+        for student in sorted(
+            data.get('students', []) or [],
+            key=lambda s: str(s.get('roll', '') or '')
+        ):
+            roll = str(student.get('roll', '') or '')
+            stars = int(student.get('stars', 0) or 0)
+            parts.append(f"S:{roll}:{stars}")
+        profiles = data.get('month_roster_profiles', {}) or {}
+        for month in sorted(profiles.keys()):
+            rows = profiles[month] or []
+            if not isinstance(rows, list):
+                continue
+            for row in sorted(rows, key=lambda r: str(r.get('roll', '') or '')):
+                roll = str(row.get('roll', '') or '')
+                msc = int(row.get('month_star_count', 0) or 0)
+                parts.append(f"M:{month}:{roll}:{msc}")
+        return hashlib.sha256(';'.join(parts).encode()).hexdigest()
+    except Exception:
+        return None
+
 def check_for_corruption():
-    """Detect if VETO data has been corrupted by stale sync."""
+    """Detect if VETO or star data has been corrupted by stale sync."""
     try:
         with open(DATA_FILE, 'r', encoding='utf-8') as f:
             data = json.load(f)
-        
-        current_hash = calculate_veto_hash(data)
-        last_known_hash = data.get('_last_known_correct_veto_hash')
-        
-        if last_known_hash and current_hash != last_known_hash:
+
+        current_veto_hash = calculate_veto_hash(data)
+        current_star_hash = calculate_star_hash(data)
+        last_veto_hash = data.get('_last_known_correct_veto_hash')
+        last_star_hash = data.get('_last_known_correct_star_hash')
+
+        corrupted = False
+        if last_veto_hash and current_veto_hash != last_veto_hash:
             print("\n" + "=" * 70)
-            print("⚠️  CORRUPTION DETECTED IN VETO SYSTEM")
+            print("⚠️  VETO STATE DRIFT DETECTED")
             print("=" * 70)
-            print(f"Last known correct hash: {last_known_hash}")
-            print(f"Current data hash:       {current_hash}")
+            print(f"Last known correct VETO hash: {last_veto_hash}")
+            print(f"Current VETO hash:            {current_veto_hash}")
             print("\nThis indicates stale data was synced back to the file.")
-            print("The VETO corrections are being overwritten by cached browser data.")
+            corrupted = True
+
+        if last_star_hash and current_star_hash != last_star_hash:
+            print("\n" + "=" * 70)
+            print("⚠️  STAR STATE DRIFT DETECTED")
+            print("=" * 70)
+            print(f"Last known correct STAR hash: {last_star_hash}")
+            print(f"Current STAR hash:            {current_star_hash}")
+            print("\nstudent.stars or month_star_count values have changed since the")
+            print("last known-good checkpoint. If no admin award/use/transfer was")
+            print("performed in between, this is a regression — restore from backup.")
+            corrupted = True
+
+        if corrupted:
             print("\nACTION REQUIRED:")
-            print("1. Stop the Flask app (already done)")
-            print("2. Run: python restore_correct_veto_data.py")
-            print("3. Manually clear browser cache/localStorage")
+            print("1. Stop the Flask app")
+            print("2. Inspect instance/offline_scoreboard_data.json backups")
+            print("3. Manually clear browser cache/localStorage on all devices")
             print("=" * 70 + "\n")
             return False
-        
-        if not last_known_hash:
-            print("✅ Setting VETO checkpoint for corruption detection...")
-            data['_last_known_correct_veto_hash'] = current_hash
+
+        # Seed/refresh missing checkpoints. Only write if something changed.
+        dirty = False
+        if not last_veto_hash and current_veto_hash:
+            print(f"✅ Setting VETO checkpoint: {current_veto_hash}")
+            data['_last_known_correct_veto_hash'] = current_veto_hash
+            dirty = True
+        if not last_star_hash and current_star_hash:
+            print(f"✅ Setting STAR checkpoint: {current_star_hash}")
+            data['_last_known_correct_star_hash'] = current_star_hash
+            dirty = True
+        if dirty:
             with open(DATA_FILE, 'w', encoding='utf-8') as f:
                 json.dump(data, f, indent=2, ensure_ascii=False)
-            print(f"   Checkpoint: {current_hash}")
-        
+
         return True
     except Exception as e:
         print(f"❌ Error checking corruption: {e}")
@@ -87,8 +146,13 @@ def lock_veto_system(data):
     # Add current hash
     veto_tracking['_last_sync_hash'] = calculate_veto_hash(data)
     veto_tracking['_last_sync_time'] = datetime.utcnow().isoformat() + 'Z'
-    
+
     data['veto_tracking'] = veto_tracking
+
+    # Refresh top-level checkpoints so the next check_for_corruption() run has
+    # an up-to-date reference after an admin-sanctioned lock.
+    data['_last_known_correct_veto_hash'] = calculate_veto_hash(data)
+    data['_last_known_correct_star_hash'] = calculate_star_hash(data)
     return data
 
 def sanitize_student_veto_counts(data):
