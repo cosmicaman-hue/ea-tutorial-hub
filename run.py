@@ -42,11 +42,51 @@ def create_startup_restore_point(flask_app, keep=200):
 
 
 def _pid_is_running(pid):
+    """Check whether `pid` belongs to a live server process."""
     try:
-        os.kill(int(pid), 0)
+        pid = int(pid)
+    except Exception:
+        return False
+    if pid <= 0:
+        return False
+    if os.name == 'nt':
+        return _windows_pid_is_python(pid)
+    try:
+        os.kill(pid, 0)
+        return True
+    except ProcessLookupError:
+        return False
+    except PermissionError:
         return True
     except Exception:
         return False
+
+
+def _windows_pid_is_python(pid):
+    """Windows: True if `pid` is alive and looks like our python server process."""
+    import ctypes
+    from ctypes import wintypes
+
+    PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+    ERROR_ACCESS_DENIED = 5
+    STILL_ACTIVE = 259
+
+    kernel32 = ctypes.windll.kernel32
+    handle = kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
+    if not handle:
+        return ctypes.get_last_error() == ERROR_ACCESS_DENIED or kernel32.GetLastError() == ERROR_ACCESS_DENIED
+    try:
+        exit_code = wintypes.DWORD()
+        if kernel32.GetExitCodeProcess(handle, ctypes.byref(exit_code)) and exit_code.value != STILL_ACTIVE:
+            return False
+        buf_len = wintypes.DWORD(32768)
+        buf = ctypes.create_unicode_buffer(buf_len.value)
+        if kernel32.QueryFullProcessImageNameW(handle, 0, buf, ctypes.byref(buf_len)):
+            exe_name = os.path.basename(buf.value).lower()
+            return exe_name.startswith('python')
+        return True
+    finally:
+        kernel32.CloseHandle(handle)
 
 
 def acquire_single_instance_lock(flask_app):

@@ -59,6 +59,9 @@ import threading
 import time
 import math
 import functools
+import logging
+
+_ledger_log = logging.getLogger(__name__)
 
 points_bp = Blueprint('points', __name__, url_prefix='/scoreboard')
 _sync_subscribers = []
@@ -1444,11 +1447,17 @@ def start_peer_sync_background(app):
         import time as _time
         # Initial delay so the server finishes booting before the first sync.
         _time.sleep(15)
+        last_error_repr = None
         while True:
             try:
                 _do_peer_sync_cycle(app)
-            except Exception:
-                pass
+                last_error_repr = None
+            except Exception as exc:
+                if repr(exc) != last_error_repr:
+                    last_error_repr = repr(exc)
+                    app.logger.exception('[BgSync] Peer sync cycle failed')
+                else:
+                    app.logger.debug('[BgSync] Peer sync cycle failed (repeat): %s', exc)
             _time.sleep(30)
 
     t = threading.Thread(target=_loop, daemon=True, name='ea-peer-sync')
@@ -1462,6 +1471,23 @@ def _atomic_write_json(path, payload):
     # mount on Render/Docker, causing os.replace() to raise:
     #   [Errno 18] Invalid cross-device link
     _shared_atomic_write_json(path, payload, separators=(',', ':'))
+
+
+def _verify_backup_copy(source_path, backup_path):
+    """Verify a freshly copied backup has the same size as its source."""
+    try:
+        if os.path.getsize(backup_path) == os.path.getsize(source_path):
+            return True
+        _ledger_log.error(
+            'Backup verification failed (size mismatch): %s — removing bad copy', backup_path
+        )
+    except OSError:
+        _ledger_log.exception('Backup verification failed for %s', backup_path)
+    try:
+        os.remove(backup_path)
+    except OSError:
+        pass
+    return False
 
 
 def _backup_offline_file(path, keep=50):
@@ -1479,6 +1505,7 @@ def _backup_offline_file(path, keep=50):
     backup_name = f'offline_scoreboard_{timestamp}.json'
     backup_path = os.path.join(_offline_backup_dir(), backup_name)
     shutil.copy2(path, backup_path)
+    _verify_backup_copy(path, backup_path)
 
     backups = sorted(
         [os.path.join(_offline_backup_dir(), f) for f in os.listdir(_offline_backup_dir()) if f.endswith('.json')],
@@ -1507,6 +1534,7 @@ def _backup_offline_hourly_immutable(payload, keep=24 * 30):
         main_path = _offline_data_path()
         if os.path.exists(main_path):
             shutil.copy2(main_path, backup_path)
+            _verify_backup_copy(main_path, backup_path)
         else:
             _atomic_write_json(backup_path, payload)
 
@@ -1535,7 +1563,8 @@ def _load_latest_offline_backup():
         try:
             with open(backup_path, 'r', encoding='utf-8') as f:
                 return json.load(f)
-        except Exception:
+        except Exception as exc:
+            _ledger_log.warning('Skipping unreadable backup %s: %s', backup_path, exc)
             continue
     return None
 
@@ -1578,6 +1607,7 @@ def _load_offline_data():
         # Fall through to recovery logic below.
 
     if not os.path.exists(path):
+        _ledger_log.warning('Offline ledger missing at %s — attempting recovery from backups/gist', path)
         data = _load_latest_offline_backup()
         if not data:
             gist_data, _ = _gist_fetch_snapshot()
@@ -1588,10 +1618,13 @@ def _load_offline_data():
                 _atomic_write_json(path, data)
                 _invalidate_data_cache()
             except Exception:
-                pass
+                # Recovered data is served but NOT persisted — recovery will
+                # re-run on every request until the write succeeds.
+                _ledger_log.exception('Failed to persist recovered ledger to %s', path)
             return data
         # Last resort: hardcoded seed so the UI is never completely blank.
         try:
+            _ledger_log.error('No recoverable ledger found — falling back to FEB26 seed data')
             payload = json.loads(json.dumps(FEB26_SEED))
             payload['server_updated_at'] = _SEED_STAMP
             payload['updated_at'] = _SEED_STAMP
@@ -1599,7 +1632,7 @@ def _load_offline_data():
                 _atomic_write_json(path, payload)
                 _invalidate_data_cache()
             except Exception:
-                pass
+                _ledger_log.exception('Failed to persist seed ledger to %s', path)
             return payload
         except Exception:
             return None
@@ -1610,6 +1643,7 @@ def _load_offline_data():
                 raise ValueError('Empty offline snapshot')
             return data
     except Exception:
+        _ledger_log.exception('Offline ledger at %s is corrupted/empty — attempting recovery', path)
         data = _load_latest_offline_backup()
         if not data:
             gist_data, _ = _gist_fetch_snapshot()
@@ -1620,9 +1654,10 @@ def _load_offline_data():
                 _atomic_write_json(path, data)
                 _invalidate_data_cache()
             except Exception:
-                pass
+                _ledger_log.exception('Failed to persist recovered ledger to %s', path)
             return data
         try:
+            _ledger_log.error('No recoverable ledger found — falling back to FEB26 seed data')
             payload = json.loads(json.dumps(FEB26_SEED))
             payload['server_updated_at'] = _SEED_STAMP
             payload['updated_at'] = _SEED_STAMP
@@ -1630,7 +1665,7 @@ def _load_offline_data():
                 _atomic_write_json(path, payload)
                 _invalidate_data_cache()
             except Exception:
-                pass
+                _ledger_log.exception('Failed to persist seed ledger to %s', path)
             return payload
         except Exception:
             return None
@@ -1690,7 +1725,10 @@ def _save_offline_data_locked(payload):
         payload['server_version'] = next_ver if next_ver > 0 else 1
         if not payload.get('updated_at'):
             payload['updated_at'] = payload.get('server_updated_at') or _server_now_iso()
-    _backup_offline_file(path)
+    try:
+        _backup_offline_file(path)
+    except Exception:
+        _ledger_log.exception('Pre-save backup failed for %s', path)
     _atomic_write_json(path, payload)
     # Prime the shared cache with the just-saved payload so the next read
     # (immediate refetch from frontend after save) is a cache hit.
@@ -1698,7 +1736,10 @@ def _save_offline_data_locked(payload):
         _prime_data_cache(payload)
     else:
         _invalidate_data_cache()
-    _backup_offline_hourly_immutable(payload)
+    try:
+        _backup_offline_hourly_immutable(payload)
+    except Exception:
+        _ledger_log.exception('Hourly immutable backup failed for %s', path)
     _gist_push_snapshot_async(payload, reason='save_offline_data')
     return payload
 

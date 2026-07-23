@@ -460,6 +460,8 @@ role gating: `isTabAccessibleForCurrentRole` 14818, `applyRolePermissions` 14864
     `.rule-modal-overlay`, mobile responsive card layout at ≤480px using `data-label` attributes on `<td>`s.
     `editRuleText` and `deleteRuleText` updated to work with object items via `_migrateRuleItem` normalization before field access.
 
+30. **2026-07-23 — Phase 1 ledger reliability hardening**: `run.py::_pid_is_running` now uses the Win32 process API and rejects a PID reused by a non-Python executable, while conservatively treating access-denied processes as live; this prevents duplicate JSON-ledger writers on Windows. SQLite now uses WAL, `busy_timeout=15000`, `synchronous=NORMAL`, and a 15-second connection timeout. Ledger recovery, background peer sync, and backup failures now emit logs instead of failing silently; backup copies undergo a source-size verification and invalid copies are removed. Regression coverage: `tests/test_ledger_reliability.py`. **Test safety:** it overrides `EA_STORAGE_ROOT` and resets `data_paths` storage/cache state before exercising `_save_offline_data` so it never touches live ledger data.
+
 *(append new entries here as: date — symptom — root cause — fix anchor)*
 
 ---

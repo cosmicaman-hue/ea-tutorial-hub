@@ -445,9 +445,12 @@ def create_app():
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     app.config['MAX_CONTENT_LENGTH'] = int(os.getenv('MAX_CONTENT_LENGTH', 52428800))
     app.config['UPLOAD_FOLDER'] = os.getenv('UPLOAD_FOLDER', 'app/static/uploads')
-    app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+    engine_options = {
         'pool_pre_ping': True
     }
+    if database_url.startswith('sqlite'):
+        engine_options['connect_args'] = {'timeout': 15}
+    app.config['SQLALCHEMY_ENGINE_OPTIONS'] = engine_options
     # LAN deployment: allow unlimited/repeated requests from classroom devices.
     # Set ENABLE_RATE_LIMITING=1 in environment if you want throttling again.
     app.config['RATELIMIT_ENABLED'] = str(os.getenv('ENABLE_RATE_LIMITING', '0')).strip().lower() in ('1', 'true', 'yes', 'on')
@@ -465,6 +468,18 @@ def create_app():
     
     # Initialize extensions
     db.init_app(app)
+    if database_url.startswith('sqlite'):
+        from sqlalchemy import event as _sa_event
+        with app.app_context():
+            @_sa_event.listens_for(db.engine, 'connect')
+            def _set_sqlite_pragmas(dbapi_conn, _record):
+                cursor = dbapi_conn.cursor()
+                try:
+                    cursor.execute('PRAGMA journal_mode=WAL')
+                    cursor.execute('PRAGMA busy_timeout=15000')
+                    cursor.execute('PRAGMA synchronous=NORMAL')
+                finally:
+                    cursor.close()
     login_manager.init_app(app)
     login_manager.login_view = 'auth.login'
     csrf.init_app(app)
