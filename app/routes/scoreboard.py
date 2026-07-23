@@ -6543,6 +6543,15 @@ def offline_data():
                 cache_mtime = getattr(st, 'st_mtime_ns', int(st.st_mtime * 1e9))
                 cache_size = st.st_size
                 cache_ver = _parse_int_safe(data.get('server_version'), 0)
+                expected_etag = f'W/"{cache_ver}-{cache_size}"'
+                # Conditional GET: if the client already has this version,
+                # return 304 Not Modified — saves ~18 MB of bandwidth per pull.
+                if_none_match = (request.headers.get('If-None-Match') or '').strip()
+                if if_none_match and if_none_match == expected_etag:
+                    resp = Response(status=304)
+                    resp.headers['ETag'] = expected_etag
+                    resp.headers['Cache-Control'] = 'no-store'
+                    return resp
                 cached_body, cached_etag = _get_serialized_response(cache_mtime, cache_size, cache_ver)
                 if cached_body is not None:
                     resp = Response(cached_body, mimetype='application/json')

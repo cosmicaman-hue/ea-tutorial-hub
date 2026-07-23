@@ -7963,6 +7963,37 @@ body.header-offscreen .header-kicker::after {
         let pullDebouncedToast = false;
         let pullDebouncedForceFull = false;
         let lastKnownRemoteStamp = 0;
+        // ETag from the last successful full admin pull — sent as If-None-Match
+        // on subsequent full pulls so the server can return 304 (saves ~18 MB).
+        let _lastServerETag = '';
+        try { _lastServerETag = localStorage.getItem('ea_last_server_etag') || ''; } catch (e) {}
+        function _saveServerETag(etag) {
+            _lastServerETag = etag || '';
+            try { localStorage.setItem('ea_last_server_etag', _lastServerETag); } catch (e) {}
+        }
+        // ── Phase 4: Multi-tab coordination via BroadcastChannel ──────────
+        // Prevents last-writer-wins localStorage clobbering when the SPA is
+        // open in multiple tabs. Tab A saves → broadcasts → Tab B pulls.
+        let _eaBroadcastChannel = null;
+        try {
+            _eaBroadcastChannel = new BroadcastChannel('ea-scoreboard');
+            _eaBroadcastChannel.onmessage = (ev) => {
+                const msg = ev.data || {};
+                if (msg.type === 'save' && msg.tabId !== _eaTabId) {
+                    // Another tab saved data. Pull from server to get the merged
+                    // result instead of overwriting with our potentially stale copy.
+                    if (!pullInFlightPromise) {
+                        pullFromServer(false, true).catch(() => {});
+                    }
+                }
+            };
+        } catch (e) { /* BroadcastChannel not supported (older browsers) */ }
+        const _eaTabId = 'tab-' + Date.now() + '-' + Math.random().toString(36).slice(2);
+        function _broadcastSave() {
+            if (_eaBroadcastChannel) {
+                try { _eaBroadcastChannel.postMessage({ type: 'save', tabId: _eaTabId }); } catch (e) {}
+            }
+        }
         function isMobileViewport() {
             return window.innerWidth <= 980 || /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent || '');
         }
@@ -11698,6 +11729,71 @@ body.header-offscreen .header-kicker::after {
                 }
             }
 
+            // ── Phase 3: Debounced localStorage persistence ──────────────
+            _pendingLocalWriteTimer = null;
+            _pendingLocalWriteSnapshot = null;
+            _pendingLocalWriteDataRef = null;
+            _pendingLocalWriteOptions = null;
+
+            _scheduleDeferredLocalWrite(storageSnapshot, dataRef, options) {
+                // Store the latest snapshot — only the last one matters (coalescing).
+                this._pendingLocalWriteSnapshot = storageSnapshot;
+                this._pendingLocalWriteDataRef = dataRef;
+                this._pendingLocalWriteOptions = options;
+                if (this._pendingLocalWriteTimer) return true; // already scheduled
+                this._pendingLocalWriteTimer = setTimeout(() => {
+                    this._pendingLocalWriteTimer = null;
+                    this._flushDeferredLocalWrite();
+                }, 300);
+                return true; // optimistic — in-memory cache is already updated
+            }
+
+            _flushDeferredLocalWrite() {
+                const snapshot = this._pendingLocalWriteSnapshot;
+                const dataRef = this._pendingLocalWriteDataRef;
+                const options = this._pendingLocalWriteOptions || {};
+                this._pendingLocalWriteSnapshot = null;
+                this._pendingLocalWriteDataRef = null;
+                this._pendingLocalWriteOptions = null;
+                if (!snapshot) return;
+                const serialized = JSON.stringify(snapshot);
+                const _deferIdbWrite = () => {
+                    try { this._idbWrite(JSON.stringify(dataRef)); } catch (e) {}
+                };
+                let savedLocally = false;
+                try {
+                    localStorage.setItem(this.storageKey, serialized);
+                    savedLocally = true;
+                    if (typeof requestIdleCallback === 'function') {
+                        requestIdleCallback(_deferIdbWrite, { timeout: 2000 });
+                    } else { setTimeout(_deferIdbWrite, 100); }
+                } catch (err) {
+                    if (reclaimLocalStorageSpace()) {
+                        try {
+                            localStorage.setItem(this.storageKey, serialized);
+                            savedLocally = true;
+                            if (typeof requestIdleCallback === 'function') {
+                                requestIdleCallback(_deferIdbWrite, { timeout: 2000 });
+                            } else { setTimeout(_deferIdbWrite, 100); }
+                        } catch (retryErr) {}
+                    }
+                    if (!savedLocally) {
+                        try {
+                            const emergency = JSON.stringify(buildEmergencyLocalStorageSnapshot(dataRef));
+                            localStorage.setItem(this.storageKey, emergency);
+                            savedLocally = true;
+                        } catch (emergencyErr) {}
+                    }
+                    if (!savedLocally) {
+                        try { this._idbWrite(JSON.stringify(dataRef)); } catch (e) {}
+                        if (!options.system) {
+                            showAlert('Browser storage is full. Data is kept in-memory for this session. Export a backup from Tools tab.', 'warning', 0);
+                        }
+                    }
+                }
+                return savedLocally;
+            }
+
             _idbWrite(serialized) {
                 // Fire-and-forget: write a JSON string to IndexedDB asynchronously.
                 if (!this._idb) return;
@@ -12568,67 +12664,21 @@ body.header-offscreen .header-kicker::after {
                 // Invalidate tab render cache on every data mutation so switchTab
                 // knows it must re-render any previously cached tab.
                 _tabRenderVer++;
-                // Serialize the localStorage snapshot first (smaller, needed immediately).
-                // Defer the full-data IDB serialization to idle time — IDB is a
-                // supplemental backup and its ~150ms JSON.stringify should not block
-                // the main thread when the user is waiting for a tab render.
+                // ── Phase 3: Debounced localStorage persistence ──────────────
+                // Serialize + LZ-compress + localStorage.setItem for the ~5-18 MB
+                // snapshot takes 100-500 ms on the main thread. Deferring it by a
+                // short debounce window means rapid edits (e.g. entering scores for
+                // multiple students) only trigger ONE expensive write instead of
+                // one per edit. The in-memory cache is already updated above, so
+                // the UI re-render is instant.
                 const storageSnapshot = buildLocalStorageSnapshot(data);
-                const serialized = JSON.stringify(storageSnapshot);
-                // Capture a reference for the deferred IDB write so the data object
-                // is still available when idle fires (it lives in _cacheData anyway).
                 const _dataRef = data;
-                const _deferIdbWrite = () => {
-                    try { this._idbWrite(JSON.stringify(_dataRef)); } catch (e) { /* non-fatal */ }
-                };
-                let savedLocally = false;
-                try {
-                    localStorage.setItem(this.storageKey, serialized);
-                    savedLocally = true;
-                    if (typeof requestIdleCallback === 'function') {
-                        requestIdleCallback(_deferIdbWrite, { timeout: 2000 });
-                    } else {
-                        setTimeout(_deferIdbWrite, 100);
-                    }
-                } catch (err) {
-                    if (reclaimLocalStorageSpace()) {
-                        try {
-                            localStorage.setItem(this.storageKey, serialized);
-                            savedLocally = true;
-                            if (typeof requestIdleCallback === 'function') {
-                                requestIdleCallback(_deferIdbWrite, { timeout: 2000 });
-                            } else {
-                                setTimeout(_deferIdbWrite, 100);
-                            }
-                        } catch (retryErr) {
-                            // fall through to emergency fallback
-                        }
-                    }
-                    if (!savedLocally) {
-                        try {
-                            const emergency = JSON.stringify(buildEmergencyLocalStorageSnapshot(data));
-                            localStorage.setItem(this.storageKey, emergency);
-                            savedLocally = true;
-                            if (typeof requestIdleCallback === 'function') {
-                                requestIdleCallback(_deferIdbWrite, { timeout: 2000 });
-                            } else {
-                                setTimeout(_deferIdbWrite, 100);
-                            }
-                        } catch (emergencyErr) {
-                            // fall through to warning below
-                        }
-                    }
-                    if (!savedLocally) {
-                        // localStorage is completely exhausted — write the full data to IDB so
-                        // the startup recovery path can restore it on next page load.
-                        // In this case we must write IDB immediately (no idle deferral).
-                        try { this._idbWrite(JSON.stringify(_dataRef)); } catch (e) {}
-                        if (!options.system) {
-                            showAlert('Browser storage is full. Data is kept in-memory for this session. Click Refresh to sync, then reload.', 'warning');
-                        } else {
-                            showAlert('Browser storage quota exceeded during a background save. Nothing was overwritten; free site data for this browser when you can.', 'warning');
-                        }
-                    }
-                }
+                let savedLocally = this._scheduleDeferredLocalWrite(storageSnapshot, _dataRef, options);
+                // Phase 4: Notify other tabs so they pull the merged result
+                // instead of clobbering localStorage with stale data.
+                if (!options.skipSync) _broadcastSave();
+                // Return optimistically — the in-memory cache is authoritative for
+                // the current session; the deferred write lands within ~300 ms.
                 if (!options.skipBackup) {
                     maybeLocalBackup(data);
                 }
@@ -18492,6 +18542,9 @@ body.header-offscreen .header-kicker::after {
             // Mark outbound payload immediately so concurrent pulls do not overwrite unsynced local edits.
             pendingSyncPayload = data;
             updateSyncStatus('syncing', 'Syncing');
+            // Invalidate the cached server ETag — our push will change server_version,
+            // so the next pull must NOT skip via If-None-Match (it would get a stale 304).
+            _saveServerETag('');
             // If we're already pushing now, cancel any scheduled push to avoid duplicate POSTs.
             if (pendingPushTimer) {
                 clearTimeout(pendingPushTimer);
@@ -18731,11 +18784,28 @@ body.header-offscreen .header-kicker::after {
             // Used for explicit pull requests so teachers/admins always see latest data.
             const canUseSince = !forceFull && !!since && localRosterCount >= MIN_SAFE_STUDENT_ROSTER && !localLooksSuspiciousForSince;
             const readPath = canUseSince ? `${SERVER_SYNC.dataUrl}?since=${encodeURIComponent(since)}` : SERVER_SYNC.dataUrl;
+            // For full admin pulls (no ?since), attach If-None-Match so the
+            // server can return 304 when nothing changed — avoids re-downloading
+            // the full ~18 MB snapshot on every page load/focus.
+            const etagHeaders = {};
+            if (!canUseSince && _lastServerETag) {
+                etagHeaders['If-None-Match'] = _lastServerETag;
+            }
             const fetchTasks = readTargets.map(async (baseUrl) => {
                 try {
-                    const resp = await fetchWithTimeout(buildSyncUrl(baseUrl, readPath), { cache: 'no-store', credentials: 'include', headers: { ...eaAuthHeaders() } }, 9000);
-                    if (resp.status === 204) {
+                    const resp = await fetchWithTimeout(buildSyncUrl(baseUrl, readPath), { cache: 'no-store', credentials: 'include', headers: { ...eaAuthHeaders(), ...etagHeaders } }, 9000);
+                    if (resp.status === 204 || resp.status === 304) {
+                        // 304 from If-None-Match: server confirms our local copy is current.
+                        // Persist the ETag so future pulls also get 304.
+                        if (resp.status === 304 && resp.headers.get('ETag')) {
+                            _saveServerETag(resp.headers.get('ETag'));
+                        }
                         return { baseUrl, notModified: true };
+                    }
+                    // Capture ETag from 200 responses for future conditional GETs
+                    const responseETag = resp.headers.get('ETag');
+                    if (responseETag) {
+                        _saveServerETag(responseETag);
                     }
                     // Read as text then parse in Web Worker to avoid blocking the main thread
                     // on large server snapshots (can be 200KB+ of JSON).
@@ -53673,7 +53743,7 @@ body.header-offscreen .header-kicker::after {
                 _startupSyncOverlay.className = 'startup-sync-overlay';
                 _startupSyncOverlay.innerHTML =
                     '<div class="sync-spinner"></div>' +
-                    '<div class="sync-text">Loading data from server...</div>';
+                    '<div class="sync-text" id="_eaStartupStep">Connecting to server...</div>';
                 document.body.appendChild(_startupSyncOverlay);
                 // Global safety net: remove overlay after 15s no matter what,
                 // in case an unexpected error prevents the normal removal path.
@@ -53687,6 +53757,11 @@ body.header-offscreen .header-kicker::after {
                         try { refreshActiveTabFromSync({ passive: false }); } catch (e) {}
                     }
                 }, 15000);
+            }
+            // Phase 5: Update the startup overlay text to show progress steps.
+            function _updateStartupStep(text) {
+                const el = document.getElementById('_eaStartupStep');
+                if (el) el.textContent = text;
             }
 
             // Paint the last active tab immediately (behind the overlay if syncing)
@@ -53712,6 +53787,7 @@ body.header-offscreen .header-kicker::after {
             //   • IDB unhealthy → always keep localStorage (even if empty; server pull will fix)
             try {
                 if (db._preParsePromise) {
+                    _updateStartupStep('Restoring local backup...');
                     await db._preParsePromise;
                 }
                 const localData = db.getData();
@@ -53804,27 +53880,19 @@ body.header-offscreen .header-kicker::after {
             }
 
             if (SERVER_SYNC.enabled) {
-                // If browser is already offline in cross-origin mode, show banner immediately
-                // rather than waiting for session context retries to time out.
+                _updateStartupStep('Checking session...');
                 if ((SERVER_SYNC.crossOrigin || !isLANHost()) && !navigator.onLine) {
                     showCrossOriginOfflineBanner();
                 }
                 await loadSessionContext(3);
                 await refreshAllowedMonthsFromServer();
                 if (!TEMP_DISABLE_AUTO_SYNC_LOOPS) {
-                    checkinDevice('login'); // fire-and-forget: log this device/session
+                    checkinDevice('login');
                     setInterval(() => checkinDevice('heartbeat'), 5 * 60 * 1000);
                 }
                 updateSyncStatus('syncing', 'Connecting');
                 await resetBrowserScoreboardCacheOnce();
-                // ── Startup sync ────────────────────────────────────────────
-                // Always use forceFull=true on startup to guarantee fresh data.
-                // Delta sync (?since=) can miss edits to existing scores because
-                // the server filters delta scores by score date, not updated_at.
-                // A full pull ensures the user always sees the latest data on
-                // hard-refresh.  The pull is awaited so the overlay stays until
-                // the fresh data is applied.  A 10s safety timeout prevents the
-                // overlay from hanging if the server is slow/unreachable.
+                _updateStartupStep('Syncing data...');
                 await Promise.race([
                     pullFromServer(false, true).catch(() => {}),
                     new Promise(resolve => setTimeout(resolve, 10000))
@@ -53878,6 +53946,7 @@ body.header-offscreen .header-kicker::after {
             // active tab so the user sees the synced data, not the stale
             // localStorage snapshot that was painted behind the overlay.
             if (_startupSyncOverlay) {
+                _updateStartupStep('Preparing dashboard...');
                 _startupSyncOverlay.classList.add('fade-out');
                 const _ov = _startupSyncOverlay;
                 setTimeout(() => { if (_ov && _ov.parentNode) _ov.parentNode.removeChild(_ov); }, 350);
@@ -53951,6 +54020,14 @@ body.header-offscreen .header-kicker::after {
                 if (realtimeSyncSource) {
                     realtimeSyncSource.close();
                     realtimeSyncSource = null;
+                }
+                // Phase 3: flush any pending deferred localStorage write so
+                // data is not lost when the user closes the tab within the
+                // 300 ms debounce window.
+                if (db && db._pendingLocalWriteTimer) {
+                    clearTimeout(db._pendingLocalWriteTimer);
+                    db._pendingLocalWriteTimer = null;
+                    db._flushDeferredLocalWrite();
                 }
             });
 
