@@ -12882,7 +12882,11 @@ body.header-offscreen .header-kicker::after {
                     const student = data.students.find(s => s.id === studentId);
                     if (student) {
                         normalizeStudentMeta(student);
-                        student.stars = Math.max(0, (parseInt(student.stars, 10) || 0) - (parseInt(existing.stars, 10) || 0));
+                        const _existingStars = parseInt(existing.stars, 10) || 0;
+                        if (_existingStars !== 0) {
+                            student.stars = Math.max(0, (parseInt(student.stars, 10) || 0) - _existingStars);
+                            student.stars_updated_at = new Date().toISOString();
+                        }
                         student.veto_count = Math.max(0, (parseInt(student.veto_count, 10) || 0) - (parseInt(existing.vetos, 10) || 0));
                     }
                 }
@@ -17950,6 +17954,22 @@ body.header-offscreen .header-kicker::after {
                     if (prev.class_updated_at) mergedStudent.class_updated_at = prev.class_updated_at;
                 }
 
+                // Preserve stars from the record with the newer star-specific timestamp.
+                // student.stars is the authoritative current-month balance; a stale sync
+                // snapshot with a bumped updated_at (but no actual star mutation) must NOT
+                // overwrite a genuinely newer star value. Falls back to updated_at when
+                // stars_updated_at is absent (legacy records). This is the defensive fix for
+                // the "should be 11, shows 8" class of stale-sync star regressions.
+                const prevStarStamp = parseSyncStamp(prev.stars_updated_at || prev.updated_at || prev.created_at || '');
+                const nextStarStamp = parseSyncStamp(next.stars_updated_at || next.updated_at || next.created_at || '');
+                if (prevStarStamp > nextStarStamp && prev.stars !== undefined) {
+                    mergedStudent.stars = Math.max(0, parseInt(prev.stars, 10) || 0);
+                    if (prev.stars_updated_at) mergedStudent.stars_updated_at = prev.stars_updated_at;
+                } else if (nextStarStamp > prevStarStamp && next.stars !== undefined) {
+                    mergedStudent.stars = Math.max(0, parseInt(next.stars, 10) || 0);
+                    if (next.stars_updated_at) mergedStudent.stars_updated_at = next.stars_updated_at;
+                }
+
                 // Never let a stale payload turn an active student inactive.
                 if (prev.active !== false && mergedStudent.active === false) {
                     mergedStudent.active = prev.active;
@@ -22674,8 +22694,9 @@ body.header-offscreen .header-kicker::after {
             }
 
             student.stars = availableStars - starsNeeded;
+            student.stars_updated_at = new Date().toISOString();
             student.veto_count = Math.max(0, (parseInt(student.veto_count, 10) || 0) + vetoGain);
-            student.updated_at = new Date().toISOString();
+            student.updated_at = student.stars_updated_at;
 
             // Append an audit entry to veto_tracking.usage_log so the conversion is
             // durably recorded and visible to server-side consistency checks.
@@ -23336,148 +23357,15 @@ body.header-offscreen .header-kicker::after {
             return { updated: false, appealId: safeProp(created, 'id') || 0 };
         }
 
-        function smartStarCounter(studentId, date, month, points, stars) {
-            // If student uses stars to counter negative marking
-            if (points < 0 && stars > 0) {
-                // VALIDATION: Check if student has enough stars
-                const student = db.getStudents().find(s => s.id === studentId);
-                const availableStars = parseInt(safeProp(student, 'stars'), 10) || 0;
-                if (availableStars < stars) {
-                    showAlert(`Student only has ${availableStars} star(s) available, cannot use ${stars} star(s).`, 'danger');
-                    return null;
-                }
-
-                const absPoints = Math.abs(points);
-                let modifiedPoints = 0;
-                let nextDayBonus = 0;
-                let cellColor = 'red';  // Default to red for large penalties
-
-                // IF points >= -50 (small penalty like -49, -48 to -1): GREEN + BONUS
-                if (points >= -50) {
-                    cellColor = 'green';       // Replace with green cell
-                    modifiedPoints = 0;        // Remove negative mark
-                    nextDayBonus = 100;        // Add +100 to next day
-                } else {
-                    // IF points < -50 (large penalty like -51, -52, etc): RED + NO BONUS
-                    cellColor = 'red';         // Replace with red cell
-                    modifiedPoints = 0;        // Remove negative mark
-                    nextDayBonus = 0;          // No bonus applied
-                }
-
-                // Update current day score with visual indicator
-                const resolved = {
-                    score: {
-                        studentId,
-                        date,
-                        points: modifiedPoints,
-                        stars: stars,
-                        vetos: 0,
-                        month,
-                        notes: `[${cellColor.toUpperCase()}] Star used to counter negative marking (original: ${points})`,
-                        recordedBy: currentUserRole
-                    },
-                    cellColor: cellColor
-                };
-
-                // Deduct stars from student record
-                if (student && availableStars >= stars) {
-                    student.stars = availableStars - stars;
-                    // Don't save yet - will be saved with addScore
-                }
-
-                // If bonus applies, create/update next day entry
-                if (nextDayBonus > 0) {
-                    const nextDate = new Date(date);
-                    nextDate.setDate(nextDate.getDate() + 1);
-                    const nextDateStr = formatDateKey(nextDate);
-                    const nextMonth = nextDateStr.substring(0, 7);
-
-                    // Check if next day already has a score
-                    const nextDayScore = db.getScore(studentId, nextDateStr);
-                    if (nextDayScore) {
-                        // Add bonus to existing score
-                        const newPoints = (parseInt(nextDayScore.points, 10) || 0) + nextDayBonus;
-                        db.addScore({
-                            studentId,
-                            date: nextDateStr,
-                            points: newPoints,
-                            stars: parseInt(safeProp(nextDayScore, 'stars'), 10) || 0,
-                            vetos: parseInt(safeProp(nextDayScore, 'vetos'), 10) || 0,
-                            month: nextMonth,
-                            notes: `${safeProp(nextDayScore, 'notes') || ''} [Star bonus +100]`.trim(),
-                            recordedBy: currentUserRole
-                        });
-                    } else {
-                        // Create new next day entry with bonus (VISIBLE IN SCOREBOARD)
-                        db.addScore({
-                            studentId,
-                            date: nextDateStr,
-                            points: nextDayBonus,
-                            stars: 0,
-                            vetos: 0,
-                            month: nextMonth,
-                            notes: `[BONUS] Star bonus +100 from ${date}`,
-                            recordedBy: currentUserRole
-                        });
-                    }
-                }
-
-                // ── Auto-resume suspended posts ──────────────────────────────────
-                // Any star use to counter negative marking lifts an active suspension,
-                // regardless of whether a bonus was earned (works for penalties > -50 too).
-                const _phData = db.getData();
-                const _resumedPosts = [];
-                const _todayKey = formatDateKey(new Date());
-                // Leadership / GR tables
-                ['leadership', 'group_crs', 'class_reps'].forEach(tbl => {
-                    (_phData[tbl] || []).forEach(entry => {
-                        if (parseInt(entry.studentId, 10) === studentId &&
-                                normalizePostHolderStatus(entry.status || 'active') === 'suspended') {
-                            entry.status = 'active';
-                            entry.auto_suspend_waived = true;
-                            entry.resumed_on = _todayKey;
-                            entry.resume_reason = nextDayBonus > 0
-                                ? 'Auto-resumed: star used (bonus earned)'
-                                : 'Auto-resumed: star used to counter negative marking';
-                            _resumedPosts.push(entry.postName || entry.post || entry.title || tbl);
-                        }
-                    });
-                });
-                // Party President table (stored inside data.parties[].members[])
-                (_phData.parties || []).forEach(party => {
-                    (party.members || []).forEach(member => {
-                        if (!isPartyPresidentDesignation(member.designation)) return;
-                        let sid = parseInt(member.studentId, 10);
-                        if (!sid) {
-                            const roll = normalizeRoll(member.roll || '');
-                            sid = roll ? (new Map((_phData.students || []).map(s => [normalizeRoll(s.roll), parseInt(s.id, 10)])).get(roll) || 0) : 0;
-                        }
-                        if (sid !== studentId) return;
-                        if (normalizePostHolderStatus(member.status || 'active') === 'suspended') {
-                            member.status = 'active';
-                            member.auto_suspend_waived = true;
-                            member.resumed_on = _todayKey;
-                            member.resume_reason = nextDayBonus > 0
-                                ? 'Auto-resumed: star used (bonus earned)'
-                                : 'Auto-resumed: star used to counter negative marking';
-                            _resumedPosts.push(member.designation || 'Party President');
-                        }
-                    });
-                });
-                if (_resumedPosts.length > 0) {
-                    savePostHolderData(_phData);
-                    refreshAllPostHolderViews();
-                    loadScoreboard();
-                    showAlert(`Post auto-resumed: ${_resumedPosts.join(', ')} — star used to counter negative marking.`, 'success');
-                }
-                // ────────────────────────────────────────────────────────────────
-
-                return resolved;
-            }
-
-            // If not using star to counter negative marking, return normal result
-            return null;
-        }
+        // smartStarCounter removed 2026-07-25: this function was dead code (never
+        // called from any path) and contained a latent double-deduction bug — it
+        // manually set student.stars = availableStars - stars AND returned a score
+        // payload with stars: stars, which db.addScore would deduct again via
+        // applyStarVetoDelta. Had it ever been wired up, every "star use to counter
+        // negative marking" would have cost 2 stars instead of 1. The normal star
+        // usage flow (saveRecordScoreRow / saveScore) handles all star deductions
+        // correctly through db.addScore's single delta application. Do NOT
+        // re-introduce a manual student.stars mutation alongside a db.addScore call.
 
         function resolveScoreForRole(studentId, date, month, points, stars, vetos, notes = '') {
             const existing = db.getScore(studentId, date);
@@ -26450,7 +26338,11 @@ body.header-offscreen .header-kicker::after {
                 note: `[Admin repair] ${currentPoints} → ${nextPoints.value}`
             });
             normalizeStudentMeta(liveStudent);
-            liveStudent.stars = Math.max(0, (parseInt(liveStudent.stars, 10) || 0) + (nextStars.value - oldStars));
+            const _repairStarDelta = (nextStars.value - oldStars);
+            if (_repairStarDelta !== 0) {
+                liveStudent.stars = Math.max(0, (parseInt(liveStudent.stars, 10) || 0) + _repairStarDelta);
+                liveStudent.stars_updated_at = new Date().toISOString();
+            }
             liveStudent.veto_count = Math.max(0, (parseInt(liveStudent.veto_count, 10) || 0) + (nextVetos.value - oldVetos));
 
             db.saveData(data);
@@ -28268,6 +28160,8 @@ body.header-offscreen .header-kicker::after {
             
             const newStars = Math.max(0, currentStars - removeCount);
             student.stars = newStars;
+            student.stars_updated_at = new Date().toISOString();
+            student.updated_at = student.stars_updated_at;
 
             // Sync month_star_count so repairMonthCounterCarryForward (auto-runs at admin login)
             // doesn't revert this change by recalculating from stale carry-in values.
@@ -28968,6 +28862,8 @@ body.header-offscreen .header-kicker::after {
                     const stu = (freshData.students || []).find(s => s.id === studentId);
                     if (stu) {
                         stu.stars = (freshData.scores || []).reduce((s, e) => e.studentId === studentId ? s + (parseInt(e.stars, 10) || 0) : s, 0);
+                        stu.stars_updated_at = new Date().toISOString();
+                        stu.updated_at = stu.stars_updated_at;
                     }
 
                     db.saveData(freshData, { allowHistoricalWrite: true, skipSync: true });
@@ -29217,7 +29113,15 @@ body.header-offscreen .header-kicker::after {
 
             const rows = [];
             parties.forEach(party => {
-                const activeMembers = (party.members || []).filter(m => normalizePostHolderStatus(m.status || '') === 'active');
+                // Only count members whose member.status is active AND whose underlying
+                // student is still active for the selected standings month — deactivated
+                // students must not inflate the count or appear in the roster.
+                const activeMembers = (party.members || []).filter(m => {
+                    if (normalizePostHolderStatus(m.status || '') !== 'active') return false;
+                    const sid = parseInt(m.studentId, 10);
+                    const student = studentMap.get(sid);
+                    return !!(student && isStudentActiveForMonth(student, month, students));
+                });
                 let totalScore = 0;
                 let votePower = 0;
                 let memberCount = 0;
@@ -29234,6 +29138,7 @@ body.header-offscreen .header-kicker::after {
                 });
                 rows.push({
                     party: party,
+                    activeMembers: activeMembers,
                     memberCount: memberCount,
                     totalScore: totalScore,
                     votePower: votePower,
@@ -29274,8 +29179,8 @@ body.header-offscreen .header-kicker::after {
                 const partyRankMap = new Map(rows.map((r, idx) => [r.party, idx]));
                 const _rosterRows = [];
                 rows.forEach(row => {
-                    const activeMembers = (row.party.members || []).filter(m => normalizePostHolderStatus(m.status || '') === 'active');
-                    activeMembers.forEach(m => {
+                    // row.activeMembers already excludes deactivated students for this month.
+                    row.activeMembers.forEach(m => {
                         const sid = parseInt(m.studentId, 10);
                         const student = studentMap.get(sid);
                         if (!student) return;
@@ -33510,7 +33415,9 @@ body.header-offscreen .header-kicker::after {
 
             const totalPower = parties.reduce((sum, party) => sum + getPartyPower(party), 0);
             tbody.innerHTML = parties.map(party => {
-                const seatsUsed = (party.members || []).length;
+                // Only active members (active status AND active student) occupy a seat —
+                // deactivated students and ended/suspended tenures must not fill the bar.
+                const seatsUsed = getActivePartyMembers(party).length;
                 const power = getPartyPower(party);
                 const color = party.color || PARTY_COLORS[normalizePartyCode(party.code)] || '#64748b';
                 const seatBar = Array.from({length: 8}, (_, i) =>
@@ -33764,7 +33671,9 @@ body.header-offscreen .header-kicker::after {
             if (!party || !studentSelect) return;
 
             const students = db.getActiveStudents();
-            const memberIds = new Set((party.members || []).map(m => m.studentId));
+            // Only block students currently holding an ACTIVE slot — ended/suspended
+            // tenures should not prevent re-adding the same student later.
+            const memberIds = new Set(getActivePartyMembers(party).map(m => m.studentId));
             const editingMember = (party.members || []).find(m => m.id === editingPartyMemberId);
             const allowId = editingMember ? editingMember.studentId : null;
 
@@ -33805,6 +33714,27 @@ body.header-offscreen .header-kicker::after {
             updatePartyMemberStudentOptions();
         }
 
+        // Active party members = member.status is 'active' AND the underlying student is
+        // still active for the current month. Deactivated students (deactivation_month,
+        // active=false, retired roll, etc.) do NOT occupy a slot — this is what keeps the
+        // 8-member cap, the members table, the standings count, and the student dropdown
+        // all consistent. `allStudents` is optional (auto-fetched) so callers can pass a
+        // pre-built list to avoid repeated lookups.
+        function getActivePartyMembers(party, allStudents) {
+            const members = (party && party.members) || [];
+            const students = allStudents || (db.getStudents ? db.getStudents() : []);
+            const studentMap = students.length ? new Map(students.map(s => [parseInt(s.id, 10), s])) : null;
+            const month = (typeof getCurrentMonthKey === 'function') ? getCurrentMonthKey() : '';
+            return members.filter(m => {
+                if (normalizePostHolderStatus(m.status || 'active') !== 'active') return false;
+                const sid = parseInt(m.studentId, 10);
+                if (!sid) return false;
+                const student = studentMap ? studentMap.get(sid) : null;
+                if (!student) return false;
+                return isStudentActiveForMonth(student, month, students);
+            });
+        }
+
         function loadPartyMembers() {
             const tbody = document.getElementById('partyMembersBody');
             const party = db.getParties().find(p => p.id === activePartyId);
@@ -33818,7 +33748,8 @@ body.header-offscreen .header-kicker::after {
 
             const students = getVotingDefaultStudents();
             const studentMap = new Map(students.map(s => [s.id, s]));
-            const members = party.members || [];
+            // Only show active members — ended/suspended tenures are history, not current slots.
+            const members = getActivePartyMembers(party);
 
             tbody.innerHTML = members.map(member => {
                 const student = studentMap.get(member.studentId);
@@ -33867,12 +33798,14 @@ body.header-offscreen .header-kicker::after {
             const party = db.getParties().find(p => p.id === partyId);
             if (!party) return;
             const members = party.members || [];
-            const existingMember = members.find(m => m.studentId === studentId);
+            // Only active members occupy a slot — ended/suspended tenures are history.
+            const activeMembers = getActivePartyMembers(party);
+            const existingMember = activeMembers.find(m => m.studentId === studentId);
             const _prevPartyMemberSid = editingPartyMemberId
                 ? parseInt((members.find(m => m.id === editingPartyMemberId) || {}).studentId, 10)
                 : 0;
 
-            if (!editingPartyMemberId && members.length >= 8) {
+            if (!editingPartyMemberId && activeMembers.length >= 8) {
                 showAlert('This party already has 8 members', 'danger');
                 return;
             }
@@ -41826,7 +41759,11 @@ body.header-offscreen .header-kicker::after {
             }
 
             normalizeStudentMeta(student);
-            student.stars = Math.max(0, (parseInt(student.stars, 10) || 0) + (safeStars - oldStars));
+            const _adjStarDelta = (safeStars - oldStars);
+            if (_adjStarDelta !== 0) {
+                student.stars = Math.max(0, (parseInt(student.stars, 10) || 0) + _adjStarDelta);
+                student.stars_updated_at = new Date().toISOString();
+            }
             student.veto_count = Math.max(0, (parseInt(student.veto_count, 10) || 0) + (safeVetos - oldVetos));
             db.saveData(data, canAdminRecordHistoricalScore(month) ? { skipSync: true } : {});
             if (canAdminRecordHistoricalScore(month)) {
@@ -53560,7 +53497,10 @@ body.header-offscreen .header-kicker::after {
             if (!student) return false;
             const currentStars = parseInt(safeProp(student, 'stars'), 10) || 0;
             const newStars = Math.max(0, currentStars + delta);
-            student.stars = newStars;
+            if (newStars !== currentStars) {
+                student.stars = newStars;
+                student.stars_updated_at = new Date().toISOString();
+            }
             return true;
         }
 
