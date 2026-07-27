@@ -8824,8 +8824,13 @@ body.header-offscreen .header-kicker::after {
         function ensurePartyCatalogData(data) {
             if (!Array.isArray(data.parties)) data.parties = [];
 
-            if (data.parties.length === 0) {
-                // No parties yet — seed the six defaults
+            // Only seed the six default parties on the very first initialization.
+            // Once parties have been seeded (or the user has added/removed any), set
+            // parties_initialized=true so deleting parties — even all of them — does
+            // NOT silently re-create the defaults. Without this flag, deleting the last
+            // party would leave data.parties.length === 0 and trigger a re-seed on the
+            // next getData(), making parties appear to be un-deletable.
+            if (!data.parties_initialized && data.parties.length === 0) {
                 data.parties = ACTIVE_PARTY_CODES.map((code, idx) => ({
                     id: idx + 1,
                     code,
@@ -8835,36 +8840,36 @@ body.header-offscreen .header-kicker::after {
                     color: PARTY_COLORS[code] || '#64748b',
                     members: []
                 }));
-            } else {
-                // Migrate existing parties: add fullName/symbol/color if missing, de-dup by code
-                const seen = new Map();
-                (data.parties || []).forEach(party => {
-                    const code = normalizePartyCode(party.code);
-                    if (!code) return; // skip invalid codes
-                    if (!seen.has(code)) {
-                        seen.set(code, party);
-                    } else {
-                        // Keep the entry with more members (prefer richer data)
-                        const prev = seen.get(code);
-                        const prevLen = Array.isArray(prev.members) ? prev.members.length : 0;
-                        const curLen  = Array.isArray(party.members) ? party.members.length : 0;
-                        if (curLen > prevLen) {
-                            seen.set(code, party);
-                        }
-                    }
-                });
-                // Rebuild parties array from the deduped Map
-                data.parties = Array.from(seen.values());
-                data.parties.forEach(party => {
-                    const code = normalizePartyCode(party.code);
-                    // Back-fill new fields from constants for legacy parties
-                    if (!party.fullName) party.fullName = party.full_name || PARTY_CODE_LABELS[code] || code;
-                    if (!party.full_name) party.full_name = party.fullName;
-                    if (party.symbol === undefined || party.symbol === null) party.symbol = PARTY_SYMBOLS[code] || '';
-                    if (!party.color) party.color = PARTY_COLORS[code] || '#64748b';
-                    if (!Array.isArray(party.members)) party.members = [];
-                });
             }
+            data.parties_initialized = true;
+            // Migrate existing parties: add fullName/symbol/color if missing, de-dup by code
+            const seen = new Map();
+            (data.parties || []).forEach(party => {
+                const code = normalizePartyCode(party.code);
+                if (!code) return; // skip invalid codes
+                if (!seen.has(code)) {
+                    seen.set(code, party);
+                } else {
+                    // Keep the entry with more members (prefer richer data)
+                    const prev = seen.get(code);
+                    const prevLen = Array.isArray(prev.members) ? prev.members.length : 0;
+                    const curLen  = Array.isArray(party.members) ? party.members.length : 0;
+                    if (curLen > prevLen) {
+                        seen.set(code, party);
+                    }
+                }
+            });
+            // Rebuild parties array from the deduped Map
+            data.parties = Array.from(seen.values());
+            data.parties.forEach(party => {
+                const code = normalizePartyCode(party.code);
+                // Back-fill new fields from constants for legacy parties
+                if (!party.fullName) party.fullName = party.full_name || PARTY_CODE_LABELS[code] || code;
+                if (!party.full_name) party.full_name = party.fullName;
+                if (party.symbol === undefined || party.symbol === null) party.symbol = PARTY_SYMBOLS[code] || '';
+                if (!party.color) party.color = PARTY_COLORS[code] || '#64748b';
+                if (!Array.isArray(party.members)) party.members = [];
+            });
             // Always push the latest stored metadata into the live catalogs
             syncPartyCatalogs(data.parties);
         }
@@ -8943,11 +8948,14 @@ body.header-offscreen .header-kicker::after {
         }
 
         function getStudentVotePower(student) {
-            const total = student
-                ? (student.computed_total_score !== undefined
-                    ? parseInt(student.computed_total_score, 10)
-                    : getStudentMonthTotal(student.id, getCurrentMonthKey()))
-                : 0;
+            if (!student) return 0;
+            // computed_total_score may be null / non-numeric / stale — only trust a real
+            // finite number, otherwise fall back to the live month total so the displayed
+            // vote power is accurate instead of silently clamping to the 1-point floor.
+            const cached = student.computed_total_score;
+            const total = (cached !== undefined && cached !== null && Number.isFinite(Number(cached)))
+                ? Number(cached)
+                : getStudentMonthTotal(student.id, getCurrentMonthKey());
             return computeVotePower(total);
         }
 
@@ -29133,8 +29141,11 @@ body.header-offscreen .header-kicker::after {
                     const sbRow = scoreboardMap.get(sid);
                     if (sbRow) {
                         totalScore += sbRow.total || 0;
-                        votePower += computeVotePower(sbRow.total);
                     }
+                    // Vote power is per-student and has a base floor of 1 — do NOT gate on
+                    // sbRow, otherwise a party whose active members have no scores this
+                    // month shows 0 vote power even though every member is worth >= 1.
+                    votePower += getStudentVotePower(student);
                 });
                 rows.push({
                     party: party,
@@ -33461,10 +33472,11 @@ body.header-offscreen .header-kicker::after {
         }
 
         function getPartyPower(party) {
-            const students = getVotingDefaultStudents();
-            const studentMap = new Map(students.map(s => [s.id, s]));
-            return (party.members || []).reduce((sum, member) => {
-                const student = studentMap.get(member.studentId);
+            // Only active members (active status AND active student) contribute —
+            // deactivated students and ended/suspended tenures must not inflate power.
+            const activeMembers = getActivePartyMembers(party);
+            return activeMembers.reduce((sum, member) => {
+                const student = db.getStudents ? db.getStudents().find(s => parseInt(s.id, 10) === parseInt(member.studentId, 10)) : null;
                 return sum + getStudentVotePower(student);
             }, 0);
         }
@@ -33538,14 +33550,21 @@ body.header-offscreen .header-kicker::after {
             document.querySelector('#party-tab .form-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
 
-        function deleteParty(partyId) {
-            if (confirm('Delete this party? Member assignments will also be removed.')) {
-                db.deleteParty(partyId);
-                if (activePartyId === partyId) activePartyId = null;
-                loadParties();
-                loadOfficeHolders();
-                showAlert('Party deleted.', 'success');
-            }
+        async function deleteParty(partyId) {
+            const party = db.getParties().find(p => p.id === partyId);
+            const code = party ? (normalizePartyCode(party.code) || party.code) : '?';
+            const seats = party ? getActivePartyMembers(party).length : 0;
+            const confirmed = await showConfirmDialog(
+                `Delete party ${code}?${seats ? ` It has ${seats} active member${seats === 1 ? '' : 's'} who will be removed from this party.` : ''}`,
+                { mode: 'confirm', type: 'danger', title: 'Delete party', okLabel: 'Delete', cancelLabel: 'Cancel' }
+            );
+            if (!confirmed) return;
+            db.deleteParty(partyId);
+            if (activePartyId === partyId) activePartyId = null;
+            loadParties();
+            loadPartyMembers();
+            loadOfficeHolders();
+            showConfirmDialog(`Party ${code} deleted.`, { mode: 'notice', type: 'success', title: 'Deleted', okLabel: 'OK' });
         }
 
         function clearPartyForm() {
@@ -33589,10 +33608,28 @@ body.header-offscreen .header-kicker::after {
             const picker = document.getElementById('partyEmojiPicker');
             if (!picker) return;
             if (picker.classList.contains('hidden')) {
-                const emojis = ['🌙','⚡','🦁','🏛️','🎓','🌿','🔥','💧','🌊','🌺','🌸','🦅',
-                                '🐯','🐉','⭐','🏆','🥇','🎯','👑','⚔️','🛡️','✊','🤝','🌐',
-                                '🎭','🎨','📚','🔬','🎵','🌈','🌟','💫','⚙️','🔑','🏰','🗺️',
-                                '🦋','🌻','🍀','🔱','⚜️','🎪','🎶','🏹','🌍','🧭','💎','🔮'];
+                // Free/open-source Unicode emoji (no licensing required). Grouped loosely
+                // by theme so common party symbols (nature, animals, objects, flags of
+                // identity) are easy to find. Keep maxlength on the input in sync if you
+                // extend further — most emoji are 1-2 code points.
+                const emojis = [
+                    // Celestial / light
+                    '🌙','☀️','⭐','🌟','💫','⚡','🔥','✨','🌠','🌈','☁️','⛅',
+                    // Nature / plants
+                    '🌿','🌱','🌳','🌲','🌴','🍀','🍃','🌺','🌸','🌼','🌻','🌷','🌹','🍁','🌾','🌳',
+                    // Animals
+                    '🦁','🐯','🐉','🦅','🐺','🦊','🐻','🐘','🦏','🐎','🐂','🦌','🦓','🦒','🐪','🦅',
+                    // Water / weather
+                    '💧','🌊','🐟','🐠','🐬','🐳','🐋','🦈','🐢','❄️','🌨️','⛈️',
+                    // Objects / symbols
+                    '🏛️','🏰','🎓','⚖️','⚔️','🛡️','🏹','🎯','🏆','🥇','👑','🔑','🗝️','⚙️','🔧','🔨',
+                    '💎','🔮','⚜️','🔱','🎪','🎭','🎨','🎶','🎵','🎼','📚','📖','🔬','🔭','🧭',
+                    '🗺️','🌍','🌎','🌏','🌐','🪶','🪔','🕯️','🕊️','🦋','🐝','🪲','🦗','🐞','🦟',
+                    // Hands / unity / action
+                    '✊','✌️','🤝','👊','🙌','👏','🙏','💪','🫱','🫲','🫳','🫴',
+                    // Flags of identity (colour-based, party-neutral)
+                    '🏳️','🏴','🚩','🏁','🟠','🟡','🟢','🔵','🟣','🟤','⚫','⚪','🟥','🟧','🟨','🟩','🟦','🟪','🟫'
+                ];
                 picker.innerHTML = emojis.map(e =>
                     `<button type="button" class="emoji-btn" onclick="pickPartyEmoji('${e}')">${e}</button>`
                 ).join('');
@@ -33671,13 +33708,25 @@ body.header-offscreen .header-kicker::after {
             if (!party || !studentSelect) return;
 
             const students = db.getActiveStudents();
-            // Only block students currently holding an ACTIVE slot — ended/suspended
-            // tenures should not prevent re-adding the same student later.
-            const memberIds = new Set(getActivePartyMembers(party).map(m => m.studentId));
+            // Block students currently holding an ACTIVE slot in ANY party (not just this
+            // one) — a student may belong to at most one party at a time. The student
+            // being edited is always allowed so their row stays selectable.
+            const blockedByOtherParty = new Set();
+            (db.getParties() || []).forEach(p => {
+                if (p.id === activePartyId) return;
+                getActivePartyMembers(p).forEach(m => blockedByOtherParty.add(parseInt(m.studentId, 10)));
+            });
+            const memberIds = new Set(getActivePartyMembers(party).map(m => parseInt(m.studentId, 10)));
             const editingMember = (party.members || []).find(m => m.id === editingPartyMemberId);
-            const allowId = editingMember ? editingMember.studentId : null;
+            const allowId = editingMember ? parseInt(editingMember.studentId, 10) : null;
 
-            const filtered = students.filter(s => !memberIds.has(s.id) || s.id === allowId);
+            const filtered = students.filter(s => {
+                const sid = parseInt(s.id, 10);
+                if (sid === allowId) return true;
+                if (memberIds.has(sid)) return false;
+                if (blockedByOtherParty.has(sid)) return false;
+                return true;
+            });
             const selected = studentSelect.value;
             studentSelect.innerHTML = '<option value="">Select Student...</option>' +
                 filtered.map(s => `<option value="${s.id}">${s.base_name || s.name} (${s.roll}) [*${s.stars || 0} V${getVisibleVetoCount(s, getCurrentMonthKey())}]</option>`).join('');
@@ -33735,6 +33784,21 @@ body.header-offscreen .header-kicker::after {
             });
         }
 
+        // Cross-party membership guard: returns the party a student currently holds an
+        // active slot in (excluding `excludePartyId`), or null if they are in no other
+        // party. Used to enforce "one student → at most one party at a time".
+        function findStudentActiveParty(studentId, excludePartyId) {
+            const sid = parseInt(studentId, 10);
+            if (!sid) return null;
+            const parties = db.getParties ? db.getParties() : [];
+            for (const party of parties) {
+                if (excludePartyId && party.id === excludePartyId) continue;
+                const inParty = getActivePartyMembers(party).some(m => parseInt(m.studentId, 10) === sid);
+                if (inParty) return party;
+            }
+            return null;
+        }
+
         function loadPartyMembers() {
             const tbody = document.getElementById('partyMembersBody');
             const party = db.getParties().find(p => p.id === activePartyId);
@@ -33747,12 +33811,14 @@ body.header-offscreen .header-kicker::after {
             if (chipEl) chipEl.innerHTML = renderPartyChip(party.code);
 
             const students = getVotingDefaultStudents();
-            const studentMap = new Map(students.map(s => [s.id, s]));
+            // Use parseInt keys so a string studentId on a member record still matches
+            // a numeric id on the student record (and vice-versa).
+            const studentMap = new Map(students.map(s => [parseInt(s.id, 10), s]));
             // Only show active members — ended/suspended tenures are history, not current slots.
             const members = getActivePartyMembers(party);
 
             tbody.innerHTML = members.map(member => {
-                const student = studentMap.get(member.studentId);
+                const student = studentMap.get(parseInt(member.studentId, 10));
                 if (!student) return '';
                 const roll = student ? formatRollDisplay(student.roll) : '';
                 const power = getStudentVotePower(student);
@@ -33788,6 +33854,7 @@ body.header-offscreen .header-kicker::after {
             const studentId = parseInt(studentSelect.value, 10);
             const designation = formatDesignationShort(designationInput.value.trim());
             const electedOn = electedOnInput.value || new Date().toISOString().split('T')[0];
+            let _pendingNotice = null;
 
             if (!partyId || !studentId) {
                 showAlert('Select both party and student', 'danger');
@@ -33800,10 +33867,24 @@ body.header-offscreen .header-kicker::after {
             const members = party.members || [];
             // Only active members occupy a slot — ended/suspended tenures are history.
             const activeMembers = getActivePartyMembers(party);
-            const existingMember = activeMembers.find(m => m.studentId === studentId);
+            const existingMember = activeMembers.find(m => parseInt(m.studentId, 10) === studentId);
             const _prevPartyMemberSid = editingPartyMemberId
                 ? parseInt((members.find(m => m.id === editingPartyMemberId) || {}).studentId, 10)
                 : 0;
+
+            // One student → at most one party at a time. When adding a new member, block
+            // if the student already holds an active slot in another party. When editing,
+            // only block if the student is being changed to someone already in another
+            // party (moving the same student within the same party is allowed).
+            const studentChangedOnEdit = editingPartyMemberId && _prevPartyMemberSid !== studentId;
+            if (!editingPartyMemberId || studentChangedOnEdit) {
+                const otherParty = findStudentActiveParty(studentId, partyId);
+                if (otherParty) {
+                    const otherCode = normalizePartyCode(otherParty.code) || otherParty.code || '?';
+                    showAlert(`This student is already a member of party ${otherCode}. A student can only be in one party at a time.`, 'danger');
+                    return;
+                }
+            }
 
             if (!editingPartyMemberId && activeMembers.length >= 8) {
                 showAlert('This party already has 8 members', 'danger');
@@ -33821,7 +33902,7 @@ body.header-offscreen .header-kicker::after {
                 member.designation = designation;
                 member.elected_on = electedOn;
                 member.status = normalizePostHolderStatus(member.status || 'active');
-                showAlert('Party member updated', 'success');
+                _pendingNotice = { msg: 'Party member updated', type: 'success' };
             } else {
                 if (existingMember) {
                     showAlert('This student is already in the party', 'danger');
@@ -33834,7 +33915,11 @@ body.header-offscreen .header-kicker::after {
                     elected_on: electedOn,
                     status: 'active'
                 });
-                showAlert('Party member added', 'success');
+                const studentName = (() => {
+                    const s = (db.getStudents() || []).find(x => parseInt(x.id, 10) === studentId);
+                    return s ? (s.base_name || s.name || '') : '';
+                })();
+                _pendingNotice = { msg: `${studentName ? studentName + ' ' : ''}added to party ${normalizePartyCode(party.code) || party.code}`, type: 'success' };
             }
 
             db.updateParty(partyId, { members });
@@ -33843,8 +33928,16 @@ body.header-offscreen .header-kicker::after {
                 saveData({ system: true });
             }
             clearPartyMemberForm();
+            // Refresh immediately so the new/edited member shows up in the table and the
+            // seat bar updates in the same tick — no extra tab switch required.
             loadParties();
+            loadPartyMembers();
             loadOfficeHolders();
+            // Centered, position-aware confirmation in the middle of the screen.
+            if (_pendingNotice) {
+                const notice = _pendingNotice; _pendingNotice = null;
+                showConfirmDialog(notice.msg, { mode: 'notice', type: notice.type, title: notice.type === 'success' ? 'Success' : 'Notice', okLabel: 'OK' });
+            }
         }
 
         function editPartyMember(memberId) {
@@ -33854,22 +33947,35 @@ body.header-offscreen .header-kicker::after {
             if (!member) return;
             editingPartyMemberId = memberId;
             document.getElementById('partyMemberParty').value = party.id;
-            document.getElementById('partyMemberStudent').value = member.studentId;
             document.getElementById('partyMemberDesignation').value = formatDesignationShort(member.designation) || '';
             document.getElementById('partyMemberElectedOn').value = member.elected_on || '';
+            // Rebuild the student dropdown FIRST (it filters based on editingPartyMemberId),
+            // THEN set the value — otherwise the rebuild wipes the selection and the user
+            // has to click Edit a second time to see the member selected.
             updatePartyMemberStudentOptions();
+            document.getElementById('partyMemberStudent').value = member.studentId;
         }
 
-        function deletePartyMember(memberId) {
+        async function deletePartyMember(memberId) {
             const party = db.getParties().find(p => p.id === activePartyId);
             if (!party) return;
-            if (confirm('Remove this member from the party?')) {
-                party.members = (party.members || []).filter(m => m.id !== memberId);
-                db.updateParty(party.id, { members: party.members });
-                loadParties();
-                loadOfficeHolders();
-                showAlert('Party member removed', 'success');
-            }
+            const member = (party.members || []).find(m => m.id === memberId);
+            const studentName = (() => {
+                if (!member) return '';
+                const s = (db.getStudents() || []).find(x => parseInt(x.id, 10) === parseInt(member.studentId, 10));
+                return s ? (s.base_name || s.name || '') : '';
+            })();
+            const confirmed = await showConfirmDialog(
+                `Remove ${studentName ? studentName + ' ' : 'this member'}from party ${normalizePartyCode(party.code) || party.code}?`,
+                { mode: 'confirm', type: 'warning', title: 'Remove member', okLabel: 'Remove', cancelLabel: 'Cancel' }
+            );
+            if (!confirmed) return;
+            party.members = (party.members || []).filter(m => m.id !== memberId);
+            db.updateParty(party.id, { members: party.members });
+            loadParties();
+            loadPartyMembers();
+            loadOfficeHolders();
+            showConfirmDialog('Party member removed.', { mode: 'notice', type: 'success', title: 'Removed', okLabel: 'OK' });
         }
 
         function clearPartyMemberForm(keepParty = false) {
@@ -39877,11 +39983,15 @@ body.header-offscreen .header-kicker::after {
                     if (!headers.length) return;
                     const vetoIndex = headers.findIndex(th => {
                         const text = String(th.textContent || '').trim().toLowerCase();
-                        return text.includes('veto') || text === 'vs' || text.includes('v');
+                        return text.includes('veto');
                     });
                     const statusIndex = headers.findIndex(th => {
                         const text = String(th.textContent || '').trim().toLowerCase();
                         return text.includes('status');
+                    });
+                    const nameIndex = headers.findIndex(th => {
+                        const text = String(th.textContent || '').trim().toLowerCase();
+                        return text.includes('name') || text.includes('student') || text.includes('current');
                     });
                     if (vetoIndex < 0) return;
 
@@ -39914,7 +40024,20 @@ body.header-offscreen .header-kicker::after {
 
                         // Keep the current-CR cell's V badge in sync when the row is rendered
                         // outside the main scoreboard renderer.
-                        const nameCell = cells[1] || null;
+                        // Find the name cell dynamically — hardcoding cells[1] wrongly targets
+                        // the Roll No. cell in tables like the Group Roster (where name is at
+                        // index 2), causing the V badge to stick to the roll.
+                        const nameCell = (nameIndex >= 0 ? cells[nameIndex] : cells[1]) || null;
+                        // Clean up stale V badges that were previously appended to the wrong
+                        // cell (e.g. the Roll No. cell) by an earlier buggy pass.
+                        cells.forEach(cell => {
+                            if (cell === nameCell) return;
+                            Array.from(cell.children).forEach(child => {
+                                if (child.tagName !== 'SPAN' && child.tagName !== 'DIV') return;
+                                const t = String(child.textContent || '').trim().toUpperCase();
+                                if (/^V\d+$/.test(t)) child.remove();
+                            });
+                        });
                         if (nameCell) {
                             const normalizeBadgeStyle = (node) => {
                                 if (!node) return;
@@ -53150,6 +53273,53 @@ body.header-offscreen .header-kicker::after {
             }
         }
 
+        // Centered, position-aware confirmation / notice dialog built on the existing
+        // openModal/closeModal system (centerViewport:true → fixed in the middle of the
+        // viewport regardless of scroll position). Two modes:
+        //   - confirm: shows Cancel + OK; resolves true on OK, false on Cancel/close.
+        //   - notice:  shows only OK (no Cancel); resolves true on OK/close.
+        // `opts.title`, `opts.okLabel`, `opts.cancelLabel`, `opts.type` (success|danger|
+        // warning|info) customize appearance. Always returns a Promise.
+        function showConfirmDialog(message, opts = {}) {
+            return new Promise(resolve => {
+                const modal = document.getElementById('eaConfirmModal');
+                if (!modal) { const r = confirm(message); resolve(r); return; }
+                const mode = opts.mode === 'notice' ? 'notice' : 'confirm';
+                const titleEl = document.getElementById('eaConfirmTitle');
+                const msgEl = document.getElementById('eaConfirmMessage');
+                const okBtn = document.getElementById('eaConfirmOk');
+                const cancelBtn = document.getElementById('eaConfirmCancel');
+                if (!titleEl || !msgEl || !okBtn || !cancelBtn) { const r = confirm(message); resolve(r); return; }
+
+                const type = opts.type || (mode === 'notice' ? 'success' : 'info');
+                const icon = type === 'success' ? 'check-circle' : type === 'danger' ? 'exclamation-circle' : type === 'warning' ? 'exclamation-triangle' : 'info-circle';
+                titleEl.innerHTML = `<i class="fas fa-${icon}"></i> ${escapeHtml(opts.title || (mode === 'notice' ? 'Notice' : 'Please confirm'))}`;
+                msgEl.textContent = message;
+                okBtn.textContent = opts.okLabel || (mode === 'notice' ? 'OK' : 'Confirm');
+                cancelBtn.textContent = opts.cancelLabel || 'Cancel';
+                cancelBtn.style.display = mode === 'notice' ? 'none' : '';
+                okBtn.className = type === 'danger' ? 'danger' : '';
+
+                let settled = false;
+                const finish = (val) => {
+                    if (settled) return;
+                    settled = true;
+                    closeModal('eaConfirmModal');
+                    okBtn.removeEventListener('click', onOk);
+                    cancelBtn.removeEventListener('click', onCancel);
+                    modal.removeEventListener('_modalClosed', onClosed);
+                    resolve(val);
+                };
+                const onOk = () => finish(true);
+                const onCancel = () => finish(false);
+                const onClosed = () => finish(false);
+                okBtn.addEventListener('click', onOk);
+                cancelBtn.addEventListener('click', onCancel);
+                modal.addEventListener('_modalClosed', onClosed);
+                openModal('eaConfirmModal', { centerViewport: true, maxWidth: 460 });
+            });
+        }
+
         /* VALIDATION MODAL FUNCTIONS */
         /* ── Score History Modal ── */
         function _getScoreHistoryFromActivityLog(studentId, dateKey) {
@@ -54304,6 +54474,22 @@ body.header-offscreen .header-kicker::after {
 
 })();
 </script>
+    <!-- Generic centered confirmation / notice modal (position-aware, viewport-centered) -->
+    <div id="eaConfirmModal" class="modal">
+        <div class="modal-content" style="max-width: 460px;">
+            <div class="modal-header">
+                <h2 id="eaConfirmTitle"><i class="fas fa-check-circle"></i> Confirm</h2>
+                <button class="close-btn" onclick="closeModal('eaConfirmModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p id="eaConfirmMessage" style="margin:0 0 6px;line-height:1.5;"></p>
+            </div>
+            <div class="modal-footer" style="padding:16px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:12px;">
+                <button class="secondary" id="eaConfirmCancel" onclick="closeModal('eaConfirmModal')">Cancel</button>
+                <button id="eaConfirmOk">OK</button>
+            </div>
+        </div>
+    </div>
     <!-- Planner Designer Modal -->
     <div id="plannerModal" class="modal">
         <div class="modal-content planner-editor-modal">
