@@ -60,3 +60,19 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Large binaries — never commit (exceed GitHub file size limits)
+# cloudflared.exe is ~51 MB (GitHub warning >50 MB)
+# jdk17.zip is ~182 MB (GitHub hard reject >100 MB)
+cloudflared.exe
+jdk17.zip
+jdk-17.0.19+10/
+jdk-*/
+
+# Scratch / diagnostic scripts (local only)
+scratch/
+
+# Site credentials and local runtime data — never commit
+public_site/credentials.json
+ea_data.db
+_ayush_scores_*.json
