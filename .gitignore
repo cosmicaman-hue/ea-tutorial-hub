@@ -72,7 +72,9 @@ jdk-*/
 # Scratch / diagnostic scripts (local only)
 scratch/
 
-# Site credentials and local runtime data — never commit
-public_site/credentials.json
+# Local runtime data — never commit
+# NOTE: public_site/credentials.json must stay TRACKED: it is deployed to
+# Cloudflare Pages via the git-based Force Publish flow (contains only
+# salted SHA-256 hashes of public-gate passwords, public by design).
 ea_data.db
 _ayush_scores_*.json
