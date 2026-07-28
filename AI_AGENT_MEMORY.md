@@ -152,7 +152,7 @@ peer/cloud sync → load/save → merge engine → routes.
 | 2850–2911 | month_students / month_roster_profiles supersets |
 | 2916–2993 | **`_locked_month_keys`, `_preserve_locked_historical_window`** (locked months = Aug 2024–Feb 2026; protects history on every save) |
 | 2994 | `_apply_admin_historical_score_ops` (admin queued historical edits) |
-| 3086 | `_merge_students_preserve_active` |
+| 3086 | `_merge_students_preserve_active` (vis-field restore honors explicit-null clears — §10.34) |
 | 3283 | **`_merge_scores_superset`** — history-aware: uses `_get_last_history_stamp` (L1674) so a row with newer real edit history wins over newer-but-synthetic `updated_at` |
 | 3354–4820 | all other domain supersets: notifications, records, activity log, elections, attendance, fees, resources, leadership, parties, CRs, syllabus (via `syllabus_helpers`) |
 | 5151 | `_enforce_current_month_roster_integrity` |
@@ -495,6 +495,28 @@ role gating: `isTabAccessibleForCurrentRole` 14818, `applyRolePermissions` 14864
     instance — serving requests on the shared package-level app flips Flask's first-request flag and breaks
     `run.py` import in `test_ledger_reliability`; do not import the shared app for request-level tests).
     **Takes effect on next server restart.**
+
+34. **2026-07-28 — reactivated student shows deactivated again (changes "not sticking") — FIXED**:
+    - **Symptom:** Aamna (EA25H04, id 46) reactivated ~18:18 IST; hours later she rendered deactivated again.
+      Ledger held the impossible combo `active:true` + `deactivation_month:'2026-07'` + `updated_at`=reactivation
+      time — a state NO UI path can produce (activation sets dm=null; the edit form forces active=false when dm
+      has arrived), proving a merge constructed it.
+    - **Root cause:** the structural-visibility restore guard (fe `mergeStudentsSuperset` ~L17989, be
+      `_merge_pair` ~L3364) restored `active_from_month`/`deactivation_month` whenever EITHER side held the
+      field — it could not distinguish "stale snapshot missing the key" (restore wanted) from "deliberate
+      reactivation that CLEARED the field" (restore resurrects the deactivation). The user's own reactivation
+      push (dm=null, newer updated_at) was merged against the server's record (dm='2026-07') and the guard
+      re-introduced the field on the spot; the next pull brought it back everywhere. `active:true` survived
+      (separate guard) but every visibility check (`isStudentActiveForMonth` ~L16242, `getActiveStudents`
+      ~L12929, party/CR rosters) hides a student whose dm has arrived → "deactivated again".
+    - **Fix:** both merges now honor an EXPLICIT clear — incoming record carries the key with null/'' → do NOT
+      restore; an ABSENT key still restores (protects stale/legacy/import snapshots, including timestamp-bumping
+      import flows). Applied to all 4 merge sites: be `scoreboard.py`, fe main + `public_site/` + android copies.
+      No UI/schema change — the activation handler already sent `deactivation_month: null`; the merges finally
+      respect it. Regression coverage: `tests/test_visibility_field_merge.py` (6 tests).
+    - **Data fallout:** 14 ledger records carry the bug's fingerprint (active:true + dm arrived). They are
+      display-deactivated until deliberately re-toggled; with this fix deployed, reactivations now stick.
+      List via `scratch/scan_inconsistent_active.py` (read-only). **Takes effect on next server restart.**
 
 *(append new entries here as: date — symptom — root cause — fix anchor)*
 

@@ -3361,10 +3361,15 @@ def _merge_students_preserve_active(existing_students, incoming_students):
         # Preserve structural visibility fields: never drop active_from_month or
         # deactivation_month once set on either side.  These control whether a
         # student appears in historical months and roll-change visibility checks.
+        # EXCEPTION: an incoming record that carries the key with an explicit
+        # null/empty value is a DELIBERATE clear (the reactivation path sets
+        # deactivation_month=null). Honor the clear; only an ABSENT key marks a
+        # stale/legacy/imported record that never knew about the field.
         for _vis_field in ('active_from_month', 'deactivation_month'):
             _existing_val = str(existing.get(_vis_field) or '').strip()
             _merged_val = str(merged_s.get(_vis_field) or '').strip()
-            if _existing_val and not _merged_val:
+            _explicit_clear = _vis_field in incoming and str(incoming.get(_vis_field) or '').strip() == ''
+            if _existing_val and not _merged_val and not _explicit_clear:
                 merged_s[_vis_field] = _existing_val
 
         roll_value = _normalize_roll_value(merged_s.get('roll'))

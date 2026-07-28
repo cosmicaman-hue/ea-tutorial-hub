@@ -15456,10 +15456,15 @@ body.sb-closing .main-content-wrapper { transition: margin-left var(--sb-close);
                 // Preserve structural visibility fields: never drop active_from_month or
                 // deactivation_month once set on either side.  These control whether a
                 // student appears in historical months and roll-change visibility checks.
+                // EXCEPTION: an incoming record carrying the key with an explicit null/empty
+                // value is a DELIBERATE clear (reactivation sets deactivation_month=null) —
+                // honor it. Only an ABSENT key marks a stale/legacy/imported record.
                 for (const _visField of ['active_from_month', 'deactivation_month']) {
                     const _prevVal = String(prev[_visField] || '').trim();
                     const _mergedVal = String(mergedStudent[_visField] || '').trim();
-                    if (_prevVal && !_mergedVal) mergedStudent[_visField] = _prevVal;
+                    const _explicitClear = Object.prototype.hasOwnProperty.call(next, _visField)
+                        && String(next[_visField] || '').trim() === '';
+                    if (_prevVal && !_mergedVal && !_explicitClear) mergedStudent[_visField] = _prevVal;
                 }
 
                 if (String(mergedStudent.roll || '').trim()) {
