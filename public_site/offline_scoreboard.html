@@ -29127,13 +29127,15 @@ body.header-offscreen .header-kicker::after {
             const rows = [];
             parties.forEach(party => {
                 // Only count members whose member.status is active AND whose underlying
-                // student is still active for the selected standings month — deactivated
-                // students must not inflate the count or appear in the roster.
+                // student is not explicitly deactivated for the selected standings month —
+                // deactivated students must not inflate the count or appear in the roster.
+                // Uses the lenient isStudentExplicitlyDeactivated (not isStudentActiveForMonth)
+                // so recently-added members are not wrongly hidden by roll-change handling.
                 const activeMembers = (party.members || []).filter(m => {
                     if (normalizePostHolderStatus(m.status || '') !== 'active') return false;
                     const sid = parseInt(m.studentId, 10);
                     const student = studentMap.get(sid);
-                    return !!(student && isStudentActiveForMonth(student, month, students));
+                    return !!(student && !isStudentExplicitlyDeactivated(student, month));
                 });
                 let totalScore = 0;
                 let votePower = 0;
@@ -33768,12 +33770,24 @@ body.header-offscreen .header-kicker::after {
             updatePartyMemberStudentOptions();
         }
 
+        // A student is "explicitly deactivated" only when they were deliberately switched
+        // off (active === false) or their deactivation_month has arrived. This is the ONLY
+        // condition that should hide a party member — looser than isStudentActiveForMonth,
+        // which also excludes roll-change-retired / superseded / active_from-future students
+        // and was incorrectly hiding members that were added recently.
+        function isStudentExplicitlyDeactivated(student, month) {
+            if (!student) return true;
+            if (student.active === false) return true;
+            const dm = String(student.deactivation_month || '').trim();
+            if (dm && month && month >= dm) return true;
+            return false;
+        }
+
         // Active party members = member.status is 'active' AND the underlying student is
-        // still active for the current month. Deactivated students (deactivation_month,
-        // active=false, retired roll, etc.) do NOT occupy a slot — this is what keeps the
-        // 8-member cap, the members table, the standings count, and the student dropdown
-        // all consistent. `allStudents` is optional (auto-fetched) so callers can pass a
-        // pre-built list to avoid repeated lookups.
+        // not explicitly deactivated. Used for the 8-member cap, the members table, the
+        // standings count, and the student dropdown so that deactivated students and
+        // ended/suspended tenures don't occupy a slot. `allStudents` is optional
+        // (auto-fetched) so callers can pass a pre-built list to avoid repeated lookups.
         function getActivePartyMembers(party, allStudents) {
             const members = (party && party.members) || [];
             const students = allStudents || (db.getStudents ? db.getStudents() : []);
@@ -33784,8 +33798,12 @@ body.header-offscreen .header-kicker::after {
                 const sid = parseInt(m.studentId, 10);
                 if (!sid) return false;
                 const student = studentMap ? studentMap.get(sid) : null;
+                // Student record missing entirely → cannot display, hide.
                 if (!student) return false;
-                return isStudentActiveForMonth(student, month, students);
+                // Only hide when the student was explicitly deactivated. Do NOT use the
+                // stricter isStudentActiveForMonth here — roll-change / superseded-record
+                // handling is orthogonal to party membership and was hiding valid members.
+                return !isStudentExplicitlyDeactivated(student, month);
             });
         }
 
