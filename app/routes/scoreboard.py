@@ -4967,8 +4967,52 @@ def _merge_class_reps_superset(existing_reps, incoming_reps):
     return list(merged.values())
 
 
+def _merge_party_members_superset(prev_members, new_members):
+    """Merge two party member arrays into a union by member id — never lose a member.
+
+    Prior behaviour overwrote the whole members array with whichever party record was
+    processed last (last-writer-wins). That dropped members added on a client whose
+    snapshot had not yet synced everywhere: an incoming snapshot from another client with
+    a stale (older, non-empty) members array would silently overwrite the newer one, so
+    members added earlier would vanish on the next sync. Same class of bug as the
+    star-merge regression. This merges by member id so every member is preserved; on a
+    conflicting id the record with the later elected_on / updated_at wins, preferring the
+    one with more populated fields when timestamps are equal or absent."""
+    merged = {}
+    for arr in [prev_members or [], new_members or []]:
+        for member in arr:
+            if not isinstance(member, dict):
+                continue
+            mid = member.get('id')
+            if mid is None or mid == '':
+                # No id — key by studentId so we still de-dupe rather than duplicating.
+                sid = member.get('studentId')
+                mid = f"sid-{sid}" if sid is not None else None
+                if mid is None:
+                    continue
+            key = str(mid)
+            existing = merged.get(key)
+            if not existing:
+                merged[key] = dict(member)
+                continue
+            # Prefer the member record that looks newer/richer.
+            def _stamp(m):
+                return _parse_sync_stamp(m.get('updated_at') or m.get('elected_on') or m.get('created_at'))
+            if _stamp(member) > _stamp(existing):
+                merged[key] = {**existing, **member}
+            elif _stamp(existing) > _stamp(member):
+                merged[key] = {**member, **existing}
+            else:
+                # Equal/unknown timestamps — keep whichever has more non-empty fields.
+                def _richness(m):
+                    return sum(1 for v in m.values() if v not in (None, '', 0))
+                merged[key] = {**existing, **member} if _richness(member) >= _richness(existing) else {**member, **existing}
+    return list(merged.values())
+
+
 def _merge_parties_superset(existing_parties, incoming_parties):
-    """Merge parties by code; never overwrite non-empty members with empty."""
+    """Merge parties by code; never overwrite non-empty members with empty, and never
+    lose individual members to a stale snapshot."""
     merged = {}
     for arr in [existing_parties or [], incoming_parties or []]:
         for party in arr:
@@ -4981,10 +5025,10 @@ def _merge_parties_superset(existing_parties, incoming_parties):
                 continue
             prev_members = prev.get('members') or []
             new_members = party.get('members') or []
-            if prev_members and not new_members:
-                merged[key] = {**prev, **party, 'members': prev_members}
-            else:
-                merged[key] = {**prev, **party}
+            # Union the members by id so members added on either side are preserved;
+            # then merge the rest of the party metadata with the incoming record winning.
+            merged_members = _merge_party_members_superset(prev_members, new_members)
+            merged[key] = {**prev, **party, 'members': merged_members}
     return list(merged.values())
 
 
@@ -6133,13 +6177,14 @@ def _get_offline_html_hash():
 
 @points_bp.route('/offline')
 def offline_scoreboard():
-    """Serve offline scoreboard HTML — no-store to prevent stale cached copies."""
+    """Serve offline scoreboard HTML — ETag-revalidated every load, never stale."""
     response = send_file('static/offline_scoreboard.html')
-    # NEVER cache the HTML shell — inline CSS/JS changes (sidebar toggle, etc.)
-    # must be picked up immediately. Data updates still go through /offline-data JSON sync.
-    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
-    response.headers['Pragma'] = 'no-cache'
-    response.headers['Expires'] = '0'
+    # no-cache (NOT no-store): the browser keeps a copy but MUST revalidate on
+    # every load. send_file emits an mtime/size ETag, so an unchanged file gets
+    # a 0-byte 304 instead of re-downloading ~3.1 MB (~550 KB gzipped); any edit
+    # bumps mtime+size → new ETag → fresh 200. Freshness guarantee identical to
+    # no-store (every load still hits the server); repeat loads are near-instant.
+    response.headers['Cache-Control'] = 'no-cache, must-revalidate'
     return response
 
 

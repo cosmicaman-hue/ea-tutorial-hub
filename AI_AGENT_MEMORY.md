@@ -20,6 +20,8 @@
 5. Regenerate the full function index anytime with the one-liners in §12.
 6. Line anchors below were captured **2026-07-02** (`offline_scoreboard.html` = 50,402 lines,
    `scoreboard.py` = 10,499+ lines). Rules system anchors updated **2026-07-11** (file now ~53,300 lines). If a target file changed by ±200 lines since, trust names over numbers.
+   Snapshot **2026-07-28**: `offline_scoreboard.html` = 54,891 lines, `scoreboard.py` = 11,238 lines,
+   `app/__init__.py` = 729 lines. All §4/§6/§7/§8/§9 function-name anchors re-verified present on this date.
 
 ---
 
@@ -33,8 +35,11 @@ attendance, fees, elections/politics, notebooks, resources, syllabus — for stu
   Served by route `/scoreboard/offline`. This file is where ~90% of feature work happens.
 - **Primary datastore:** a JSON ledger file `offline_scoreboard_data.json` (NOT SQLite). Resolved by
   `app/utils/data_paths.py` → priority: `EA_STORAGE_ROOT` → `RENDER_DISK_PATH` → `/var/data/ea_tutorial_hub`
-  (on Windows server PC this is `C:/var/data/ea_tutorial_hub/`) → Flask `instance_path` → project `instance/`.
-  **The LIVE production DB is `C:/var/data/ea_tutorial_hub/offline_scoreboard_data.json`, not `instance/`.**
+  (**Linux/macOS only** — skipped on Windows) → Flask `instance_path` → project `instance/`.
+  **The LIVE production DB on the Windows server PC is `E:\Project EA\instance\offline_scoreboard_data.json`.**
+  (Verified 2026-07-28: `.env` sets no `EA_STORAGE_ROOT`, so resolution falls to `instance/`. The
+  `C:/var/data/ea_tutorial_hub/offline_scoreboard_data.json` file is a STALE relic last written 2026-07-05 —
+  do not operate on it. Backup scripts `daily_backup.ps1`/`backup_offsite_sync.ps1` correctly target `instance/`.)
 - **Secondary datastore:** SQLite (`ea_data.db` / `DATABASE_URL`) for auth users, notebook checks,
   fee transactions, governance tables. JSON ledger is synced INTO SQLite at startup
   (`_sync_json_ledger_to_sqlite`, `app/__init__.py:115`).
@@ -88,8 +93,9 @@ attendance, fees, elections/politics, notebooks, resources, syllabus — for stu
 - `_migrate_notebook_schema` L50, `_sync_json_ledger_to_sqlite` L115 (JSON→SQLite student/score sync at boot).
 - `_bootstrap_auth_defaults` L293 — ensures Admin/Teacher users.
 - `create_app` L319: rate-limit disabled by default (`ENABLE_RATE_LIMITING`), 7-day sessions,
-  no-store on all HTML L401, ProxyFix L412, blueprints L418-430, `/`→public scoreboard L432,
-  `static_v` cache-buster L444, user loader L466, CORS after_request L517 (allows file://, trycloudflare, 192.168.*).
+  no-store safety net on HTML lacking an explicit Cache-Control (`_no_store_html`; §10.33), ProxyFix,
+  blueprints, `/`→public scoreboard, `static_v` cache-buster, user loader, CORS after_request
+  `_is_trusted_cors_origin` (exact-match localhost/loopback/private IPs, trycloudflare, file://).
 - Module-level `app = create_app()` L534 (for `app:app` targets).
 
 ---
@@ -162,7 +168,7 @@ peer/cloud sync → load/save → merge engine → routes.
 | 5371 | GET `/balances` | star/veto balances |
 | 5412 | POST `/validate-action` | pre-validate star/veto spend |
 | 5471 | POST `/record-roll-change` | roll promotions (roll_history) |
-| 5761 | GET `/offline` | **serves the SPA** (no-store + hash `_get_offline_html_hash` L5746) |
+| 5761 | GET `/offline` | **serves the SPA** (ETag + `no-cache` revalidation since 2026-07-28 — §10.33; `_get_offline_html_hash` L5746) |
 | 5773 | GET `/public` | public Jinja scoreboard |
 | ~6147 | GET/POST **`/offline-data`** | **THE sync endpoint.** GET: full payload for admin/replication-key callers, month-clipped for teacher/student, SANITIZED for anonymous (env escape hatch `EA_ALLOW_ANON_FULL_SYNC=1`); delta filters by `updated_at` first. POST merges by role, serialized by `_ledger_write_guard` |
 | 6747 | GET `/offline-events` | SSE stream |
@@ -379,8 +385,11 @@ role gating: `isTabAccessibleForCurrentRole` 14818, `applyRolePermissions` 14864
 11. **Service workers are unconditionally killed** (head + L49679). PWA install prompt removed. Don't re-add
     SW caching without solving historical-data staleness.
 12. **`TEMP_DISABLE_AUTO_SYNC_LOOPS = true` is permanent** (L6391). Sync model: push-after-edit + pull-on-load.
-13. **Dual-database trap**: Flask reads `C:/var/data/ea_tutorial_hub/` (via data_paths), NOT `instance/`.
-    Scripts must use `get_data_path()` — never hardcode either path.
+13. **Dual-database trap**: On the Windows server, Flask reads `instance/offline_scoreboard_data.json`
+    (data_paths skips `/var/data` when `os.name == 'nt'`; no `EA_STORAGE_ROOT` set). A stale 18 MB relic
+    exists at `C:/var/data/ea_tutorial_hub/` (frozen 2026-07-05) — ignore it. Scripts must use
+    `get_data_path()` — never hardcode either path. (`scripts/push_fix_to_server_v2.py` hardcodes the
+    stale `C:/var/data` path — do not reuse that script.)
 14. **ID generation**: use `generateUniqueId()` (6495), never raw `Date.now()` (collision bugs).
 15. **`saveData` shrink-check**: non-system saves prompt on student/score count shrink. System saves must pass
     `{system:true}` and follow the batched-repair pattern (§8).
@@ -475,6 +484,18 @@ role gating: `isTabAccessibleForCurrentRole` 14818, `applyRolePermissions` 14864
     - **Removed — `smartStarCounter` (dead double-deduction landmine):** The function (was ~L23360 in main, ~L20611 in android, ~L23339 in public_site) was never called from any code path across all 4 HTML copies, but contained the exact "2 stars per single usage" bug pattern the user suspected: it manually set `student.stars = availableStars - stars` AND returned a score payload with `stars: stars`, which `db.addScore::applyStarVetoDelta` would deduct again — a double deduction. Deleted from all 3 active copies (main, public_site, android); the `backups/offline_scoreboard.html.pre-implementation-backup` copy is intentionally left unchanged (immutable artifact). A removal note is left in place of each function. **Do NOT re-introduce a manual `student.stars` mutation alongside a `db.addScore` call** — `db.addScore` is the single point that applies star deltas.
     - **New diagnostic:** `scripts/diag_star_ledger.py --roll <ROLL>` dumps a student's full star ledger (student.stars, every score row with star/usage/transfer fields, cross-month duplicate detection, derived current-month balance vs ledger, month_roster_profile carries, corruption checkpoint hashes, and diagnosis hints). Use this first for any future "stars are wrong" report — it distinguishes stale-sync overwrite, duplicate-row confusion, and genuine misuse from a student misunderstanding of carry-in vs available.
 
+33. **2026-07-28 — SPA shell re-downloaded 3.1 MB on every page load — FIXED**: `/scoreboard/offline` sent
+    `Cache-Control: no-store`, so browsers never stored the 3.1 MB shell (~550 KB gzipped) and re-downloaded
+    it on every open — the dominant repeat-load cost, worst over the WAN tunnel. `send_file` already emits an
+    mtime/size ETag and answered `If-None-Match` with 304 all along; the route now sends `no-cache,
+    must-revalidate` so browsers store-but-revalidate every load: unchanged → 0-byte 304, changed → fresh 200
+    (freshness guarantee identical to no-store). The global `_no_store_html` after_request hook
+    (`app/__init__.py`) now skips responses that already carry an explicit `Cache-Control` (Jinja pages keep
+    the no-store net). Regression coverage: `tests/test_cache_headers.py` (uses a dedicated `create_app()`
+    instance — serving requests on the shared package-level app flips Flask's first-request flag and breaks
+    `run.py` import in `test_ledger_reliability`; do not import the shared app for request-level tests).
+    **Takes effect on next server restart.**
+
 *(append new entries here as: date — symptom — root cause — fix anchor)*
 
 ---
@@ -514,8 +535,11 @@ Select-String -Path "app/static/offline_scoreboard.html" -Pattern 'class="tab-co
 
 ## 13. TESTS & VERIFICATION
 
-- `tests/test_attendance_sync.py`, `tests/test_calculation.py`, `tests/test_teacher_sync*.py` — run with
-  `python -m pytest tests/ -q` (venv: recreate; `.venv_broken_from_old_pc_20260214` is dead).
+- `tests/` suite (2026-07-28: **41 passed, 1 skipped** via `python -m pytest tests/ -q`): app configuration,
+  attendance sync, calculation, cache headers, file operations, ledger reliability, star merge guard,
+  sync config, sync payloads, voting. (No `test_teacher_sync*.py` exists — teacher-sync coverage is
+  manual, see `TEST_TEACHER_SYNC.md`.) Venv note: `.venv_broken_from_old_pc_20260214` is dead; use `.venv`.
+- CI: `.github/workflows/tests.yml` runs the suite on Python 3.11 (runtime.txt) for pushes/PRs to main.
 - `test_guardrail.py` (root) — merge guardrail regression checks.
 - `scripts/anti_corruption_check.py` and other `scripts/*` for ledger integrity (all path-safe via `get_data_path()`).
 - Manual smoke: start server → `/scoreboard/offline` → check startup overlay clears, scoreboard renders

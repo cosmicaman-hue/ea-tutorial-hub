@@ -544,8 +544,11 @@ def create_app():
     # are picked up immediately, even on mobile browsers that aggressively cache.
     @app.after_request
     def _no_store_html(response):
+        # Safety net for Jinja pages that set no Cache-Control of their own.
+        # Routes with an explicit policy (e.g. /scoreboard/offline's ETag
+        # revalidation) are left untouched.
         ct = response.content_type or ''
-        if 'text/html' in ct:
+        if 'text/html' in ct and 'Cache-Control' not in response.headers:
             response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
             response.headers['Pragma'] = 'no-cache'
             response.headers['Expires'] = '0'
