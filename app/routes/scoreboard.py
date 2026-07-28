@@ -3341,6 +3341,23 @@ def _merge_students_preserve_active(existing_students, incoming_students):
         if existing.get('active') is not False and merged_s.get('active') is False:
             merged_s['active'] = existing.get('active', True)
 
+        # Preserve stars from the record with the newer star-specific timestamp.
+        # student.stars is the authoritative current-month balance; a stale sync
+        # snapshot with a bumped updated_at (but no actual star mutation) must NOT
+        # overwrite a genuinely newer star value. Falls back to updated_at when
+        # stars_updated_at is absent (legacy records). Defensive fix for the
+        # "should be 11, shows 8" class of stale-sync star regressions.
+        def _star_stamp(row):
+            return _parse_sync_stamp(row.get('stars_updated_at') or row.get('updated_at') or row.get('created_at') or '')
+        if _star_stamp(existing) > _star_stamp(incoming) and existing.get('stars') is not None:
+            merged_s['stars'] = max(0, _parse_int_safe(existing.get('stars')))
+            if existing.get('stars_updated_at'):
+                merged_s['stars_updated_at'] = existing.get('stars_updated_at')
+        elif _star_stamp(incoming) > _star_stamp(existing) and incoming.get('stars') is not None:
+            merged_s['stars'] = max(0, _parse_int_safe(incoming.get('stars')))
+            if incoming.get('stars_updated_at'):
+                merged_s['stars_updated_at'] = incoming.get('stars_updated_at')
+
         # Preserve structural visibility fields: never drop active_from_month or
         # deactivation_month once set on either side.  These control whether a
         # student appears in historical months and roll-change visibility checks.
@@ -3974,6 +3991,16 @@ def _upsert_score_delta(snapshot, student_id, date_key, month_key, delta_points=
     if note:
         target['notes'] = f"{existing_note} | {note}" if existing_note else note
     target['updated_at'] = now_iso
+    # Propagate star-specific timestamp to the student ledger so the merge
+    # strategy can distinguish a genuine star mutation from a sync-bumped
+    # updated_at on a stale snapshot. Only touch the student record when stars
+    # actually changed — avoids false "newer star" signals on points-only deltas.
+    if _parse_int_safe(delta_stars, 0) != 0:
+        students = snapshot.get('students', []) or []
+        for s in students:
+            if isinstance(s, dict) and _parse_int_safe(s.get('id'), 0) == sid:
+                s['stars_updated_at'] = now_iso
+                break
     return target
 
 
