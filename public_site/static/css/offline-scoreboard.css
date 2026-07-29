@@ -256,6 +256,7 @@
         body.light-mode .fee-paid       { color: #14532d; background: rgba(22,163,74,0.20); font-weight: 700; }
         body.light-mode .fee-due        { color: #b45309; background: rgba(217,119,6,0.13); }
         body.light-mode .fee-overdue    { color: #b91c1c; background: rgba(239,68,68,0.12); }
+        body.light-mode .fee-skipped    { color: #475569; background: rgba(100,116,139,0.14); }
         body.light-mode .fee-status-sub { color: #64748b; }
         body.light-mode .fee-action-btn { background: rgba(226,232,240,0.8); color: #1e293b; border-color: rgba(100,116,139,0.35); }
         body.light-mode .fee-action-btn:hover:not(:disabled) { background: #e2e8f0; color: #0f172a; }
@@ -263,6 +264,7 @@
         body.light-mode .fee-action-btn.partial-btn { color: #92400e !important; border-color: rgba(146,64,14,0.4) !important; }
         body.light-mode .fee-action-btn.edit-btn    { color: #1d4ed8 !important; border-color: rgba(29,78,216,0.4) !important; }
         body.light-mode .fee-action-btn.hist-btn    { color: #7c3aed !important; border-color: rgba(124,58,237,0.4) !important; }
+        body.light-mode .fee-action-btn.skip-btn    { color: #475569 !important; border-color: rgba(100,116,139,0.45) !important; }
 
         /* ── Inputs / selects / textareas ── */
         body.light-mode input,
@@ -420,6 +422,7 @@
         body.light-mode .fee-hist-early            { color: #92400e !important; }
         body.light-mode .fee-hist-partial          { color: #1d4ed8 !important; }
         body.light-mode .fee-hist-regular          { color: #15803d !important; }
+        body.light-mode .fee-hist-skip             { color: #475569 !important; }
         body.light-mode .fee-modal-early           { background: rgba(217,119,6,0.12) !important; color: #92400e !important; border-color: rgba(217,119,6,0.3) !important; }
         body.light-mode .fee-modal-preview         { color: #0284c7 !important; }
         body.light-mode .fee-modal-reset-warn      { color: #b91c1c !important; }
@@ -3027,6 +3030,7 @@
         .fee-overdue { color: #fecaca; background: rgba(239,68,68,0.22); }
         .fee-paid    { color: #4ade80; background: rgba(34,197,94,0.25); }
         .fee-due     { color: #fde68a; background: rgba(234,179,8,0.18); }
+        .fee-skipped { color: #cbd5e1; background: rgba(148,163,184,0.22); }
         .fee-status-sub { font-size: 11px; color: #94a3b8; padding-left: 2px; }
         /* Action icon buttons */
         .fee-actions { display: flex; gap: 5px; align-items: center; flex-wrap: nowrap; }
@@ -3047,6 +3051,7 @@
         .fee-action-btn.partial-btn { color: #fde68a; border-color: rgba(253,230,138,0.35); }
         .fee-action-btn.edit-btn { color: #93c5fd; border-color: rgba(147,197,253,0.35); }
         .fee-action-btn.hist-btn { color: #c4b5fd; border-color: rgba(196,181,253,0.35); }
+        .fee-action-btn.skip-btn { color: #cbd5e1; border-color: rgba(148,163,184,0.4); }
         /* Fee modals */
         .fee-modal-row { display: flex; flex-direction: column; gap: 4px; margin-bottom: 14px; }
         .fee-modal-row label { font-size: 12px; color: #94a3b8; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
@@ -3069,6 +3074,7 @@
         .fee-hist-early { color: #fde68a; }
         .fee-hist-partial { color: #93c5fd; }
         .fee-hist-regular { color: #4ade80; }
+        .fee-hist-skip { color: #cbd5e1; }
         .fee-hist-delete { text-align: right; }
         .fee-delete-entry {
             background: rgba(239,68,68,0.14);
@@ -3095,6 +3101,7 @@
         .fee-mode-badge.cheque  { background: rgba(234,179,8,0.15);  color: #fde68a; border: 1px solid rgba(253,230,138,0.35); }
         .fee-mode-badge.waiver  { background: rgba(168,85,247,0.18); color: #d8b4fe; border: 1px solid rgba(216,180,254,0.35); }
         .fee-mode-badge.scholarship { background: rgba(20,184,166,0.18); color: #5eead4; border: 1px solid rgba(94,234,212,0.35); }
+        .fee-mode-badge.skipped  { background: rgba(148,163,184,0.18); color: #cbd5e1; border: 1px solid rgba(148,163,184,0.35); }
         .fee-mode-badge.other   { background: rgba(148,163,184,0.15); color: #cbd5e1; border: 1px solid rgba(148,163,184,0.3); }
         /* Fee category badges */
         .fee-cat-badge {
@@ -3175,6 +3182,7 @@
         body.light-mode .fee-mode-badge.bank    { color: #1d4ed8; }
         body.light-mode .fee-mode-badge.cheque  { color: #92400e; }
         body.light-mode .fee-mode-badge.waiver  { color: #7c3aed; }
+        body.light-mode .fee-mode-badge.skipped { color: #475569; }
         body.light-mode .fee-breakdown-chip     { background: #f1f5f9; border-color: #cbd5e1; color: #374151; }
         body.light-mode .fee-breakdown-chip strong { color: #111827; }
         body.light-mode .fee-receipt-btn        { background: rgba(99,102,241,0.1); color: #4f46e5; }

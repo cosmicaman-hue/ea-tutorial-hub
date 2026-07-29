@@ -1095,6 +1095,49 @@ body.header-offscreen .header-kicker::after {
             </div>
         </div>
 
+        <!-- FEE SKIP MODAL -->
+        <div id="feeSkipModal" class="validation-modal hidden">
+            <div class="validation-modal-content" style="max-width:580px;">
+                <div class="validation-modal-header">
+                    <h3><i class="fas fa-forward" style="color:#cbd5e1;margin-right:8px;"></i>Skip Month(s) — Unpaid</h3>
+                </div>
+                <div class="validation-modal-body">
+                    <!-- Summary banner -->
+                    <div class="fee-modal-info" id="feeSkipInfo"></div>
+                    <!-- Notice -->
+                    <div class="fee-modal-early hidden" id="feeSkipNote" style="margin-bottom:10px;"></div>
+
+                    <!-- Multi-month selector (shown only when >1 month pending) -->
+                    <div id="feeSkipConsolidatedWrap" style="display:none;margin-bottom:14px;padding:12px;background:rgba(148,163,184,0.08);border:1px solid rgba(148,163,184,0.25);border-radius:8px;">
+                        <div style="font-size:12px;color:#cbd5e1;font-weight:600;margin-bottom:8px;">⏭️ Multiple months pending — how many months to skip?</div>
+                        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;" id="feeSkipMonthButtons"></div>
+                        <div style="font-size:11px;color:#94a3b8;margin-top:8px;" id="feeSkipConsolidatedHint"></div>
+                    </div>
+
+                    <div class="fee-modal-row">
+                        <label>Reason <span style="font-weight:400;color:#64748b;">(required)</span></label>
+                        <select id="feeSkipReason"></select>
+                    </div>
+                    <div class="fee-modal-row" id="feeSkipOtherWrap" style="display:none;">
+                        <label>Specify reason</label>
+                        <input type="text" id="feeSkipOtherReason" placeholder="Enter reason...">
+                    </div>
+                    <div class="fee-modal-row" style="margin-top:12px;">
+                        <label>Note <span style="font-weight:400;color:#64748b;">(optional)</span></label>
+                        <input type="text" id="feeSkipNoteText" placeholder="Additional notes...">
+                    </div>
+                    <!-- Preview -->
+                    <div id="feeSkipPreview" style="margin-top:10px;font-size:13px;color:#cbd5e1;font-weight:600;"></div>
+                </div>
+                <div class="validation-modal-footer">
+                    <button class="secondary" onclick="closeFeeModal('feeSkipModal')">Cancel</button>
+                    <button class="btn-primary" onclick="confirmFeeSkipModal()" style="background:rgba(148,163,184,0.25);border-color:rgba(203,213,225,0.65);color:#cbd5e1;">
+                        <i class="fas fa-forward"></i> Confirm Skip
+                    </button>
+                </div>
+            </div>
+        </div>
+
         <!-- FEE PARTIAL MODAL -->
         <div id="feePartialModal" class="validation-modal hidden">
             <div class="validation-modal-content" style="max-width:560px;">
@@ -3207,23 +3250,182 @@ body.header-offscreen .header-kicker::after {
                     padding: 4px 10px;
                     font-size: 12px !important;
                 }
+                .syllabus-topic-dropdown {
+                    position: absolute;
+                    top: calc(100% + 4px);
+                    left: 0;
+                    right: 0;
+                    max-height: 340px;
+                    overflow-y: auto;
+                    z-index: 1200;
+                    background: #0b1220;
+                    border: 1px solid #334155;
+                    border-radius: 10px;
+                    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.6);
+                }
+                .syllabus-topic-option {
+                    display: flex;
+                    align-items: flex-start;
+                    gap: 10px;
+                    padding: 9px 12px;
+                    cursor: pointer;
+                    border-bottom: 1px solid rgba(51, 65, 85, 0.55);
+                    transition: background 0.12s ease;
+                }
+                .syllabus-topic-option:last-child {
+                    border-bottom: none;
+                }
+                .syllabus-topic-option:hover,
+                .syllabus-topic-option.kb-active {
+                    background: rgba(6, 182, 212, 0.14);
+                }
+                .syllabus-topic-option.selected {
+                    background: rgba(16, 185, 129, 0.10);
+                }
+                .syllabus-topic-option .opt-check {
+                    width: 17px;
+                    height: 17px;
+                    margin-top: 1px;
+                    border-radius: 5px;
+                    border: 1.5px solid #475569;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    flex-shrink: 0;
+                    font-size: 10px;
+                    color: transparent;
+                    background: transparent;
+                    transition: all 0.15s ease;
+                }
+                .syllabus-topic-option.selected .opt-check {
+                    background: #10b981;
+                    border-color: #10b981;
+                    color: #ffffff;
+                }
+                .syllabus-topic-option .opt-body {
+                    flex: 1;
+                    min-width: 0;
+                }
+                .syllabus-topic-title {
+                    font-size: 13px;
+                    color: #e5e7eb;
+                    font-weight: 600;
+                    line-height: 1.3;
+                    word-break: break-word;
+                }
+                .syllabus-topic-title mark {
+                    background: rgba(34, 211, 238, 0.28);
+                    color: #a5f3fc;
+                    border-radius: 3px;
+                    padding: 0 1px;
+                }
+                .syllabus-topic-meta {
+                    display: flex;
+                    gap: 5px;
+                    flex-wrap: wrap;
+                    margin-top: 3px;
+                }
+                .syllabus-topic-meta .meta-tag {
+                    font-size: 10.5px;
+                    font-weight: 600;
+                    padding: 1px 7px;
+                    border-radius: 9999px;
+                    background: rgba(51, 65, 85, 0.6);
+                    color: #94a3b8;
+                    border: 1px solid rgba(71, 85, 105, 0.5);
+                }
+                .syllabus-topic-meta .meta-tag.board-tag {
+                    background: rgba(6, 182, 212, 0.14);
+                    color: #67e8f9;
+                    border-color: rgba(34, 211, 238, 0.3);
+                }
+                .syllabus-topic-meta .meta-tag.class-tag {
+                    background: rgba(168, 85, 247, 0.14);
+                    color: #d8b4fe;
+                    border-color: rgba(168, 85, 247, 0.3);
+                }
+                .syllabus-topic-dropdown-footer {
+                    position: sticky;
+                    bottom: 0;
+                    padding: 7px 12px;
+                    font-size: 11.5px;
+                    color: #9ca3af;
+                    background: #0b1220;
+                    border-top: 1px solid rgba(51, 65, 85, 0.8);
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    gap: 8px;
+                }
+                .syllabus-topic-chips {
+                    display: flex;
+                    flex-wrap: wrap;
+                    gap: 6px;
+                    margin-top: 8px;
+                }
+                .syllabus-topic-chip {
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 6px;
+                    padding: 5px 6px 5px 11px;
+                    border-radius: 9999px;
+                    background: linear-gradient(135deg, rgba(6, 182, 212, 0.18), rgba(8, 145, 178, 0.12));
+                    border: 1px solid rgba(34, 211, 238, 0.45);
+                    color: #cffafe;
+                    font-size: 12px;
+                    font-weight: 600;
+                    max-width: 100%;
+                }
+                .syllabus-topic-chip .chip-label {
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                    white-space: nowrap;
+                    max-width: 260px;
+                }
+                .syllabus-topic-chip .chip-meta {
+                    color: #67e8f9;
+                    font-size: 10.5px;
+                    font-weight: 500;
+                    white-space: nowrap;
+                }
+                .syllabus-topic-chip button {
+                    background: rgba(6, 182, 212, 0.15);
+                    border: none;
+                    color: #67e8f9;
+                    cursor: pointer;
+                    width: 18px;
+                    height: 18px;
+                    border-radius: 50%;
+                    display: inline-flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 10px;
+                    padding: 0;
+                    transition: all 0.15s ease;
+                    flex-shrink: 0;
+                }
+                .syllabus-topic-chip button:hover {
+                    background: rgba(239, 68, 68, 0.85);
+                    color: #ffffff;
+                }
             </style>
 
             <div class="form-card">
                 <h3><i class="fas fa-book-open" style="color:#06b6d4"></i> Log Completed Lecture</h3>
                 <p class="section-subtitle">
-                    Enter the topic you just completed first, then quickly review student attendance for that session.
+                    Search the full 2026-27 syllabus catalog (NCERT·CBSE / ICSE / WBBSE, Classes 3-12), select one or more chapters — even across classes — then confirm attendance and save. Each chapter is logged with the present students of its own class.
                 </p>
                 
-                <!-- ROW 1: TOPIC AND SUBJECT -->
+                <!-- ROW 1: TOPIC SEARCH AND SUBJECT -->
                 <div class="syllabus-form-row">
-                    <div class="control-group" style="grid-column: span 2;">
-                        <label><i class="fas fa-heading" style="color:#06b6d4; margin-right:4px;"></i> Topic / Chapter Completed</label>
+                    <div class="control-group" style="grid-column: 1 / -1;">
+                        <label><i class="fas fa-magnifying-glass" style="color:#06b6d4; margin-right:4px;"></i> Topic / Chapter Completed <span id="syllabusTopicSelectedCount" style="color:#22d3ee; font-weight:700;"></span></label>
                         <div class="syllabus-autocomplete-wrapper">
-                            <input id="syllabusNewTopic" type="text" placeholder="e.g., Climate and Weather, Linear Equations, Unit 1..." style="width:100%;" list="syllabusTopicDatalist" oninput="autoDetectTopicSubject();">
-                            <datalist id="syllabusTopicDatalist"></datalist>
+                            <input id="syllabusNewTopic" type="text" placeholder="Type to search every board &amp; class — e.g. trigonometry, photosynthesis, fractions..." autocomplete="off" style="width:100%;" oninput="handleSyllabusTopicSearchInput()" onfocus="handleSyllabusTopicSearchInput()" onkeydown="handleSyllabusTopicSearchKey(event)">
+                            <div id="syllabusTopicDropdown" class="syllabus-topic-dropdown" style="display:none;"></div>
                         </div>
-                        <span style="font-size: 11px; color: #9ca3af; margin-top: 4px; display: block;">Type a new topic directly or select a template from suggestions.</span>
+                        <div id="syllabusTopicChips" class="syllabus-topic-chips" style="display:none;"></div>
+                        <span style="font-size: 11px; color: #9ca3af; margin-top: 4px; display: block;">Pick one or more chapters from any board/class (2026-27 NCERT·CBSE / ICSE / WBBSE catalog). Press Enter on a free-typed name to save it as a custom topic under the Board / Class / Subject chosen below.</span>
                     </div>
 
                     <div class="control-group">
@@ -3240,7 +3442,10 @@ body.header-offscreen .header-kicker::after {
                     </div>
                 </div>
 
-                <!-- ROW 2: GENERAL FILTERS AND DATE -->
+                <!-- ROW 2: DEFAULTS (custom topics) AND DATE -->
+                <div style="font-weight:600; font-size:12px; color:#7dd3fc; margin:2px 0 8px; letter-spacing:0.02em;">
+                    <i class="fas fa-sliders" style="margin-right:4px;"></i> Defaults for custom topics &amp; session date <span style="color:#64748b; font-weight:400;">(catalog picks already carry their own board / class / subject)</span>
+                </div>
                 <div class="syllabus-form-row">
                     <div class="control-group">
                         <label>Board</label>
@@ -8042,7 +8247,7 @@ body.header-offscreen .header-kicker::after {
         let _notifSelectedIdx = -1;
         let _proposalCache = [];
         let _activeProposalId = 0;
-        const SYLLABUS_SEED_VERSION = '2026-04-11.v2';
+        const SYLLABUS_SEED_VERSION = '2026-07-29.v3';
         const SYLLABUS_BOARDS = ['CBSE', 'ICSE', 'WBBSE'];
         const SYLLABUS_CLASSES = ['3', '4', '5', '6', '7', '8', '9', '10', '11', '12'];
         const SYLLABUS_INTERNET_SOURCES = [
@@ -8283,6 +8488,334 @@ body.header-offscreen .header-kicker::after {
             }
         };
 
+        /**
+         * 2026-27 syllabus chapter catalog: board -> class -> subject -> [chapters].
+         * CBSE lists follow the new NCERT books (Santoor / Math-Mela / Our Wondrous World /
+         * Curiosity / Ganita Prakash / Poorvi / Exploring Society) for classes 3-8 and the
+         * rationalized NCERT texts for classes 9-12. ICSE/WBBSE lists follow the current
+         * board syllabi. Seeded via buildInitialSyllabusCatalog(); teachers can still add
+         * custom chapters which are preserved by the superset merge.
+         */
+        const SYLLABUS_CATALOG_2026 = {
+            CBSE: {
+                '3': {
+                    'English': ['Colours', 'Badal and Moti', 'Best Friends', 'Out in the Garden', 'Talking Toys', 'Paper Boats', 'The Big Laddoo', 'Thank God', "Madhu's Wish", 'Night', 'Chanda Mama Counts the Stars', 'Chandrayaan'],
+                    'Mathematics': ["What's in a Name?", 'Toy Joy', 'Double Century', 'Vacation with My Nani Maa', 'Fun with Shapes', 'House of Hundreds - I', 'Raksha Bandhan', 'Fair Share', 'House of Hundreds - II', 'Fun at Class Party!', 'Filling and Lifting', 'Give and Take', 'Time Goes On', 'The Surajkund Fair'],
+                    'EVS': ['Family and Friends', 'Going to the Mela', 'Celebrating Festivals', 'Getting to Know Plants', 'Plants and Animals Live Together', 'Living in Harmony', 'Water - A Precious Gift', 'Food We Eat', 'Staying Healthy and Happy', 'This World of Things', 'Making Things', 'Taking Charge of Waste'],
+                    'Hindi': ['Varnamala aur Shabd Rachna', 'Kavita aur Geet', 'Kahani Path', 'Byakaran: Sangya', 'Byakaran: Sarvanaam', 'Byakaran: Visheshan', 'Byakaran: Kriya', 'Apathit Gadyansh', 'Chitra Varnan'],
+                    'Computer Studies': ['Computer: A Smart Machine', 'Parts of a Computer', 'Using the Keyboard and Mouse', 'Drawing on a Computer', 'Fun with Paint', 'Introduction to Internet'],
+                    'General Knowledge': ['My Family and Neighbourhood', 'Festivals of India', 'Our National Symbols', 'Famous Personalities', 'Sports and Games', 'Amazing Animals', 'Our India']
+                },
+                '4': {
+                    'English': ['Together We Can', 'The Tinkling Bells', 'Be Smart, Be Safe', 'One Thing at a Time', 'The Old Stag', 'Braille', 'Fit Body, Fit Mind, Fit Nation', 'The Lagori Champions', 'Hekko', 'The Swing', 'A Journey to the Magical Mountains', 'Maheshwar'],
+                    'Mathematics': ['Shapes Around Us', 'Hide and Seek', 'Pattern Around Us', 'Thousands Around Us', 'Sharing and Measuring', 'Measuring Length', 'The Cleanest Village', 'Weigh it, Pour it', 'Equal Groups', 'Elephants, Tigers, and Leopards', 'Fun with Symmetry', 'Ticking Clocks and Turning Calendar', 'The Transport Museum', 'Data Handling'],
+                    'EVS': ['Living Together', 'Exploring Our Neighbourhood', 'Nature Trail', 'Growing up with Nature', 'Food for Health', 'Happy and Healthy Living', 'How Things Work', 'How Things are Made', 'Different Lands, Different Lives', 'Our Sky'],
+                    'Hindi': ['Kavita aur Kahani', 'Nibandh Lekhan', 'Byakaran: Sangya', 'Byakaran: Sarvanaam', 'Byakaran: Visheshan', 'Byakaran: Kriya aur Kaal', 'Vachan aur Ling', 'Apathit Gadyansh', 'Patra Lekhan'],
+                    'Computer Studies': ['Computer and its Uses', 'Hardware and Software', 'Introduction to MS Paint', 'Word Processing Basics', 'Internet and E-mail', 'Scratch Programming Basics'],
+                    'General Knowledge': ['States and Capitals of India', 'Rivers and Mountains of India', 'Inventions and Discoveries', 'Great Leaders', 'Sports and Trophies', 'Plants and Animals', 'Books and Authors']
+                },
+                '5': {
+                    'English': ["Papa's Spectacles", 'Gone with the Scooter', 'The Rainbow', 'The Wise Parrot', 'The Frog', 'What a Tank!', 'Gilli Danda', 'The Decision of the Panchayat', 'Vocation', 'Glass Bangles'],
+                    'Mathematics': ['We the Travellers - I', 'Fractions', 'Angles as Turns', 'We the Travellers - II', 'Far and Near', 'The Dairy Farm', 'Shapes and Patterns', 'Weight and Capacity', 'Coconut Farm', 'Symmetrical Designs', "Grandmother's Quilt", 'Racing Seconds', 'Animal Jumps', 'Maps and Locations', 'Data Through Pictures'],
+                    'EVS': ['Water - The Essence of Life', 'Journey of a River', 'The Mystery of Food', 'Our School - A Happy Place', 'Our Vibrant Country', 'Some Unique Places', 'Energy - How Things Work', 'Clothes - How Things are Made', 'Rhythms of Nature', 'Earth - Our Shared Home'],
+                    'Hindi': ['Kahani aur Sansmaran', 'Kavita Path', 'Nibandh: Mera Parivar', 'Byakaran: Sangya ke Bhed', 'Byakaran: Sarvanaam', 'Byakaran: Visheshan', 'Byakaran: Kriya aur Kaal', 'Muhavare aur Lokoktiyan', 'Patra Lekhan', 'Apathit Gadyansh'],
+                    'Computer Studies': ['Evolution of Computers', 'Computer Memory and Storage', 'Advanced Word Processing', 'Introduction to Presentations', 'Internet: Browsing and Search', 'Programming with Scratch', 'Cyber Safety'],
+                    'General Knowledge': ['Indian Geography', 'Freedom Fighters', 'Science and Technology', 'Environment and Conservation', 'World Organisations', 'Famous Monuments', 'Current Sports']
+                },
+                '6': {
+                    'English': ['A Bottle of Dew', 'The Raven and the Fox', 'Rama to the Rescue', 'The Unlikely Best Friends', "A Friend's Prayer", 'The Chair', 'Neem Baba', 'What a Bird Thought', 'Spices that Heal Us', 'Change of Heart', 'The Winner', 'Yoga: A Way of Life', 'Hamara Bharat: Incredible India!', 'The Kites', 'Ila Sachani: Embroidering Dreams with her Feet', 'National War Memorial'],
+                    'Mathematics': ['Patterns in Mathematics', 'Lines and Angles', 'Number Play', 'Data Handling and Presentation', 'Prime Time', 'Perimeter and Area', 'Fractions', 'Playing with Constructions', 'Symmetry', 'The Other Side of Zero'],
+                    'Science': ['The Wonderful World of Science', 'Diversity in the Living World', 'Mindful Eating: A Path to a Healthy Body', 'Exploring Magnets', 'Measurement of Length and Motion', 'Materials Around Us', 'Temperature and its Measurement', 'A Journey through States of Water', 'Methods of Separation in Everyday Life', 'Living Creatures: Exploring their Characteristics', "Nature's Treasures", 'Beyond Earth'],
+                    'Social Science': ['Locating Places on the Earth', 'Oceans and Continents', 'Landforms and Life', 'Timeline and Sources of History', 'India, That Is Bharat', 'The Beginnings of Indian Civilisation', "India's Cultural Roots", "Unity in Diversity, or 'Many in the One'", 'Family and Community', 'Grassroots Democracy - Part 1: Governance', 'Grassroots Democracy - Part 2: Local Government in Rural Areas', 'Grassroots Democracy - Part 3: Local Government in Urban Areas', 'The Value of Work', 'Economic Activities Around Us'],
+                    'Hindi': ['Matribhumi (Kavita)', 'Gol (Sansmaran)', 'Pehli Boond (Kavita)', 'Haar ki Jeet (Kahani)', 'Rahim ke Dohe', 'Meri Maa (Atmakatha)', 'Jalate Chalo (Kavita)', 'Satriya aur Bihu Nritya (Nibandh)', 'Maiya Main Nahin Makhan Khayo (Pad)', 'Pariksha (Kahani)', 'Chetak ki Veerta (Kavita)', 'Hind Mahasagar Mein Chhota-sa Hindustan (Yatra Vrittant)', 'Ped ki Baat (Nibandh)'],
+                    'Computer Studies': ['Computer Fundamentals', 'Input and Output Devices', 'Memory and Storage', 'Operating System Basics', 'Word Processing', 'Internet and E-mail', 'Digital Citizenship and Safety']
+                },
+                '7': {
+                    'English': ['The Day the River Spoke', 'Try Again', 'Three Days to See', 'Animals, Birds, and Dr. Dolittle', 'A Funny Man', 'Say the Right Thing', "My Brother's Great Invention", 'Paper Boats', 'North, South, East, West', 'The Tunnel', 'Travel', 'Conquering the Summit', 'A Homage to Our Brave Soldiers', 'My Dear Soldiers', 'Rani Abbakka'],
+                    'Mathematics': ['Large Numbers Around Us', 'Arithmetic Expressions', 'A Peek Beyond the Point', 'Expressions Using Letter-Numbers', 'Parallel and Intersecting Lines', 'Number Play', 'A Tale of Three Intersecting Lines', 'Working with Fractions', 'Geometric Twins', 'Operations with Integers', 'Finding Common Ground', 'Another Peek Beyond the Point', 'Connecting the Dots', 'Constructions and Tilings', 'Finding the Unknown'],
+                    'Science': ['The Ever-Evolving World of Science', 'Exploring Substances: Acidic, Basic, and Neutral', 'Electricity: Circuits and their Components', 'The World of Metals and Non-metals', 'Changes Around Us: Physical and Chemical', 'Adolescence: A Stage of Growth and Change', 'Heat Transfer in Nature', 'Measurement of Time and Motion', 'Life Processes in Animals', 'Life Processes in Plants', 'Light: Shadows and Reflections', 'Earth, Moon, and the Sun'],
+                    'Social Science': ['Geographical Diversity of India', 'Understanding the Weather', 'Climates of India', 'New Beginnings: Cities and States', 'The Rise of Empires', 'The Age of Reorganisation', 'The Gupta Era: An Age of Tireless Creativity', 'How the Land Becomes Sacred', 'From the Rulers to the Ruled: Types of Governments', 'The Constitution of India - An Introduction', 'From Barter to Money', 'Understanding Markets'],
+                    'Hindi': ['Kahani: Lok Kathayen', 'Kavita Sangrah', 'Nibandh Lekhan', 'Byakaran: Sandhi', 'Byakaran: Samas', 'Byakaran: Upsarg aur Pratyay', 'Muhavare', 'Patra Lekhan: Anopcharik', 'Apathit Gadyansh'],
+                    'Computer Studies': ['Algorithms and Flowcharts', 'Introduction to Scratch Programming', 'Spreadsheet Basics', 'Computer Networks and Internet', 'Cyber Safety and Ethics', 'Introduction to Artificial Intelligence']
+                },
+                '8': {
+                    'English': ['The Wit that Won Hearts', 'A Concrete Example', 'Wisdom Paves the Way', 'A Tale of Valour: Major Somnath Sharma and the Battle of Badgam', "Somebody's Mother", 'Verghese Kurien - I Too Had A Dream', 'The Case of the Fifth Word', 'The Magic Brush of Dreams', 'Spectacular Wonders', 'The Cherry Tree', 'Harvest Hymn', 'Waiting for the Rain', 'Feathered Friend', 'Magnifying Glass', 'Bibha Chowdhuri: The Beam of Light that Lit the Path for Women in Indian Science'],
+                    'Mathematics': ['A Square and A Cube', 'Power Play', 'A Story of Numbers', 'Quadrilaterals', 'Number Play', 'We Distribute, Yet Things Multiply', 'Proportional Reasoning - 1', 'Fractions in Disguise', 'The Baudhayana-Pythagoras Theorem', 'Proportional Reasoning - 2', 'Exploring Some Geometric Themes', 'Tales by Dots and Lines', 'Algebra Play', 'Area'],
+                    'Science': ['Exploring the Investigative World of Science', 'The Invisible Living World: Beyond Our Naked Eye', 'Health: The Ultimate Treasure', 'Electricity: Magnetic and Heating Effects', 'Exploring Forces', 'Pressure, Winds, Storms, and Cyclones', 'Particulate Nature of Matter', 'Nature of Matter: Elements, Compounds, and Mixtures', 'The Amazing World of Solutes, Solvents, and Solutions', 'Light: Mirrors and Lenses', 'Keeping Time with the Skies', 'How Nature Works in Harmony', 'Our Home: Earth, a Unique Life Sustaining Planet'],
+                    'Social Science': ['Natural Resources and Their Use', "Reshaping India's Political Map", 'The Rise of the Marathas', 'The Colonial Era in India', "Universal Franchise and India's Electoral System", 'The Parliamentary System: Legislature and Executive', 'Factors of Production'],
+                    'Hindi': ['Kahani aur Ekanki', 'Kavita: Deshbhakti', 'Yatra Vrittant', 'Byakaran: Vaachya', 'Byakaran: Pad Parichay', 'Byakaran: Vakya Sanshodhan', 'Patra Lekhan: Opcharik', 'Apathit Gadyansh', 'Vigyanpan Lekhan'],
+                    'Computer Studies': ['Advanced Scratch Programming', 'Introduction to Python', 'HTML Basics', 'Spreadsheets: Formulas and Charts', 'Digital Footprints and Security', 'Emerging Technologies']
+                },
+                '9': {
+                    'Mathematics': ['Number Systems', 'Polynomials', 'Coordinate Geometry', 'Linear Equations in Two Variables', "Introduction to Euclid's Geometry", 'Lines and Angles', 'Triangles', 'Quadrilaterals', 'Circles', "Heron's Formula", 'Surface Areas and Volumes', 'Statistics'],
+                    'Science': ['Matter in Our Surroundings', 'Is Matter Around Us Pure', 'Atoms and Molecules', 'Structure of the Atom', 'The Fundamental Unit of Life', 'Tissues', 'Motion', 'Force and Laws of Motion', 'Gravitation', 'Work and Energy', 'Sound', 'Improvement in Food Resources'],
+                    'English': ['The Fun They Had', 'The Sound of Music', 'The Little Girl', 'A Truly Beautiful Mind', 'The Snake and the Mirror', 'My Childhood', 'Reach for the Top', 'Kathmandu', 'If I Were You', 'The Road Not Taken (Poem)', 'Wind (Poem)', 'Rain on the Roof (Poem)', 'The Lake Isle of Innisfree (Poem)', 'A Legend of the Northland (Poem)', 'No Men Are Foreign (Poem)', 'On Killing a Tree (Poem)', 'A Slumber Did My Spirit Seal (Poem)', 'The Lost Child', 'The Adventures of Toto', 'Iswaran the Storyteller', 'In the Kingdom of Fools', 'The Happy Prince', 'Weathering the Storm in Ersama', 'The Last Leaf', 'A House Is Not a Home', 'The Beggar'],
+                    'Social Science': ['The French Revolution', 'Socialism in Europe and the Russian Revolution', 'Nazism and the Rise of Hitler', 'Forest Society and Colonialism', 'Pastoralists in the Modern World', 'India - Size and Location', 'Physical Features of India', 'Drainage', 'Climate', 'Natural Vegetation and Wildlife', 'Population', 'What is Democracy? Why Democracy?', 'Constitutional Design', 'Electoral Politics', 'Working of Institutions', 'Democratic Rights', 'The Story of Village Palampur', 'People as Resource', 'Poverty as a Challenge', 'Food Security in India'],
+                    'Hindi': ['Do Bailon ki Katha', 'Lhasa ki Aur', 'Upbhoktavad ki Sanskriti', 'Sanwale Sapnon ki Yaad', 'Premchand ke Phate Joote', 'Mere Bachpan ke Din', 'Bade Bhai Sahab', 'Diary ka ek Panna', 'Kaidi aur Kokila', 'Gram Shree', 'Dharam ki Aad', 'Shukratare ke Saman', 'Sparsh: Kavita Khand', 'Byakaran Abhyas'],
+                    'Information Technology': ['Communication Skills', 'Self-Management Skills', 'ICT Skills', 'Entrepreneurial Skills', 'Green Skills', 'Digital Documentation', 'Electronic Spreadsheet', 'Database Management', 'Web Applications and Security']
+                },
+                '10': {
+                    'Mathematics': ['Real Numbers', 'Polynomials', 'Pair of Linear Equations in Two Variables', 'Quadratic Equations', 'Arithmetic Progressions', 'Triangles', 'Coordinate Geometry', 'Introduction to Trigonometry', 'Some Applications of Trigonometry', 'Circles', 'Areas Related to Circles', 'Surface Areas and Volumes', 'Statistics', 'Probability'],
+                    'Science': ['Chemical Reactions and Equations', 'Acids, Bases and Salts', 'Metals and Non-metals', 'Carbon and its Compounds', 'Life Processes', 'Control and Coordination', 'How do Organisms Reproduce?', 'Heredity and Evolution', 'Light - Reflection and Refraction', 'The Human Eye and the Colourful World', 'Electricity', 'Magnetic Effects of Electric Current', 'Our Environment', 'Sustainable Management of Natural Resources'],
+                    'English': ['A Letter to God', 'Nelson Mandela: Long Walk to Freedom', 'Two Stories about Flying', 'From the Diary of Anne Frank', 'Glimpses of India', 'Mijbil the Otter', 'Madam Rides the Bus', 'The Sermon at Benares', 'The Proposal', 'Dust of Snow (Poem)', 'Fire and Ice (Poem)', 'A Tiger in the Zoo (Poem)', 'How to Tell Wild Animals (Poem)', 'The Ball Poem', 'Amanda! (Poem)', 'The Trees (Poem)', 'Fog (Poem)', 'The Tale of Custard the Dragon (Poem)', 'For Anne Gregory (Poem)', 'A Triumph of Surgery', "The Thief's Story", 'The Midnight Visitor', 'A Question of Trust', 'Footprints without Feet', 'The Making of a Scientist', 'The Necklace', 'Bholi', 'The Book That Saved the Earth'],
+                    'Social Science': ['The Rise of Nationalism in Europe', 'Nationalism in India', 'The Making of a Global World', 'Print Culture and the Modern World', 'Resources and Development', 'Forest and Wildlife Resources', 'Water Resources', 'Agriculture', 'Minerals and Energy Resources', 'Manufacturing Industries', 'Lifelines of National Economy', 'Power Sharing', 'Federalism', 'Gender, Religion and Caste', 'Political Parties', 'Outcomes of Democracy', 'Development', 'Sectors of the Indian Economy', 'Money and Credit', 'Globalisation and the Indian Economy', 'Consumer Rights'],
+                    'Hindi': ['Surdas ke Pad', 'Ram-Lakshman-Parshuram Samvad', 'Bade Bhai Sahab', 'Diary ka ek Panna', 'Tatara-Vamiro Katha', 'Bahurani', 'Harihar Kaka', 'Sapnon ke se Din', 'Topi Shukla', 'Kartoos', 'Netaji ka Chashma', 'Bal Gobind Bhagat', 'Lakhnavi Andaz', 'Ek Kahani yeh Bhi', 'Stri Shiksha ke Virodhi Kutarkon ka Khandan', 'Naukarani', 'Sanskriti', 'Byakaran Abhyas'],
+                    'Information Technology': ['Communication Skills', 'Self-Management Skills', 'ICT Skills', 'Entrepreneurial Skills', 'Green Skills', 'Digital Documentation', 'Electronic Spreadsheet', 'Database Management', 'Web Applications and Security']
+                },
+                '11': {
+                    'English Core': ['The Portrait of a Lady', "We're Not Afraid to Die... if We Can All Be Together", 'Discovering Tut: the Saga Continues', 'The Adventure', 'Silk Road', 'A Photograph (Poem)', 'The Laburnum Top (Poem)', 'The Voice of the Rain (Poem)', 'Childhood (Poem)', 'Father to Son (Poem)', 'The Summer of the Beautiful White Horse', 'The Address', "Mother's Day", 'Birth', 'The Tale of Melon City', 'Note Making', 'Summarising', 'Letter Writing: Official', 'Speech Writing', 'Debate Writing'],
+                    'Physics': ['Units and Measurements', 'Motion in a Straight Line', 'Motion in a Plane', 'Laws of Motion', 'Work, Energy and Power', 'System of Particles and Rotational Motion', 'Gravitation', 'Mechanical Properties of Solids', 'Mechanical Properties of Fluids', 'Thermal Properties of Matter', 'Thermodynamics', 'Kinetic Theory', 'Oscillations', 'Waves'],
+                    'Chemistry': ['Some Basic Concepts of Chemistry', 'Structure of Atom', 'Classification of Elements and Periodicity in Properties', 'Chemical Bonding and Molecular Structure', 'Thermodynamics', 'Equilibrium', 'Redox Reactions', 'Organic Chemistry - Some Basic Principles and Techniques', 'Hydrocarbons'],
+                    'Mathematics': ['Sets', 'Relations and Functions', 'Trigonometric Functions', 'Complex Numbers and Quadratic Equations', 'Linear Inequalities', 'Permutations and Combinations', 'Binomial Theorem', 'Sequences and Series', 'Straight Lines', 'Conic Sections', 'Introduction to Three Dimensional Geometry', 'Limits and Derivatives', 'Statistics', 'Probability'],
+                    'Biology': ['The Living World', 'Biological Classification', 'Plant Kingdom', 'Animal Kingdom', 'Morphology of Flowering Plants', 'Anatomy of Flowering Plants', 'Structural Organisation in Animals', 'Cell: The Unit of Life', 'Biomolecules', 'Cell Cycle and Cell Division', 'Photosynthesis in Higher Plants', 'Respiration in Plants', 'Plant Growth and Development', 'Breathing and Exchange of Gases', 'Body Fluids and Circulation', 'Excretory Products and their Elimination', 'Locomotion and Movement', 'Neural Control and Coordination', 'Chemical Coordination and Integration'],
+                    'Accountancy': ['Introduction to Accounting', 'Theory Base of Accounting', 'Recording of Transactions - I', 'Recording of Transactions - II', 'Bank Reconciliation Statement', 'Trial Balance and Rectification of Errors', 'Depreciation, Provisions and Reserves', 'Bill of Exchange', 'Financial Statements - I', 'Financial Statements - II', 'Accounts from Incomplete Records', 'Applications of Computers in Accounting', 'Computerised Accounting System'],
+                    'Business Studies': ['Nature and Purpose of Business', 'Forms of Business Organisation', 'Private, Public and Global Enterprises', 'Business Services', 'Emerging Modes of Business', 'Social Responsibility of Business and Business Ethics', 'Formation of a Company', 'Sources of Business Finance', 'Small Business and Entrepreneurship', 'Internal Trade', 'International Business'],
+                    'Economics': ['Statistics for Economics: Introduction', 'Collection of Data', 'Organisation of Data', 'Presentation of Data', 'Measures of Central Tendency', 'Measures of Dispersion', 'Correlation', 'Index Numbers', 'Introduction to Microeconomics', 'Theory of Consumer Behaviour', 'Production and Costs', 'Theory of the Firm under Perfect Competition', 'Market Equilibrium'],
+                    'History': ['From the Beginning of Time', 'Writing and City Life', 'An Empire Across Three Continents', 'The Central Islamic Lands', 'Nomadic Empires', 'The Three Orders', 'Changing Cultural Traditions', 'Confrontation of Cultures', 'The Industrial Revolution', 'Displacing Indigenous Peoples', 'Paths to Modernisation'],
+                    'Political Science': ['Constitution: Why and How', 'Rights in the Indian Constitution', 'Election and Representation', 'Executive', 'Legislature', 'Judiciary', 'Federalism', 'Local Governments', 'Constitution as a Living Document', 'The Philosophy of the Constitution', 'Political Theory: An Introduction', 'Freedom', 'Equality', 'Social Justice', 'Rights (Political Theory)', 'Citizenship', 'Nationalism', 'Secularism'],
+                    'Geography': ['Geography as a Discipline', 'The Origin and Evolution of the Earth', 'Interior of the Earth', 'Distribution of Oceans and Continents', 'Minerals and Rocks', 'Geomorphic Processes', 'Landforms and their Evolution', 'Composition and Structure of Atmosphere', 'Solar Radiation, Heat Balance and Temperature', 'Atmospheric Circulation and Weather Systems', 'Water in the Atmosphere', 'World Climate and Climate Change', 'Water (Oceans)', 'Movements of Ocean Water', 'Life on the Earth', 'Biodiversity and Conservation', 'India: Introduction', 'Structure and Physiography of India', 'Drainage System of India', 'Climate, Vegetation and Soil of India', 'Natural Hazards and Disasters'],
+                    'Computer Science': ['Computer System', 'Encoding Schemes and Number System', 'Emerging Trends', 'Introduction to Problem Solving', 'Getting Started with Python', 'Flow of Control', 'Functions in Python', 'Strings', 'Lists', 'Tuples and Dictionaries', 'Societal Impact']
+                },
+                '12': {
+                    'English Core': ['The Last Lesson', 'Lost Spring', 'Deep Water', 'The Rattrap', 'Indigo', 'Poets and Pancakes', 'The Interview', 'Going Places', 'My Mother at Sixty-six (Poem)', 'Keeping Quiet (Poem)', 'A Thing of Beauty (Poem)', 'A Roadside Stand (Poem)', "Aunt Jennifer's Tigers (Poem)", 'The Third Level', 'The Tiger King', 'Journey to the End of the Earth', 'The Enemy', 'On the Face of It', 'Memories of Childhood', 'Notice Writing', 'Letter Writing: Formal', 'Article and Report Writing'],
+                    'Physics': ['Electric Charges and Fields', 'Electrostatic Potential and Capacitance', 'Current Electricity', 'Moving Charges and Magnetism', 'Magnetism and Matter', 'Electromagnetic Induction', 'Alternating Current', 'Electromagnetic Waves', 'Ray Optics and Optical Instruments', 'Wave Optics', 'Dual Nature of Radiation and Matter', 'Atoms', 'Nuclei', 'Semiconductor Electronics'],
+                    'Chemistry': ['Solutions', 'Electrochemistry', 'Chemical Kinetics', 'The d and f Block Elements', 'Coordination Compounds', 'Haloalkanes and Haloarenes', 'Alcohols, Phenols and Ethers', 'Aldehydes, Ketones and Carboxylic Acids', 'Amines', 'Biomolecules'],
+                    'Mathematics': ['Relations and Functions', 'Inverse Trigonometric Functions', 'Matrices', 'Determinants', 'Continuity and Differentiability', 'Applications of Derivatives', 'Integrals', 'Applications of Integrals', 'Differential Equations', 'Vector Algebra', 'Three Dimensional Geometry', 'Linear Programming', 'Probability'],
+                    'Biology': ['Sexual Reproduction in Flowering Plants', 'Human Reproduction', 'Reproductive Health', 'Principles of Inheritance and Variation', 'Molecular Basis of Inheritance', 'Evolution', 'Human Health and Disease', 'Microbes in Human Welfare', 'Biotechnology: Principles and Processes', 'Biotechnology and its Applications', 'Organisms and Populations', 'Ecosystem', 'Biodiversity and Conservation'],
+                    'Accountancy': ['Accounting for Partnership: Basic Concepts', 'Reconstitution of a Partnership Firm - Admission of a Partner', 'Reconstitution of a Partnership Firm - Retirement/Death of a Partner', 'Dissolution of Partnership Firm', 'Accounting for Share Capital', 'Issue and Redemption of Debentures', 'Financial Statements of a Company', 'Analysis of Financial Statements', 'Accounting Ratios', 'Cash Flow Statement'],
+                    'Business Studies': ['Nature and Significance of Management', 'Principles of Management', 'Business Environment', 'Planning', 'Organising', 'Staffing', 'Directing', 'Controlling', 'Financial Management', 'Financial Markets', 'Marketing Management', 'Consumer Protection'],
+                    'Economics': ['Macroeconomics: Introduction', 'National Income Accounting', 'Money and Banking', 'Determination of Income and Employment', 'Government Budget and the Economy', 'Open Economy Macroeconomics', 'Indian Economy on the Eve of Independence', 'Indian Economy 1950-1990', 'Liberalisation, Privatisation and Globalisation', 'Human Capital Formation in India', 'Rural Development', 'Employment: Growth and Informalisation', 'Environment and Sustainable Development', 'Comparative Development Experiences of India and its Neighbours'],
+                    'History': ['Bricks, Beads and Bones: The Harappan Civilisation', 'Kings, Farmers and Towns', 'Kinship, Caste and Class', 'Thinkers, Beliefs and Buildings', 'Through the Eyes of Travellers', 'Bhakti-Sufi Traditions', 'An Imperial Capital: Vijayanagara', 'Peasants, Zamindars and the State', 'Colonialism and the Countryside', 'Rebels and the Raj: 1857 Revolt', 'Mahatma Gandhi and the Nationalist Movement', 'Framing the Constitution'],
+                    'Political Science': ['The Cold War Era', 'The End of Bipolarity', 'Contemporary Centres of Power', 'Contemporary South Asia', 'International Organisations', 'Security in the Contemporary World', 'Environment and Natural Resources', 'Globalisation', 'Challenges of Nation Building', 'Era of One-Party Dominance', 'Politics of Planned Development', "India's External Relations", 'Challenges to and Restoration of the Congress System', 'The Crisis of Democratic Order', 'Regional Aspirations', 'Recent Developments in Indian Politics'],
+                    'Geography': ['Human Geography: Nature and Scope', 'The World Population', 'Human Development', 'Primary Activities', 'Secondary Activities', 'Tertiary and Quaternary Activities', 'Transport and Communication', 'International Trade', 'Human Settlements', 'Population: Distribution, Density, Growth and Composition', 'Human Settlements of India', 'Land Resources and Agriculture', 'Water Resources', 'Mineral and Energy Resources', 'Planning and Sustainable Development in Indian Context', 'Transport and Communication in India', 'International Trade of India', 'Geographical Perspective on Selected Issues and Problems'],
+                    'Computer Science': ['Exception Handling in Python', 'File Handling in Python', 'Stack', 'Computer Network', 'Database and SQL', 'Interface Python with mySQL', 'Project Work']
+                }
+            },
+            ICSE: {
+                '3': {
+                    'English Language': ['Parts of Speech', 'Tenses: Simple Present and Past', 'Articles: a, an, the', 'Singular and Plural', 'Pronouns', 'Adjectives', 'Paragraph Writing', 'Story Writing', 'Comprehension Passage', 'Letter Writing'],
+                    'English Literature': ['Rhymes and Poems', 'Short Stories', 'Fables and Folk Tales', 'Reading Aloud and Recitation', 'Picture Composition'],
+                    'Mathematics': ['Numbers up to 10000', 'Addition', 'Subtraction', 'Multiplication', 'Division', 'Fractions', 'Money', 'Time and Calendar', 'Measurement: Length, Weight, Capacity', 'Shapes and Patterns', 'Data Handling'],
+                    'Environmental Science': ['My Family', 'Our Body and Sense Organs', 'Food and Nutrition', 'Plants Around Us', 'Animals Around Us', 'Air, Water and Weather', 'Our Neighbourhood', 'Transport and Communication', 'Safety and First Aid', 'Keeping Our Environment Clean'],
+                    'Second Language': ['Varnamala Revision', 'Shabd Rachna', 'Kavita', 'Kahani', 'Grammar: Sangya, Ling, Vachan', 'Apathit Gadyansh'],
+                    'Computer Studies': ['Introduction to Computers', 'Uses of Computers', 'Parts of a Computer', 'Keyboard and Mouse Skills', 'Introduction to Paint', 'Care of Computers'],
+                    'General Knowledge': ['My Country India', 'Festivals and Celebrations', 'Our Helpers', 'Famous Places', 'Sports and Games', 'Amazing World of Animals']
+                },
+                '4': {
+                    'English Language': ['Nouns and Pronouns', 'Verbs and Tenses', 'Adjectives and Adverbs', 'Prepositions', 'Conjunctions', 'Subject-Verb Agreement', 'Essay Writing', 'Letter Writing', 'Comprehension Passage', 'Story Completion'],
+                    'English Literature': ['Poems and Recitation', 'Short Stories', 'Playlets and Role Play', 'Character Sketch', 'Reading Comprehension'],
+                    'Mathematics': ['Large Numbers', 'Roman Numerals', 'Addition and Subtraction', 'Multiplication', 'Division', 'Factors and Multiples', 'Fractions', 'Decimals', 'Money', 'Time', 'Metric Measures', 'Geometry: Lines and Angles', 'Perimeter and Area', 'Symmetry', 'Data Handling'],
+                    'Environmental Science': ['Our Family and Society', 'Human Body and Health', 'Food: Sources and Nutrients', 'Plants: Parts and Uses', 'Animals and their Habitats', 'Water and Water Cycle', 'Weather and Seasons', 'Maps and Directions', 'Means of Communication', 'Natural Resources and Conservation'],
+                    'Second Language': ['Sangya aur Sarvanaam', 'Visheshan aur Kriya', 'Kavita', 'Kahani Lekhan', 'Patra Lekhan', 'Apathit Gadyansh'],
+                    'Computer Studies': ['Hardware and Software', 'Introduction to Windows', 'Word Processing Basics', 'Drawing with Paint', 'Introduction to Internet', 'Logical Thinking with Scratch'],
+                    'General Knowledge': ['States and Capitals', 'National Symbols', 'Great Indians', 'Inventions', 'Solar System Basics', 'Sports and Awards']
+                },
+                '5': {
+                    'English Language': ['Tenses: Present, Past, Future', 'Active and Passive Voice (Intro)', 'Direct and Indirect Speech (Intro)', 'Degrees of Comparison', 'Modal Auxiliaries', 'Punctuation', 'Essay: Descriptive and Narrative', 'Letter: Formal and Informal', 'Notice Writing', 'Comprehension and Summary'],
+                    'English Literature': ['Poetry Appreciation', 'Short Stories', 'Drama: One-Act Plays', 'Diary Entry', 'Reading Comprehension'],
+                    'Mathematics': ['Large Numbers and Roman Numerals', 'Operations on Large Numbers', 'Factors and Multiples: HCF and LCM', 'Fractions', 'Decimals', 'Percentage', 'Unitary Method', 'Profit and Loss (Intro)', 'Money and Bills', 'Metric Measures', 'Time and Temperature', 'Geometry: Angles and Triangles', 'Circles', 'Perimeter, Area and Volume', 'Symmetry and Patterns', 'Data Handling'],
+                    'Environmental Science': ['Human Body: Organ Systems', 'Health and Diseases', 'Food and Preservation', 'Plants: Reproduction', 'Animals: Adaptation', 'Air and its Composition', 'Rocks, Soil and Minerals', 'Natural Disasters', 'Our Universe', 'Environmental Pollution'],
+                    'Second Language': ['Kaal', 'Sandhi (Intro)', 'Muhavare', 'Kavita', 'Nibandh Lekhan', 'Patra Lekhan', 'Apathit Gadyansh'],
+                    'Computer Studies': ['Computer Memory and Storage Devices', 'Operating System', 'Advanced Word Processing', 'Introduction to Spreadsheets', 'Presentations', 'Internet and E-mail', 'Programming with Scratch'],
+                    'General Knowledge': ['Indian States and Culture', 'World Geography Basics', 'Scientists and Inventors', 'Environment Issues', 'Books and Authors', 'Sports and Tournaments']
+                },
+                '6': {
+                    'Mathematics': ['Knowing Our Numbers', 'Whole Numbers', 'Playing with Numbers', 'Negative Numbers and Integers', 'Fractions', 'Decimals', 'Introduction to Algebra', 'Ratio and Proportion', 'Unitary Method', 'Fundamental Concepts of Geometry', 'Angles', 'Triangles', 'Quadrilaterals', 'Symmetry', 'Mensuration', 'Data Handling'],
+                    'Physics': ['Matter', 'Physical Quantities and Measurement', 'Force and Pressure', 'Energy', 'Light', 'Magnetism'],
+                    'Chemistry': ['Introduction to Chemistry', 'Elements, Compounds and Mixtures', 'Air and Atmosphere', 'Water', 'Rocks and Soil'],
+                    'Biology': ['Plant Life', 'The Cell', 'Human Body', 'Health and Hygiene', 'Food'],
+                    'History & Civics': ['The Ancient World: Mesopotamia', 'The Ancient World: Egypt', 'The Ancient World: India and China', 'The Indus Valley Civilization', 'The Vedic Period', 'The Rise of Jainism and Buddhism', 'The Mauryan Empire', 'The Golden Age: Gupta Empire', 'Rural Local Self-Government', 'Urban Local Self-Government'],
+                    'Geography': ['Maps and Diagrams', 'Landforms', 'Water Bodies', 'Weather and Climate', 'Minerals and Rocks', 'Study of Continents: North America', 'Study of Continents: South America'],
+                    'English Language': ['Composition: Essay Writing', 'Letter Writing: Formal and Informal', 'Notice and Email', 'Comprehension Passage', 'Grammar: Parts of Speech', 'Grammar: Tenses', 'Grammar: Subject-Verb Agreement', 'Grammar: Active and Passive Voice', 'Grammar: Direct and Indirect Speech', 'Grammar: Prepositions and Conjunctions', 'Transformation of Sentences'],
+                    'English Literature': ['Prose: Short Stories', 'Poetry', 'Drama: One-Act Plays', 'Comprehension and Appreciation'],
+                    'Second Language': ['Kahani aur Kavitayen', 'Vyakaran: Sandhi', 'Vyakaran: Samas (Intro)', 'Patra Lekhan', 'Nibandh Lekhan', 'Apathit Gadyansh'],
+                    'Computer Applications': ['Computer Fundamentals', 'Data Processing', 'Word Processing', 'Spreadsheets', 'Presentations', 'Internet and E-mail', 'Algorithms and Flowcharts', 'Introduction to Scratch']
+                },
+                '7': {
+                    'Mathematics': ['Integers', 'Rational Numbers', 'Fractions and Decimals', 'Exponents', 'Ratio and Proportion', 'Unitary Method', 'Percentage and its Applications', 'Profit and Loss', 'Simple Interest', 'Algebraic Expressions', 'Linear Equations in One Variable', 'Lines and Angles', 'Triangles and their Properties', 'Congruence of Triangles', 'Symmetry', 'Mensuration', 'Data Handling', 'Sets'],
+                    'Physics': ['Physical Quantities and Measurement', 'Motion', 'Energy', 'Light Energy', 'Heat', 'Sound', 'Electricity and Magnetism'],
+                    'Chemistry': ['Matter and its Composition', 'Physical and Chemical Changes', 'Elements, Compounds and Mixtures', 'Atomic Structure', 'Language of Chemistry', 'Metals and Non-metals', 'Air and Atmosphere', 'Water'],
+                    'Biology': ['Plant and Animal Tissues', 'Classification of Plants', 'Classification of Animals', 'Photosynthesis and Respiration', 'Human Body: Excretory and Nervous System', 'Allergy', 'Disease and its Prevention'],
+                    'History & Civics': ['Medieval India: Rise of Islam', 'The Delhi Sultanate', 'The Vijayanagar and Bahmani Kingdoms', 'The Mughal Empire', 'Rise of Independent Kingdoms', 'Major Religions of the World', 'The Constitution of India', 'Directive Principles of State Policy', 'Fundamental Rights and Duties'],
+                    'Geography': ['Weather and Climate', 'Weathering and Soil Formation', 'Industries', 'Europe: Land and Resources', 'Africa: Land and Resources', 'Australia: Land and Resources', 'Antarctica'],
+                    'English Language': ['Composition: Narrative and Descriptive Essays', 'Letter Writing', 'Notice and Email', 'Comprehension Passage', 'Grammar: Tenses', 'Grammar: Active and Passive Voice', 'Grammar: Direct and Indirect Speech', 'Grammar: Modals', 'Synthesis of Sentences', 'Transformation of Sentences'],
+                    'English Literature': ['Prose: Short Stories', 'Poetry', 'Drama', 'Comprehension and Appreciation'],
+                    'Second Language': ['Kahani aur Nibandh', 'Vyakaran: Samas', 'Vyakaran: Muhavare', 'Patra Lekhan', 'Apathit Gadyansh'],
+                    'Computer Applications': ['Computer Fundamentals and Number System', 'HTML Basics', 'Spreadsheets: Formulas and Functions', 'Charts in Spreadsheets', 'Internet Services', 'Algorithms and Flowcharts', 'Introduction to Python']
+                },
+                '8': {
+                    'Mathematics': ['Rational Numbers', 'Exponents', 'Squares and Square Roots', 'Cubes and Cube Roots', 'Playing with Numbers', 'Sets', 'Percentage', 'Profit, Loss and Discount', 'Simple and Compound Interest', 'Direct and Inverse Variation', 'Algebraic Expressions and Identities', 'Factorisation', 'Linear Equations in One Variable', 'Polygons', 'Special Quadrilaterals', 'Constructions', 'Mensuration', 'Representing 3D in 2D', 'Data Handling', 'Probability'],
+                    'Physics': ['Matter', 'Physical Quantities and Measurement', 'Force and Pressure', 'Energy', 'Light Energy', 'Heat Transfer', 'Sound', 'Static Electricity', 'Current Electricity'],
+                    'Chemistry': ['Matter', 'Physical and Chemical Changes', 'Elements, Compounds and Mixtures', 'Atomic Structure', 'Language of Chemistry', 'Chemical Reactions', 'Hydrogen', 'Water', 'Carbon and its Compounds'],
+                    'Biology': ['Cell Structure and Functions', 'Transportation in Plants and Animals', 'Reproduction in Plants and Animals', 'Ecosystems', 'Endocrine System and Adolescence', 'Food Production and Management'],
+                    'History & Civics': ['A Period of Transition', 'The Growth of Nationalism', 'India in the 18th Century', 'Traders to Rulers', 'British Policies and their Impact', 'The Great Uprising of 1857', 'Socio-Religious Reform Movements', 'Struggle for Freedom: Early Phase', 'The Union Legislature', 'The Union Executive', 'The Judiciary'],
+                    'Geography': ['Interpretation of Topographical Maps', 'Population Dynamics', 'Migration', 'Urbanisation', 'Natural and Man-made Disasters', 'Asia: Land and Features', 'India: Location and Physical Features', 'India: Climate and Natural Vegetation'],
+                    'English Language': ['Composition: Argumentative Essays', 'Letter Writing', 'Notice and Email', 'Comprehension Passage', 'Grammar: Tenses', 'Grammar: Active and Passive Voice', 'Grammar: Direct and Indirect Speech', 'Transformation of Sentences', 'Synthesis of Sentences'],
+                    'English Literature': ['Prose: Short Stories', 'Poetry', 'Drama', 'Comprehension and Appreciation'],
+                    'Second Language': ['Kahani, Nibandh aur Sansmaran', 'Vyakaran: Vaachya', 'Vyakaran: Avayav', 'Patra Lekhan', 'Apathit Gadyansh'],
+                    'Computer Applications': ['Operating System and File Management', 'Advanced HTML', 'Spreadsheets: Advanced Features', 'Internet and Networking', 'Python: Basics and Control Flow', 'Cyber Ethics and Safety']
+                },
+                '9': {
+                    'Mathematics': ['Rational and Irrational Numbers', 'Compound Interest', 'Expansions', 'Factorisation', 'Simultaneous Linear Equations', 'Indices and Logarithms', 'Triangles: Congruency and Mid-point Theorem', 'Pythagoras Theorem', 'Rectilinear Figures', 'Area Theorems', 'Circle: Chord Properties', 'Statistics', 'Mensuration', 'Trigonometrical Ratios', 'Coordinate Geometry', 'Inequalities', 'Constructions'],
+                    'Physics': ['Measurements and Experimentation', 'Motion in One Dimension', 'Laws of Motion', 'Pressure in Fluids and Atmospheric Pressure', 'Upthrust in Fluids, Archimedes Principle and Floatation', 'Heat and Energy', 'Reflection of Light', 'Propagation of Sound Waves'],
+                    'Chemistry': ['The Language of Chemistry', 'Chemical Changes and Reactions', 'Water', 'Atomic Structure and Chemical Bonding', 'The Periodic Table', 'Study of the First Element: Hydrogen', 'Study of Gas Laws', 'Atmospheric Pollution'],
+                    'Biology': ['Basic Biology: Cell and Tissues', 'Flowering Plants', 'Plant Physiology', 'Diversity in Living Organisms', 'Human Anatomy and Physiology', 'Health and Disease', 'Waste Generation and Management', 'Economic Importance of Bacteria and Fungi'],
+                    'History & Civics': ['The Harappan Civilisation', 'The Vedic Period', 'Jainism and Buddhism', 'The Mauryan Empire', 'The Sangam Age', 'The Age of the Guptas', 'The Delhi Sultanate', 'The Mughal Empire', 'The Bhakti Movement and Sufism', 'Composite Culture', 'Our Constitution', 'Fundamental Rights and Duties', 'Directive Principles of State Policy', 'Elections', 'Local Self-Government'],
+                    'Geography': ['Earth as a Planet', 'Geographic Grid: Latitudes and Longitudes', 'Rotation and Revolution', "Earth's Structure", 'Landforms of the Earth', 'Rocks', 'Volcanoes', 'Earthquakes', 'Weathering', 'Hydrosphere', 'Atmosphere', 'Insolation', 'Atmospheric Pressure and Winds', 'Humidity and Precipitation', 'Pollution: Sources and Effects', 'Preventive Measures of Pollution'],
+                    'English Language': ['Composition: Essays', 'Letter Writing: Formal and Informal', 'Notice and Email', 'Comprehension Passage', 'Grammar: Tenses', 'Grammar: Active and Passive Voice', 'Grammar: Direct and Indirect Speech', 'Grammar: Articles and Prepositions', 'Transformation of Sentences', 'Synthesis of Sentences'],
+                    'English Literature': ['Drama: The Merchant of Venice - Acts I and II', 'Drama: The Merchant of Venice - Act III', 'Poetry: Treasure Chest', 'Short Stories: Treasure Chest'],
+                    'Second Language': ['Sahitya: Gadya aur Padya', 'Vyakaran', 'Patra aur Nibandh Lekhan', 'Apathit Gadyansh'],
+                    'Computer Applications': ['Object Oriented Programming Concepts', 'Introduction to Java', 'Values and Data Types', 'Operators and Expressions', 'Input in Java', 'Conditional Constructs', 'Iterative Constructs', 'Library Classes and Mathematical Functions']
+                },
+                '10': {
+                    'Mathematics': ['Goods and Services Tax', 'Banking', 'Shares and Dividends', 'Linear Inequations', 'Quadratic Equations', 'Ratio and Proportion', 'Matrices', 'Arithmetic Progression', 'Coordinate Geometry', 'Reflection', 'Section and Mid-point Formula', 'Equation of a Line', 'Similarity', 'Loci', 'Circles', 'Construction', 'Trigonometry', 'Heights and Distances', 'Mensuration', 'Probability', 'Statistics'],
+                    'Physics': ['Force, Work, Power and Energy', 'Machines', 'Refraction of Light', 'Refraction through a Lens', 'Spectrum', 'Sound', 'Current Electricity', 'Electrical Power and Household Circuits', 'Electro-magnetism', 'Calorimetry', 'Thermionic Emission and Radioactivity'],
+                    'Chemistry': ['Periodic Table, Periodic Properties and Variations of Properties', 'Chemical Bonding', 'Acids, Bases and Salts', 'Analytical Chemistry', 'Mole Concept and Stoichiometry', 'Electrolysis', 'Metallurgy', 'Study of Compounds: Hydrogen Chloride', 'Study of Compounds: Ammonia and Nitric Acid', 'Study of Compounds: Sulphuric Acid', 'Organic Chemistry'],
+                    'Biology': ['Cell Cycle and Cell Division', 'Genetics: Some Basic Fundamentals', 'Absorption by Roots', 'Transpiration', 'Photosynthesis', 'Chemical Coordination in Plants', 'Circulatory System', 'Excretory System', 'Nervous System', 'Endocrine System', 'Reproductive System', 'Population and its Control', 'Human Evolution', 'Pollution'],
+                    'History & Civics': ['The First War of Independence 1857', 'Growth of Nationalism', 'Early Phase of the Indian National Movement', 'Second Phase of the Indian National Movement', 'The Muslim League', 'Mahatma Gandhi and the National Movement', 'Quit India Movement', 'Forward Bloc and the INA', 'Independence and Partition of India', 'The First World War', 'Rise of Dictatorships', 'The Second World War', 'United Nations', 'Non-Aligned Movement', 'The Union Legislature', 'The President and the Vice-President', 'The Prime Minister and the Council of Ministers', 'The Supreme Court', 'The Subordinate Courts'],
+                    'Geography': ['Interpretation of Topographical Maps', 'Map of India', 'Location, Extent and Physical Features of India', 'Climate of India', 'Soil Resources', 'Natural Vegetation', 'Water Resources', 'Mineral and Energy Resources', 'Agriculture in India', 'Industries in India', 'Transport', 'Waste Generation and Management'],
+                    'English Language': ['Composition: Essays', 'Letter Writing: Formal and Informal', 'Notice and Email', 'Comprehension Passage', 'Grammar: Tenses', 'Grammar: Active and Passive Voice', 'Grammar: Direct and Indirect Speech', 'Transformation of Sentences', 'Synthesis of Sentences'],
+                    'English Literature': ['Drama: The Merchant of Venice - Acts III, IV and V', 'Poetry: Treasure Chest', 'Short Stories: Treasure Chest'],
+                    'Second Language': ['Sahitya: Gadya aur Padya', 'Vyakaran', 'Patra aur Nibandh Lekhan', 'Apathit Gadyansh'],
+                    'Computer Applications': ['Revision of Class IX Java Concepts', 'Class as the Basis of all Computation', 'User-defined Methods', 'Constructors', 'Library Classes', 'Encapsulation and Inheritance', 'Arrays', 'String Handling', 'Nested Loops']
+                },
+                '11': {
+                    'English': ['Composition', 'Report Writing', 'Article Writing', 'Proposal Writing', 'Comprehension', 'Grammar in Context', 'Prose: Prism Collection', 'Poetry: Rhapsody Collection', 'Drama: The Tempest - Acts I to III'],
+                    'Physics': ['Physical World and Measurement', 'Kinematics', 'Laws of Motion', 'Work, Energy and Power', 'Motion of System of Particles and Rigid Body', 'Gravitation', 'Properties of Bulk Matter', 'Heat and Thermodynamics', 'Behaviour of Perfect Gases and Kinetic Theory', 'Oscillations and Waves'],
+                    'Chemistry': ['Some Basic Concepts of Chemistry', 'Structure of Atom', 'Classification of Elements and Periodicity', 'Chemical Bonding', 'States of Matter: Gases and Liquids', 'Chemical Thermodynamics', 'Chemical Equilibrium', 'Ionic Equilibrium', 'Redox Reactions', 'Hydrogen', 's-Block Elements', 'p-Block Elements', 'Organic Chemistry: Basic Principles', 'Hydrocarbons', 'Environmental Chemistry'],
+                    'Mathematics': ['Sets and Functions', 'Relations and Functions', 'Trigonometric Functions', 'Principle of Mathematical Induction', 'Complex Numbers', 'Quadratic Equations', 'Permutations and Combinations', 'Binomial Theorem', 'Sequences and Series', 'Straight Lines', 'Circles', 'Conic Sections', 'Three Dimensional Geometry', 'Limits and Continuity', 'Differentiation', 'Statistics', 'Probability'],
+                    'Biology': ['The Living World', 'Biological Classification', 'Plant Kingdom', 'Animal Kingdom', 'Morphology of Flowering Plants', 'Anatomy of Flowering Plants', 'Structural Organisation in Animals', 'Cell: The Unit of Life', 'Biomolecules', 'Cell Cycle and Cell Division', 'Transport in Plants', 'Mineral Nutrition', 'Photosynthesis', 'Respiration in Plants', 'Plant Growth and Development', 'Digestion and Absorption', 'Breathing and Exchange of Gases', 'Body Fluids and Circulation', 'Excretory Products and their Elimination', 'Locomotion and Movement', 'Neural Control and Coordination', 'Chemical Coordination and Integration'],
+                    'Accounts': ['Introduction to Accounting', 'Basic Accounting Terms', 'Accounting Principles', 'Journal', 'Ledger', 'Cash Book and Subsidiary Books', 'Bank Reconciliation Statement', 'Trial Balance', 'Depreciation', 'Provisions and Reserves', 'Bills of Exchange', 'Final Accounts', 'Rectification of Errors'],
+                    'Commerce': ['Nature and Purpose of Business', 'Forms of Business Organisation', 'Private, Public and Global Enterprises', 'Business Services', 'Emerging Modes of Business', 'Social Responsibility of Business', 'Sources of Business Finance', 'Small Business', 'Internal Trade', 'International Business'],
+                    'Economics': ['Introduction to Economics', 'Theory of Consumer Behaviour', 'Demand and Supply', 'Elasticity of Demand', 'Production and Cost', 'Market Mechanism', 'Statistics: Collection and Organisation of Data', 'Measures of Central Value', 'Correlation', 'Index Numbers'],
+                    'History': ['Early Societies', 'Empires', 'Changing Traditions', 'Towards Modernisation', 'World War I and its Aftermath', 'The Russian Revolution', 'Rise of Nationalism in Asia'],
+                    'Political Science': ['Indian Constitution', 'Fundamental Rights', 'Organs of Government: Legislature', 'Organs of Government: Executive', 'Organs of Government: Judiciary', 'Federalism', 'Local Government', 'Political Theory: Liberty, Equality, Justice'],
+                    'Geography': ['Geography as a Discipline', 'The Earth: Origin and Evolution', 'Landforms', 'Climate', 'Water (Oceans)', 'Life on the Earth', 'India: Physical Environment', 'Natural Hazards and Disasters'],
+                    'Computer Science': ['Computer Fundamentals', 'Number Systems', 'Introduction to Python Programming', 'Data Types and Operators', 'Control Flow', 'Functions', 'Strings', 'Lists, Tuples and Dictionaries', 'Society, Law and Ethics']
+                },
+                '12': {
+                    'English': ['Composition', 'Report Writing', 'Article Writing', 'Proposal Writing', 'Comprehension', 'Grammar in Context', 'Prose: Prism Collection', 'Poetry: Rhapsody Collection', 'Drama: The Tempest - Acts IV and V'],
+                    'Physics': ['Electrostatics', 'Current Electricity', 'Magnetic Effects of Current and Magnetism', 'Electromagnetic Induction and Alternating Currents', 'Electromagnetic Waves', 'Optics', 'Dual Nature of Radiation and Matter', 'Atoms and Nuclei', 'Electronic Devices', 'Communication Systems'],
+                    'Chemistry': ['Solid State', 'Solutions', 'Electrochemistry', 'Chemical Kinetics', 'Surface Chemistry', 'General Principles and Processes of Isolation of Elements', 'p-Block Elements', 'd and f Block Elements', 'Coordination Compounds', 'Haloalkanes and Haloarenes', 'Alcohols, Phenols and Ethers', 'Aldehydes, Ketones and Carboxylic Acids', 'Organic Compounds Containing Nitrogen', 'Biomolecules', 'Polymers', 'Chemistry in Everyday Life'],
+                    'Mathematics': ['Relations and Functions', 'Inverse Trigonometric Functions', 'Algebra: Matrices and Determinants', 'Continuity and Differentiability', 'Applications of Derivatives', 'Integrals', 'Applications of Integrals', 'Differential Equations', 'Vectors', 'Three Dimensional Geometry', 'Linear Regression', 'Linear Programming', 'Probability'],
+                    'Biology': ['Reproduction in Organisms', 'Sexual Reproduction in Flowering Plants', 'Human Reproduction', 'Reproductive Health', 'Principles of Inheritance and Variation', 'Molecular Basis of Inheritance', 'Evolution', 'Human Health and Disease', 'Strategies for Enhancement in Food Production', 'Microbes in Human Welfare', 'Biotechnology: Principles and Processes', 'Biotechnology and its Applications', 'Organisms and Populations', 'Ecosystem', 'Biodiversity and Conservation'],
+                    'Accounts': ['Partnership Accounts: Fundamentals', 'Goodwill: Concept and Valuation', 'Admission of a Partner', 'Retirement and Death of a Partner', 'Dissolution of Partnership Firm', 'Issue of Shares', 'Issue and Redemption of Debentures', 'Final Accounts of Companies', 'Cash Flow Statement', 'Ratio Analysis'],
+                    'Commerce': ['Nature and Significance of Management', 'Principles of Management', 'Business Environment', 'Planning', 'Organising', 'Staffing', 'Directing', 'Controlling', 'Financial Management', 'Financial Markets', 'Marketing', 'Consumer Protection'],
+                    'Economics': ['National Income and Related Aggregates', 'Money and Banking', 'Aggregate Demand and its Components', 'Short-run Equilibrium Output', 'Government Budget and the Economy', 'Balance of Payments', 'Indian Economic Development', 'Comparative Development Experiences'],
+                    'History': ['Towards Independence and Partition', 'Framing of the Constitution', 'Post-War National Developments', 'The Cold War', 'Decolonisation', 'Regional Conflicts and Peace Initiatives'],
+                    'Political Science': ['Constitution and Democracy in India', 'Challenges to Indian Democracy', 'Contemporary World Order', 'India and the World', 'Social Movements'],
+                    'Geography': ['Human Geography: Nature and Scope', 'Population and Human Settlements', 'Resources and their Classification', 'Agriculture and Allied Activities', 'Industries', 'Transport and Communication', 'Regional and Economic Development of India', 'Map Work'],
+                    'Computer Science': ['Revision of Python', 'Functions and Recursion', 'File Handling', 'Data Structures: Stacks and Queues', 'Computer Networks', 'Database Concepts and SQL', 'Interface Python with SQL']
+                }
+            },
+            WBBSE: {
+                '3': {
+                    'English': ['Rhymes and Poems', 'Short Stories', 'Reading Comprehension', 'Grammar Basics: Naming Words', 'Handwriting and Composition'],
+                    'Mathematics': ['Numbers up to 1000', 'Addition', 'Subtraction', 'Multiplication', 'Division', 'Fractions: Halves and Quarters', 'Money', 'Time and Calendar', 'Measurement', 'Shapes and Patterns'],
+                    'Environmental Studies': ['My Family', 'My Body', 'Food We Eat', 'Plants Around Us', 'Animals Around Us', 'Water and Air', 'Our Festivals', 'Transport', 'Safety Rules', 'Keeping Surroundings Clean'],
+                    'Bengali': ['Sahaj Path: Kobita', 'Sahaj Path: Golpo', 'Borno Porichoy O Shobdo Gathon', 'Byakaran: Byakoron Porichoy', 'Bakya Lekha O Chitro Bornona'],
+                    'Computer Studies': ['Introduction to Computers', 'Parts of a Computer', 'Using Keyboard and Mouse', 'Drawing on Computer'],
+                    'General Knowledge': ['My State: West Bengal', 'Festivals', 'National Symbols', 'Sports and Games', 'Famous People']
+                },
+                '4': {
+                    'English': ['Poems and Recitation', 'Short Stories', 'Reading Comprehension', 'Grammar: Nouns and Pronouns', 'Grammar: Verbs and Tenses', 'Paragraph Writing'],
+                    'Mathematics': ['Numbers up to 10000', 'Roman Numerals', 'Addition and Subtraction', 'Multiplication', 'Division', 'Factors and Multiples', 'Fractions', 'Money', 'Time', 'Measurement: Length, Weight, Capacity', 'Geometry: Basic Shapes', 'Data Handling'],
+                    'Environmental Studies': ['Our Society', 'Human Body', 'Food and Health', 'Plants and Trees', 'Animals and Birds', 'Water: Sources and Uses', 'Weather and Seasons', 'Maps of Bengal', 'Communication', 'Save Environment'],
+                    'Bengali': ['Kobita O Chorha', 'Golpo', 'Natok', 'Byakaran: Karak (Intro)', 'Bakya Gathon O Rachana'],
+                    'Computer Studies': ['Computer and its Parts', 'Uses of Computer', 'Introduction to MS Paint', 'Word Processing Basics'],
+                    'General Knowledge': ['Districts of West Bengal', 'Rivers of Bengal', 'Great Personalities of Bengal', 'Sports', 'Books and Reading']
+                },
+                '5': {
+                    'English': ['Poems and Recitation', 'Short Stories', 'Drama', 'Reading Comprehension', 'Grammar: Tenses', 'Grammar: Adjectives and Adverbs', 'Letter Writing', 'Paragraph Writing'],
+                    'Mathematics': ['Large Numbers', 'Roman Numerals', 'Operations on Numbers', 'Factors and Multiples: HCF and LCM', 'Fractions', 'Decimals', 'Percentage', 'Unitary Method', 'Money', 'Metric Measures', 'Time', 'Geometry: Angles and Triangles', 'Perimeter and Area', 'Symmetry', 'Data Handling'],
+                    'Environmental Studies': ['Human Body and Health', 'Food and Nutrition', 'Plants: Life Processes', 'Animals: Adaptation', 'Air and Water', 'Soil and Crops', 'Natural Disasters', 'Our Universe', 'Pollution and Conservation'],
+                    'Bengali': ['Kobita', 'Golpo O Uponnyash Ongsho', 'Prabondho', 'Byakaran: Karak O Bibhakti', 'Patro Lekhon'],
+                    'Computer Studies': ['Computer Memory', 'Operating System Basics', 'Word Processing', 'Introduction to Internet', 'Fun with Scratch'],
+                    'General Knowledge': ['Geography of India', 'History of Bengal', 'Science and Technology', 'Environment', 'Current Affairs']
+                },
+                '6': {
+                    'English': ['Prose: Short Stories', 'Poetry', 'Reading Comprehension', 'Grammar: Parts of Speech', 'Grammar: Tenses', 'Grammar: Voice (Intro)', 'Letter Writing', 'Paragraph and Essay Writing'],
+                    'Mathematics': ['Knowing Our Numbers', 'Whole Numbers', 'Factors and Multiples', 'Integers', 'Fractions', 'Decimals', 'Introduction to Algebra', 'Ratio and Proportion', 'Basic Geometry', 'Angles', 'Triangles', 'Symmetry', 'Mensuration', 'Data Handling'],
+                    'Physical Science': ['Measurement', 'Force and Motion', 'Simple Machines', 'Light', 'Sound', 'Magnetism', 'States of Matter', 'Water and Solutions', 'Air'],
+                    'Life Science': ['Living and Non-living', 'Plants Around Us', 'Food and Nutrition', 'Human Body', 'Health and Hygiene', 'Habitat and Adaptation'],
+                    'History': ['Sources of History', 'Prehistoric Age', 'Indus Valley Civilization', 'Vedic Age', 'Jainism and Buddhism', 'Mauryan Empire', 'Gupta Empire'],
+                    'Geography': ['Earth and the Solar System', 'Globe: Latitudes and Longitudes', 'Motions of the Earth', 'Maps', 'Major Landforms', 'India: Physical Features'],
+                    'Bengali': ['Sahitya: Kobita', 'Sahitya: Golpo', 'Sahitya: Natok', 'Byakaran: Karak', 'Byakaran: Sandhi', 'Rachana: Anucched Lekhon'],
+                    'Computer Applications': ['Computer Fundamentals', 'Word Processing', 'Spreadsheets Basics', 'Internet and E-mail', 'Algorithms and Flowcharts']
+                },
+                '7': {
+                    'English': ['Prose: Short Stories', 'Poetry', 'Reading Comprehension', 'Grammar: Tenses', 'Grammar: Voice', 'Grammar: Narration (Intro)', 'Letter Writing', 'Essay Writing'],
+                    'Mathematics': ['Integers', 'Rational Numbers', 'Fractions and Decimals', 'Exponents', 'Ratio and Proportion', 'Percentage', 'Profit and Loss', 'Algebraic Expressions', 'Linear Equations', 'Lines and Angles', 'Triangles', 'Congruence', 'Mensuration', 'Data Handling'],
+                    'Physical Science': ['Measurement and Units', 'Motion', 'Heat', 'Light', 'Electricity', 'Acids, Bases and Salts (Basic)', 'Metals and Non-metals (Basic)'],
+                    'Life Science': ['Cell: Basic Unit of Life', 'Tissues', 'Nutrition in Plants and Animals', 'Respiration', 'Transportation in Living Beings', 'Reproduction in Plants', 'Environment and its Balance'],
+                    'History': ['The Delhi Sultanate', 'The Mughal Empire', 'Bhakti and Sufi Movements', 'Vijayanagara Empire', 'Regional Kingdoms'],
+                    'Geography': ['Environment', 'Atmosphere', 'Oceans and Seas', 'Weather and Climate', 'Soil', 'Natural Vegetation and Wildlife'],
+                    'Bengali': ['Sahitya: Kobita', 'Sahitya: Golpo', 'Sahitya: Prabondho', 'Byakaran: Samas', 'Byakaran: Muhavara', 'Rachana: Patro Lekhon'],
+                    'Computer Applications': ['Number System', 'HTML Basics', 'Spreadsheets: Formulas', 'Internet Services', 'Introduction to Programming']
+                },
+                '8': {
+                    'English': ['Prose: Short Stories', 'Poetry', 'Reading Comprehension', 'Grammar: Voice', 'Grammar: Narration', 'Grammar: Transformation of Sentences', 'Letter and Application Writing', 'Essay Writing'],
+                    'Mathematics': ['Rational Numbers', 'Exponents and Powers', 'Squares and Square Roots', 'Cubes and Cube Roots', 'Percentage and its Applications', 'Simple and Compound Interest', 'Algebraic Expressions and Identities', 'Factorisation', 'Linear Equations', 'Polygons and Quadrilaterals', 'Constructions', 'Mensuration', 'Data Handling and Probability'],
+                    'Physical Science': ['Force and Pressure', 'Friction', 'Sound', 'Light', 'Electricity', 'Chemical Effects of Electric Current', 'Synthetic Fibres and Plastics', 'Metals and Non-metals'],
+                    'Life Science': ['Cell Division', 'Microorganisms: Friends and Foe', 'Crop Production and Management', 'Conservation of Plants and Animals', 'Reproduction in Animals', 'Reaching the Age of Adolescence'],
+                    'History': ['Advent of the Europeans in India', 'Establishment of British Rule', 'The Revolt of 1857', 'Social and Religious Reform Movements', 'Rise of Nationalism'],
+                    'Geography': ['Resources: Types and Conservation', 'Agriculture', 'Industries', 'Transport and Communication', 'Asia and India: Regional Studies', 'Disaster Management'],
+                    'Bengali': ['Sahitya: Kobita', 'Sahitya: Golpo O Uponnyash', 'Sahitya: Natok O Prabondho', 'Byakaran: Bachyo', 'Byakaran: Oboyob', 'Rachana: Prabandha Lekhon'],
+                    'Computer Applications': ['Operating System', 'Advanced HTML', 'Spreadsheets: Charts', 'Computer Networks', 'Python Basics', 'Cyber Safety']
+                },
+                '9': {
+                    'English': ['Tales of Bhola Grandpa', 'All About a Dog', 'Autumn (Poem)', 'A Day in the Zoo', 'All Summer in a Day', 'Mild the Mist upon the Hill (Poem)', 'Tom Loses a Tooth', 'Reading Comprehension', 'Grammar: Voice and Narration', 'Writing: Notice, Letter, Paragraph'],
+                    'Mathematics': ['Real Numbers', 'Laws of Indices', 'Graph', 'Co-ordinate Geometry', 'Properties of Parallelogram', 'Theorems on Transversals and Mid-points', 'Theorems Involving Area', 'Construction: Parallelogram and Triangle', 'Pythagoras Theorem', 'Logarithm', 'Polynomials', 'Statistics'],
+                    'Physical Science': ['Measurement', 'Force and Motion', 'Atomic Structure', 'Mole Concept', 'Acids, Bases and Salts', 'Work, Power and Energy', 'Sound', 'Light', 'Heat', 'Separation of Components of Mixtures', 'Water'],
+                    'Life Science': ['Cell: Structure and Functions', 'Cell Division', 'Tissues', 'Classification of Living World', 'Diversity of Plant and Animal Life', 'Ecosystem', 'Biodiversity and Conservation'],
+                    'History': ['Some Aspects of the French Revolution', 'Revolutionary Ideas in Europe', 'Industrial Revolution and Colonialism', 'Colonialism in India', 'Resistance to Colonial Rule'],
+                    'Geography': ['Earth as a Planet', 'Determination of Location of a Place on the Earth', 'Movements of the Earth', 'Internal Structure of the Earth', 'Weathering', 'Rivers: Work and Landforms', 'Atmosphere', 'Ocean'],
+                    'Bengali': ['Sahitya Sanchayan: Gadya', 'Sahitya Sanchayan: Padya', 'Byakaran: Karak O Samas', 'Rachana O Patro Lekhon'],
+                    'Computer Applications': ['Computer System Overview', 'Problem Solving: Algorithms and Flowcharts', 'Introduction to Python', 'Data Handling in Spreadsheets', 'Internet and Cyber Security']
+                },
+                '10': {
+                    'English': ["Father's Help", 'Fable (Poem)', 'The Passing Away of Bapu', 'The Cat (Poem)', 'My Own True Family (Poem)', 'Our Runaway Kite', 'Sea Fever (Poem)', 'The Snail (Poem)', 'Reading Comprehension', 'Grammar: Voice, Narration, Transformation', 'Writing: Notice, Report, Letter, Paragraph, Story'],
+                    'Mathematics': ['Quadratic Equations in One Variable', 'Simple Interest', 'Theorems Related to Circle', 'Rectangular Parallelepiped or Cuboid', 'Ratio and Proportion', 'Compound Interest and Uniform Rate of Increase or Decrease', 'Theorems Related to Angles in a Circle', 'Right Circular Cylinder', 'Quadratic Surd', 'Theorems Related to Cyclic Quadrilateral', 'Construction: Circumcircle and Incircle of a Triangle', 'Sphere', 'Variation', 'Partnership Business', 'Right Circular Cone', 'Construction: Similarity and Mean Proportional', 'Trigonometry: Concept of Measurement of Angle', 'Trigonometric Ratios and Identities', 'Complementary Angles', 'Heights and Distances', 'Statistics: Mean, Median, Mode, Ogive'],
+                    'Physical Science': ['Physical and Chemical Classification of Matter', 'Behavior of Gases', 'Chemical Calculations', 'Periodic Table and Periodic Properties', 'Ionic and Covalent Bond', 'Acids, Bases and Salts', 'Metallurgy', 'Organic Chemistry', 'Environment and Pollution', 'Light', 'Force and Motion', 'Work, Power and Energy', 'Heat', 'Wave and Sound', 'Electricity and Magnetism', 'Atomic Nucleus'],
+                    'Life Science': ['Control and Coordination in Living Organisms', 'Continuity of Life', 'Heredity and Common Genetic Diseases', 'Evolution and Adaptation', 'Environment, Ecology and Ecosystem', 'Biodiversity and Conservation'],
+                    'History': ['Ideas of History', 'Reform: Characteristics and Observations', 'Resistance and Rebellion', 'Early Developments of Nationalism', 'Rise of Nationalism in Europe', 'Second World War and After', 'Movements Organized by Women, Students and Marginal People in 20th Century India', 'Post-Colonial India: Second Half of the 20th Century'],
+                    'Geography': ['Exogenetic Processes and Resultant Landforms', 'Atmosphere', 'Hydrosphere', 'Waste Management', 'India: Physical Environment', 'Economic Development of India', 'Satellite Imageries and Topographical Maps', 'Map Work'],
+                    'Bengali': ['Sahitya Sanchayan: Gadya', 'Sahitya Sanchayan: Padya', 'Byakaran: Karak, Samas O Bachyo', 'Rachana, Patro Lekhon O Pratibedon'],
+                    'Computer Applications': ['Computer Fundamentals', 'Introduction to Python Programming', 'Control Statements', 'Lists and Tuples', 'Database Basics', 'Networking and Cyber Security']
+                },
+                '11': {
+                    'English': ['Prose: Short Stories and Essays', 'Poetry', 'Rapid Reader', 'Comprehension', 'Grammar: Textual and Applied', 'Writing: Report, Letter, Precis, Essay'],
+                    'Bengali': ['Sahitya: Gadya', 'Sahitya: Padya', 'Bhasha O Byakaran', 'Rachana O Pratibedon'],
+                    'Physics': ['Physical World and Measurement', 'Kinematics', 'Laws of Motion', 'Work, Energy and Power', 'Motion of System of Particles and Rigid Body', 'Gravitation', 'Properties of Bulk Matter', 'Thermodynamics', 'Kinetic Theory of Gases', 'Oscillations and Waves'],
+                    'Chemistry': ['Some Basic Concepts of Chemistry', 'Structure of Atom', 'Classification of Elements and Periodicity', 'Chemical Bonding and Molecular Structure', 'States of Matter', 'Thermodynamics', 'Equilibrium', 'Redox Reactions', 'Organic Chemistry: Basic Principles and Techniques', 'Hydrocarbons'],
+                    'Mathematics': ['Sets', 'Relations and Functions', 'Trigonometric Functions', 'Principle of Mathematical Induction', 'Complex Numbers and Quadratic Equations', 'Linear Inequalities', 'Permutations and Combinations', 'Binomial Theorem', 'Sequences and Series', 'Straight Lines', 'Conic Sections', 'Introduction to Three Dimensional Geometry', 'Limits and Derivatives', 'Mathematical Reasoning', 'Statistics', 'Probability'],
+                    'Biology': ['The Living World', 'Biological Classification', 'Plant Kingdom', 'Animal Kingdom', 'Morphology of Flowering Plants', 'Anatomy of Flowering Plants', 'Structural Organisation in Animals', 'Cell: The Unit of Life', 'Biomolecules', 'Cell Cycle and Cell Division', 'Transport in Plants', 'Photosynthesis in Higher Plants', 'Respiration in Plants', 'Plant Growth and Development', 'Digestion and Absorption', 'Breathing and Exchange of Gases', 'Body Fluids and Circulation', 'Excretory Products and their Elimination', 'Locomotion and Movement', 'Neural Control and Coordination', 'Chemical Coordination and Integration'],
+                    'Accountancy': ['Introduction to Accounting', 'Theory Base of Accounting', 'Recording of Transactions', 'Bank Reconciliation Statement', 'Trial Balance and Rectification of Errors', 'Depreciation, Provisions and Reserves', 'Bill of Exchange', 'Financial Statements', 'Accounts from Incomplete Records'],
+                    'Business Studies': ['Nature and Purpose of Business', 'Forms of Business Organisation', 'Private, Public and Global Enterprises', 'Business Services', 'Emerging Modes of Business', 'Social Responsibility of Business', 'Sources of Business Finance', 'Small Business', 'Internal Trade', 'International Business'],
+                    'Economics': ['Statistics for Economics: Introduction', 'Collection, Organisation and Presentation of Data', 'Measures of Central Tendency', 'Measures of Dispersion', 'Correlation', 'Index Numbers', 'Introduction to Microeconomics', 'Theory of Consumer Behaviour', 'Production and Cost', 'Market under Perfect Competition'],
+                    'History': ['From the Beginning of Time', 'Writing and City Life', 'An Empire Across Three Continents', 'The Central Islamic Lands', 'Nomadic Empires', 'The Three Orders', 'Changing Cultural Traditions', 'The Industrial Revolution', 'Displacing Indigenous Peoples', 'Paths to Modernisation'],
+                    'Political Science': ['Constitution: Why and How', 'Rights in the Indian Constitution', 'Election and Representation', 'Executive', 'Legislature', 'Judiciary', 'Federalism', 'Local Governments', 'Political Theory: An Introduction', 'Freedom', 'Equality', 'Social Justice', 'Rights', 'Citizenship', 'Nationalism', 'Secularism'],
+                    'Geography': ['Geography as a Discipline', 'The Origin and Evolution of the Earth', 'Interior of the Earth', 'Distribution of Oceans and Continents', 'Minerals and Rocks', 'Geomorphic Processes', 'Landforms and their Evolution', 'Composition and Structure of Atmosphere', 'Solar Radiation and Heat Balance', 'Atmospheric Circulation and Weather Systems', 'Water in the Atmosphere', 'Water (Oceans)', 'India: Physical Environment', 'Natural Hazards and Disasters'],
+                    'Computer Science': ['Computer System', 'Encoding Schemes and Number System', 'Introduction to Problem Solving', 'Getting Started with Python', 'Flow of Control', 'Functions', 'Strings', 'Lists', 'Tuples and Dictionaries', 'Societal Impact']
+                },
+                '12': {
+                    'English': ['Prose: Short Stories and Essays', 'Poetry', 'Play: Drama Extracts', 'Comprehension', 'Grammar: Textual and Applied', 'Writing: Report, Letter, Precis, Essay'],
+                    'Bengali': ['Sahitya: Gadya', 'Sahitya: Padya', 'Bhasha O Byakaran', 'Rachana O Pratibedon'],
+                    'Physics': ['Electric Charges and Fields', 'Electrostatic Potential and Capacitance', 'Current Electricity', 'Moving Charges and Magnetism', 'Magnetism and Matter', 'Electromagnetic Induction', 'Alternating Current', 'Electromagnetic Waves', 'Ray Optics and Optical Instruments', 'Wave Optics', 'Dual Nature of Radiation and Matter', 'Atoms', 'Nuclei', 'Semiconductor Electronics'],
+                    'Chemistry': ['Solid State', 'Solutions', 'Electrochemistry', 'Chemical Kinetics', 'Surface Chemistry', 'p-Block Elements', 'd and f Block Elements', 'Coordination Compounds', 'Haloalkanes and Haloarenes', 'Alcohols, Phenols and Ethers', 'Aldehydes, Ketones and Carboxylic Acids', 'Amines', 'Biomolecules', 'Polymers', 'Chemistry in Everyday Life'],
+                    'Mathematics': ['Relations and Functions', 'Inverse Trigonometric Functions', 'Matrices', 'Determinants', 'Continuity and Differentiability', 'Applications of Derivatives', 'Integrals', 'Applications of Integrals', 'Differential Equations', 'Vector Algebra', 'Three Dimensional Geometry', 'Linear Programming', 'Probability'],
+                    'Biology': ['Reproduction in Organisms', 'Sexual Reproduction in Flowering Plants', 'Human Reproduction', 'Reproductive Health', 'Principles of Inheritance and Variation', 'Molecular Basis of Inheritance', 'Evolution', 'Human Health and Disease', 'Microbes in Human Welfare', 'Biotechnology: Principles and Processes', 'Biotechnology and its Applications', 'Organisms and Populations', 'Ecosystem', 'Biodiversity and Environmental Issues'],
+                    'Accountancy': ['Accounting for Partnership: Basic Concepts', 'Admission of a Partner', 'Retirement/Death of a Partner', 'Dissolution of Partnership Firm', 'Accounting for Share Capital', 'Issue and Redemption of Debentures', 'Financial Statements of a Company', 'Analysis of Financial Statements', 'Accounting Ratios', 'Cash Flow Statement'],
+                    'Business Studies': ['Nature and Significance of Management', 'Principles of Management', 'Business Environment', 'Planning', 'Organising', 'Staffing', 'Directing', 'Controlling', 'Financial Management', 'Financial Markets', 'Marketing Management', 'Consumer Protection'],
+                    'Economics': ['Macroeconomics: Introduction', 'National Income Accounting', 'Money and Banking', 'Determination of Income and Employment', 'Government Budget and the Economy', 'Open Economy Macroeconomics', 'Indian Economic Development', 'Current Challenges Facing the Indian Economy'],
+                    'History': ['Bricks, Beads and Bones', 'Kings, Farmers and Towns', 'Kinship, Caste and Class', 'Thinkers, Beliefs and Buildings', 'Through the Eyes of Travellers', 'Bhakti-Sufi Traditions', 'An Imperial Capital: Vijayanagara', 'Peasants, Zamindars and the State', 'Colonialism and the Countryside', 'Rebels and the Raj', 'Mahatma Gandhi and the Nationalist Movement', 'Framing the Constitution'],
+                    'Political Science': ['The Cold War Era', 'The End of Bipolarity', 'Contemporary Centres of Power', 'Contemporary South Asia', 'International Organisations', 'Security in the Contemporary World', 'Environment and Natural Resources', 'Globalisation', 'Challenges of Nation Building', 'Era of One-Party Dominance', "India's External Relations", 'Regional Aspirations', 'Recent Developments in Indian Politics'],
+                    'Geography': ['Human Geography: Nature and Scope', 'The World Population', 'Human Development', 'Primary and Secondary Activities', 'Tertiary and Quaternary Activities', 'Transport, Communication and International Trade', 'Population of India: Distribution and Composition', 'Land Resources and Agriculture', 'Water Resources', 'Mineral and Energy Resources', 'Planning and Sustainable Development', 'Geographical Perspective on Selected Issues'],
+                    'Computer Science': ['Exception Handling in Python', 'File Handling in Python', 'Stack', 'Computer Network', 'Database and SQL', 'Interface Python with mySQL', 'Project Work']
+                }
+            }
+        };
+
         function deepCloneJson(value) {
             return JSON.parse(JSON.stringify(value === undefined ? null : value));
         }
@@ -8341,14 +8874,34 @@ body.header-offscreen .header-kicker::after {
         function buildInitialSyllabusCatalog() {
             const catalog = {
                 seed_version: SYLLABUS_SEED_VERSION,
-                sources: [],
+                sources: cloneSeed(SYLLABUS_INTERNET_SOURCES),
                 boards: {}
             };
 
             SYLLABUS_BOARDS.forEach(board => {
                 const boardData = { classes: {} };
+                const stageSubjectsByBoard = SYLLABUS_SUBJECTS_BY_BOARD_STAGE[board] || {};
+                const catalogBoard = SYLLABUS_CATALOG_2026[board] || {};
                 SYLLABUS_CLASSES.forEach(classLevel => {
-                    boardData.classes[String(classLevel)] = { subjects: {} };
+                    const stage = getSyllabusStage(classLevel);
+                    const stageSubjects = Array.isArray(stageSubjectsByBoard[stage]) ? stageSubjectsByBoard[stage] : [];
+                    const catalogSubjects = catalogBoard[String(classLevel)] || {};
+                    const subjectNames = Array.from(new Set([...stageSubjects, ...Object.keys(catalogSubjects)]));
+                    const subjects = {};
+                    subjectNames.forEach(subjectName => {
+                        const chapters = Array.isArray(catalogSubjects[subjectName]) ? catalogSubjects[subjectName] : [];
+                        const seen = new Set();
+                        subjects[subjectName] = chapters
+                            .map(ch => String(ch || '').trim())
+                            .filter(ch => {
+                                if (!ch) return false;
+                                const key = ch.toLowerCase();
+                                if (seen.has(key)) return false;
+                                seen.add(key);
+                                return true;
+                            });
+                    });
+                    boardData.classes[String(classLevel)] = { subjects };
                 });
                 catalog.boards[board] = boardData;
             });
@@ -43760,9 +44313,22 @@ body.header-offscreen .header-kicker::after {
 
         function _feeModeLabel(mode) {
             const labels = { cash: 'Cash', upi: 'UPI', bank: 'Bank/NEFT', cheque: 'Cheque',
-                             waiver: 'Waiver', scholarship: 'Scholarship', other: 'Other' };
+                             waiver: 'Waiver', scholarship: 'Scholarship', skipped: 'Skipped', other: 'Other' };
             return labels[mode] || mode || 'Cash';
         }
+
+        // Pre-listed reasons for marking a fee cycle as skipped (unpaid but settled).
+        const FEE_SKIP_REASONS = [
+            'Long leave',
+            'Family emergency',
+            'Financial hardship',
+            'Holiday break (no classes)',
+            'Scholarship applied',
+            'Medical leave',
+            'Exam break',
+            'Transferred out',
+            'Disciplinary hold'
+        ];
 
         function _feeCatLabel(cat) {
             const labels = { tuition: 'Tuition', exam: 'Exam Fee', library: 'Library',
@@ -44365,6 +44931,236 @@ body.header-offscreen .header-kicker::after {
             });
         }
 
+        // ── SKIP MODAL ────────────────────────────────────────────────────────────
+        // Marks fee cycle(s) as skipped (unpaid but settled) with a reason. The cycle
+        // anchor (start_date) advances exactly like a payment so skipped months stop
+        // accumulating as overdue. A mode:'skipped' / amount:0 history entry is added
+        // per skipped cycle for audit trail. last_paid_date is NOT updated (no money
+        // changed hands).
+        let _feeSkipMonthsSelected = 1;
+
+        function _isLatestHistorySkip(record) {
+            // True when the most recent non-reversed, non-reversal history entry is a
+            // skip — used to show a "Skipped" status instead of "Advance ⚡".
+            const history = Array.isArray(record && record.payment_history) ? record.payment_history : [];
+            if (!history.length) return false;
+            const sorted = history.slice().sort((a, b) => {
+                const da = String(a.date || a.paid_on || '');
+                const dbb = String(b.date || b.paid_on || '');
+                return dbb.localeCompare(da);
+            });
+            const latest = sorted[0];
+            return !!latest && latest.mode === 'skipped' && latest.status !== 'reversed' && !latest.is_reversal;
+        }
+
+        function _selectFeeSkipMonths(months, totalOverdue) {
+            _feeSkipMonthsSelected = months;
+            document.querySelectorAll('#feeSkipMonthButtons button').forEach(btn => {
+                const sel = parseInt(btn.dataset.months, 10) === months;
+                btn.style.borderColor = sel ? 'rgba(203,213,225,0.7)' : '';
+                btn.style.color = sel ? '#cbd5e1' : '';
+            });
+            _updateFeeSkipPreview(months, totalOverdue);
+        }
+
+        function _updateFeeSkipPreview(months, totalOverdue) {
+            const previewEl = document.getElementById('feeSkipPreview');
+            const hintEl = document.getElementById('feeSkipConsolidatedHint');
+            if (previewEl) {
+                previewEl.textContent = months > 1 ? `Will skip ${months} month(s) — no fee recorded.` : 'Will skip 1 month — no fee recorded.';
+            }
+            if (hintEl && totalOverdue != null) {
+                if (months < totalOverdue) {
+                    hintEl.textContent = `⚠ ${totalOverdue - months} month(s) still unpaid — status stays Overdue.`;
+                    hintEl.style.color = '#fbbf24';
+                } else {
+                    hintEl.textContent = `✓ All overdue months skipped — status becomes Skipped (next due starts fresh).`;
+                    hintEl.style.color = '#94a3b8';
+                }
+            }
+        }
+
+        function _populateFeeSkipReasons() {
+            const sel = document.getElementById('feeSkipReason');
+            if (!sel) return;
+            sel.innerHTML = '<option value="">— Select a reason —</option>' +
+                FEE_SKIP_REASONS.map(r => `<option value="${escapeHtml(r)}">${escapeHtml(r)}</option>`).join('') +
+                '<option value="__other__">Other (specify)…</option>';
+        }
+
+        function _onFeeSkipReasonChange() {
+            const sel = document.getElementById('feeSkipReason');
+            const otherWrap = document.getElementById('feeSkipOtherWrap');
+            if (!sel || !otherWrap) return;
+            otherWrap.style.display = sel.value === '__other__' ? '' : 'none';
+        }
+
+        function openFeeSkipModal(studentId, anchorEl = null) {
+            if (currentUserRole !== 'admin') return;
+            _feeModalStudentId = studentId;
+            const studentKey = String(studentId);
+            const record = normalizeFeeRecord(db.getFeeRecords().find(r => String(r.studentId) === studentKey));
+            const student = db.getStudents().find(s => s.id === studentId);
+            const fallbackAmt = Number.isFinite(Number(student && student.fees)) ? Number(student.fees) : 0;
+            const amount = Number.isFinite(Number(record.amount)) ? Number(record.amount) : fallbackAmt;
+            const today = new Date().toISOString().split('T')[0];
+
+            const { overdue, advance, dueDate } = getPendingCycles(record);
+
+            // Default: skip all overdue months; if none overdue, skip 1 (current cycle)
+            _feeSkipMonthsSelected = overdue > 0 ? overdue : 1;
+
+            const infoEl = document.getElementById('feeSkipInfo');
+            const overdueInfo = overdue > 1
+                ? `<strong>Overdue months:</strong> ${overdue}<br>` : '';
+            infoEl.innerHTML = `
+                <strong>Student:</strong> ${student ? (student.base_name || student.name || student.roll) : studentId}<br>
+                <strong>Monthly fee:</strong> ₹${amount || 0}<br>
+                ${overdueInfo}<strong>Today:</strong> ${formatDateLabel(today)}
+            `;
+
+            const noteEl = document.getElementById('feeSkipNote');
+            if (!record.start_date) {
+                noteEl.innerHTML = `⚠️ <strong>No start date set.</strong> Use ✏️ Edit to set a cycle start date before skipping.`;
+                noteEl.style.color = '#fbbf24';
+                noteEl.classList.remove('hidden');
+            } else if (advance) {
+                noteEl.innerHTML = `ℹ️ <strong>Fee not due until ${formatDateLabel(dueDate)}.</strong> Skipping will advance the cycle anyway.`;
+                noteEl.style.color = '#67e8f9';
+                noteEl.classList.remove('hidden');
+            } else {
+                noteEl.innerHTML = `ℹ️ Skipping marks the cycle as settled <strong>without payment</strong>. The reason is recorded in the ledger.`;
+                noteEl.style.color = '#94a3b8';
+                noteEl.classList.remove('hidden');
+            }
+
+            // Multi-month selector
+            const consolidatedWrap = document.getElementById('feeSkipConsolidatedWrap');
+            const monthButtons = document.getElementById('feeSkipMonthButtons');
+            if (overdue > 1) {
+                consolidatedWrap.style.display = '';
+                monthButtons.innerHTML = '';
+                for (let m = 1; m <= overdue; m++) {
+                    const btn = document.createElement('button');
+                    btn.className = 'secondary';
+                    const isSelected = m === _feeSkipMonthsSelected;
+                    btn.style.cssText = `font-size:12px;padding:4px 10px;${isSelected ? 'border-color:rgba(203,213,225,0.7);color:#cbd5e1;' : ''}`;
+                    btn.textContent = m === 1 ? '1 month' : m === overdue ? `All ${m} (clear dues)` : `${m} months`;
+                    btn.dataset.months = m;
+                    btn.onclick = () => _selectFeeSkipMonths(m, overdue);
+                    monthButtons.appendChild(btn);
+                }
+                _updateFeeSkipPreview(_feeSkipMonthsSelected, overdue);
+            } else {
+                consolidatedWrap.style.display = 'none';
+                _updateFeeSkipPreview(1, null);
+            }
+
+            // Reason dropdown
+            _populateFeeSkipReasons();
+            const reasonSel = document.getElementById('feeSkipReason');
+            if (reasonSel) reasonSel.onchange = _onFeeSkipReasonChange;
+            const otherWrap = document.getElementById('feeSkipOtherWrap');
+            if (otherWrap) otherWrap.style.display = 'none';
+            const otherInput = document.getElementById('feeSkipOtherReason');
+            if (otherInput) otherInput.value = '';
+            const noteInput = document.getElementById('feeSkipNoteText');
+            if (noteInput) noteInput.value = '';
+
+            openFeeModalNearAnchor('feeSkipModal', anchorEl);
+        }
+
+        async function confirmFeeSkipModal() {
+            if (currentUserRole !== 'admin' || _feeModalStudentId === null) return;
+            const studentId = _feeModalStudentId;
+            const reasonSel = document.getElementById('feeSkipReason');
+            const reason = reasonSel ? reasonSel.value.trim() : '';
+            if (!reason) {
+                showAlert('Please select a reason for skipping the month.', 'warning');
+                return;
+            }
+            let reasonText = reason;
+            if (reason === '__other__') {
+                const other = (document.getElementById('feeSkipOtherReason') || {}).value.trim();
+                if (!other) {
+                    showAlert('Please specify the reason.', 'warning');
+                    return;
+                }
+                reasonText = other;
+            }
+            const extraNote = (document.getElementById('feeSkipNoteText') || {}).value.trim();
+
+            const studentKey = String(studentId);
+            const record = normalizeFeeRecord(db.getFeeRecords().find(r => String(r.studentId) === studentKey));
+            const period = Math.max(1, parseInt(record.period_months, 10) || 1);
+            const today = new Date().toISOString().split('T')[0];
+
+            const { overdue, advance } = getPendingCycles(record);
+            const monthsToSkip = _feeSkipMonthsSelected || 1;
+
+            // Build one skip history entry per cycle, each with its own cycle window
+            const history = Array.isArray(record.payment_history) ? record.payment_history.slice() : [];
+            let cycleStart = getEffectiveFeeStartDate(record);
+
+            for (let i = 0; i < monthsToSkip; i++) {
+                const cycleDue = addMonths(cycleStart, period);
+                let txnTag;
+                if (monthsToSkip > 1 && i < overdue) {
+                    txnTag = `skip (${i + 1}/${monthsToSkip}) | ${cycleStart} → ${cycleDue}`;
+                } else if (advance && monthsToSkip === 1) {
+                    txnTag = `skip (advance) | ${cycleStart} → ${cycleDue}`;
+                } else {
+                    txnTag = `skip | ${cycleStart} → ${cycleDue}`;
+                }
+                const reasonTag = `reason: ${reasonText}`;
+                const fullNote = extraNote ? `${txnTag} | ${reasonTag} | ${extraNote}` : `${txnTag} | ${reasonTag}`;
+                history.push({
+                    txn_id: _generateTxnId(),
+                    date: today,
+                    amount: 0,
+                    mode: 'skipped',
+                    category: record.category || 'tuition',
+                    note: fullNote,
+                    recorded_by: _getOperator(),
+                    status: 'confirmed',
+                });
+                cycleStart = cycleDue; // advance cursor for next cycle
+            }
+
+            // New start_date = original start advanced by monthsToSkip cycles
+            const newStartDate = cycleStart;
+
+            const updatePayload = {
+                amount: record.amount,
+                pending_amount: record.pending_amount,
+                payment_history: history,
+                start_date: newStartDate,
+                // last_paid_date intentionally NOT updated — no payment occurred
+            };
+
+            closeFeeModal('feeSkipModal');
+
+            let saved = false;
+            try {
+                saved = !!saveFeeRecord(studentId, updatePayload);
+            } catch (e) { saved = false; }
+
+            if (!saved) {
+                loadFeesTab();
+                showAlert('Save failed locally. Click Refresh and retry.', 'warning');
+                return;
+            }
+
+            const msg = monthsToSkip > 1
+                ? `⏭️ ${monthsToSkip} month(s) skipped — reason: ${reasonText}`
+                : `⏭️ Month skipped — reason: ${reasonText}`;
+
+            setTimeout(() => { loadFeesTab(); showAlert(msg, 'success'); }, 0);
+            syncFeeChangeNow().catch(() => {
+                showAlert('Saved locally. Server sync will retry in background.', 'warning');
+            });
+        }
+
         // ── PARTIAL MODAL ─────────────────────────────────────────────────────────
         function openFeePartialModal(studentId, anchorEl = null) {
             if (currentUserRole !== 'admin') return;
@@ -44520,14 +45316,29 @@ body.header-offscreen .header-kicker::after {
                 const rows = sorted.map(row => {
                     const entry = row.entry;
                     const entryNote = String(entry.note || '').toLowerCase();
-                    const userNote = entryNote.replace(/^(early_payment_before_due:\S+|regular_payment|partial)\s*\|?\s*/i, '').trim();
+                    const isSkip = entry.mode === 'skipped';
                     const isReversal = !!entry.is_reversal;
                     const isReversed = entry.status === 'reversed';
                     const amount = Number(entry.amount) || 0;
 
+                    // Clean display note: strip internal cycle/tag prefixes.
+                    let userNote;
+                    if (isSkip) {
+                        // skip notes look like: "skip (...) | <cycle> | reason: <reason> | <extra>"
+                        const reasonMatch = String(entry.note || '').match(/reason:\s*([^|]+)/i);
+                        const reasonTxt = reasonMatch ? reasonMatch[1].trim() : '';
+                        // Anything after the reason tag is the user's extra note.
+                        const afterReason = String(entry.note || '').split(/reason:[^|]*\|?/i).slice(1).join('|').trim();
+                        userNote = [reasonTxt, afterReason].filter(Boolean).join(' · ');
+                    } else {
+                        userNote = entryNote.replace(/^(early_payment_before_due:\S+|regular_payment|partial)\s*\|?\s*/i, '').trim();
+                    }
+
                     let typeLabel;
                     if (isReversal) {
                         typeLabel = '<span class="fee-reversal-badge">REVERSAL</span>';
+                    } else if (isSkip) {
+                        typeLabel = '<span class="fee-hist-skip">Skipped</span>';
                     } else if (entryNote.includes('early_payment_before_due')) {
                         const dueMatch = entryNote.match(/early_payment_before_due:(\S+)/);
                         typeLabel = `<span class="fee-hist-early">${dueMatch ? 'Early (before ' + formatDateLabel(dueMatch[1]) + ')' : 'Early'}</span>`;
@@ -44544,24 +45355,28 @@ body.header-offscreen .header-kicker::after {
                     const noteText = userNote ? `<div style="font-size:11px;color:#64748b;">${escapeHtml(userNote)}</div>` : '';
                     const opText = entry.recorded_by ? `<div style="font-size:10px;color:#475569;">by ${escapeHtml(entry.recorded_by)}</div>` : '';
 
-                    const amtColor = isReversal ? '#fca5a5' : (isReversed ? '#64748b' : '#4ade80');
-                    const amtPrefix = isReversal ? '−' : '+';
+                    const amtColor = isReversal ? '#fca5a5' : (isReversed ? '#64748b' : (isSkip ? '#94a3b8' : '#4ade80'));
+                    const amtPrefix = isReversal ? '−' : (isSkip ? '' : '+');
+                    const amtDisplay = isSkip ? '—' : `₹${Math.abs(amount).toLocaleString('en-IN')}`;
 
                     const bal = balByIdx[row.idx];
                     const balText = (bal !== undefined) ? `<div class="fee-running-balance ${bal >= 0 ? 'positive' : 'negative'}" title="Running balance">Σ ₹${Math.round(bal).toLocaleString('en-IN')}</div>` : '';
 
+                    // Skips are non-payments: no receipt, but reversible for audit/undo.
+                    const canReceipt = entry.txn_id && !isReversal && !isReversed && !isSkip;
+                    const canReverse = entry.txn_id && !isReversal && !isReversed;
                     const actionBtns = isAdmin ? `
                         <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end;">
-                            ${entry.txn_id && !isReversal && !isReversed ? `<button class="fee-receipt-btn" onclick="handleOpenFeeReceipt(this)" data-entry="${escapeHtml(JSON.stringify(entry))}" data-student="${escapeHtml(JSON.stringify(student || {}))}">🧾 Receipt</button>` : ''}
-                            ${entry.txn_id && !isReversal && !isReversed ? `<button class="fee-reverse-btn" onclick="reverseFeeTransaction(${studentId}, '${escapeHtml(escapeJsInlineString(entry.txn_id || ''))}')">↩ Reverse</button>` : ''}
+                            ${canReceipt ? `<button class="fee-receipt-btn" onclick="handleOpenFeeReceipt(this)" data-entry="${escapeHtml(JSON.stringify(entry))}" data-student="${escapeHtml(JSON.stringify(student || {}))}">🧾 Receipt</button>` : ''}
+                            ${canReverse ? `<button class="fee-reverse-btn" onclick="reverseFeeTransaction(${studentId}, '${escapeHtml(escapeJsInlineString(entry.txn_id || ''))}')">↩ Reverse</button>` : ''}
                             ${!entry.txn_id ? `<button class="fee-delete-entry" onclick="removeFeeHistoryEntry(${studentId}, ${row.idx})">🗑️</button>` : ''}
                         </div>
-                    ` : (entry.txn_id && !isReversal && !isReversed ? `<button class="fee-receipt-btn" onclick="handleOpenFeeReceipt(this)" data-entry="${escapeHtml(JSON.stringify(entry))}" data-student="${escapeHtml(JSON.stringify(student || {}))}">🧾 Receipt</button>` : '');
+                    ` : (canReceipt ? `<button class="fee-receipt-btn" onclick="handleOpenFeeReceipt(this)" data-entry="${escapeHtml(JSON.stringify(entry))}" data-student="${escapeHtml(JSON.stringify(student || {}))}">🧾 Receipt</button>` : '');
 
                     const trClass = isReversed ? 'fee-hist-reversed' : (isReversal ? 'fee-hist-reversal' : '');
                     return `<tr class="${trClass}">
                         <td style="min-width:90px;">${formatDateLabel(entry.date || entry.paid_on || '-')}</td>
-                        <td style="font-weight:700;color:${amtColor};white-space:nowrap;">${amtPrefix}₹${Math.abs(amount).toLocaleString('en-IN')}</td>
+                        <td style="font-weight:700;color:${amtColor};white-space:nowrap;">${amtPrefix}${amtDisplay}</td>
                         <td>${typeLabel}<br>${modeBadge} ${catBadge}${refText}${noteText}</td>
                         <td>${txnChip}${opText}${balText}</td>
                         <td style="text-align:right;">${actionBtns}</td>
@@ -44874,6 +45689,9 @@ body.header-offscreen .header-kicker::after {
                 const { overdue, advance, dueDate } = getPendingCycles(record);
                 const isPaid = overdue === 0 && !advance && !!record.last_paid_date;
                 const isAdvance = advance;
+                // If the most recent settled cycle was a skip (not a payment), show a
+                // "Skipped" badge instead of "Advance ⚡" so it isn't mistaken for a payment.
+                const isLatestSkipped = isAdvance && _isLatestHistorySkip(record);
 
                 // Payment status filter
                 if (dueFilter === 'paid' && !isPaid && !isAdvance) return '';
@@ -44883,7 +45701,10 @@ body.header-offscreen .header-kicker::after {
                 const nextDueLabel = dueDate ? formatDateLabel(dueDate) : (record.start_date ? '-' : '⚠ set start date');
 
                 let statusHtml;
-                if (isAdvance) {
+                if (isLatestSkipped) {
+                    paidCount++;
+                    statusHtml = `<span class="fee-status fee-skipped" title="Latest cycle skipped — no fee due until ${formatDateLabel(dueDate)}">Skipped ⏭️</span>`;
+                } else if (isAdvance) {
                     paidCount++;
                     statusHtml = `<span class="fee-status fee-paid" title="Paid in advance">Advance ⚡</span>`;
                 } else if (isPaid) {
@@ -44923,6 +45744,7 @@ body.header-offscreen .header-kicker::after {
                                 <button class="fee-action-btn edit-btn" title="Edit fee amount" ${disAttr} onclick="openFeeEditModal(${student.id}, this)"><i class="fas fa-pencil-alt"></i> ✏️</button>
                                 <button class="fee-action-btn pay-btn" title="Record full payment" ${disAttr} onclick="openFeePayModal(${student.id}, this)"><i class="fas fa-check"></i> 💚</button>
                                 <button class="fee-action-btn partial-btn" title="Record partial payment" ${disAttr} onclick="openFeePartialModal(${student.id}, this)"><i class="fas fa-coins"></i> 🪙</button>
+                                <button class="fee-action-btn skip-btn" title="Mark month as skipped (unpaid)" ${disAttr} onclick="openFeeSkipModal(${student.id}, this)"><i class="fas fa-forward"></i> ⏭️</button>
                                 <button class="fee-action-btn hist-btn" title="Payment history" onclick="openFeeHistoryModal(${student.id}, this)"><i class="fas fa-book-open"></i> 📒</button>
                             </div>
                         </td>
@@ -49053,6 +49875,14 @@ body.header-offscreen .header-kicker::after {
         let syllabusAttendanceExpanded = false;
         let selectedSyllabusClasses = [];
         let selectedSyllabusGroups = [];
+        let selectedSyllabusTopics = [];
+        let syllabusTopicSearchActive = -1;
+
+        document.addEventListener('click', function (evt) {
+            const wrap = document.querySelector('#syllabus-tab .syllabus-autocomplete-wrapper');
+            if (!wrap) return;
+            if (!wrap.contains(evt.target)) hideSyllabusTopicDropdown();
+        });
 
         function getSyllabusSelection() {
             const board = String(getElementValue('syllabusBoardFilter') || 'CBSE').trim().toUpperCase();
@@ -49213,8 +50043,276 @@ body.header-offscreen .header-kicker::after {
             
             const subjectMap = getSyllabusCatalogClassSubjects(board, classLevel);
             const topics = (subjectMap[subject] || []).filter(Boolean);
-            
+
             dl.innerHTML = topics.map(topic => `<option value="${escapeHtml(topic)}">`).join('');
+        }
+
+        // ── Global topic search (all boards / classes / subjects) ──────────────
+        function flattenSyllabusCatalogTopics() {
+            const catalog = db.getSyllabusCatalog();
+            const boards = (catalog && catalog.boards) || {};
+            const entries = [];
+            Object.entries(boards).forEach(([boardName, boardData]) => {
+                const classes = (boardData && boardData.classes) || {};
+                Object.entries(classes).forEach(([classLevel, classData]) => {
+                    const subjects = (classData && classData.subjects) || {};
+                    Object.entries(subjects).forEach(([subjectName, topics]) => {
+                        (Array.isArray(topics) ? topics : []).forEach(topic => {
+                            const cleanTopic = String(topic || '').trim();
+                            if (!cleanTopic) return;
+                            const cleanSubject = String(subjectName || '').trim();
+                            entries.push({
+                                board: String(boardName || '').trim().toUpperCase(),
+                                classLevel: String(classLevel || '').trim(),
+                                subject: cleanSubject,
+                                topic: cleanTopic,
+                                hay: `${cleanTopic} ${cleanSubject} ${boardName} class ${classLevel}`.toLowerCase()
+                            });
+                        });
+                    });
+                });
+            });
+            return entries;
+        }
+
+        function searchSyllabusTopics(query) {
+            const tokens = String(query || '').toLowerCase().split(/\s+/).filter(Boolean);
+            const entries = flattenSyllabusCatalogTopics();
+            if (!tokens.length) {
+                const { board, classLevel, subject } = getSyllabusSelection();
+                const contextual = entries.filter(e => e.board === board && e.classLevel === classLevel
+                    && (!subject || subject === '__custom__' || e.subject === subject));
+                return contextual.slice(0, 40);
+            }
+            const phrase = tokens.join(' ');
+            const matched = [];
+            entries.forEach(e => {
+                if (!tokens.every(t => e.hay.includes(t))) return;
+                const topicLc = e.topic.toLowerCase();
+                let score = 10;
+                if (topicLc === phrase) score = 100;
+                else if (topicLc.startsWith(phrase) || topicLc.startsWith(tokens[0])) score = 60;
+                else if (topicLc.includes(phrase)) score = 50;
+                else if (topicLc.includes(tokens[0])) score = 40;
+                else if (e.subject.toLowerCase().includes(tokens[0])) score = 30;
+                matched.push({ ...e, score });
+            });
+            matched.sort((a, b) => b.score - a.score
+                || (parseInt(a.classLevel, 10) || 0) - (parseInt(b.classLevel, 10) || 0)
+                || a.board.localeCompare(b.board)
+                || a.subject.localeCompare(b.subject)
+                || a.topic.localeCompare(b.topic));
+            return matched.slice(0, 60);
+        }
+
+        function isSyllabusTopicSelected(item) {
+            const topicLc = String(item.topic || '').toLowerCase();
+            return selectedSyllabusTopics.some(t => t.board === item.board
+                && t.classLevel === item.classLevel
+                && t.subject === item.subject
+                && String(t.topic || '').toLowerCase() === topicLc);
+        }
+
+        function highlightSyllabusMatch(text, query) {
+            let html = escapeHtml(text);
+            String(query || '').toLowerCase().split(/\s+/).filter(t => t.length >= 2).forEach(token => {
+                const safe = token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                html = html.replace(new RegExp(`(${safe})`, 'gi'), '<mark>$1</mark>');
+            });
+            return html;
+        }
+
+        function handleSyllabusTopicSearchInput() {
+            const input = document.getElementById('syllabusNewTopic');
+            const dropdown = document.getElementById('syllabusTopicDropdown');
+            if (!input || !dropdown) return;
+            const query = String(input.value || '').trim();
+            const results = searchSyllabusTopics(query);
+            renderSyllabusTopicDropdown(results, query);
+        }
+
+        function renderSyllabusTopicDropdown(results, query) {
+            const dropdown = document.getElementById('syllabusTopicDropdown');
+            if (!dropdown) return;
+            syllabusTopicSearchActive = -1;
+            const tokens = String(query || '').trim();
+            let html = '';
+
+            if (tokens.length >= 2 && !results.some(r => r.topic.toLowerCase() === tokens.toLowerCase())) {
+                html += `
+                    <div class="syllabus-topic-option" data-custom="1">
+                        <div class="opt-check"><i class="fas fa-plus"></i></div>
+                        <div class="opt-body">
+                            <div class="syllabus-topic-title" style="color:#67e8f9;">Add custom topic: "${escapeHtml(tokens)}"</div>
+                            <div class="syllabus-topic-meta"><span class="meta-tag">uses Board / Class / Subject selected below</span></div>
+                        </div>
+                    </div>`;
+            }
+
+            html += results.map((r, idx) => {
+                const selected = isSyllabusTopicSelected(r);
+                return `
+                    <div class="syllabus-topic-option ${selected ? 'selected' : ''}" data-idx="${idx}">
+                        <div class="opt-check"><i class="fas fa-check"></i></div>
+                        <div class="opt-body">
+                            <div class="syllabus-topic-title">${highlightSyllabusMatch(r.topic, query)}</div>
+                            <div class="syllabus-topic-meta">
+                                <span class="meta-tag board-tag">${escapeHtml(r.board)}</span>
+                                <span class="meta-tag class-tag">Class ${escapeHtml(r.classLevel)}</span>
+                                <span class="meta-tag">${escapeHtml(r.subject)}</span>
+                            </div>
+                        </div>
+                    </div>`;
+            }).join('');
+
+            if (!results.length && tokens.length < 2) {
+                html += `<div style="padding:14px 12px; color:#9ca3af; font-size:12.5px; text-align:center;">Type at least 2 letters to search the full syllabus catalog.</div>`;
+            } else if (!results.length && tokens.length >= 2) {
+                html += `<div style="padding:10px 12px 4px; color:#9ca3af; font-size:12.5px; text-align:center;">No catalog chapters match "${escapeHtml(tokens)}".</div>`;
+            }
+
+            const selectedCount = selectedSyllabusTopics.length;
+            html += `
+                <div class="syllabus-topic-dropdown-footer">
+                    <span>${results.length ? results.length + ' chapter(s) found' : 'Catalog search'}</span>
+                    <span style="color:${selectedCount ? '#34d399' : '#9ca3af'}; font-weight:600;">${selectedCount ? selectedCount + ' selected — save logs one lecture per topic' : 'click to select'}</span>
+                </div>`;
+
+            dropdown.innerHTML = html;
+            dropdown.style.display = 'block';
+
+            dropdown.querySelectorAll('.syllabus-topic-option').forEach(opt => {
+                opt.addEventListener('click', () => {
+                    if (opt.dataset.custom === '1') {
+                        addCustomSyllabusTopicFromSearch();
+                        return;
+                    }
+                    const idx = parseInt(opt.dataset.idx, 10);
+                    const item = results[idx];
+                    if (item) toggleSyllabusTopicSelection(item, results, query);
+                });
+            });
+        }
+
+        function hideSyllabusTopicDropdown() {
+            const dropdown = document.getElementById('syllabusTopicDropdown');
+            if (dropdown) dropdown.style.display = 'none';
+            syllabusTopicSearchActive = -1;
+        }
+
+        function handleSyllabusTopicSearchKey(evt) {
+            const dropdown = document.getElementById('syllabusTopicDropdown');
+            if (!dropdown || dropdown.style.display === 'none') {
+                if (evt.key === 'Enter') {
+                    evt.preventDefault();
+                    addCustomSyllabusTopicFromSearch();
+                }
+                return;
+            }
+            const options = Array.from(dropdown.querySelectorAll('.syllabus-topic-option'));
+            if (evt.key === 'ArrowDown' || evt.key === 'ArrowUp') {
+                evt.preventDefault();
+                if (!options.length) return;
+                syllabusTopicSearchActive += (evt.key === 'ArrowDown' ? 1 : -1);
+                if (syllabusTopicSearchActive < 0) syllabusTopicSearchActive = options.length - 1;
+                if (syllabusTopicSearchActive >= options.length) syllabusTopicSearchActive = 0;
+                options.forEach((opt, i) => opt.classList.toggle('kb-active', i === syllabusTopicSearchActive));
+                const active = options[syllabusTopicSearchActive];
+                if (active && active.scrollIntoView) active.scrollIntoView({ block: 'nearest' });
+            } else if (evt.key === 'Enter') {
+                evt.preventDefault();
+                const active = options[syllabusTopicSearchActive] || options[0];
+                if (active) active.click();
+            } else if (evt.key === 'Escape') {
+                hideSyllabusTopicDropdown();
+            }
+        }
+
+        function addCustomSyllabusTopicFromSearch() {
+            const typed = String(getElementValue('syllabusNewTopic') || '').trim();
+            if (typed.length < 2) {
+                showAlert('Type a topic name first.', 'warning');
+                return;
+            }
+            const { board, classLevel, subject } = getSyllabusSelection();
+            if (!subject || subject === '__custom__') {
+                showAlert('Pick a subject below (or add one) before saving a custom topic.', 'warning');
+                return;
+            }
+            toggleSyllabusTopicSelection({ board, classLevel, subject, topic: typed });
+            const input = document.getElementById('syllabusNewTopic');
+            if (input) {
+                input.value = '';
+                input.focus();
+            }
+            hideSyllabusTopicDropdown();
+        }
+
+        function toggleSyllabusTopicSelection(item, lastResults, lastQuery) {
+            const topicLc = String(item.topic || '').toLowerCase();
+            const existingIdx = selectedSyllabusTopics.findIndex(t => t.board === item.board
+                && t.classLevel === item.classLevel
+                && t.subject === item.subject
+                && String(t.topic || '').toLowerCase() === topicLc);
+            if (existingIdx > -1) {
+                selectedSyllabusTopics.splice(existingIdx, 1);
+            } else {
+                selectedSyllabusTopics.push({
+                    board: String(item.board || '').trim().toUpperCase(),
+                    classLevel: String(item.classLevel || '').trim(),
+                    subject: String(item.subject || '').trim(),
+                    topic: String(item.topic || '').trim()
+                });
+            }
+            renderSyllabusTopicChips();
+            syncSyllabusClassesFromTopics();
+            if (Array.isArray(lastResults)) {
+                renderSyllabusTopicDropdown(lastResults, lastQuery);
+            }
+        }
+
+        function removeSyllabusTopicChip(index) {
+            if (index < 0 || index >= selectedSyllabusTopics.length) return;
+            selectedSyllabusTopics.splice(index, 1);
+            renderSyllabusTopicChips();
+        }
+
+        function renderSyllabusTopicChips() {
+            const container = document.getElementById('syllabusTopicChips');
+            const countEl = document.getElementById('syllabusTopicSelectedCount');
+            if (!container) return;
+            if (countEl) {
+                countEl.textContent = selectedSyllabusTopics.length ? `(${selectedSyllabusTopics.length} selected)` : '';
+            }
+            if (!selectedSyllabusTopics.length) {
+                container.style.display = 'none';
+                container.innerHTML = '';
+                return;
+            }
+            container.style.display = 'flex';
+            container.innerHTML = selectedSyllabusTopics.map((t, idx) => `
+                <span class="syllabus-topic-chip" title="${escapeHtml(t.board)} · Class ${escapeHtml(t.classLevel)} · ${escapeHtml(t.subject)}">
+                    <span class="chip-label">${escapeHtml(t.topic)}</span>
+                    <span class="chip-meta">${escapeHtml(t.board)} · C${escapeHtml(t.classLevel)} · ${escapeHtml(t.subject)}</span>
+                    <button type="button" onclick="removeSyllabusTopicChip(${idx})" data-allow="true" title="Remove topic"><i class="fas fa-xmark"></i></button>
+                </span>`).join('');
+        }
+
+        function syncSyllabusClassesFromTopics() {
+            if (!selectedSyllabusTopics.length) return;
+            const topicClasses = Array.from(new Set(selectedSyllabusTopics.map(t => t.classLevel).filter(Boolean)));
+            if (!topicClasses.length) return;
+            const merged = Array.from(new Set([...selectedSyllabusClasses, ...topicClasses]));
+            merged.sort((a, b) => (parseInt(a, 10) || 0) - (parseInt(b, 10) || 0));
+            selectedSyllabusClasses = merged;
+            const classSelect = document.getElementById('syllabusClassFilter');
+            if (classSelect && topicClasses.includes(String(classSelect.value || '').trim()) === false) {
+                classSelect.value = topicClasses[0];
+                populateSyllabusSubjectOptions();
+            }
+            populateSyllabusPills();
+            populateSyllabusStudentList();
+            fetchAttendanceFromMainSheet(true);
         }
 
         function populateSyllabusPills() {
@@ -49284,9 +50382,10 @@ body.header-offscreen .header-kicker::after {
         function handleSyllabusBoardClassChange() {
             const board = String(getElementValue('syllabusBoardFilter') || 'CBSE').trim().toUpperCase();
             const classLevel = String(getElementValue('syllabusClassFilter') || '3').trim();
-            
-            selectedSyllabusClasses = [classLevel];
-            
+
+            const chipClasses = selectedSyllabusTopics.map(t => t.classLevel).filter(Boolean);
+            selectedSyllabusClasses = Array.from(new Set([classLevel, ...chipClasses]));
+
             populateSyllabusSubjectOptions();
             populateSyllabusTopicDatalist();
             populateSyllabusStudentList();
@@ -49384,16 +50483,16 @@ body.header-offscreen .header-kicker::after {
             });
         }
 
-        function fetchAttendanceFromMainSheet() {
+        function fetchAttendanceFromMainSheet(silent = false) {
             const dateValue = String(getElementValue('syllabusDefaultDate') || '').trim();
             if (!/^\d{4}-\d{2}-\d{2}$/.test(dateValue)) {
-                showAlert('Select a valid conducted date first.', 'warning');
+                if (!silent) showAlert('Select a valid conducted date first.', 'warning');
                 return;
             }
-            
+
             const studentCards = document.querySelectorAll('#syllabusStudentList .syllabus-student-card');
             if (!studentCards.length) {
-                showAlert('No students displayed. Select class/group filters first.', 'warning');
+                if (!silent) showAlert('No students displayed. Select class/group filters first.', 'warning');
                 return;
             }
             
@@ -49416,13 +50515,13 @@ body.header-offscreen .header-kicker::after {
             });
             
             updateSyllabusStudentCount();
-            
+
             if (recordFound) {
-                showAlert(`Prechecked ${markedCount} student(s) marked Present/Late on ${dateValue} from main attendance sheet.`, 'success');
+                if (!silent) showAlert(`Prechecked ${markedCount} student(s) marked Present/Late on ${dateValue} from main attendance sheet.`, 'success');
             } else {
                 studentCards.forEach(card => card.classList.add('active'));
                 updateSyllabusStudentCount();
-                showAlert(`No main attendance records found for ${dateValue}. Prechecked all visible active students as present by default.`, 'info');
+                if (!silent) showAlert(`No main attendance records found for ${dateValue}. Prechecked all visible active students as present by default.`, 'info');
             }
         }
 
@@ -49478,6 +50577,13 @@ body.header-offscreen .header-kicker::after {
         function saveSyllabusLecture() {
             const canMark = currentUserRole === 'admin' || currentUserRole === 'teacher';
             if (!canMark) { showAlert('Only admin/teacher can log topic sessions.', 'warning'); return; }
+
+            if (selectedSyllabusTopics.length) {
+                const multiDate = String(getElementValue('syllabusDefaultDate') || '').trim();
+                if (!/^\d{4}-\d{2}-\d{2}$/.test(multiDate)) { showAlert('Select a valid conducted date.', 'warning'); return; }
+                saveSelectedSyllabusTopics(multiDate);
+                return;
+            }
 
             const board = String(getElementValue('syllabusBoardFilter') || 'CBSE').trim().toUpperCase();
             const classLevel = String(getElementValue('syllabusClassFilter') || '3').trim();
@@ -49573,8 +50679,105 @@ body.header-offscreen .header-kicker::after {
             
             populateSyllabusTopicDatalist();
             renderSyllabusLectureTable();
-            
+
             showAlert(`Lecture saved: "${topic}" on ${dateValue}. ${attendees.length} student(s) recorded.`, 'success');
+        }
+
+        function saveSelectedSyllabusTopics(dateValue) {
+            const topics = selectedSyllabusTopics.map(t => ({ ...t }));
+            if (!topics.length) return;
+
+            const studentById = new Map((db.getStudents() || []).map(s => [parseInt(s.id, 10), s]));
+            const selectedIds = Array.from(document.querySelectorAll('#syllabusStudentList .syllabus-student-card.active'))
+                .map(card => parseInt(card.dataset.id, 10))
+                .filter(v => Number.isFinite(v) && v > 0);
+
+            const attendeesByClass = new Map();
+            selectedIds.forEach(sid => {
+                const s = studentById.get(sid);
+                if (!s) return;
+                const cls = String(s.class || '').trim();
+                if (!attendeesByClass.has(cls)) attendeesByClass.set(cls, []);
+                attendeesByClass.get(cls).push({
+                    id: sid,
+                    roll: String(s.roll || '').trim().toUpperCase(),
+                    name: String(s.base_name || s.name || '').trim()
+                });
+            });
+            attendeesByClass.forEach(list => list.sort((a, b) => String(a.roll || '').localeCompare(String(b.roll || ''))));
+
+            const totalAttendees = topics.reduce((sum, t) => sum + ((attendeesByClass.get(t.classLevel) || []).length), 0);
+            if (!totalAttendees) {
+                if (!confirm('No students are selected for the classes of the chosen topics. Save all lectures with 0 attendees?')) {
+                    return;
+                }
+            }
+
+            const nowIso = new Date().toISOString();
+            const trackingMap = getSyllabusTrackingMap();
+            const newRows = [];
+            const data = db.getData();
+            data.syllabus_catalog = normalizeSyllabusCatalogShape(data.syllabus_catalog || {});
+
+            topics.forEach(t => {
+                data.syllabus_catalog.boards[t.board] = data.syllabus_catalog.boards[t.board] || { classes: {} };
+                data.syllabus_catalog.boards[t.board].classes[t.classLevel] = data.syllabus_catalog.boards[t.board].classes[t.classLevel] || { subjects: {} };
+                const subjectMap = data.syllabus_catalog.boards[t.board].classes[t.classLevel].subjects || {};
+                const existingTopics = Array.isArray(subjectMap[t.subject]) ? subjectMap[t.subject] : [];
+                if (!existingTopics.some(x => String(x || '').trim().toLowerCase() === t.topic.toLowerCase())) {
+                    subjectMap[t.subject] = [...existingTopics, t.topic];
+                }
+                data.syllabus_catalog.boards[t.board].classes[t.classLevel].subjects = subjectMap;
+
+                const attendees = attendeesByClass.get(t.classLevel) || [];
+                const key = buildSyllabusTrackingKey(t.board, t.classLevel, t.subject, t.topic);
+                const existingTracking = trackingMap.get(key) || null;
+
+                const sessionsByDate = new Map();
+                (Array.isArray(existingTracking && existingTracking.sessions) ? existingTracking.sessions : []).forEach(sess => {
+                    if (sess && sess.date) sessionsByDate.set(String(sess.date), sess);
+                });
+                sessionsByDate.set(dateValue, {
+                    date: dateValue,
+                    attended_student_ids: attendees.map(i => i.id).filter(v => v > 0),
+                    attended_rolls: attendees.map(i => i.roll).filter(Boolean),
+                    attended_names: attendees.map(i => i.name).filter(Boolean),
+                    marked_by: String(currentLoginId || currentUserRole || '').trim(),
+                    marked_at: nowIso
+                });
+
+                newRows.push({
+                    id: parseInt(existingTracking && existingTracking.id, 10) || generateUniqueId(),
+                    key,
+                    board: t.board,
+                    class_level: t.classLevel,
+                    subject: t.subject,
+                    topic: t.topic,
+                    chapter: t.topic,
+                    conducted_dates: Array.from(new Set([...(Array.isArray(existingTracking && existingTracking.conducted_dates) ? existingTracking.conducted_dates : []), dateValue])).sort(),
+                    sessions: Array.from(sessionsByDate.values()).sort((a, b) => String(a.date || '').localeCompare(String(b.date || ''))),
+                    created_at: String(existingTracking && existingTracking.created_at || nowIso),
+                    updated_at: nowIso
+                });
+            });
+
+            data.syllabus_seed_version = SYLLABUS_SEED_VERSION;
+            db.saveData(data, { allowTeacher: true });
+            db.upsertSyllabusTrackingRows(newRows);
+
+            selectedSyllabusTopics = [];
+            renderSyllabusTopicChips();
+            const input = document.getElementById('syllabusNewTopic');
+            if (input) input.value = '';
+            hideSyllabusTopicDropdown();
+            populateSyllabusSubjectOptions();
+            renderSyllabusLectureTable();
+
+            const perTopic = topics.map(t => {
+                const n = (attendeesByClass.get(t.classLevel) || []).length;
+                return `"${t.topic}" (Class ${t.classLevel}, ${n} student(s))`;
+            }).join(', ');
+            showAlert(`Saved ${topics.length} lecture(s) on ${dateValue}: ${perTopic}`, 'success');
         }
 
         function getSyllabusTrackingMap() {
@@ -49904,9 +51107,11 @@ body.header-offscreen .header-kicker::after {
             populateSyllabusSubjectOptions();
             
             const currentSelectedClass = String(getElementValue('syllabusClassFilter') || '3').trim();
-            selectedSyllabusClasses = [currentSelectedClass];
+            const chipClasses = selectedSyllabusTopics.map(t => t.classLevel).filter(Boolean);
+            selectedSyllabusClasses = Array.from(new Set([currentSelectedClass, ...chipClasses]));
             selectedSyllabusGroups = [];
-            
+            renderSyllabusTopicChips();
+
             populateSyllabusPills();
             populateSyllabusStudentList();
             populateSyllabusTopicDatalist();
