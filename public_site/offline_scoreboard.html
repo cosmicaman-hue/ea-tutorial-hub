@@ -2291,13 +2291,15 @@ body.header-offscreen .header-kicker::after {
 
         <!-- TAB: RESOURCES -->
         <div id="resources-tab" class="tab-content hidden">
-            <div class="form-card">
-                <h3><i class="fas fa-boxes-stacked"></i> Excel Resource Management</h3>
-                <p class="section-subtitle">
-                    Manage the resource cabinet, and track student redemption (points) or purchases (cash) with teacher recommendation and admin approval.
-                </p>
+            <!-- Resources sub-tabs: streamline viewing so each section is its own screen (no long scroll) -->
+            <div class="res-sub-tabs" id="resSubTabs">
+                <button type="button" class="res-sub-tab active" data-restab="cabinet" onclick="switchResourcesSubTab('cabinet', this)"><i class="fas fa-warehouse"></i> Cabinet &amp; Requests <span class="res-tab-badge" id="resTabBadge-cabinet" data-empty="1">0</span></button>
+                <button type="button" class="res-sub-tab" data-restab="freequota" onclick="switchResourcesSubTab('freequota', this)"><i class="fas fa-hand-holding-dollar"></i> Free Quota <span class="res-tab-badge" id="resTabBadge-freequota" data-empty="1">0</span></button>
+                <button type="button" class="res-sub-tab" data-restab="transactions" id="resSubTabTransactions" onclick="switchResourcesSubTab('transactions', this)"><i class="fas fa-file-invoice"></i> Transactions <span class="res-tab-badge" id="resTabBadge-transactions" data-empty="1">0</span></button>
             </div>
 
+            <!-- Sub-tab: Cabinet & Requests -->
+            <div class="res-sub-content active" id="resSubCabinet">
             <div class="form-card" id="resourceCabinetCard">
                 <h3><i class="fas fa-warehouse"></i> Resource Cabinet</h3>
                 <div class="controls">
@@ -2442,8 +2444,6 @@ body.header-offscreen .header-kicker::after {
                     <button onclick="submitResourceRequest(this)" data-allow="true"><i class="fas fa-paper-plane"></i> Submit Request</button>
                     <button class="secondary" onclick="clearResourceRequestForm()" data-allow="true"><i class="fas fa-xmark"></i> Cancel</button>
                     <button class="secondary" onclick="loadResourcesTab()" data-allow="true"><i class="fas fa-rotate"></i> Refresh</button>
-                    <button class="secondary" onclick="adminQuickCashPurchase('full_paid')" data-role-only="admin" data-allow="true"><i class="fas fa-money-bill-wave"></i> Cash Full Paid</button>
-                    <button class="secondary" onclick="adminQuickCashPurchase('half_paid')" data-role-only="admin" data-allow="true"><i class="fas fa-percent"></i> Cash Half Paid</button>
                 </div>
                 <p class="section-subtitle" id="resourceRequestHint"></p>
             </div>
@@ -2464,7 +2464,6 @@ body.header-offscreen .header-kicker::after {
                 <div class="form-buttons" data-role-only="admin">
                     <button class="secondary" onclick="adminManualRedeem(false)" data-allow="true"><i class="fas fa-pen"></i> Save Manual Redeem</button>
                     <button class="secondary" onclick="adminManualRedeem(true)" data-allow="true"><i class="fas fa-check"></i> Redeem Remaining</button>
-                    <button class="secondary" onclick="adminDiagnoseExcessPointsIssue()" data-allow="true"><i class="fas fa-stethoscope"></i> Diagnose Excess Points</button>
                 </div>
                 <div style="margin-bottom:8px;">
                     <label style="font-size:0.82em; color:var(--text-muted); cursor:pointer; display:inline-flex; align-items:center; gap:6px;">
@@ -2533,28 +2532,35 @@ body.header-offscreen .header-kicker::after {
                     </div>
                 </div>
             </div>
+            </div><!-- /resSubCabinet -->
 
+            <!-- Sub-tab: Free Quota -->
+            <div class="res-sub-content" id="resSubFreequota">
             <div class="form-card" id="freeQuotaCounterCard">
                 <h3><i class="fas fa-hand-holding-dollar"></i> Free Quota Counter — Academy Subsidy</h3>
-                <p class="section-subtitle">Monthly free quota provided by the Academy for purchasing resources. Quota varies by post-holder role. The color gradient shows utilization: <span style="color:#4ade80;font-weight:600;">green = not used</span> → <span style="color:#fbbf24;font-weight:600;">yellow = partially used</span> → <span style="color:#ef4444;font-weight:600;">red = fully availed</span>.</p>
+                <p class="section-subtitle">Monthly free quota provided by the Academy for purchasing resources. Quota varies by post-holder role. The color gradient shows utilization: <span style="color:#4ade80;font-weight:600;">green = not used</span> → <span style="color:#fbbf24;font-weight:600;">yellow = partially used</span> → <span style="color:#ef4444;font-weight:600;">red = fully availed</span>. <span style="color:#94a3b8;">The full list is not loaded by default — pick a filter and click <b>View</b> to keep scrolling short.</span></p>
                 <div class="controls">
                     <div class="control-group">
                         <label>Month</label>
-                        <input id="freeQuotaCounterMonth" type="month" min="2025-08" onchange="renderFreeQuotaCounter()">
+                        <input id="freeQuotaCounterMonth" type="month" min="2025-08" onchange="onFreeQuotaFilterChange()">
                     </div>
                     <div class="control-group">
                         <label>Filter</label>
-                        <select id="freeQuotaCounterFilter" onchange="renderFreeQuotaCounter()">
-                            <option value="active" selected>Active Students</option>
+                        <select id="freeQuotaCounterFilter" onchange="onFreeQuotaFilterChange()">
+                            <option value="availed" selected>Availed Only</option>
+                            <option value="remaining">Remaining Only</option>
+                            <option value="active">Active Students</option>
                             <option value="all">All Students</option>
                             <option value="inactive">Inactive Only</option>
-                            <option value="availed">Availed Only</option>
-                            <option value="remaining">Remaining Only</option>
                         </select>
                     </div>
                     <div class="control-group">
                         <label>Search</label>
-                        <input id="freeQuotaCounterSearch" type="text" placeholder="Name or roll..." oninput="renderFreeQuotaCounter()" style="width:160px;">
+                        <input id="freeQuotaCounterSearch" type="text" placeholder="Name or roll..." oninput="onFreeQuotaFilterChange()" style="width:160px;">
+                    </div>
+                    <div class="control-group" style="flex-direction:row; align-items:flex-end; gap:6px;">
+                        <button class="btn-primary" onclick="viewFreeQuotaCounter()" data-allow="true" style="background:linear-gradient(135deg,#0d9488,#0f766e);border:none;color:#fff;font-weight:600;padding:8px 14px;border-radius:8px;cursor:pointer;"><i class="fas fa-eye"></i> View</button>
+                        <button class="secondary" onclick="resetFreeQuotaCounterFilters()" data-allow="true"><i class="fas fa-rotate-left"></i> Reset</button>
                     </div>
                 </div>
                 <div class="stats-grid" id="freeQuotaStatsGrid"></div>
@@ -2571,17 +2577,21 @@ body.header-offscreen .header-kicker::after {
                                     <th style="width: 100px;">Used</th>
                                     <th style="width: 100px;">Remaining</th>
                                     <th style="width: 200px;">Utilization</th>
-                                    <th style="width: 90px;">Details</th>
+                                    <th style="width: 110px;">Details</th>
+                                    <th style="width: 120px;" data-role-only="admin">Mark Availed</th>
                                 </tr>
                             </thead>
                             <tbody id="freeQuotaCounterBody">
-                                <tr><td colspan="9" class="text-center loading">Loading...</td></tr>
+                                <tr><td colspan="10" class="text-center" style="padding:22px;color:#94a3b8;">Apply a filter and click <b>View</b> to load the list.</td></tr>
                             </tbody>
                         </table>
                     </div>
                 </div>
             </div>
+            </div><!-- /resSubFreequota -->
 
+            <!-- Sub-tab: Transactions -->
+            <div class="res-sub-content" id="resSubTransactions">
             <div class="form-card" id="resourceTransactionsCard">
                 <h3><i class="fas fa-file-invoice"></i> Transactions (Approved/Fulfilled)</h3>
                 <div style="display:flex; justify-content:flex-end; margin-bottom:10px;">
@@ -2596,6 +2606,14 @@ body.header-offscreen .header-kicker::after {
                             <option value="all" selected>All</option>
                             <option value="completed">Completed</option>
                             <option value="not_completed">Not Completed</option>
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <label>Source</label>
+                        <select id="resourceTransactionsSourceFilter" onchange="renderResourceTransactions()">
+                            <option value="all" selected>All Sources</option>
+                            <option value="resources">Resources</option>
+                            <option value="mela">Excel Mela</option>
                         </select>
                     </div>
                     <div class="control-group">
@@ -2663,6 +2681,7 @@ body.header-offscreen .header-kicker::after {
                     </div>
                 </div>
             </div>
+            </div><!-- /resSubTransactions -->
         </div>
 
         <!-- TAB: EXCEL MELA -->
@@ -2745,6 +2764,62 @@ body.header-offscreen .header-kicker::after {
                         <p style="color: #94a3b8; max-width: 400px; margin: 10px auto 0;">
                             Choose a student from the qualified list on the left to see their points breakdown and available resources.
                         </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Mela Transactions: mirrors the Resources Transactions card, filtered to
+                 Excel-Mela-originated transactions from the shared resource_transactions store.
+                 Settlements here also refresh the Resources tab (and vice versa). -->
+            <div class="form-card" id="melaTransactionsCard">
+                <h3 style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+                    <span><i class="fas fa-receipt"></i> Mela Transactions</span>
+                    <button onclick="printTransactionSummary('mela')" style="background:linear-gradient(135deg,#d946ef,#7c3aed); border:none; color:#fff; font-weight:600; padding:8px 16px; border-radius:8px; cursor:pointer; box-shadow:0 2px 8px rgba(217,70,239,0.3); font-size:0.85rem;">
+                        <i class="fas fa-print"></i> Print Summary
+                    </button>
+                </h3>
+                <p class="section-subtitle">All transactions originating from Excel Mela (cart purchases, point settlements, offline settlements). These share the same ledger as the Resources tab — settling in either place updates both instantly.</p>
+                <div class="controls">
+                    <div class="control-group">
+                        <label>Status</label>
+                        <select id="melaTxnStatusFilter" onchange="renderMelaTransactionsList()">
+                            <option value="all" selected>All</option>
+                            <option value="open">Pending Settlement</option>
+                            <option value="settled">Settled</option>
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <label>Student</label>
+                        <select id="melaTxnStudentFilter" onchange="renderMelaTransactionsList()">
+                            <option value="all" selected>All Students</option>
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <label>Month</label>
+                        <input id="melaTxnMonthFilter" type="month" min="2024-08" onchange="renderMelaTransactionsList()">
+                    </div>
+                </div>
+                <div class="scoreboard-wrapper">
+                    <div class="scoreboard-scroll">
+                        <table class="scoreboard" id="melaTransactionsTable">
+                            <thead>
+                                <tr>
+                                    <th style="width: 72px;">Txn ID</th>
+                                    <th style="width: 92px;">Month</th>
+                                    <th style="width: 110px;">Type</th>
+                                    <th>Student</th>
+                                    <th style="width: 88px;">Roll</th>
+                                    <th>Item / Note</th>
+                                    <th style="width: 86px;">Points</th>
+                                    <th style="width: 130px;">Cash</th>
+                                    <th style="width: 130px;">Status</th>
+                                    <th style="width: 104px;">Date</th>
+                                </tr>
+                            </thead>
+                            <tbody id="melaTransactionsBody">
+                                <tr><td colspan="10" class="text-center loading">Loading...</td></tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </div>
@@ -6466,6 +6541,17 @@ body.header-offscreen .header-kicker::after {
                 .awf-sub-tab.active { color:#f59e0b; border-bottom-color:#f59e0b; font-weight:700; }
                 .awf-sub-content { display: none; }
                 .awf-sub-content.active { display: block; }
+                /* Resources sub-tabs (scoped, teal-themed) */
+                .res-sub-tabs { display:flex; gap:4px; overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none; margin-bottom:1.2rem; border-bottom:2px solid var(--border-color); padding-bottom:0; position:sticky; top:0; z-index:5; background:var(--bg-color, #0f172a); }
+                .res-sub-tabs::-webkit-scrollbar { display:none; }
+                .res-sub-tab { background:none; border:none; border-bottom:3px solid transparent; padding:0.55rem 1.1rem; font-weight:500; font-size:0.9rem; color:var(--text-muted); cursor:pointer; white-space:nowrap; transition:color .15s,border-color .15s,background .15s; display:inline-flex; align-items:center; gap:6px; min-height:44px; touch-action:manipulation; }
+                .res-sub-tab:hover { color:#14b8a6; background:rgba(20,184,166,.06); }
+                .res-sub-tab.active { color:#14b8a6; border-bottom-color:#14b8a6; font-weight:700; }
+                .res-sub-tab .res-tab-badge { display:inline-flex; align-items:center; justify-content:center; min-width:18px; height:18px; padding:0 6px; border-radius:9px; background:rgba(20,184,166,.18); color:#14b8a6; font-size:11px; font-weight:700; }
+                .res-sub-tab .res-tab-badge[data-empty="1"] { display:none; }
+                .res-sub-content { display: none; }
+                .res-sub-content.active { display: block; }
+                @media print { .res-sub-tabs { display:none !important; } .res-sub-content { display:block !important; } }
                 .awf-cat-bar { height: 8px; border-radius: 4px; background: var(--border-color); overflow: hidden; margin-top: 4px; }
                 .awf-cat-bar-fill { height: 100%; border-radius: 4px; transition: width .3s ease; }
                 .awf-form-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; margin-bottom: 16px; }
@@ -7688,14 +7774,6 @@ body.header-offscreen .header-kicker::after {
                     <input type="number" id="editVotePower" readonly>
                 </div>
                 <div class="form-group">
-                    <label>Stars</label>
-                    <input type="number" id="editStars" min="0">
-                </div>
-                <div class="form-group">
-                    <label>VETOs</label>
-                    <input type="number" id="editVetos" min="0">
-                </div>
-                <div class="form-group">
                     <label>Active</label>
                     <select id="editActive">
                         <option value="true">Active</option>
@@ -7713,28 +7791,31 @@ body.header-offscreen .header-kicker::after {
                     <small style="color:var(--text-muted)">Leave blank = always visible while active</small>
                 </div>
             </div>
-            <div class="form-grid" style="margin-top:6px; border-top:1px solid var(--border); padding-top:10px;">
-                <div class="form-group">
-                    <label>New Roll (from month…)</label>
-                    <input type="text" id="editNewRoll" placeholder="EA24B16">
+            <details class="modal-collapse-section" style="margin-top:6px; border-top:1px solid var(--border); padding-top:10px;">
+                <summary class="modal-collapse-header"><i class="fas fa-random"></i> Roll Change</summary>
+                <div class="form-grid" style="margin-top:8px;">
+                    <div class="form-group">
+                        <label>New Roll (from month…)</label>
+                        <input type="text" id="editNewRoll" placeholder="EA24B16">
+                    </div>
+                    <div class="form-group">
+                        <label>Effective Month</label>
+                        <input type="month" id="editEffectiveMonth" min="2024-01">
+                    </div>
+                    <div class="form-group" style="grid-column: 1 / -1;">
+                        <button id="recordRollChangeBtn" class="secondary" onclick="triggerRollChangeFromEdit()" data-allow="true">
+                            <i class="fas fa-random"></i> Record Roll Change (keeps earlier months frozen)
+                        </button>
+                        <p style="font-size:0.78em;color:var(--text-muted);margin:6px 0 0 0;">
+                            Uses the safe server endpoint. Earlier months stay unchanged; new roll applies from the chosen month onward.
+                        </p>
+                    </div>
                 </div>
-                <div class="form-group">
-                    <label>Effective Month</label>
-                    <input type="month" id="editEffectiveMonth" min="2024-01">
-                </div>
-                <div class="form-group" style="grid-column: 1 / -1;">
-                    <button id="recordRollChangeBtn" class="secondary" onclick="triggerRollChangeFromEdit()" data-allow="true">
-                        <i class="fas fa-random"></i> Record Roll Change (keeps earlier months frozen)
-                    </button>
-                    <p style="font-size:0.78em;color:var(--text-muted);margin:6px 0 0 0;">
-                        Uses the safe server endpoint. Earlier months stay unchanged; new roll applies from the chosen month onward.
-                    </p>
-                </div>
-            </div>
+            </details>
             <!-- Historical Month Corrections (admin only) -->
-            <div id="historicalMonthSection" style="display:none; border-top:1px solid var(--border); padding-top:10px; margin-top:6px;">
-                <h4 style="margin: 0 0 8px 0; color: var(--text-muted);">Month Score Editor</h4>
-                <div class="form-grid">
+            <details id="historicalMonthSection" class="modal-collapse-section" style="display:none; border-top:1px solid var(--border); padding-top:10px; margin-top:6px;">
+                <summary class="modal-collapse-header"><i class="fas fa-clock-rotate-left"></i> Month Score Editor</summary>
+                <div class="form-grid" style="margin-top:8px;">
                     <div class="form-group">
                         <label>Month</label>
                         <select id="editHistMonth" onchange="onHistMonthChange()">
@@ -7782,9 +7863,10 @@ body.header-offscreen .header-kicker::after {
                     </div>
                 </div>
                 <p style="font-size:0.78em; color:var(--text-muted); margin:8px 0 0 0;">Adding an entry auto-enrolls the student in this month's roster. All changes are admin-locked and sync-safe.</p>
-            </div>
-            <h4 style="margin: 10px 0; color: var(--text-muted);">Profile Details</h4>
-            <div class="form-grid">
+            </details>
+            <details class="modal-collapse-section" style="border-top:1px solid var(--border); padding-top:10px; margin-top:6px;">
+                <summary class="modal-collapse-header"><i class="fas fa-id-card"></i> Profile Details</summary>
+                <div class="form-grid" style="margin-top:8px;">
                 <div class="form-group">
                     <label>Father's Name</label>
                     <input type="text" id="editFatherName">
@@ -7829,10 +7911,58 @@ body.header-offscreen .header-kicker::after {
                     <label>Address</label>
                     <textarea id="editAddress" rows="2"></textarea>
                 </div>
-            </div>
+                </div>
+            </details>
             <div class="form-buttons">
                 <button class="secondary" onclick="closeModal('editStudentModal')">Cancel</button>
                 <button id="saveStudentEditsBtn" onclick="saveStudentEdits()">Save Changes</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: ADJUST STAR / VETO (Add or Subtract) -->
+    <div id="adjustStarVetoModal" class="modal">
+        <div class="modal-content" style="max-width:440px;">
+            <div class="modal-header">
+                <h2 id="adjustStarVetoTitle">Adjust</h2>
+                <button class="close-btn" onclick="closeModal('adjustStarVetoModal')">X</button>
+            </div>
+            <div style="padding:4px 2px 0;">
+                <div id="adjustStarVetoStudentLine" style="font-size:0.9rem;color:var(--text-muted);margin-bottom:10px;"></div>
+                <div style="display:flex;gap:10px;margin-bottom:12px;align-items:center;flex-wrap:wrap;">
+                    <div style="flex:1;min-width:120px;background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:8px 12px;">
+                        <div style="font-size:0.72rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.4px;">Current</div>
+                        <div id="adjustStarVetoCurrent" style="font-size:1.35rem;font-weight:800;">0</div>
+                    </div>
+                    <div style="flex:1;min-width:120px;background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:8px 12px;">
+                        <div style="font-size:0.72rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.4px;">After</div>
+                        <div id="adjustStarVetoPreview" style="font-size:1.35rem;font-weight:800;color:var(--accent);">0</div>
+                    </div>
+                </div>
+                <label style="font-size:0.82rem;font-weight:600;display:block;margin-bottom:6px;">Choose action</label>
+                <div style="display:flex;gap:10px;margin-bottom:12px;">
+                    <button type="button" id="adjustModeAdd" data-allow="true" onclick="setAdjustStarVetoMode('add')"
+                        style="flex:1;padding:10px;border-radius:8px;border:2px solid var(--border);background:var(--bg-card);color:var(--text-main);cursor:pointer;font-weight:700;">
+                        <i class="fas fa-plus"></i> Add
+                    </button>
+                    <button type="button" id="adjustModeSubtract" data-allow="true" onclick="setAdjustStarVetoMode('subtract')"
+                        style="flex:1;padding:10px;border-radius:8px;border:2px solid var(--border);background:var(--bg-card);color:var(--text-main);cursor:pointer;font-weight:700;">
+                        <i class="fas fa-minus"></i> Subtract
+                    </button>
+                </div>
+                <div class="form-group" style="margin-bottom:10px;">
+                    <label id="adjustStarVetoCountLabel" for="adjustStarVetoCount">Count</label>
+                    <input type="number" id="adjustStarVetoCount" min="1" step="1" value="1" oninput="updateAdjustStarVetoPreview()">
+                </div>
+                <div class="form-group" style="margin-bottom:6px;">
+                    <label for="adjustStarVetoReason">Reason (optional)</label>
+                    <input type="text" id="adjustStarVetoReason" placeholder="e.g. bonus award / accidental correction" maxlength="120">
+                </div>
+                <div id="adjustStarVetoNote" style="font-size:0.76rem;color:var(--text-muted);margin-bottom:10px;"></div>
+            </div>
+            <div class="form-buttons">
+                <button class="secondary" onclick="closeModal('adjustStarVetoModal')">Cancel</button>
+                <button id="adjustStarVetoApplyBtn" onclick="confirmAdjustStarVeto()">Apply</button>
             </div>
         </div>
     </div>
@@ -20738,9 +20868,10 @@ body.header-offscreen .header-kicker::after {
             if ((text.includes('discipline') && text.includes('welfare')) || /\bdwi\b/.test(text) || text.includes('(dwi)')) {
                 return 'DWI';
             }
-            // Check for GR / CR
+            // Check for GR / CR — both map to the 'CR' key in role_veto_defaults
+            // (GR and CR share the same quota; the settings dict uses 'CR')
             if (text.includes('group representative') || text.includes('class representative') || /\b(gr|cr|representative)\b/.test(text)) {
-                return 'GR';
+                return 'CR';
             }
             // Check for PP
             if (text.includes('party president') || /\bpp\b/.test(text)) {
@@ -20785,7 +20916,7 @@ body.header-offscreen .header-kicker::after {
             const markCrQuota = (studentId) => {
                 const sid = parseInt(studentId, 10);
                 if (!sid) return;
-                const crAmount = Math.max(0, parseInt(safeProp(settings.role_veto_defaults, 'GR'), 10) || 0);
+                const crAmount = Math.max(0, parseInt(safeProp(settings.role_veto_defaults, 'CR') || safeProp(settings.role_veto_defaults, 'GR'), 10) || 0);
                 crQuotaByStudent.set(sid, Math.max(crQuotaByStudent.get(sid) || 0, crAmount));
             };
 
@@ -27719,9 +27850,9 @@ body.header-offscreen .header-kicker::after {
                     <td>
                         <div class="student-action-grid">
                             <button class="s-btn s-btn-edit" onclick="openEditStudent(${student.id})"><i class="fas fa-pen"></i> Edit</button>
-                            <button class="s-btn s-btn-edit" onclick="moveStudentGroup(${student.id})"><i class="fas fa-exchange-alt"></i> Move Group</button>
-                            <button class="s-btn s-btn-star" onclick="removeStudentStars(${student.id})"><i class="fas fa-star"></i> Stars</button>
-                            <button class="s-btn s-btn-veto" onclick="removeStudentVetos(${student.id})"><i class="fas fa-shield-alt"></i> VETO</button>
+                            <button class="s-btn s-btn-move" onclick="moveStudentGroup(${student.id})"><i class="fas fa-exchange-alt"></i> Move Group</button>
+                            <button class="s-btn s-btn-star" onclick="openAdjustStarsDialog(${student.id})"><i class="fas fa-star"></i> Stars</button>
+                            <button class="s-btn s-btn-veto" onclick="openAdjustVetosDialog(${student.id})"><i class="fas fa-shield-alt"></i> VETO</button>
                             <button class="s-btn s-btn-toggle${isActive ? ' deactivate' : ''}" onclick="toggleStudentActive(${student.id})"><i class="fas fa-power-off"></i> ${isActive ? 'Deactivate' : 'Activate'}</button>
                             <button class="s-btn s-btn-delete" onclick="deleteStudent(${student.id})"><i class="fas fa-trash"></i> Delete</button>
                         </div>
@@ -28701,90 +28832,223 @@ body.header-offscreen .header-kicker::after {
             showAlert(`Restored ${restored.base_name || restored.name || 'student'} successfully.`, 'success');
         }
 
-        function removeStudentStars(studentId) {
-            const student = db.getStudents().find(s => s.id === studentId);
-            if (!student) {
-                showAlert('Student not found', 'danger');
-                return;
-            }
-            
-            const currentStars = parseInt(student.stars, 10) || 0;
-            if (currentStars === 0) {
-                showAlert('This student has no stars to remove', 'warning');
-                return;
-            }
-            
-            const prompt_msg = `Remove accidental stars? (Current: ${currentStars})\n\nEnter number to remove (1-${currentStars}):`;
-            const response = prompt(prompt_msg, '1');
-            if (response === null) return;
-            
-            const removeCount = parseInt(response, 10);
-            if (Number.isNaN(removeCount) || removeCount < 1 || removeCount > currentStars) {
-                showAlert(`Enter a valid number between 1 and ${currentStars}`, 'danger');
-                return;
-            }
-            
-            const newStars = Math.max(0, currentStars - removeCount);
-            student.stars = newStars;
-            student.stars_updated_at = new Date().toISOString();
-            student.updated_at = student.stars_updated_at;
+        // ── Adjust Star / VETO dialog (Add or Subtract) ─────────────────────────
+        // Replaces the old prompt()-based removeStudentStars / removeStudentVetos.
+        // VETO Add/Subtract persists end-to-end by writing a manual_veto_grant /
+        // manual_veto_revoke entry into veto_tracking.usage_log, which the server's
+        // _reconcile_veto_tracking_from_data honors (see scoreboard.py). Editing
+        // student.veto_count alone is reverted by the server reconcile, so the
+        // ledger entry is mandatory for persistence.
+        let _adjustStarVetoCtx = { type: 'star', studentId: 0, mode: 'add', name: '', current: 0 };
 
-            // Sync month_star_count so repairMonthCounterCarryForward (auto-runs at admin login)
-            // doesn't revert this change by recalculating from stale carry-in values.
-            const _rssData = db.getData();
-            const _rssMonth = getCurrentMonthKey();
-            const _rssSid = parseInt(student.id, 10) || 0;
-            if (_rssSid && _rssData.month_roster_profiles) {
-                const _rssProfiles = Array.isArray(_rssData.month_roster_profiles[_rssMonth])
-                    ? _rssData.month_roster_profiles[_rssMonth] : [];
-                const _rssProfile = _rssProfiles.find(p => parseInt(p.studentId, 10) === _rssSid)
-                                 || _rssProfiles.find(p => normalizeRosterValue(p.roll) === normalizeRosterValue(student.roll));
-                if (_rssProfile) {
-                    const _rssDelta = (_rssData.scores || [])
-                        .filter(s => s.studentId === _rssSid && s.month === _rssMonth)
-                        .reduce((sum, s) => sum + (parseInt(s.stars, 10) || 0), 0);
-                    _rssProfile.month_star_count = Math.max(0, newStars - _rssDelta);
+        function _syncMonthRosterCounter(studentId, monthKey, field, newLiveValue, scoreField) {
+            const data = db.getData();
+            const sid = parseInt(studentId, 10) || 0;
+            if (!sid || !data.month_roster_profiles) return;
+            const profiles = Array.isArray(data.month_roster_profiles[monthKey])
+                ? data.month_roster_profiles[monthKey] : [];
+            const student = (data.students || []).find(s => parseInt(s.id, 10) === sid);
+            const profile = profiles.find(p => parseInt(p.studentId, 10) === sid)
+                         || profiles.find(p => student && normalizeRosterValue(p.roll) === normalizeRosterValue(student.roll));
+            if (!profile) return;
+            const delta = (data.scores || [])
+                .filter(s => s.studentId === sid && s.month === monthKey)
+                .reduce((sum, s) => {
+                    const v = parseInt(s[scoreField], 10) || 0;
+                    return sum + (scoreField === 'vetos' ? (v > 0 ? v : 0) : v);
+                }, 0);
+            profile[field] = Math.max(0, newLiveValue - delta);
+        }
+
+        function _appendVetoUsageLogEntry(student, entry) {
+            try {
+                const data = db.getData();
+                data.veto_tracking = data.veto_tracking || {};
+                if (!Array.isArray(data.veto_tracking.usage_log)) {
+                    data.veto_tracking.usage_log = [];
                 }
-            }
-
-            db.saveData(db.getData());
-
-            loadStudents();
-            loadScoreboard();
-            showAlert(`Removed ${removeCount} star(s). Student now has ${newStars} stars.`, 'success');
+                data.veto_tracking.usage_log.push(entry);
+                // Keep the students[roll] map roughly in sync if it already exists.
+                const roll = String(student.roll || '').trim();
+                if (roll && data.veto_tracking.students && data.veto_tracking.students[roll]) {
+                    const sEntry = data.veto_tracking.students[roll];
+                    const ind = Math.max(0, parseInt(sEntry.individual_vetos, 10) || 0);
+                    if (entry.action === 'manual_veto_grant') {
+                        sEntry.individual_vetos = ind + (parseInt(entry.vetos_granted, 10) || 0);
+                    } else if (entry.action === 'manual_veto_revoke') {
+                        sEntry.individual_vetos = Math.max(0, ind - (parseInt(entry.vetos_revoked, 10) || 0));
+                    }
+                    sEntry.total_vetos = (parseInt(sEntry.individual_vetos, 10) || 0)
+                        + (parseInt(sEntry.role_vetos, 10) || 0);
+                }
+            } catch (_) {}
         }
 
-        function removeStudentVetos(studentId) {
+        function openAdjustStarsDialog(studentId) {
             const student = db.getStudents().find(s => s.id === studentId);
-            if (!student) {
-                showAlert('Student not found', 'danger');
+            if (!student) { showAlert('Student not found', 'danger'); return; }
+            const name = student.base_name || student.name || 'this student';
+            const current = Math.max(0, parseInt(safeProp(student, 'stars'), 10) || 0);
+            _adjustStarVetoCtx = { type: 'star', studentId, mode: 'add', name, current };
+            _showAdjustStarVetoModal('Stars', name, current, 'star');
+        }
+
+        function openAdjustVetosDialog(studentId) {
+            const student = db.getStudents().find(s => s.id === studentId);
+            if (!student) { showAlert('Student not found', 'danger'); return; }
+            const name = student.base_name || student.name || 'this student';
+            const current = getAvailableVetosForMonth(student.id, getCurrentMonthKey());
+            _adjustStarVetoCtx = { type: 'veto', studentId, mode: 'add', name, current };
+            _showAdjustStarVetoModal('VETOs', name, current, 'veto');
+        }
+
+        function _showAdjustStarVetoModal(label, name, current, type) {
+            document.getElementById('adjustStarVetoTitle').textContent = `Adjust ${label}`;
+            document.getElementById('adjustStarVetoStudentLine').textContent =
+                `${name} — choose Add or Subtract, then enter the count.`;
+            document.getElementById('adjustStarVetoCurrent').textContent = current;
+            document.getElementById('adjustStarVetoCount').value = 1;
+            document.getElementById('adjustStarVetoReason').value = '';
+            const note = document.getElementById('adjustStarVetoNote');
+            if (type === 'veto') {
+                note.textContent = 'VETO Add grants new individual VETOs (persists via the VETO ledger). Subtract reduces available individual VETOs and is recorded as an admin revoke.';
+            } else {
+                note.textContent = 'Stars are adjusted directly on the student record and sync to the current-month roster.';
+            }
+            setAdjustStarVetoMode('add');
+            updateAdjustStarVetoPreview();
+            openModal('adjustStarVetoModal');
+        }
+
+        function setAdjustStarVetoMode(mode) {
+            _adjustStarVetoCtx.mode = mode;
+            const addBtn = document.getElementById('adjustModeAdd');
+            const subBtn = document.getElementById('adjustModeSubtract');
+            let accentRgb = '99,179,237';
+            try { accentRgb = (getComputedStyle(document.body).getPropertyValue('--accent-rgb') || '99,179,237').trim() || '99,179,237'; } catch (_) {}
+            const accent = 'var(--accent)';
+            const selected = `2px solid ${accent};background:rgba(${accentRgb},0.12);color:${accent};`;
+            const idle = '2px solid var(--border);background:var(--bg-card);color:var(--text-main);';
+            const base = 'flex:1;padding:10px;border-radius:8px;border:';
+            if (mode === 'add') {
+                addBtn.setAttribute('style', base + selected + 'font-weight:700;');
+                subBtn.setAttribute('style', base + idle + 'font-weight:700;');
+            } else {
+                subBtn.setAttribute('style', base + selected + 'font-weight:700;');
+                addBtn.setAttribute('style', base + idle + 'font-weight:700;');
+            }
+            updateAdjustStarVetoPreview();
+        }
+
+        function updateAdjustStarVetoPreview() {
+            const count = Math.max(0, parseInt(document.getElementById('adjustStarVetoCount').value, 10) || 0);
+            const cur = _adjustStarVetoCtx.current;
+            const next = _adjustStarVetoCtx.mode === 'add' ? cur + count : Math.max(0, cur - count);
+            const previewEl = document.getElementById('adjustStarVetoPreview');
+            previewEl.textContent = next;
+            previewEl.style.color = _adjustStarVetoCtx.mode === 'add' ? '#22c55e' : '#f87171';
+        }
+
+        function confirmAdjustStarVeto() {
+            const ctx = _adjustStarVetoCtx;
+            const count = Math.max(0, parseInt(document.getElementById('adjustStarVetoCount').value, 10) || 0);
+            const reason = (document.getElementById('adjustStarVetoReason').value || '').trim();
+            if (count < 1) { showAlert('Enter a count of at least 1.', 'danger'); return; }
+            const data = db.getData();
+            const student = (data.students || []).find(s => s.id === ctx.studentId);
+            if (!student) { showAlert('Student not found', 'danger'); return; }
+            const nowIso = new Date().toISOString();
+            const actor = currentLoginId || currentUserRole || 'admin';
+
+            if (ctx.type === 'star') {
+                const current = Math.max(0, parseInt(safeProp(student, 'stars'), 10) || 0);
+                if (ctx.mode === 'subtract' && count > current) {
+                    showAlert(`Cannot subtract ${count} — student only has ${current} star(s).`, 'danger');
+                    return;
+                }
+                const newStars = ctx.mode === 'add' ? current + count : Math.max(0, current - count);
+                student.stars = newStars;
+                student.stars_updated_at = nowIso;
+                student.updated_at = nowIso;
+                _syncMonthRosterCounter(student.id, getCurrentMonthKey(), 'month_star_count', newStars, 'stars');
+                db.saveData(data);
+                closeModal('adjustStarVetoModal');
+                loadStudents();
+                loadScoreboard();
+                showAlert(`${ctx.mode === 'add' ? 'Added' : 'Subtracted'} ${count} star(s). ${ctx.name} now has ${newStars} star(s).`, 'success');
                 return;
             }
-            
-            const currentVetos = parseInt(student.veto_count, 10) || 0;
-            if (currentVetos === 0) {
-                showAlert('This student has no VETOs to remove', 'warning');
+
+            // VETO
+            const currentMonth = getCurrentMonthKey();
+            const displayed = getAvailableVetosForMonth(student.id, currentMonth);
+            const individual = Math.max(0, parseInt(safeProp(student, 'veto_count'), 10) || 0);
+
+            if (ctx.mode === 'add') {
+                student.veto_count = individual + count;
+                student.vetos_updated_at = nowIso;
+                student.updated_at = nowIso;
+                _appendVetoUsageLogEntry(student, {
+                    timestamp: nowIso,
+                    entry_id: `mvg_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+                    roll: String(student.roll || ''),
+                    name: ctx.name,
+                    action: 'manual_veto_grant',
+                    vetos_granted: count,
+                    reason: reason || 'admin_manual_grant',
+                    remaining_after: Math.max(0, student.veto_count),
+                    recorded_by: actor
+                });
+                _syncMonthRosterCounter(student.id, currentMonth, 'month_veto_count', student.veto_count, 'vetos');
+                db.saveData(db.getData());
+                closeModal('adjustStarVetoModal');
+                loadStudents();
+                loadScoreboard();
+                showAlert(`Added ${count} VETO(s). ${ctx.name} now has ${displayed + count} VETO(s).`, 'success');
+                if (SERVER_SYNC.enabled && (currentUserRole === 'admin' || currentUserRole === 'teacher')) {
+                    pushToServer(db.getData(), { silent: true }).catch(() => {});
+                }
                 return;
             }
-            
-            const prompt_msg = `Remove accidental VETOs? (Current: ${currentVetos})\n\nEnter number to remove (1-${currentVetos}):`;
-            const response = prompt(prompt_msg, '1');
-            if (response === null) return;
-            
-            const removeCount = parseInt(response, 10);
-            if (Number.isNaN(removeCount) || removeCount < 1 || removeCount > currentVetos) {
-                showAlert(`Enter a valid number between 1 and ${currentVetos}`, 'danger');
+
+            // Subtract VETO (admin revoke — recorded so the server reconcile preserves it)
+            if (displayed === 0) {
+                showAlert(`${ctx.name} has no VETOs to subtract.`, 'warning');
                 return;
             }
-            
-            const newVetos = Math.max(0, currentVetos - removeCount);
-            student.veto_count = newVetos;
+            // Only the individual live counter can be revoked here; awards/role
+            // portions come from score entries / post-holder grants.
+            if (count > individual) {
+                const extra = displayed > individual ? `; the remaining ${displayed - individual} come from score awards / role grants` : '';
+                showAlert(`Cannot subtract ${count} from individual VETOs (only ${individual} available${extra}). Enter a value of ${individual} or less.`, 'danger');
+                return;
+            }
+            const newVeto = Math.max(0, individual - count);
+            student.veto_count = newVeto;
+            student.vetos_updated_at = nowIso;
+            student.updated_at = nowIso;
+            _appendVetoUsageLogEntry(student, {
+                timestamp: nowIso,
+                entry_id: `mvr_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+                roll: String(student.roll || ''),
+                name: ctx.name,
+                action: 'manual_veto_revoke',
+                vetos_revoked: count,
+                reason: reason || 'admin_manual_revoke',
+                remaining_after: newVeto,
+                recorded_by: actor
+            });
+            _syncMonthRosterCounter(student.id, currentMonth, 'month_veto_count', newVeto, 'vetos');
             db.saveData(db.getData());
-            
+            closeModal('adjustStarVetoModal');
             loadStudents();
             loadScoreboard();
-            showAlert(`Removed ${removeCount} VETO(s). Student now has ${newVetos} VETOs.`, 'success');
+            showAlert(`Subtracted ${count} VETO(s). ${ctx.name} now has ${Math.max(0, displayed - count)} VETO(s).`, 'success');
+            if (SERVER_SYNC.enabled && (currentUserRole === 'admin' || currentUserRole === 'teacher')) {
+                pushToServer(db.getData(), { silent: true }).catch(() => {});
+            }
         }
+
 
         function syncThemeButton() {
             const btn = document.getElementById('themeToggleBtn');
@@ -29058,8 +29322,6 @@ body.header-offscreen .header-kicker::after {
             document.getElementById('editClass').value = student.class || '';
             document.getElementById('editFees').value = coalesce(student.fees, 0);
             document.getElementById('editVotePower').value = computeVotePower(getStudentMonthTotal(student.id, getCurrentMonthKey()));
-            document.getElementById('editStars').value = coalesce(student.stars, 0);
-            document.getElementById('editVetos').value = coalesce(student.veto_count, 0);
             document.getElementById('editActive').value = student.active === false ? 'false' : 'true';
             document.getElementById('editActiveFromMonth').value = student.active_from_month || '';
             document.getElementById('editDeactivationMonth').value = student.deactivation_month || '';
@@ -29108,7 +29370,7 @@ body.header-offscreen .header-kicker::after {
                 _histSection.style.display = 'none';
             }
 
-            const lockIds = ['editRoll', 'editClass', 'editFees', 'editVotePower', 'editStars', 'editVetos', 'editActive', 'editActiveFromMonth', 'editDeactivationMonth'];
+            const lockIds = ['editRoll', 'editClass', 'editFees', 'editVotePower', 'editActive', 'editActiveFromMonth', 'editDeactivationMonth'];
             lockIds.forEach(id => {
                 const element = document.getElementById(id);
                 if (element) element.disabled = selfOnly;
@@ -29187,8 +29449,6 @@ body.header-offscreen .header-kicker::after {
             const name = document.getElementById('editName').value.trim();
             const classNum = parseInt(document.getElementById('editClass').value);
             const fees = parseInt(document.getElementById('editFees').value) || 0;
-            const stars = parseInt(document.getElementById('editStars').value, 10) || 0;
-            const vetos = parseInt(document.getElementById('editVetos').value, 10) || 0;
             const isActive = document.getElementById('editActive').value === 'true';
             const activeFromMonth = (document.getElementById('editActiveFromMonth').value || '').trim() || null;
             const deactivationMonth = (document.getElementById('editDeactivationMonth').value || '').trim() || null;
@@ -29330,8 +29590,6 @@ body.header-offscreen .header-kicker::after {
                     class: classNum,
                     fees,
                     vote_power: null,
-                    stars,
-                    veto_count: vetos,
                     active: isActive,
                     profile_data: profileData
                 };
@@ -29354,7 +29612,13 @@ body.header-offscreen .header-kicker::after {
                     const nowIso = new Date().toISOString();
 
                     // Step 1: Commit pending score entries into data.scores[]
+                    // Capture star/veto deltas before clearing pending entries so we can
+                    // apply them to the live student counters for the current month.
+                    let _pendingStarDelta = 0;
+                    let _pendingVetoDelta = 0;
                     for (const entry of _histPendingScoreEntries) {
+                        _pendingStarDelta += (parseInt(entry.stars, 10) || 0);
+                        _pendingVetoDelta += (parseInt(entry.vetos, 10) || 0);
                         const dupIdx = (freshData.scores || []).findIndex(
                             s => s.studentId === studentId && s.date === entry.date
                         );
@@ -29424,38 +29688,28 @@ body.header-offscreen .header-kicker::after {
                         histProfile.month_veto_count = allMonthScores.reduce((s, e) => s + (parseInt(e.vetos, 10) || 0), 0);
                     }
 
-                    // Update student's aggregate star total
-                    const stu = (freshData.students || []).find(s => s.id === studentId);
-                    if (stu) {
-                        stu.stars = (freshData.scores || []).reduce((s, e) => e.studentId === studentId ? s + (parseInt(e.stars, 10) || 0) : s, 0);
-                        stu.stars_updated_at = new Date().toISOString();
-                        stu.updated_at = stu.stars_updated_at;
+                    // Apply pending score-entry deltas to the live student counters
+                    // ONLY for the current month (historical months use roster profiles).
+                    // Previously this recalculated stu.stars as the all-time sum of every
+                    // score entry's stars across ALL months — that overwrote the current
+                    // live balance with a meaningless cumulative total (e.g. 4 → 10).
+                    if (histMonth === getCurrentMonthKey() && (_pendingStarDelta !== 0 || _pendingVetoDelta !== 0)) {
+                        const stu = (freshData.students || []).find(s => s.id === studentId);
+                        if (stu) {
+                            if (_pendingStarDelta !== 0) {
+                                stu.stars = Math.max(0, (parseInt(stu.stars, 10) || 0) + _pendingStarDelta);
+                                stu.stars_updated_at = nowIso;
+                            }
+                            if (_pendingVetoDelta !== 0) {
+                                stu.veto_count = Math.max(0, (parseInt(stu.veto_count, 10) || 0) + _pendingVetoDelta);
+                                stu.vetos_updated_at = nowIso;
+                            }
+                            stu.updated_at = nowIso;
+                        }
                     }
 
                     db.saveData(freshData, { allowHistoricalWrite: true, skipSync: true });
                     repairMonthCounterCarryForward({ persist: true, startMonth: histMonth, syncStudentTotals: true });
-                } else {
-                    // No histMonth context — admin edited stars directly via the student edit form.
-                    // Sync month_star_count so repairMonthCounterCarryForward (auto-runs at admin
-                    // login) doesn't revert the change by recalculating from stale carry-in values.
-                    // Formula: month_star_count = desiredStars - scoreDeltas(currentMonth)
-                    const _sseData = db.getData();
-                    const _sseMonth = getCurrentMonthKey();
-                    const _sseSid = studentId;
-                    const _sseNormRoll = normalizeRoll(roll);
-                    if (_sseData.month_roster_profiles) {
-                        const _sseProfiles = Array.isArray(_sseData.month_roster_profiles[_sseMonth])
-                            ? _sseData.month_roster_profiles[_sseMonth] : [];
-                        const _sseProfile = _sseProfiles.find(p => parseInt(p.studentId, 10) === _sseSid)
-                                         || _sseProfiles.find(p => normalizeRoll(p.roll || '') === _sseNormRoll);
-                        if (_sseProfile) {
-                            const _sseDelta = (_sseData.scores || [])
-                                .filter(s => s.studentId === _sseSid && s.month === _sseMonth)
-                                .reduce((sum, s) => sum + (parseInt(s.stars, 10) || 0), 0);
-                            _sseProfile.month_star_count = Math.max(0, stars - _sseDelta);
-                            db.saveData(_sseData, { system: true, skipBackup: true });
-                        }
-                    }
                 }
 
                 // Fire server push in background — don't block modal close on network latency.
@@ -35398,7 +35652,7 @@ body.header-offscreen .header-kicker::after {
             setVal('settingsGrantCoLeader', safeProp(settings.role_veto_defaults, 'CO_LEADER'));
             setVal('settingsGrantLop', safeProp(settings.role_veto_defaults, 'LOP'));
             setVal('settingsGrantDwi', safeProp(settings.role_veto_defaults, 'DWI'));
-            setVal('settingsGrantGr', safeProp(settings.role_veto_defaults, 'GR'));
+            setVal('settingsGrantGr', safeProp(settings.role_veto_defaults, 'CR') || safeProp(settings.role_veto_defaults, 'GR'));
             setVal('settingsGrantPp', safeProp(settings.role_veto_defaults, 'PP'));
             setVal('settingsGrantDpp', safeProp(settings.role_veto_defaults, 'DPP'));
         }
@@ -42725,35 +42979,10 @@ body.header-offscreen .header-kicker::after {
                         showAlert('VETO approval cancelled — no option chosen.', 'info');
                         return;
                     }
-                    const applied = applyVetoWorkflowDatabaseChanges(appeal.target_studentId, appeal.target_date, workflowResult);
+                    const applied = applyVetoWorkflowDatabaseChanges(appeal.studentId, appeal.target_date, workflowResult);
                     if (!applied) {
                         return;
                     }
-                    // Consume 1 veto from appeal.studentId (the requester)
-                    const requesterScore = db.getScore(appeal.studentId, appeal.target_date);
-                    const reqExistingPoints = requesterScore ? (parseInt(safeProp(requesterScore, 'points'), 10) || 0) : 0;
-                    const reqExistingStars = requesterScore ? (parseInt(safeProp(requesterScore, 'stars'), 10) || 0) : 0;
-                    const reqExistingVetos = requesterScore ? (parseInt(safeProp(requesterScore, 'vetos'), 10) || 0) : 0;
-                    const reqNotes = requesterScore ? (String(safeProp(requesterScore, 'notes') || '')).trim() : '';
-
-                    const reqFinalVetos = reqExistingVetos - 1;
-                    const reqNotesToSave = reqNotes ? `${reqNotes} | Used VETO for Student ID ${appeal.target_studentId}` : `Used VETO for Student ID ${appeal.target_studentId}`;
-                    const reqResolved = resolveScoreForRole(appeal.studentId, appeal.target_date, month, reqExistingPoints, reqExistingStars, reqFinalVetos, reqNotesToSave);
-                    if (workflowResult.vetoSource !== 'auto') {
-                        reqResolved.score.veto_source = workflowResult.vetoSource;
-                    }
-                    // Attach history entry
-                    reqResolved.score._newHistoryEntry = {
-                        delta: 0,
-                        stars_delta: 0,
-                        vetos_delta: -1,
-                        total: reqExistingPoints,
-                        actor: currentLoginId || currentUserRole || 'unknown',
-                        role: currentUserRole || 'unknown',
-                        timestamp: new Date().toISOString(),
-                        note: `VETO approved via appeal ID ${appeal.id}`
-                    };
-                    db.saveData(db.getData());
                 }
             }
 
@@ -45788,6 +46017,17 @@ body.header-offscreen .header-kicker::after {
             return Array.isArray(data.resource_transactions) ? data.resource_transactions : [];
         }
 
+        // Identify transactions that originated from the Excel Mela tab.
+        // Mela-created txns use an item_name or note prefixed with "Excel Mela".
+        // This lets the Resources Transactions card filter by Source and lets the
+        // Mela tab render its own transactions list from the shared store.
+        function isMelaTransaction(txn) {
+            if (!txn) return false;
+            const item = String(txn.item_name || txn.item || '').trim();
+            const note = String(txn.note || '').trim();
+            return item.startsWith('Excel Mela') || note.startsWith('Excel Mela');
+        }
+
         function formatMoneyValue(value) {
             const num = Number(value);
             if (!Number.isFinite(num)) return '0';
@@ -46043,6 +46283,40 @@ body.header-offscreen .header-kicker::after {
             return LABELS[role] || 'Student';
         }
 
+        // Free Quota Counter lazy-load state. The full list is NOT rendered on tab
+        // load — the admin must pick a filter and click "View". Filter/search changes
+        // only re-render once the list has been viewed (avoids re-triggering a long list).
+        let freeQuotaListViewed = false;
+
+        function onFreeQuotaFilterChange() {
+            // Only re-render live once the user has explicitly viewed the list.
+            if (freeQuotaListViewed) renderFreeQuotaCounter();
+        }
+
+        function viewFreeQuotaCounter() {
+            freeQuotaListViewed = true;
+            renderFreeQuotaCounter();
+        }
+
+        function resetFreeQuotaCounterFilters() {
+            const monthInput = document.getElementById('freeQuotaCounterMonth');
+            const filterSelect = document.getElementById('freeQuotaCounterFilter');
+            const searchInput = document.getElementById('freeQuotaCounterSearch');
+            if (monthInput) monthInput.value = getCurrentMonthKey();
+            if (filterSelect) filterSelect.value = 'availed';
+            if (searchInput) searchInput.value = '';
+            freeQuotaListViewed = false;
+            renderFreeQuotaCounterPlaceholder();
+        }
+
+        function renderFreeQuotaCounterPlaceholder() {
+            const colCount = currentUserRole === 'admin' ? 10 : 9;
+            const tbody = document.getElementById('freeQuotaCounterBody');
+            if (tbody) tbody.innerHTML = `<tr><td colspan="${colCount}" class="text-center" style="padding:22px;color:#94a3b8;">Apply a filter and click <b>View</b> to load the list.</td></tr>`;
+            const statsGrid = document.getElementById('freeQuotaStatsGrid');
+            if (statsGrid) statsGrid.innerHTML = '';
+        }
+
         function renderFreeQuotaCounter() {
             const tbody = document.getElementById('freeQuotaCounterBody');
             if (!tbody) return;
@@ -46051,9 +46325,10 @@ body.header-offscreen .header-kicker::after {
             const statsGrid = document.getElementById('freeQuotaStatsGrid');
             const monthKey = (monthInput && monthInput.value) ? monthInput.value : getCurrentMonthKey();
             if (monthInput && !monthInput.value) monthInput.value = monthKey;
-            const filter = filterSelect ? filterSelect.value : 'active';
+            const filter = filterSelect ? filterSelect.value : 'availed';
             const searchInput = document.getElementById('freeQuotaCounterSearch');
             const searchTerm = (searchInput && searchInput.value || '').trim().toLowerCase();
+            const canMarkAvailed = currentUserRole === 'admin';
 
             const allStudents = (db.getStudents() || []);
             let students;
@@ -46104,8 +46379,9 @@ body.header-offscreen .header-kicker::after {
 
             filtered.sort((a, b) => b.pct - a.pct || b.used - a.used);
 
+            const colCount = canMarkAvailed ? 10 : 9;
             if (!filtered.length) {
-                tbody.innerHTML = `<tr><td colspan="9" class="text-center" style="padding:22px;">No students match this filter</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="${colCount}" class="text-center" style="padding:22px;">No students match this filter</td></tr>`;
                 return;
             }
 
@@ -46131,6 +46407,9 @@ body.header-offscreen .header-kicker::after {
                         </div>
                         <span style="font-size:11px;font-weight:600;white-space:nowrap;color:${pct>=100?'#ef4444':pct>0?'#fbbf24':'#4ade80'};">${statusText}</span>
                     </div>`;
+                const markCell = canMarkAvailed
+                    ? `<td><button class="btn-sm" style="padding:4px 10px;font-size:11px;border-radius:6px;border:1px solid rgba(20,184,166,0.45);background:rgba(20,184,166,0.12);color:#14b8a6;cursor:pointer;" onclick="markStudentAvailedSubsidy(${r.sid}, '${monthKey}', this)" title="Manually mark this student as having availed Academy subsidy"><i class="fas fa-check"></i> Mark Availed</button></td>`
+                    : '';
                 return `
                     <tr>
                         <td>${idx + 1}</td>
@@ -46142,8 +46421,76 @@ body.header-offscreen .header-kicker::after {
                         <td style="color:${r.remaining > 0 ? '#4ade80' : '#ef4444'};font-weight:600;">₹${Math.round(r.remaining)}</td>
                         <td>${barHtml}</td>
                         <td><button class="btn-sm" style="padding:4px 10px;font-size:11px;border-radius:6px;border:1px solid rgba(99,102,241,0.4);background:rgba(99,102,241,0.1);color:#a5b4fc;cursor:pointer;" onclick="showFreeQuotaDetails(${r.sid}, '${monthKey}')"><i class="fas fa-info-circle"></i> Details</button></td>
+                        ${markCell}
                     </tr>`;
             }).join('');
+        }
+
+        // Manually record that a student availed Academy subsidy (free quota) without
+        // going through the full request/approval flow. Writes a free_quota txn row
+        // using the same free_quota_amount field that getStudentFreeQuotaUsed() sums,
+        // so the counter updates immediately. Marks it manual=true for traceability.
+        async function markStudentAvailedSubsidy(studentId, monthKey, triggerBtn) {
+            if (currentUserRole !== 'admin') { showAlert('Only admins can mark subsidy availed.', 'warning'); return; }
+            const sid = parseInt(studentId, 10);
+            if (!sid || !monthKey) return;
+            const student = (db.getStudents() || []).find(s => parseInt(s.id, 10) === sid);
+            if (!student) { showAlert('Student not found.', 'warning'); return; }
+            const name = String(student.base_name || student.name || '').trim();
+            const remaining = getStudentFreeQuotaRemaining(sid, monthKey);
+            if (remaining <= 0) {
+                const conf = await showConfirmDialog(`${name} has no remaining quota for ${monthKey}. Mark as availed anyway?`, { title: 'No remaining quota', type: 'warning', okLabel: 'Mark anyway' });
+                if (!conf) return;
+            }
+            const defaultAmt = remaining > 0 ? remaining : getStudentFreeQuotaAmount(sid);
+            const input = window.prompt(`Mark Academy subsidy availed for ${name} (${monthKey})\nEnter amount availed (₹):`, String(defaultAmt));
+            if (input === null) return;
+            const amount = Math.max(0, Math.round(parseFloat(input) || 0));
+            if (amount <= 0) { showAlert('Please enter a valid amount.', 'warning'); return; }
+
+            const restoreBtn = triggerBtn ? _btnSetLoading(triggerBtn) : null;
+            pushUndoSnapshot('Manually mark Academy subsidy availed');
+            const nowIso = new Date().toISOString();
+            const txnId = generateUniqueId();
+            const txnRow = {
+                id: txnId,
+                request_id: 0,
+                month: monthKey,
+                type: 'free_quota',
+                studentId: sid,
+                student_roll: String(student.roll || '').trim(),
+                item_id: 0,
+                item_name: 'Academy Subsidy (Manual)',
+                unit: '',
+                qty: 0,
+                price_per_unit: 0,
+                total_cost: 0,
+                points_used: 0,
+                free_quota_amount: amount,
+                cash_pricing_rule: '',
+                cash_charged: 0,
+                cash_paid: 0,
+                cash_due: 0,
+                cash_return_due: 0,
+                admin_veto: false,
+                advantage_points_deducted: 0,
+                pending_settlement: false,
+                manual: true,
+                created_at: nowIso,
+                updated_at: nowIso,
+                created_by_login_id: String(currentLoginId || 'Admin').trim()
+            };
+            applyResourcePatchLocally({ resource_transactions: [txnRow] });
+            if (restoreBtn) restoreBtn();
+            // Ensure the list is in "viewed" state so the admin sees the update.
+            freeQuotaListViewed = true;
+            renderFreeQuotaCounter();
+            // Refresh the shared transactions ledger views (Resources + Mela) so the
+            // new free_quota txn appears in both tabs immediately.
+            renderResourceTransactions();
+            renderMelaTransactionsList();
+            updateResourcesTabBadges();
+            showAlert(`Marked ₹${amount} Academy subsidy as availed for ${escapeHtml(name)} (${monthKey}). Press Ctrl+Z to undo.`, 'success');
         }
 
         function getStudentFreeQuotaTransactions(studentId, monthKey) {
@@ -46219,8 +46566,19 @@ body.header-offscreen .header-kicker::after {
                             ${txnRowsHtml}
                         </tbody>
                     </table>
+                    ${currentUserRole === 'admin' ? `
+                    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;padding-top:12px;border-top:1px solid rgba(148,163,184,0.2);">
+                        <button class="btn-primary" onclick="markStudentAvailedSubsidyFromModal(${sid}, '${monthKey}', this)" style="background:linear-gradient(135deg,#0d9488,#0f766e);border:none;color:#fff;font-weight:600;padding:8px 14px;border-radius:8px;cursor:pointer;"><i class="fas fa-check"></i> Mark Availed</button>
+                    </div>` : ''}
                 </div>`;
             openModal('freeQuotaDetailsModal', { centerViewport: true, maxWidth: 500 });
+        }
+
+        // Mark availed from within the Details modal — refreshes the modal so the
+        // new transaction shows up immediately, and updates the counter behind it.
+        async function markStudentAvailedSubsidyFromModal(studentId, monthKey, btn) {
+            await markStudentAvailedSubsidy(studentId, monthKey, btn);
+            showFreeQuotaDetails(studentId, monthKey);
         }
 
         // ===== POSTHOLDER TICKET SYSTEM =====
@@ -46884,6 +47242,19 @@ body.header-offscreen .header-kicker::after {
             if (transactionsCard) {
                 transactionsCard.style.display = isTeacher ? 'none' : '';
             }
+            // Transactions sub-tab button is hidden for teachers (they can't see txns).
+            const resTxnTabBtn = document.getElementById('resSubTabTransactions');
+            if (resTxnTabBtn) {
+                resTxnTabBtn.style.display = isTeacher ? 'none' : '';
+            }
+            // If the active sub-tab is transactions but the user is a teacher, fall back to cabinet.
+            if (isTeacher) {
+                const activeTab = document.querySelector('#resSubTabs .res-sub-tab.active');
+                if (activeTab && activeTab.dataset.restab === 'transactions') {
+                    switchResourcesSubTab('cabinet', document.querySelector('#resSubTabs .res-sub-tab[data-restab="cabinet"]'));
+                }
+            }
+            updateResourcesTabBadges();
 
             const queueFilter = document.getElementById('resourceQueueFilter');
             if (queueFilter) {
@@ -47186,6 +47557,7 @@ body.header-offscreen .header-kicker::after {
         function renderResourceRequests() {
             const tbody = document.getElementById('resourceRequestsBody');
             if (!tbody) return;
+            updateResourcesTabBadges();
             _showTableSkeleton('resourceRequestsBody', 11, 3);
             const filter = String(getElementValue('resourceQueueFilter') || 'mine').trim().toLowerCase();
             const all = getResourceRequests().slice();
@@ -47324,9 +47696,11 @@ body.header-offscreen .header-kicker::after {
         function renderResourceTransactions() {
             const tbody = document.getElementById('resourceTransactionsBody');
             if (!tbody) return;
+            updateResourcesTabBadges();
             populateResourceTransactionFilters();
             _showTableSkeleton('resourceTransactionsBody', 12, 3);
             const filter = String(getElementValue('resourceTransactionsFilter') || 'all').trim().toLowerCase();
+            const sourceFilter = String(getElementValue('resourceTransactionsSourceFilter') || 'all').trim().toLowerCase();
             const studentFilterRaw = String(getElementValue('resourceTransactionsStudentFilter') || 'all').trim();
             const studentFilter = studentFilterRaw.toLowerCase();
             const dateFilter = String(getElementValue('resourceTransactionsDateFilter') || '').trim();
@@ -47353,6 +47727,13 @@ body.header-offscreen .header-kicker::after {
                 rows = rows.filter(isCompleted);
             } else if (filter === 'not_completed') {
                 rows = rows.filter(txn => !isCompleted(txn));
+            }
+
+            // Source filter: separate Resources-originated vs Excel Mela-originated txns.
+            if (sourceFilter === 'resources') {
+                rows = rows.filter(txn => !isMelaTransaction(txn));
+            } else if (sourceFilter === 'mela') {
+                rows = rows.filter(isMelaTransaction);
             }
 
             const studentById = new Map((db.getStudents() || []).map(s => [parseInt(s.id, 10), s]));
@@ -47522,6 +47903,7 @@ body.header-offscreen .header-kicker::after {
 
                 const rowClass = isCompleted(txn) ? 'txn-row-complete' : 'txn-row-open';
                 const advBadge = advPtsDed > 0 ? `<span style="font-size:10px;background:rgba(120,53,15,0.5);border:1px solid rgba(251,191,36,0.3);color:#fcd34d;padding:1px 5px;border-radius:4px;margin-left:4px" title="Half-price advantage used">−${advPtsDed}pts</span>` : '';
+                const melaBadge = isMelaTransaction(txn) ? `<span style="font-size:10px;background:rgba(124,58,237,0.25);border:1px solid rgba(217,70,239,0.4);color:#e9d5ff;padding:1px 5px;border-radius:4px;margin-left:4px" title="Originated from Excel Mela">Mela</span>` : '';
                 return `
                     <tr class="${rowClass}">
                         <td>${id || '-'}</td>
@@ -47529,7 +47911,7 @@ body.header-offscreen .header-kicker::after {
                         <td>${escapeHtml(mode === 'free_quota' ? 'Free Quota' : (mode || '-'))}</td>
                         <td>${studentName || '-'}</td>
                         <td>${escapeHtml(formatRollDisplay(roll))}</td>
-                        <td>${escapeHtml(String(txn && (txn.item_name || txn.item) || ''))}${advBadge}</td>
+                        <td>${escapeHtml(String(txn && (txn.item_name || txn.item) || ''))}${advBadge}${melaBadge}</td>
                         <td>${qty}</td>
                         <td>${mode === 'free_quota' ? '-' : (points || '-')}</td>
                         <td>${escapeHtml(cashLabel)}</td>
@@ -47887,7 +48269,7 @@ body.header-offscreen .header-kicker::after {
             };
             db.saveData(data);
             if (SERVER_SYNC.enabled) pushToServer(db.getData(), { silent: true }).catch(() => {});
-            renderResourceTransactions();
+            refreshCrossTabTransactionViews();
             showAlert(`Advantage deduction reversed — ${ded.points_deducted} pts restored to ${studentName}'s tally.`, 'success');
         }
 
@@ -47924,7 +48306,7 @@ body.header-offscreen .header-kicker::after {
             data.resource_transactions = (data.resource_transactions || []).filter(t => parseInt(t && t.id, 10) !== txnId);
             db.saveData(data);
             if (SERVER_SYNC.enabled) pushToServer(db.getData(), { silent: true }).catch(() => {});
-            renderResourceTransactions();
+            refreshCrossTabTransactionViews();
             showAlert('Transaction deleted.', 'success');
         }
 
@@ -48039,7 +48421,7 @@ body.header-offscreen .header-kicker::after {
             db.saveData(data);
             if (SERVER_SYNC.enabled) pushToServer(db.getData(), { silent: true }).catch(() => {});
             closeTxnEditModal();
-            renderResourceTransactions();
+            refreshCrossTabTransactionViews();
             showAlert('Transaction updated.', 'success');
         }
 
@@ -48120,121 +48502,6 @@ body.header-offscreen .header-kicker::after {
             return { charged, paid, delta, pending, return_due: ret };
         }
 
-        async function adminQuickCashPurchase(kind) {
-            if (currentUserRole !== 'admin') return;
-            const action = String(kind || '').trim().toLowerCase();
-            if (!['full_paid', 'half_paid', 'due'].includes(action)) {
-                showAlert('Invalid cash action', 'warning');
-                return;
-            }
-
-            const monthKey = getResourceContextMonthKey();
-            const currentMonth = getCurrentMonthKey();
-            if (monthKey !== currentMonth) {
-                showAlert('Quick purchases are only allowed for the current month.', 'warning');
-                return;
-            }
-
-            const student = getResourceContextStudent();
-            if (!student) {
-                showAlert('Select a student to process a purchase.', 'warning');
-                return;
-            }
-
-            const itemId = parseInt(getElementValue('resourceRequestItem'), 10) || 0;
-            const qty = Math.max(1, parseInt(getElementValue('resourceRequestQty'), 10) || 1);
-            if (!itemId) {
-                showAlert('Select an item', 'warning');
-                return;
-            }
-            const item = getResourceCabinet().find(it => parseInt(it.id, 10) === itemId);
-            if (!item) {
-                showAlert('Item not found in cabinet', 'warning');
-                return;
-            }
-            if ((parseInt(item.total_held, 10) || 0) < qty) {
-                showAlert('Not enough stock held for this quantity', 'warning');
-                return;
-            }
-
-            const monthTotal = getStudentMonthTotalPoints(student.id, monthKey);
-            const totalCashCost = Math.max(0, (Number(item.price_per_unit) || 0) * qty);
-            const pricing = computeResourceCashPricing(totalCashCost, monthTotal);
-
-            let charged = pricing.charged;
-            let pricingRule = pricing.rule;
-            if (action === 'full_paid') {
-                charged = pricing.full;
-                pricingRule = 'full';
-            } else if (action === 'half_paid') {
-                if (!pricing.eligibleHalf) {
-                    showAlert('Half-price rule not eligible (student below 250 points this month).', 'warning');
-                    return;
-                }
-                charged = pricing.charged;
-                pricingRule = 'half_250';
-            }
-
-            const cashPaid = action === 'due' ? 0 : charged;
-            const cashDue = action === 'due' ? charged : 0;
-            const cashReturnDue = 0;
-            const actionLabel = action === 'due' ? 'Emergency Due' : (action === 'half_paid' ? 'Cash Half Paid' : 'Cash Full Paid');
-            const roll = formatRollDisplay(student.roll);
-            const studentName = String(student.base_name || student.name || '').trim();
-            const confirmed = await openConfirmModal('Confirm Transaction', `
-                <div class="confirm-details">
-                    <div class="row"><div class="k">Student</div><div class="v">${escapeHtml(studentName)} (${escapeHtml(roll)})</div></div>
-                    <div class="row"><div class="k">Month</div><div class="v">${escapeHtml(monthKey)}</div></div>
-                    <div class="row"><div class="k">Mode</div><div class="v">cash_purchase</div></div>
-                    <div class="row"><div class="k">Item</div><div class="v">${escapeHtml(String(item.name || '').trim())} x${qty}</div></div>
-                    <div class="row"><div class="k">Cash Charged</div><div class="v">₹${Math.round(charged)}</div></div>
-                    <div class="row"><div class="k">Cash Paid Now</div><div class="v">₹${Math.round(cashPaid)}</div></div>
-                    <div class="row"><div class="k">Pending</div><div class="v">₹${Math.round(cashDue)}</div></div>
-                </div>
-            `, { wide: true, centerViewport: true });
-            if (!confirmed) {
-                return;
-            }
-
-            const nowIso = new Date().toISOString();
-            const cabinetItem = (db.getData().resource_cabinet || []).find(it => parseInt(it.id, 10) === itemId) || { ...item };
-            if ((parseInt(cabinetItem.total_held, 10) || 0) < qty) {
-                showAlert('Not enough stock held (cabinet changed). Refresh and retry.', 'warning');
-                return;
-            }
-            cabinetItem.total_held = Math.max(0, (parseInt(cabinetItem.total_held, 10) || 0) - qty);
-            cabinetItem.updated_at = nowIso;
-            if (!cabinetItem.created_at) cabinetItem.created_at = nowIso;
-
-            const txnRow = {
-                id: generateUniqueId(),
-                request_id: 0,
-                month: monthKey,
-                type: 'cash_purchase',
-                studentId: parseInt(student.id, 10),
-                student_roll: normalizeRoll(student.roll),
-                item_id: itemId,
-                item_name: String(item.name || '').trim(),
-                unit: String(item.unit || '').trim(),
-                qty,
-                price_per_unit: Number(item.price_per_unit) || 0,
-                total_cost: pricing.full,
-                cash_pricing_rule: pricingRule,
-                cash_charged: charged,
-                cash_paid: cashPaid,
-                cash_due: cashDue,
-                cash_return_due: cashReturnDue,
-                note: action === 'due' ? 'Emergency purchase (cash due)' : (pricingRule === 'half_250' ? 'Cash purchase (half-price)' : 'Cash purchase (full)'),
-                created_at: nowIso,
-                updated_at: nowIso,
-                created_by_login_id: String(currentLoginId || 'Admin').trim()
-            };
-
-            applyResourcePatchLocally({ resource_cabinet: [cabinetItem], resource_transactions: [txnRow] });
-            loadResourcesTab();
-            showAlert(action === 'due' ? 'Emergency purchase recorded (cash due)' : 'Cash purchase recorded', 'success');
-        }
-
         async function adminSettleResourceTransaction(txnId, _triggerBtn = null, evt = null) {
             if (currentUserRole !== 'admin') return;
             const _anchorRect = _eventAnchorRect(_triggerBtn, evt);
@@ -48313,7 +48580,7 @@ body.header-offscreen .header-kicker::after {
                 updatedTxn.cash_return_due = 0;
             }
             applyResourcePatchLocally({ resource_transactions: [updatedTxn] });
-            renderResourceTransactions();
+            refreshCrossTabTransactionViews();
             showAlert('Transaction settled successfully!', 'success');
         }
 
@@ -48612,13 +48879,22 @@ body.header-offscreen .header-kicker::after {
                             ? `<div class="row"><div class="k">Free Quota Cost</div><div class="v">₹${Math.round(totalCashCost)}</div></div>
                                <div class="row"><div class="k">Free Quota Remaining</div><div class="v">₹${Math.round(getStudentFreeQuotaRemaining(student.id, monthKey))}</div></div>`
                             : `<div class="row"><div class="k">Cash Charged</div><div class="v">₹${Math.round(charged)}</div></div>
-                               <div class="row"><div class="k">Cash Paid</div><div class="v">₹${Math.round(cashPaid)}</div></div>`
+                               <div class="row"><div class="k">Payment</div><div class="v" style="display:flex;flex-direction:column;gap:6px;padding-top:2px;">
+                                 <label style="cursor:pointer;display:flex;align-items:center;gap:6px;"><input type="radio" name="cashPayOption" value="full"> Full Paid — ₹${Math.round(charged)}</label>
+                                 <label style="cursor:pointer;display:flex;align-items:center;gap:6px;"><input type="radio" name="cashPayOption" value="half"> Half Paid — ₹${Math.round(charged / 2)}</label>
+                                 <label style="cursor:pointer;display:flex;align-items:center;gap:6px;"><input type="radio" name="cashPayOption" value="custom" checked> Custom — ₹${Math.round(cashPaid)}</label>
+                               </div></div>`
                         }
                     </div>
                     <p style="margin-top: 10px; color: var(--text-muted);">This request will enter <strong>Pending Teacher</strong>. You can then recommend it to Admin from the Requests Queue.</p>
                 `;
                 const confirmed = await openConfirmModal('Submit Teacher Request', confirmHtml, { wide: true, submitFlow: true, maxWidth: 1160 });
                 if (!confirmed) return;
+                if (mode === 'cash_purchase') {
+                    const _payOpt = document.querySelector('#confirmBody input[name="cashPayOption"]:checked');
+                    if (_payOpt && _payOpt.value === 'full') cashPaid = Math.round(charged);
+                    else if (_payOpt && _payOpt.value === 'half') cashPaid = Math.round(charged / 2);
+                }
                 const reqRow = {
                     id: generateUniqueId(),
                     type: mode,
@@ -48975,6 +49251,10 @@ body.header-offscreen .header-kicker::after {
             applyResourcePatchLocally(patch);
             _restoreApproveBtn();
             loadResourcesTab();
+            // Approving creates a transaction (possibly a pending-settlement cash
+            // purchase) that affects Excel Mela dues — refresh the Mela views too.
+            filterMelaStudents();
+            renderMelaTransactionsList();
             showAlert(`Request approved${useAdvantage ? ` — ${advantagePointsDeducted} pts deducted for half-price advantage` : ''}`, 'success');
         }
 
@@ -49014,8 +49294,81 @@ body.header-offscreen .header-kicker::after {
             renderResourceRequests();
             populateResourceTransactionFilters();
             renderResourceTransactions();
-            renderFreeQuotaCounter();
+            // Free Quota list is lazy-loaded: do NOT auto-render the full list on tab
+            // open (avoids long scroll). Show the placeholder and let the admin click View.
+            freeQuotaListViewed = false;
+            renderFreeQuotaCounterPlaceholder();
+            // Restore the last-used Resources sub-tab (persisted in localStorage).
+            restoreResourcesSubTab();
             autoAdjustTableFonts();
+        }
+
+        // ── Resources sub-tab switching ──
+        function switchResourcesSubTab(tabName, btn) {
+            const wrap = document.getElementById('resSubTabs');
+            if (wrap) wrap.querySelectorAll('.res-sub-tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('#resources-tab .res-sub-content').forEach(c => c.classList.remove('active'));
+            if (btn) btn.classList.add('active');
+            const content = document.getElementById('resSub' + tabName.charAt(0).toUpperCase() + tabName.slice(1));
+            if (content) content.classList.add('active');
+            try { localStorage.setItem('ea_resources_subtab', tabName); } catch (e) {}
+            // When opening the Free Quota sub-tab, focus the search box for fast lookup.
+            if (tabName === 'freequota') {
+                const s = document.getElementById('freeQuotaCounterSearch');
+                if (s) setTimeout(() => s.focus(), 50);
+            }
+        }
+
+        function restoreResourcesSubTab() {
+            let tab = 'cabinet';
+            try { tab = localStorage.getItem('ea_resources_subtab') || 'cabinet'; } catch (e) {}
+            // Teachers can't open transactions; clamp to cabinet.
+            if (tab === 'transactions' && currentUserRole === 'teacher') tab = 'cabinet';
+            const valid = ['cabinet', 'freequota', 'transactions'];
+            if (!valid.includes(tab)) tab = 'cabinet';
+            const btn = document.querySelector('#resSubTabs .res-sub-tab[data-restab="' + tab + '"]');
+            switchResourcesSubTab(tab, btn);
+        }
+
+        // Pending-count badges on each Resources sub-tab for at-a-glance status.
+        function updateResourcesTabBadges() {
+            const setBadge = (key, count) => {
+                const el = document.getElementById('resTabBadge-' + key);
+                if (!el) return;
+                el.textContent = String(count);
+                el.setAttribute('data-empty', count > 0 ? '0' : '1');
+            };
+            // Cabinet & Requests badge: pending requests relevant to the current role.
+            try {
+                const reqs = getResourceRequests();
+                let pending = 0;
+                if (currentUserRole === 'teacher') {
+                    pending = reqs.filter(r => String(r && r.status || '').toLowerCase() === 'pending_teacher').length;
+                } else if (currentUserRole === 'admin') {
+                    pending = reqs.filter(r => String(r && r.status || '').toLowerCase() === 'pending_admin').length;
+                } else {
+                    pending = reqs.filter(r => String(r && r.status || '').toLowerCase() === 'pending').length;
+                }
+                setBadge('cabinet', pending);
+            } catch (e) { setBadge('cabinet', 0); }
+            // Free Quota badge: students who availed this month (compact summary).
+            try {
+                const mk = getCurrentMonthKey();
+                const availed = (db.getStudents() || [])
+                    .filter(s => s.status !== 'inactive')
+                    .filter(s => getStudentFreeQuotaUsed(parseInt(s.id, 10), mk) > 0).length;
+                setBadge('freequota', availed);
+            } catch (e) { setBadge('freequota', 0); }
+            // Transactions badge: pending-settlement transactions (admin only).
+            if (currentUserRole === 'admin') {
+                try {
+                    const pendingSettle = getResourceTransactions()
+                        .filter(t => t && t.pending_settlement && String(t && t.type || '').toLowerCase() !== 'free_quota').length;
+                    setBadge('transactions', pendingSettle);
+                } catch (e) { setBadge('transactions', 0); }
+            } else {
+                setBadge('transactions', 0);
+            }
         }
 
         // ============================================
@@ -49059,6 +49412,145 @@ body.header-offscreen .header-kicker::after {
             if (searchInput) searchInput.value = '';
 
             filterMelaStudents();
+            renderMelaTransactionsList();
+        }
+
+        // ── Mela Transactions list ──
+        // Renders Excel-Mela-originated transactions from the shared resource_transactions
+        // store. Mirrors the Resources Transactions card so admins can see/settle Mela
+        // activity without switching tabs.
+        function populateMelaTxnStudentFilter() {
+            const select = document.getElementById('melaTxnStudentFilter');
+            if (!select) return;
+            const prev = String(select.value || 'all');
+            const studentById = new Map((db.getStudents() || []).map(s => [parseInt(s.id, 10), s]));
+            const seen = new Set();
+            const options = [{ value: 'all', label: 'All Students' }];
+            getResourceTransactions().filter(isMelaTransaction).forEach(txn => {
+                const sid = parseInt(txn && txn.studentId, 10) || 0;
+                const student = sid ? studentById.get(sid) : null;
+                const roll = String((txn && txn.student_roll) || (student && student.roll) || '').trim();
+                const name = String((student && (student.base_name || student.name)) || '').trim();
+                let value = sid > 0 ? `id:${sid}` : (roll ? `roll:${normalizeRoll(roll)}` : '');
+                if (!value || seen.has(value)) return;
+                seen.add(value);
+                options.push({ value, label: `${name || 'Unknown'}${roll ? ` (${formatRollDisplay(roll)})` : ''}` });
+            });
+            options.sort((a, b) => {
+                if (a.value === 'all') return -1;
+                if (b.value === 'all') return 1;
+                return String(a.label || '').localeCompare(String(b.label || ''));
+            });
+            select.innerHTML = options.map(o => `<option value="${escapeHtml(o.value)}">${escapeHtml(o.label)}</option>`).join('');
+            select.value = options.some(o => o.value === prev) ? prev : 'all';
+        }
+
+        function renderMelaTransactionsList() {
+            const tbody = document.getElementById('melaTransactionsBody');
+            if (!tbody) return;
+            populateMelaTxnStudentFilter();
+            _showTableSkeleton('melaTransactionsBody', 10, 3);
+
+            const statusFilter = String(getElementValue('melaTxnStatusFilter') || 'all').trim().toLowerCase();
+            const studentFilter = String(getElementValue('melaTxnStudentFilter') || 'all').trim().toLowerCase();
+            const monthFilter = String(getElementValue('melaTxnMonthFilter') || '').trim();
+            const studentById = new Map((db.getStudents() || []).map(s => [parseInt(s.id, 10), s]));
+
+            let rows = getResourceTransactions()
+                .filter(isMelaTransaction)
+                .slice()
+                .sort((a, b) => parseSyncStamp((b && (b.created_at || b.updated_at)) || '') - parseSyncStamp((a && (a.created_at || a.updated_at)) || ''));
+
+            const isCompleted = (txn) => {
+                if (txn && txn.pending_settlement) return false;
+                const mode = String(txn && txn.type || '').trim().toLowerCase();
+                if (mode !== 'cash_purchase') return true;
+                const cashPaid = Math.max(0, parseFloat(txn && txn.cash_paid) || 0);
+                const charged = Math.max(0, parseFloat(txn && txn.cash_charged) || 0) || Math.max(0, parseFloat(txn && txn.total_cost) || 0);
+                const bal = computeResourceCashBalance(charged, cashPaid);
+                const pending = Math.max(0, Number.isFinite(parseFloat(txn && txn.cash_due)) ? parseFloat(txn.cash_due) : bal.pending);
+                const ret = Math.max(0, Number.isFinite(parseFloat(txn && txn.cash_return_due)) ? parseFloat(txn.cash_return_due) : bal.return_due);
+                return pending <= 0 && ret <= 0;
+            };
+
+            if (statusFilter === 'open') rows = rows.filter(t => !isCompleted(t));
+            else if (statusFilter === 'settled') rows = rows.filter(isCompleted);
+
+            if (studentFilter && studentFilter !== 'all') {
+                rows = rows.filter(txn => {
+                    const sid = parseInt(txn && txn.studentId, 10) || 0;
+                    const student = sid ? studentById.get(sid) : null;
+                    const roll = normalizeRoll((txn && txn.student_roll) || (student && student.roll) || '');
+                    if (studentFilter.startsWith('id:')) return sid === (parseInt(studentFilter.slice(3), 10) || 0);
+                    if (studentFilter.startsWith('roll:')) return !!normalizeRoll(studentFilter.slice(5)) && roll === normalizeRoll(studentFilter.slice(5));
+                    return false;
+                });
+            }
+            if (monthFilter) {
+                rows = rows.filter(txn => {
+                    const m = String(txn && txn.month || '').trim();
+                    if (m) return m === monthFilter;
+                    const raw = String((txn && (txn.created_at || txn.updated_at)) || '').trim();
+                    return raw && raw.slice(0, 7) === monthFilter;
+                });
+            }
+
+            if (!rows.length) {
+                tbody.innerHTML = `<tr><td colspan="10" class="text-center" style="padding:22px;">No Excel Mela transactions</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = rows.map(txn => {
+                const id = parseInt(txn && txn.id, 10) || 0;
+                const sid = parseInt(txn && txn.studentId, 10) || 0;
+                const student = sid ? studentById.get(sid) : null;
+                const roll = String((txn && txn.student_roll) || (student && student.roll) || '').trim();
+                const studentName = student ? renderStudentName(student, (txn && txn.month) || getCurrentMonthKey()) : escapeHtml(String((txn && (txn.student_name || txn.studentName)) || ''));
+                const mode = String(txn && txn.type || '').trim().toLowerCase();
+                const points = Math.max(0, parseInt(txn && txn.points_used, 10) || 0);
+                const cashPaid = Math.max(0, parseFloat(txn && txn.cash_paid) || 0);
+                const charged = Math.max(0, parseFloat(txn && txn.cash_charged) || 0) || (mode === 'cash_purchase' ? Math.max(0, parseFloat(txn && txn.total_cost) || 0) : 0);
+                const bal = computeResourceCashBalance(charged, cashPaid);
+                const cashDue = Math.max(0, Number.isFinite(parseFloat(txn && txn.cash_due)) ? parseFloat(txn.cash_due) : bal.pending);
+                const cashReturnDue = Math.max(0, Number.isFinite(parseFloat(txn && txn.cash_return_due)) ? parseFloat(txn.cash_return_due) : bal.return_due);
+                const cashLabel = mode === 'cash_purchase' && charged
+                    ? `₹${Math.round(cashPaid)} of ₹${Math.round(charged)}${cashDue > 0 ? ` (Due ₹${Math.round(cashDue)})` : ' (Paid)'}`
+                    : '-';
+                const statusLabel = isCompleted(txn)
+                    ? '<span style="color:#4ade80;font-weight:600;">Settled</span>'
+                    : (mode === 'cash_purchase' && cashDue > 0
+                        ? `<span style="color:#fca5a5;font-weight:600;">Due ₹${Math.round(cashDue)}</span>`
+                        : '<span style="color:#fbbf24;font-weight:600;">Pending</span>');
+                const created = txn && txn.created_at ? formatDateLabel(String(txn.created_at).slice(0, 10)) : '-';
+                const itemOrNote = escapeHtml(String(txn && (txn.item_name || txn.item) || '')) + (txn && txn.note ? `<div style="font-size:11px;color:#94a3b8;margin-top:2px;">${escapeHtml(String(txn.note).slice(0, 120))}</div>` : '');
+                const typeLabel = mode === 'redeem_points' ? 'Points' : (mode === 'cash_purchase' ? 'Cash' : (mode || '-'));
+                return `
+                    <tr class="${isCompleted(txn) ? 'txn-row-complete' : 'txn-row-open'}">
+                        <td>${id || '-'}</td>
+                        <td>${escapeHtml(String(txn && txn.month || ''))}</td>
+                        <td>${escapeHtml(typeLabel)}</td>
+                        <td>${studentName || '-'}</td>
+                        <td>${escapeHtml(formatRollDisplay(roll))}</td>
+                        <td>${itemOrNote}</td>
+                        <td>${mode === 'cash_purchase' ? '-' : (points || '-')}</td>
+                        <td>${escapeHtml(cashLabel)}</td>
+                        <td>${statusLabel}</td>
+                        <td>${escapeHtml(created)}</td>
+                    </tr>`;
+            }).join('');
+            eaScheduleRender(() => _animateTableRows('melaTransactionsTable'));
+        }
+
+        // ── Cross-tab transaction refresh ──
+        // Both the Resources Transactions card and the Excel Mela tab read the same
+        // shared resource_transactions store. After any settlement/purchase in either
+        // tab, call this to re-render the OTHER tab's views (and this tab's) so both
+        // reflect the change instantly without a manual switch/refresh. Each renderer
+        // no-ops if its DOM isn't present, so this is safe to call from anywhere.
+        function refreshCrossTabTransactionViews() {
+            renderResourceTransactions();   // Resources Transactions card (+ badges)
+            renderMelaTransactionsList();   // Mela Transactions card
+            filterMelaStudents();            // Mela roster + open details panel (dues)
         }
 
         function getMelaSelectedMonths() {
@@ -49631,7 +50123,7 @@ body.header-offscreen .header-kicker::after {
 
             melaCart = [];
 
-            filterMelaStudents();
+            refreshCrossTabTransactionViews();
             showAlert('Excel Mela cart purchase recorded and synced!', 'success');
         }
 
@@ -49722,7 +50214,7 @@ body.header-offscreen .header-kicker::after {
                 resource_transactions: [updatedOriginalTxn, ...txnRows]
             });
 
-            filterMelaStudents();
+            refreshCrossTabTransactionViews();
             showAlert('Resource transaction settled with points!', 'success');
         }
 
@@ -49815,7 +50307,7 @@ body.header-offscreen .header-kicker::after {
             if (amtInput) amtInput.value = '';
             if (remarkInput) remarkInput.value = '';
 
-            filterMelaStudents();
+            refreshCrossTabTransactionViews();
             showAlert('Offline amount settled successfully!', 'success');
         }
 
