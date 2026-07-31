@@ -3,8 +3,8 @@
 This folder contains public files for static hosting on Cloudflare Pages.
 
 ## Files
-- `index.html` - public read-only scoreboard UI (client-side login gate + scoreboard/info rendering)
-- `scores.json` - exported scoreboard snapshot (scoreboard + `public_information`)
+- `index.html` - public read-only site (client-side login gate + scoreboard/ranking/info rendering)
+- `scores.json` - exported scoreboard snapshot (scoreboard + ranking rows + `public_information`)
 - `credentials.json` - per-student salted SHA-256 login credentials (manually maintained)
 - `offline_scoreboard.html` - full SPA scoreboard (cross-origin mode via meta tag; no longer linked from the public UI)
 - `static/css/offline-scoreboard.css` - SPA stylesheet
@@ -12,7 +12,7 @@ This folder contains public files for static hosting on Cloudflare Pages.
 
 ## Client-side login gate
 
-The Scoreboard and Information tabs are locked behind a login dialog that runs
+The Scoreboard, Ranking, and Information tabs are locked behind a login dialog that runs
 entirely in the browser. There is **no server and no routing to the local SPA**:
 
 1. The user clicks **Login** (header button or a locked tab).

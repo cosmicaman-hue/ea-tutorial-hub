@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=0.9">
     <title>EXCEL ACADEMY LEADERSHIP BOARD - Offline System</title>
-    <meta name="x-ea-shell-version" content="2026-04-24-v3">
+    <meta name="x-ea-shell-version" content="2026-07-31-v2">
     <script>
     /* Android Secure Native WebBridge Interceptor */
     (function() {
@@ -152,7 +152,7 @@
     /* Cache-bust: if this version stamp doesn't match what the server expects,
        force a hard reload once to clear any stale cached HTML. */
     (function(){
-        var V = '2026-07-31-v1';
+        var V = '2026-07-31-v2';
         var k = '__ea_shell_v';
         try {
             if (localStorage.getItem(k) && localStorage.getItem(k) !== V) {
@@ -710,6 +710,298 @@ body.sidebar-collapsed .sidebar-nav-item { transition: color .2s var(--ease-out)
         font-size: 0.95rem;
     }
     #lastSyncTime { min-width: 0 !important; }
+}
+
+#ranking-tab.tab-content {
+    content-visibility: visible !important;
+    contain: none !important;
+}
+#ranking-tab .ranking-container {
+    position: relative;
+    min-height: 420px;
+    overflow: visible;
+    padding: 4px 0 24px;
+}
+#ranking-tab .ranking-content {
+    position: relative;
+    z-index: 1;
+}
+#ranking-tab .ranking-placeholder {
+    display: grid;
+    place-items: center;
+    min-height: 280px;
+    padding: 48px 20px;
+    text-align: center;
+}
+#ranking-tab .ranking-fireworks-canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 20;
+}
+#ranking-tab .ranking-podium {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.16fr) minmax(0, 1fr) !important;
+    align-items: end !important;
+    justify-items: center !important;
+    gap: 18px;
+    width: min(100%, 820px);
+    margin: 0 auto 34px;
+    padding: 34px 20px 24px;
+    box-sizing: border-box;
+    border: 1px solid rgba(251,191,36,.18);
+    border-radius: 24px;
+    background:
+        radial-gradient(circle at 50% 8%, rgba(251,191,36,.16), transparent 42%),
+        linear-gradient(145deg, rgba(30,41,59,.92), rgba(15,23,42,.96));
+    box-shadow: 0 18px 45px rgba(2,6,23,.3);
+}
+#ranking-tab .podium-slot {
+    position: relative;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: flex-end !important;
+    width: 100%;
+    min-width: 0;
+    text-align: center;
+    opacity: 0;
+    animation: rankingPodiumIn .72s cubic-bezier(.16,1,.3,1) both;
+    animation-delay: var(--podium-delay, 0s);
+}
+#ranking-tab .podium-slot-2 { grid-column: 1; --podium-delay: .08s; }
+#ranking-tab .podium-slot-1 { grid-column: 2; --podium-delay: .22s; }
+#ranking-tab .podium-slot-3 { grid-column: 3; --podium-delay: .36s; }
+#ranking-tab .podium-avatar {
+    display: grid !important;
+    place-items: center;
+    width: 92px;
+    height: 92px;
+    box-sizing: border-box;
+    overflow: hidden;
+    border: 4px solid var(--podium-border, rgba(251,191,36,.6));
+    border-radius: 50%;
+    background: #172033;
+    box-shadow: 0 10px 28px rgba(2,6,23,.46);
+    transition: transform .25s ease, box-shadow .25s ease;
+}
+#ranking-tab .podium-slot-1 .podium-avatar {
+    width: 126px;
+    height: 126px;
+    border-width: 5px;
+}
+#ranking-tab .podium-slot-3 .podium-avatar { width: 84px; height: 84px; }
+#ranking-tab .podium-avatar img { display: block; width: 100%; height: 100%; object-fit: cover; }
+#ranking-tab .podium-avatar .avatar-initials {
+    color: #f8fafc;
+    font-size: 1.9rem;
+    font-weight: 900;
+}
+#ranking-tab .podium-slot-1 .podium-avatar .avatar-initials { font-size: 2.6rem; }
+#ranking-tab .podium-slot:hover .podium-avatar {
+    transform: translateY(-5px) scale(1.04);
+    box-shadow: 0 16px 34px rgba(251,191,36,.25);
+}
+#ranking-tab .podium-medal {
+    position: relative;
+    z-index: 2;
+    margin: -9px 0 2px;
+    font-size: 1.7rem;
+    line-height: 1;
+    filter: drop-shadow(0 3px 5px rgba(0,0,0,.45));
+}
+#ranking-tab .podium-name {
+    max-width: 170px;
+    margin-top: 7px;
+    overflow: hidden;
+    color: var(--text, #f8fafc);
+    font-size: .98rem;
+    font-weight: 850;
+    line-height: 1.25;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+#ranking-tab .podium-slot-1 .podium-name { font-size: 1.14rem; }
+#ranking-tab .podium-meta {
+    margin-top: 3px;
+    color: var(--text-muted, #94a3b8);
+    font-size: .76rem;
+}
+#ranking-tab .podium-score {
+    margin-top: 5px;
+    color: var(--podium-accent, var(--primary, #fbbf24));
+    font-family: var(--number-font, monospace);
+    font-size: 1.28rem;
+    font-weight: 900;
+}
+#ranking-tab .podium-slot-1 .podium-score { font-size: 1.58rem; }
+#ranking-tab .podium-platform {
+    display: grid !important;
+    place-items: center;
+    width: 132px;
+    margin-top: 11px;
+    border-radius: 12px 12px 3px 3px;
+    color: rgba(255,255,255,.9);
+    font-size: 2.35rem;
+    font-weight: 950;
+    line-height: 1;
+    box-shadow: 0 -5px 22px rgba(2,6,23,.36);
+}
+#ranking-tab .podium-slot-1 .podium-platform { height: 104px; }
+#ranking-tab .podium-slot-2 .podium-platform { height: 76px; }
+#ranking-tab .podium-slot-3 .podium-platform { height: 56px; }
+#ranking-tab .podium-platform-gold { background: linear-gradient(180deg,#fbbf24,#d97706); }
+#ranking-tab .podium-platform-silver { background: linear-gradient(180deg,#e2e8f0,#64748b); }
+#ranking-tab .podium-platform-bronze { background: linear-gradient(180deg,#fb923c,#9a3412); }
+#ranking-tab .podium-glow-1 {
+    position: absolute;
+    top: 0;
+    width: 220px;
+    height: 220px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(251,191,36,.18), transparent 68%);
+    pointer-events: none;
+    animation: rankingGlow 2.8s ease-in-out infinite;
+}
+#ranking-tab .ranking-group {
+    margin: 0 auto 26px;
+    opacity: 0;
+    animation: rankingGroupIn .56s cubic-bezier(.16,1,.3,1) both;
+    animation-delay: var(--group-delay, .7s);
+}
+#ranking-tab .ranking-group-header {
+    display: flex !important;
+    align-items: center !important;
+    gap: 10px;
+    margin: 0 4px 12px;
+}
+#ranking-tab .ranking-group-tier {
+    color: var(--group-accent, var(--primary, #fbbf24));
+    font-size: 1.05rem;
+    font-weight: 900;
+    letter-spacing: .02em;
+}
+#ranking-tab .ranking-group-flavor {
+    padding: 4px 11px;
+    border: 1px solid var(--group-border, rgba(251,191,36,.25));
+    border-radius: 999px;
+    background: var(--group-bg, rgba(251,191,36,.1));
+    color: var(--text-muted, #94a3b8);
+    font-size: .78rem;
+    font-weight: 750;
+}
+#ranking-tab .ranking-group-divider {
+    flex: 1 1 auto;
+    height: 2px;
+    border-radius: 99px;
+    background: linear-gradient(90deg,var(--group-accent,#fbbf24),transparent);
+    opacity: .45;
+}
+#ranking-tab .ranking-cards {
+    display: grid !important;
+    grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+    gap: 12px;
+}
+#ranking-tab .ranking-card {
+    display: flex !important;
+    align-items: center !important;
+    gap: 9px;
+    min-width: 0;
+    padding: 12px 10px;
+    box-sizing: border-box;
+    border: 1px solid var(--border, rgba(251,191,36,.2));
+    border-radius: 15px;
+    background: var(--bg-card, #151829);
+    opacity: 0;
+    animation: rankingCardIn .46s cubic-bezier(.16,1,.3,1) both;
+    animation-delay: var(--card-delay, .8s);
+    transition: transform .22s ease, box-shadow .22s ease, border-color .22s ease;
+}
+#ranking-tab .ranking-card:hover {
+    transform: translateY(-4px);
+    border-color: var(--group-accent, var(--primary, #fbbf24));
+    box-shadow: 0 11px 24px rgba(2,6,23,.32);
+}
+#ranking-tab .ranking-card-rank {
+    display: grid !important;
+    place-items: center;
+    flex: 0 0 32px;
+    width: 32px;
+    height: 32px;
+    border: 2px solid var(--group-border, rgba(251,191,36,.25));
+    border-radius: 50%;
+    background: var(--group-bg, rgba(251,191,36,.1));
+    color: var(--group-accent, var(--primary, #fbbf24));
+    font-size: .82rem;
+    font-weight: 900;
+}
+#ranking-tab .ranking-card-avatar {
+    display: grid !important;
+    place-items: center;
+    flex: 0 0 42px;
+    width: 42px;
+    height: 42px;
+    overflow: hidden;
+    border: 2px solid var(--border, rgba(251,191,36,.2));
+    border-radius: 50%;
+    background: var(--bg-elevated, #1e2235);
+}
+#ranking-tab .ranking-card-avatar img { display: block; width: 100%; height: 100%; object-fit: cover; }
+#ranking-tab .ranking-card-avatar .avatar-initials { color: var(--text-muted,#94a3b8); font-size: .95rem; font-weight: 850; }
+#ranking-tab .ranking-card-info { flex: 1 1 auto; min-width: 0; }
+#ranking-tab .ranking-card-name {
+    overflow: hidden;
+    color: var(--text, #f8fafc);
+    font-size: .82rem;
+    font-weight: 800;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+#ranking-tab .ranking-card-meta { margin-top: 3px; color: var(--text-muted,#94a3b8); font-size: .7rem; }
+#ranking-tab .ranking-card-score {
+    flex: 0 0 auto;
+    color: var(--group-accent, var(--primary,#fbbf24));
+    font-family: var(--number-font, monospace);
+    font-size: 1rem;
+    font-weight: 950;
+}
+@keyframes rankingPodiumIn {
+    from { opacity: 0; transform: translateY(48px) scale(.94); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes rankingGroupIn {
+    from { opacity: 0; transform: translateY(24px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+@keyframes rankingCardIn {
+    from { opacity: 0; transform: translateY(18px) scale(.96); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes rankingGlow {
+    0%,100% { opacity: .55; transform: scale(1); }
+    50% { opacity: 1; transform: scale(1.12); }
+}
+@media (max-width: 1050px) {
+    #ranking-tab .ranking-cards { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+}
+@media (max-width: 700px) {
+    #ranking-tab .ranking-podium { gap: 6px; padding: 24px 8px 18px; }
+    #ranking-tab .podium-slot-1 .podium-avatar { width: 96px; height: 96px; }
+    #ranking-tab .podium-slot-2 .podium-avatar { width: 78px; height: 78px; }
+    #ranking-tab .podium-slot-3 .podium-avatar { width: 70px; height: 70px; }
+    #ranking-tab .podium-platform { width: 92px; }
+    #ranking-tab .podium-slot-1 .podium-platform { height: 76px; }
+    #ranking-tab .podium-slot-2 .podium-platform { height: 56px; }
+    #ranking-tab .podium-slot-3 .podium-platform { height: 44px; }
+    #ranking-tab .ranking-cards { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+}
+@media (max-width: 470px) {
+    #ranking-tab .ranking-podium { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+    #ranking-tab .podium-name { max-width: 98px; font-size: .76rem; }
+    #ranking-tab .podium-slot-1 .podium-name { font-size: .86rem; }
+    #ranking-tab .ranking-cards { grid-template-columns: 1fr !important; }
 }
 </style>
 <script>
@@ -19921,11 +20213,13 @@ body.header-offscreen .header-kicker::after {
                 const rows = Array.isArray(db.getMonthlyScoreboard(month)) ? db.getMonthlyScoreboard(month) : [];
                 scoreboard[month] = rows.filter(Boolean).map(row => {
                     const student = row.student || {};
+                    const profile = student.profile_data && typeof student.profile_data === 'object' ? student.profile_data : {};
                     return {
                         roll: String(student.roll || '').trim().toUpperCase() || '-',
                         name: _cleanPublicName(student.base_name || student.name || ''),
                         class: String(student.class || '').trim(),
                         total: parseInt(row.total, 10) || 0,
+                        photo_path: String(profile.photo_path || '').trim(),
                     };
                 // Always sort by total descending — never trust a pre-assigned rank that
                 // may have been set when totals were all zero (stale cache at publish time).
@@ -19933,7 +20227,7 @@ body.header-offscreen .header-kicker::after {
                 .map((row, i) => {
                     const rank = i + 1;
                     const masked = rank > 15;
-                    return { rank, roll: row.roll, name: masked ? '' : row.name, class: masked ? '' : row.class, total: row.total, masked };
+                    return { rank, roll: row.roll, name: masked ? '' : row.name, class: masked ? '' : row.class, total: row.total, photo_path: masked ? '' : row.photo_path, masked };
                 });
             });
             const data = db.getData();
