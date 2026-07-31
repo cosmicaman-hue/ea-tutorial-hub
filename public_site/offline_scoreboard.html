@@ -152,7 +152,7 @@
     /* Cache-bust: if this version stamp doesn't match what the server expects,
        force a hard reload once to clear any stale cached HTML. */
     (function(){
-        var V = '2026-04-24-v3';
+        var V = '2026-07-31-v1';
         var k = '__ea_shell_v';
         try {
             if (localStorage.getItem(k) && localStorage.getItem(k) !== V) {
@@ -2365,7 +2365,7 @@ body.header-offscreen .header-kicker::after {
                     </div>
                     <div class="control-group" data-role-only="admin">
                         <label>Month</label>
-                        <input id="resourceContextMonth" type="month" min="2025-08" onchange="updateResourceContext()">
+                        <input id="resourceContextMonth" type="month" min="2025-08" onchange="populateResourceContextStudents(); updateResourceContext()">
                     </div>
                     <div class="control-group" data-role-only="admin">
                         <label>Request Date</label>
@@ -2552,6 +2552,15 @@ body.header-offscreen .header-kicker::after {
                             <option value="active">Active Students</option>
                             <option value="all">All Students</option>
                             <option value="inactive">Inactive Only</option>
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <label>Role</label>
+                        <select id="freeQuotaCounterRoleFilter" onchange="onFreeQuotaFilterChange()">
+                            <option value="all" selected>All Roles</option>
+                            <option value="students">Students</option>
+                            <option value="post_normal">Post Holders (Normal)</option>
+                            <option value="post_high">Post Holders (High Ranking)</option>
                         </select>
                     </div>
                     <div class="control-group">
@@ -3980,29 +3989,21 @@ body.header-offscreen .header-kicker::after {
                         <option value="">Select Month...</option>
                     </select>
                 </div>
+                <div class="control-group" id="rankingReplayGroup" style="display:none;">
+                    <button class="secondary" onclick="replayRankingAnimations()" style="display:inline-flex;align-items:center;gap:6px;">
+                        <i class="fas fa-play"></i> Replay Animation
+                    </button>
+                </div>
             </div>
 
-            <div class="scoreboard-wrapper">
-                <div class="scoreboard-scroll">
-                    <table class="scoreboard" id="rankingsTable">
-                        <thead>
-                            <tr>
-                                <th style="width: 50px;">Rank</th>
-                                <th>Student Name</th>
-                                <th style="width: 100px;">Class</th>
-                                <th style="width: 120px;">Total Score</th>
-                                <th style="width: 100px;">Position</th>
-                            </tr>
-                        </thead>
-                        <tbody id="rankingsBody">
-                            <tr>
-                                <td colspan="5" class="text-center" style="padding: 40px;">
-                                    Select a month to view rankings
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
+            <div id="rankingContainer" class="ranking-container">
+                <div id="rankingContent" class="ranking-content">
+                    <div class="ranking-placeholder">
+                        <i class="fas fa-trophy" style="font-size:48px;color:var(--text-muted);margin-bottom:16px;"></i>
+                        <p style="color:var(--text-muted);font-size:1.1rem;">Select a month to view rankings</p>
+                    </div>
                 </div>
+                <canvas id="rankingFireworksCanvas" class="ranking-fireworks-canvas"></canvas>
             </div>
         </div>
 
@@ -7867,6 +7868,24 @@ body.header-offscreen .header-kicker::after {
             <details class="modal-collapse-section" style="border-top:1px solid var(--border); padding-top:10px; margin-top:6px;">
                 <summary class="modal-collapse-header"><i class="fas fa-id-card"></i> Profile Details</summary>
                 <div class="form-grid" style="margin-top:8px;">
+                <div class="form-group" style="grid-column: 1 / -1;">
+                    <label>Portrait Photo</label>
+                    <div style="display:flex; align-items:center; gap:14px; flex-wrap:wrap;">
+                        <div id="editPhotoPreview" style="width:80px; height:80px; border-radius:50%; border:3px solid var(--border); background:var(--bg-card); display:flex; align-items:center; justify-content:center; overflow:hidden; flex-shrink:0; position:relative;">
+                            <i class="fas fa-user" style="font-size:28px; color:var(--text-muted);"></i>
+                        </div>
+                        <div style="display:flex; flex-direction:column; gap:6px;">
+                            <input type="file" id="editPhotoFile" accept="image/jpeg,image/png,image/webp" style="font-size:0.82em; display:none;" onchange="handlePhotoSelect(event)">
+                            <label for="editPhotoFile" id="editPhotoUploadBtn" class="secondary" style="padding:6px 14px; font-size:0.82em; cursor:pointer; border-radius:6px; display:inline-flex; align-items:center; gap:6px; white-space:nowrap;">
+                                <i class="fas fa-camera"></i> Choose Photo
+                            </label>
+                            <button type="button" id="editPhotoRemoveBtn" onclick="handlePhotoRemove()" style="padding:6px 14px; font-size:0.82em; border-radius:6px; display:none; color:#f87171; background:rgba(248,113,113,0.1); border:1px solid rgba(248,113,113,0.3); cursor:pointer;">
+                                <i class="fas fa-trash"></i> Remove
+                            </button>
+                            <small id="editPhotoHint" style="color:var(--text-muted); font-size:0.75em;">JPG/PNG/WebP, max 5 MB</small>
+                        </div>
+                    </div>
+                </div>
                 <div class="form-group">
                     <label>Father's Name</label>
                     <input type="text" id="editFatherName">
@@ -29309,6 +29328,105 @@ body.header-offscreen .header-kicker::after {
             renderHistScoreEntries(month, studentId, profile);
         }
 
+        // ── Student portrait photo upload helpers ──────────────────────────
+        var _pendingPhotoUpload = null;   // { file, thumb (base64) } queued for upload
+        var _pendingPhotoRemoval = false; // true = remove photo on save
+        var _currentPhotoPath = '';       // currently saved photo_path (for preview)
+
+        function loadEditPhotoPreview(photoPath, photoThumb) {
+            _currentPhotoPath = photoPath || '';
+            const preview = document.getElementById('editPhotoPreview');
+            const removeBtn = document.getElementById('editPhotoRemoveBtn');
+            const hint = document.getElementById('editPhotoHint');
+            if (!preview) return;
+            preview.innerHTML = '';
+            const showImage = (src) => {
+                preview.innerHTML = `<img src="${src}" style="width:100%; height:100%; object-fit:cover; border-radius:50%;">`;
+                if (removeBtn) removeBtn.style.display = '';
+                if (hint) hint.textContent = 'Click Choose Photo to replace';
+            };
+            if (photoThumb) {
+                showImage(photoThumb);
+            } else if (photoPath) {
+                showImage(eaBuildUrl ? eaBuildUrl(photoPath) : photoPath);
+            } else {
+                preview.innerHTML = '<i class="fas fa-user" style="font-size:28px; color:var(--text-muted);"></i>';
+                if (removeBtn) removeBtn.style.display = 'none';
+                if (hint) hint.textContent = 'JPG/PNG/WebP, max 5 MB';
+            }
+        }
+
+        function handlePhotoSelect(event) {
+            const file = event.target.files && event.target.files[0];
+            if (!file) return;
+            if (file.size > 5 * 1024 * 1024) {
+                showAlert('Photo too large. Maximum 5 MB.', 'danger');
+                event.target.value = '';
+                return;
+            }
+            const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+            if (!validTypes.includes(file.type)) {
+                showAlert('Only JPG, PNG, and WebP images are allowed.', 'danger');
+                event.target.value = '';
+                return;
+            }
+            // Generate a 96x96 base64 thumbnail via canvas for instant preview
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = function() {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = 96;
+                    canvas.height = 96;
+                    const ctx = canvas.getContext('2d');
+                    // Cover-fit crop (center)
+                    const scale = Math.max(96 / img.width, 96 / img.height);
+                    const sw = 96 / scale;
+                    const sh = 96 / scale;
+                    const sx = (img.width - sw) / 2;
+                    const sy = (img.height - sh) / 2;
+                    ctx.drawImage(img, sx, sy, sw, sh, 0, 0, 96, 96);
+                    const thumb = canvas.toDataURL('image/jpeg', 0.7);
+                    _pendingPhotoUpload = { file: file, thumb: thumb };
+                    _pendingPhotoRemoval = false;
+                    loadEditPhotoPreview(null, thumb);
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function handlePhotoRemove() {
+            _pendingPhotoUpload = null;
+            _pendingPhotoRemoval = true;
+            loadEditPhotoPreview('', '');
+        }
+
+        async function uploadStudentPhoto(studentId, file) {
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('student_id', String(studentId));
+            const resp = await eaFetch('/scoreboard/upload-student-photo', { method: 'POST', body: formData }, 15000);
+            if (!resp.ok) {
+                const err = await resp.json().catch(() => ({}));
+                throw new Error(err.error || `Upload failed (${resp.status})`);
+            }
+            return resp.json();
+        }
+
+        async function removeStudentPhoto(studentId) {
+            const resp = await eaFetch('/scoreboard/remove-student-photo', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ student_id: studentId })
+            }, 10000);
+            if (!resp.ok) {
+                const err = await resp.json().catch(() => ({}));
+                throw new Error(err.error || `Remove failed (${resp.status})`);
+            }
+            return resp.json();
+        }
+
         function openEditStudent(studentId, options = {}) {
             const requestedStudent = db.getStudents().find(s => s.id === studentId);
             const student = resolveCanonicalStudentRecord(requestedStudent, getCurrentMonthKey()) || requestedStudent;
@@ -29337,6 +29455,11 @@ body.header-offscreen .header-kicker::after {
             document.getElementById('editAdmissionDate').value = profile.admissionDate || '';
             document.getElementById('editAcademicYear').value = profile.academicYear || '';
             document.getElementById('editAddress').value = profile.address || '';
+
+            // Portrait photo: load existing photo_path + thumbnail from profile
+            _pendingPhotoUpload = null;
+            _pendingPhotoRemoval = false;
+            loadEditPhotoPreview(profile.photo_path, profile.photo_thumb);
 
             // Historical month section — admin only
             _histPendingScoreEntries = [];
@@ -29380,6 +29503,12 @@ body.header-offscreen .header-kicker::after {
                 const element = document.getElementById(id);
                 if (element) element.disabled = false;
             });
+
+            // Photo upload is admin/teacher only — hide controls for student self-edit
+            const photoUploadBtn = document.getElementById('editPhotoUploadBtn');
+            const photoRemoveBtn = document.getElementById('editPhotoRemoveBtn');
+            if (photoUploadBtn) photoUploadBtn.style.display = selfOnly ? 'none' : '';
+            if (photoRemoveBtn && selfOnly) photoRemoveBtn.style.display = 'none';
 
             openModal('editStudentModal');
         }
@@ -29465,6 +29594,21 @@ body.header-offscreen .header-kicker::after {
                 academicYear: document.getElementById('editAcademicYear').value.trim(),
                 address: document.getElementById('editAddress').value.trim()
             };
+
+            // Preserve existing photo fields; will be updated below if changed
+            const _editStudent = db.getStudents().find(s => s.id === studentId);
+            const _existingProfile = (_editStudent && _editStudent.profile_data) || {};
+            if (_existingProfile.photo_path) profileData.photo_path = _existingProfile.photo_path;
+            if (_existingProfile.photo_thumb) profileData.photo_thumb = _existingProfile.photo_thumb;
+            // If a new photo was selected, use the new thumbnail
+            if (_pendingPhotoUpload && _pendingPhotoUpload.thumb) {
+                profileData.photo_thumb = _pendingPhotoUpload.thumb;
+            }
+            // If photo was removed, clear both fields
+            if (_pendingPhotoRemoval) {
+                delete profileData.photo_path;
+                delete profileData.photo_thumb;
+            }
 
             if (currentUserRole === 'student') {
                 const ownRoll = normalizeRoll(currentLoginId);
@@ -29604,6 +29748,34 @@ body.header-offscreen .header-kicker::after {
                 else if (_af && _nowMonth < _af) studentUpdates.active = false;
                 db.updateStudent(studentId, studentUpdates);
 
+                // Handle portrait photo upload / removal (admin/teacher only)
+                if (currentUserRole === 'admin' || currentUserRole === 'teacher') {
+                    if (_pendingPhotoUpload && _pendingPhotoUpload.file) {
+                        try {
+                            const result = await uploadStudentPhoto(studentId, _pendingPhotoUpload.file);
+                            if (result && result.photo_path) {
+                                // Update local data with the server-assigned photo_path
+                                const _sd = db.getData();
+                                const _ss = (_sd.students || []).find(s => s.id === studentId);
+                                if (_ss) {
+                                    if (!_ss.profile_data || typeof _ss.profile_data !== 'object') _ss.profile_data = {};
+                                    _ss.profile_data.photo_path = result.photo_path;
+                                    _ss.profile_data.photo_thumb = _pendingPhotoUpload.thumb;
+                                    db.updateStudent(studentId, { profile_data: _ss.profile_data });
+                                }
+                            }
+                        } catch (photoErr) {
+                            showAlert(`Photo upload failed: ${photoErr.message}. Other changes were saved.`, 'warning');
+                        }
+                    } else if (_pendingPhotoRemoval) {
+                        try {
+                            await removeStudentPhoto(studentId);
+                        } catch (removeErr) {
+                            showAlert(`Photo removal failed: ${removeErr.message}. Other changes were saved.`, 'warning');
+                        }
+                    }
+                }
+
                 // Save month correction only for current/future months here.
                 // Month Score Editor: upsert roster profile + commit pending score entries.
                 const histMonth = document.getElementById('editHistMonth').value;
@@ -29733,11 +29905,51 @@ body.header-offscreen .header-kicker::after {
         function initRankingForm() {
             const months = db.getMonths();
             const rankingMonth = document.getElementById('rankingMonth');
-            rankingMonth.innerHTML = '<option value="">Select Month...</option>' + 
+            rankingMonth.innerHTML = '<option value="">Select Month...</option>' +
                 months.map(m => {
                     const date = new Date(m + '-01');
                     return `<option value="${m}">${date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</option>`;
                 }).join('');
+        }
+
+        // ── Ranking tab: tier + flavor tag scheme ───────────────────────────
+        const RANKING_GROUP_TAGS = [
+            { tier: 'Top 5',       flavor: 'Contenders',     accent: '#fbbf24', bg: 'rgba(251,191,36,0.10)',  border: 'rgba(251,191,36,0.25)' },
+            { tier: 'Top 10',      flavor: 'Rising Stars',   accent: '#38bdf8', bg: 'rgba(56,189,248,0.10)',  border: 'rgba(56,189,248,0.25)' },
+            { tier: 'Top 15',      flavor: 'Trailblazers',   accent: '#34d399', bg: 'rgba(52,211,153,0.10)',  border: 'rgba(52,211,153,0.25)' },
+            { tier: 'Top 20',      flavor: 'Achievers',      accent: '#a78bfa', bg: 'rgba(167,139,250,0.10)', border: 'rgba(167,139,250,0.25)' },
+            { tier: 'Top 25',      flavor: 'Strivers',       accent: '#f472b6', bg: 'rgba(244,114,182,0.10)', border: 'rgba(244,114,182,0.25)' },
+            { tier: 'Top 30',      flavor: 'Pursuers',       accent: '#fb7185', bg: 'rgba(251,113,133,0.10)', border: 'rgba(251,113,133,0.25)' },
+            { tier: 'Top 35',      flavor: 'Climbers',       accent: '#facc15', bg: 'rgba(250,204,21,0.10)',  border: 'rgba(250,204,21,0.25)' },
+            { tier: 'Top 40',      flavor: 'Endeavorers',    accent: '#60a5fa', bg: 'rgba(96,165,250,0.10)',  border: 'rgba(96,165,250,0.25)' },
+            { tier: 'Top 45',      flavor: 'Aspirants',      accent: '#2dd4bf', bg: 'rgba(45,212,191,0.10)',  border: 'rgba(45,212,191,0.25)' },
+            { tier: 'Top 50',      flavor: 'Hopefuls',       accent: '#c084fc', bg: 'rgba(192,132,252,0.10)', border: 'rgba(192,132,252,0.25)' },
+        ];
+        // Fallback for groups beyond the predefined list
+        const RANKING_FALLBACK_TAG = { tier: '', flavor: 'Participants', accent: '#94a3b8', bg: 'rgba(148,163,184,0.10)', border: 'rgba(148,163,184,0.25)' };
+
+        function getRankingGroupTag(groupIndex) {
+            return RANKING_GROUP_TAGS[groupIndex] || RANKING_FALLBACK_TAG;
+        }
+
+        // ── Avatar helper: returns photo URL or initials avatar HTML ──
+        function getRankingAvatarHtml(student, sizeClass) {
+            const profile = (student && student.profile_data) || {};
+            const photoPath = profile.photo_path || '';
+            const photoThumb = profile.photo_thumb || '';
+            const url = photoThumb || (photoPath ? (typeof eaBuildUrl === 'function' ? eaBuildUrl(photoPath) : photoPath) : '');
+            if (url) {
+                return `<img src="${url}" alt="" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='';">
+                        <span class="avatar-initials" style="display:none;">${getInitials(student)}</span>`;
+            }
+            return `<span class="avatar-initials">${getInitials(student)}</span>`;
+        }
+
+        function getInitials(student) {
+            const name = (student && (student.base_name || student.name)) || '?';
+            const parts = String(name).trim().split(/\s+/);
+            if (parts.length >= 2) return escapeHtml((parts[0][0] || '') + (parts[1][0] || '')).toUpperCase();
+            return escapeHtml((parts[0] && parts[0][0]) || '?').toUpperCase();
         }
 
         function loadRankings() {
@@ -29745,31 +29957,212 @@ body.header-offscreen .header-kicker::after {
             if (!month) return;
 
             const scoreboard = db.getMonthlyScoreboard(month);
-            const tbody = document.getElementById('rankingsBody');
+            const content = document.getElementById('rankingContent');
+            const replayGroup = document.getElementById('rankingReplayGroup');
+            if (!content) return;
 
-            const _rankHtmlRows = scoreboard.map((row, idx) => {
-                const medals = ['gold', 'silver', 'bronze'];
-                const medal = idx < 3 ? `<span class="medal ${medals[idx]}">${idx + 1}</span>` : idx + 1;
+            if (!scoreboard || scoreboard.length === 0) {
+                content.innerHTML = `<div class="ranking-placeholder"><i class="fas fa-trophy" style="font-size:48px;color:var(--text-muted);margin-bottom:16px;"></i><p style="color:var(--text-muted);font-size:1.1rem;">No data for this month</p></div>`;
+                if (replayGroup) replayGroup.style.display = 'none';
+                return;
+            }
 
-                return `<tr>
-                    <td>${medal}</td>
-                    <td>${renderStudentName(row.student, month)}</td>
-                    <td>${row.student.class}</td>
-                    <td style="font-weight: bold; color: var(--primary);">${row.total}</td>
-                    <td>${idx === 0 ? '1st' : idx === 1 ? '2nd' : idx === 2 ? '3rd' : `#${idx + 1}`}</td>
-                </tr>`;
+            // ── Build podium (top 3) ──
+            const top3 = scoreboard.slice(0, 3);
+            const medalEmojis = ['🥇', '🥈', '🥉'];
+            const platformClasses = ['podium-platform-gold', 'podium-platform-silver', 'podium-platform-bronze'];
+            const accentColors = ['#fbbf24', '#cbd5e1', '#f97316'];
+            const borderColors = ['rgba(251,191,36,0.5)', 'rgba(203,213,225,0.5)', 'rgba(249,115,22,0.5)'];
+
+            const podiumSlots = [1, 0, 2].map(displayIdx => {
+                const row = top3[displayIdx];
+                if (!row) return '';
+                const slotClass = `podium-slot-${displayIdx + 1}`;
+                const student = row.student || {};
+                const name = escapeHtml(student.base_name || student.name || 'Unknown');
+                const className = escapeHtml(String(student.class || ''));
+                const avatar = getRankingAvatarHtml(student);
+                return `
+                    <div class="podium-slot ${slotClass}" style="--podium-border:${borderColors[displayIdx]};--podium-accent:${accentColors[displayIdx]}">
+                        ${displayIdx === 0 ? '<div class="podium-glow-1"></div>' : ''}
+                        <div class="podium-avatar">${avatar}</div>
+                        <div class="podium-medal">${medalEmojis[displayIdx]}</div>
+                        <div class="podium-name">${name}</div>
+                        <div class="podium-meta">Class ${className}</div>
+                        <div class="podium-score">${row.total}</div>
+                        <div class="podium-platform ${platformClasses[displayIdx]}">${displayIdx + 1}</div>
+                    </div>`;
+            }).join('');
+
+            // ── Build grouped cards (rank 4+) ──
+            const rest = scoreboard.slice(3);
+            const groupSize = 5;
+            const groups = [];
+            for (let i = 0; i < rest.length; i += groupSize) {
+                groups.push(rest.slice(i, i + groupSize));
+            }
+
+            const groupsHtml = groups.map((group, gIdx) => {
+                const tag = getRankingGroupTag(gIdx);
+                const startRank = 4 + gIdx * groupSize;
+                const endRank = startRank + group.length - 1;
+                const tierLabel = tag.tier || `Ranks ${startRank}–${endRank}`;
+
+                const cards = group.map((row, cIdx) => {
+                    const rank = startRank + cIdx;
+                    const student = row.student || {};
+                    const name = escapeHtml(student.base_name || student.name || 'Unknown');
+                    const className = escapeHtml(String(student.class || ''));
+                    const avatar = getRankingAvatarHtml(student);
+                    return `
+                        <div class="ranking-card" style="--group-accent:${tag.accent};--group-bg:${tag.bg};--group-border:${tag.border}">
+                            <div class="ranking-card-rank">${rank}</div>
+                            <div class="ranking-card-avatar">${avatar}</div>
+                            <div class="ranking-card-info">
+                                <div class="ranking-card-name">${name}</div>
+                                <div class="ranking-card-meta">Class ${className}</div>
+                            </div>
+                            <div class="ranking-card-score">${row.total}</div>
+                        </div>`;
+                }).join('');
+
+                return `
+                    <div class="ranking-group" style="--group-accent:${tag.accent};--group-bg:${tag.bg};--group-border:${tag.border}">
+                        <div class="ranking-group-header">
+                            <span class="ranking-group-tier">${escapeHtml(tierLabel)}</span>
+                            <span class="ranking-group-flavor">${escapeHtml(tag.flavor)}</span>
+                            <span class="ranking-group-divider"></span>
+                        </div>
+                        <div class="ranking-cards">${cards}</div>
+                    </div>`;
+            }).join('');
+
+            content.innerHTML = `
+                <div class="ranking-podium">${podiumSlots}</div>
+                ${groupsHtml}
+            `;
+
+            if (replayGroup) replayGroup.style.display = '';
+
+            // ── Set CSS animation delay variables for staggered entrance ──
+            const groupEls = content.querySelectorAll('.ranking-group');
+            groupEls.forEach((gEl, gIdx) => {
+                gEl.style.setProperty('--group-delay', (0.8 + gIdx * 0.2) + 's');
+                const cardEls = gEl.querySelectorAll('.ranking-card');
+                cardEls.forEach((card, cIdx) => {
+                    card.style.setProperty('--card-delay', (0.9 + gIdx * 0.2 + cIdx * 0.06) + 's');
+                });
             });
 
-            // Write ranking rows to DOM in chunks for smoother rendering.
-            eaChunkedInnerHtml(tbody, _rankHtmlRows, {
-                chunkSize: 60,
-                onDone() {
-                    if (scoreboard.length === 0) {
-                        tbody.innerHTML = `<tr><td colspan="5" class="text-center" style="padding: 40px;">No data for this month</td></tr>`;
-                    }
-                    eaScheduleRender(() => animateTableRows(tbody));
+            // Fireworks when podium renders
+            setTimeout(() => triggerRankingFireworks(), 400);
+        }
+
+        function replayRankingAnimations() {
+            const content = document.getElementById('rankingContent');
+            if (!content) return;
+            // Re-trigger CSS animations by removing and re-adding the elements
+            const podium = content.querySelector('.ranking-podium');
+            const groups = content.querySelectorAll('.ranking-group');
+            if (podium) {
+                podium.style.animation = 'none';
+                void podium.offsetWidth;
+                podium.style.animation = '';
+            }
+            groups.forEach(gEl => {
+                gEl.style.animation = 'none';
+                void gEl.offsetWidth;
+                gEl.style.animation = '';
+                gEl.querySelectorAll('.ranking-card').forEach(card => {
+                    card.style.animation = 'none';
+                    void card.offsetWidth;
+                    card.style.animation = '';
+                });
+            });
+            // Also re-trigger podium slot animations
+            content.querySelectorAll('.podium-slot').forEach(slot => {
+                slot.style.animation = 'none';
+                void slot.offsetWidth;
+                slot.style.animation = '';
+            });
+            setTimeout(() => triggerRankingFireworks(), 400);
+        }
+
+        // ── Fireworks / Confetti animation ──────────────────────────────────
+        var _rankingFireworksRaf = null;
+        function triggerRankingFireworks() {
+            const canvas = document.getElementById('rankingFireworksCanvas');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            const container = canvas.parentElement;
+            const rect = container.getBoundingClientRect();
+            canvas.width = rect.width;
+            canvas.height = rect.height;
+
+            const colors = ['#fbbf24', '#38bdf8', '#34d399', '#f472b6', '#a78bfa', '#fb7185', '#facc15'];
+            const particles = [];
+            const numBursts = 5;
+            const burstDelay = 300;
+
+            function createBurst(x, y) {
+                const count = 40 + Math.floor(Math.random() * 20);
+                const color = colors[Math.floor(Math.random() * colors.length)];
+                for (let i = 0; i < count; i++) {
+                    const angle = (Math.PI * 2 * i) / count + Math.random() * 0.3;
+                    const speed = 2 + Math.random() * 4;
+                    particles.push({
+                        x: x, y: y,
+                        vx: Math.cos(angle) * speed,
+                        vy: Math.sin(angle) * speed,
+                        life: 1,
+                        decay: 0.012 + Math.random() * 0.008,
+                        color: Math.random() < 0.5 ? color : colors[Math.floor(Math.random() * colors.length)],
+                        size: 2 + Math.random() * 3,
+                    });
                 }
-            });
+            }
+
+            // Schedule bursts at random positions near the top
+            for (let b = 0; b < numBursts; b++) {
+                setTimeout(() => {
+                    const bx = canvas.width * (0.2 + Math.random() * 0.6);
+                    const by = canvas.height * (0.1 + Math.random() * 0.3);
+                    createBurst(bx, by);
+                }, b * burstDelay);
+            }
+
+            if (_rankingFireworksRaf) cancelAnimationFrame(_rankingFireworksRaf);
+
+            function animate() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                let alive = false;
+                for (let i = particles.length - 1; i >= 0; i--) {
+                    const p = particles[i];
+                    p.x += p.vx;
+                    p.y += p.vy;
+                    p.vy += 0.08; // gravity
+                    p.vx *= 0.99;
+                    p.life -= p.decay;
+                    if (p.life <= 0) {
+                        particles.splice(i, 1);
+                        continue;
+                    }
+                    alive = true;
+                    ctx.globalAlpha = Math.max(0, p.life);
+                    ctx.fillStyle = p.color;
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                ctx.globalAlpha = 1;
+                if (alive || particles.length > 0) {
+                    _rankingFireworksRaf = requestAnimationFrame(animate);
+                } else {
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    _rankingFireworksRaf = null;
+                }
+            }
+            _rankingFireworksRaf = requestAnimationFrame(animate);
         }
 
         function loadGroupScoreboard() {
@@ -30927,6 +31320,226 @@ body.header-offscreen .header-kicker::after {
             .badge.silver { box-shadow: none; background: #f1f5f9; color: #475569; }
             .badge.bronze { box-shadow: none; background: #ffedd5; color: #9a3412; }
             button.btn { display: none; }
+        }
+
+        /* ════════════════════════════════════════════════════════════════
+           RANKING TAB — Podium + Grouped Cards + Animations
+           ════════════════════════════════════════════════════════════════ */
+        /* Override content-visibility/contain from enableFastSmoothUI so
+           dynamically inserted ranking content always renders correctly. */
+        #ranking-tab.tab-content {
+            content-visibility: visible !important;
+            contain: none !important;
+        }
+        .ranking-container {
+            position: relative;
+            min-height: 400px;
+            overflow: visible;
+            border-radius: var(--border-radius, 12px);
+        }
+        .ranking-content { position: relative; z-index: 1; }
+        .ranking-placeholder {
+            text-align: center;
+            padding: 80px 20px;
+        }
+        .ranking-fireworks-canvas {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        /* ── Podium ── */
+        .ranking-podium {
+            display: flex !important;
+            flex-direction: row !important;
+            align-items: flex-end !important;
+            justify-content: center !important;
+            gap: 16px;
+            padding: 30px 16px 20px;
+            flex-wrap: wrap;
+        }
+        .podium-slot {
+            display: flex !important;
+            flex-direction: column !important;
+            align-items: center !important;
+            position: relative;
+            animation: podium-rise 0.6s ease-out forwards;
+            animation-delay: var(--podium-delay, 0s);
+            opacity: 0;
+        }
+        .podium-slot-1 { order: 2; --podium-delay: 0.25s; }
+        .podium-slot-2 { order: 1; --podium-delay: 0s; }
+        .podium-slot-3 { order: 3; --podium-delay: 0.5s; }
+        @keyframes podium-rise {
+            from { opacity: 0; transform: translateY(60px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        .podium-avatar {
+            width: 88px; height: 88px;
+            border-radius: 50%;
+            border: 4px solid var(--podium-border, var(--border, #ccc));
+            background: var(--bg-card, #151829);
+            display: flex !important; align-items: center; justify-content: center;
+            overflow: hidden;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+            transition: transform 0.4s ease;
+        }
+        .podium-slot-1 .podium-avatar { width: 120px; height: 120px; border-width: 5px; }
+        .podium-slot-2 .podium-avatar { width: 96px; height: 96px; }
+        .podium-slot-3 .podium-avatar { width: 84px; height: 84px; }
+        .podium-avatar img { width: 100%; height: 100%; object-fit: cover; }
+        .podium-avatar .avatar-initials {
+            font-size: 1.8rem; font-weight: 800; color: var(--text, #f8fafc);
+        }
+        .podium-slot-1 .podium-avatar .avatar-initials { font-size: 2.4rem; }
+        .podium-slot:hover .podium-avatar { transform: scale(1.06); }
+
+        .podium-medal {
+            font-size: 1.6rem; margin-top: -8px; z-index: 2;
+            filter: drop-shadow(0 2px 6px rgba(0,0,0,0.4));
+        }
+        .podium-name {
+            font-weight: 800; font-size: 0.95rem; margin-top: 6px;
+            text-align: center; max-width: 140px; color: var(--text, #f8fafc);
+            line-height: 1.3;
+        }
+        .podium-slot-1 .podium-name { font-size: 1.15rem; }
+        .podium-meta {
+            font-size: 0.78rem; color: var(--text-muted, #94a3b8); margin-top: 2px;
+        }
+        .podium-score {
+            font-size: 1.3rem; font-weight: 900; margin-top: 4px;
+            font-family: var(--number-font, monospace);
+            color: var(--podium-accent, var(--primary, #fbbf24));
+        }
+        .podium-slot-1 .podium-score { font-size: 1.6rem; }
+        .podium-platform {
+            width: 130px; border-radius: 10px 10px 0 0;
+            display: flex !important; align-items: center; justify-content: center;
+            font-size: 2.5rem; font-weight: 900; color: rgba(255,255,255,0.85);
+            margin-top: 10px;
+            box-shadow: 0 -4px 20px rgba(0,0,0,0.3);
+        }
+        .podium-slot-1 .podium-platform { height: 100px; }
+        .podium-slot-2 .podium-platform { height: 72px; }
+        .podium-slot-3 .podium-platform { height: 54px; }
+        .podium-platform-gold {
+            background: linear-gradient(180deg, #fbbf24 0%, #d97706 100%);
+        }
+        .podium-platform-silver {
+            background: linear-gradient(180deg, #cbd5e1 0%, #64748b 100%);
+        }
+        .podium-platform-bronze {
+            background: linear-gradient(180deg, #f97316 0%, #9a3412 100%);
+        }
+        .podium-glow-1 {
+            position: absolute; width: 200px; height: 200px; border-radius: 50%;
+            background: radial-gradient(circle, rgba(251,191,36,0.15) 0%, transparent 70%);
+            pointer-events: none; z-index: 0;
+            animation: podium-pulse 3s ease-in-out infinite;
+        }
+        @keyframes podium-pulse {
+            0%, 100% { transform: scale(1); opacity: 0.6; }
+            50% { transform: scale(1.15); opacity: 1; }
+        }
+
+        /* ── Grouped Cards ── */
+        .ranking-group {
+            margin: 24px 0;
+            animation: group-fade-in 0.5s ease-out forwards;
+            animation-delay: var(--group-delay, 0.8s);
+            opacity: 0;
+        }
+        @keyframes group-fade-in {
+            from { opacity: 0; transform: translateY(30px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+        .ranking-group-header {
+            display: flex !important; align-items: center; gap: 10px;
+            margin-bottom: 12px; padding: 0 4px;
+        }
+        .ranking-group-tier {
+            font-size: 1.1rem; font-weight: 800; letter-spacing: 0.03em;
+            color: var(--group-accent, var(--primary, #fbbf24));
+        }
+        .ranking-group-flavor {
+            font-size: 0.85rem; font-weight: 600; color: var(--text-muted, #94a3b8);
+            padding: 3px 10px; border-radius: 12px;
+            background: var(--group-bg, rgba(251,191,36,0.08));
+            border: 1px solid var(--group-border, rgba(251,191,36,0.15));
+        }
+        .ranking-group-divider {
+            flex: 1; height: 2px; border-radius: 1px;
+            background: linear-gradient(90deg, var(--group-accent, var(--primary, #fbbf24)), transparent);
+            opacity: 0.4;
+        }
+        .ranking-cards {
+            display: grid !important;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)) !important;
+            gap: 12px;
+        }
+        .ranking-card {
+            display: flex !important; align-items: center; gap: 12px;
+            padding: 12px 16px; border-radius: var(--border-radius, 12px);
+            background: var(--bg-card, #151829);
+            border: 1px solid var(--border, rgba(251,191,36,0.2));
+            transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s;
+            animation: card-fade-in 0.4s ease-out forwards;
+            animation-delay: var(--card-delay, 0s);
+            opacity: 0;
+        }
+        @keyframes card-fade-in {
+            from { opacity: 0; transform: translateY(20px) scale(0.96); }
+            to   { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        .ranking-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+            border-color: var(--group-accent, var(--primary, #fbbf24));
+        }
+        .ranking-card-rank {
+            width: 36px; height: 36px; border-radius: 50%;
+            display: flex !important; align-items: center; justify-content: center;
+            font-weight: 800; font-size: 0.9rem; flex-shrink: 0;
+            background: var(--group-bg, rgba(251,191,36,0.1));
+            color: var(--group-accent, var(--primary, #fbbf24));
+            border: 2px solid var(--group-border, rgba(251,191,36,0.2));
+        }
+        .ranking-card-avatar {
+            width: 44px; height: 44px; border-radius: 50%;
+            background: var(--bg-elevated, #1e2235); overflow: hidden; flex-shrink: 0;
+            display: flex !important; align-items: center; justify-content: center;
+            border: 2px solid var(--border, rgba(251,191,36,0.2));
+        }
+        .ranking-card-avatar img { width: 100%; height: 100%; object-fit: cover; }
+        .ranking-card-avatar .avatar-initials {
+            font-size: 1rem; font-weight: 700; color: var(--text-muted, #94a3b8);
+        }
+        .ranking-card-info { flex: 1; min-width: 0; }
+        .ranking-card-name {
+            font-weight: 700; font-size: 0.9rem; color: var(--text, #f8fafc);
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .ranking-card-meta { font-size: 0.75rem; color: var(--text-muted, #94a3b8); margin-top: 2px; }
+        .ranking-card-score {
+            font-weight: 900; font-size: 1.1rem; font-family: var(--number-font, monospace);
+            color: var(--group-accent, var(--primary, #fbbf24)); flex-shrink: 0;
+        }
+
+        /* ── Responsive ── */
+        @media (max-width: 640px) {
+            .ranking-podium { gap: 8px; padding: 20px 8px 12px; }
+            .podium-slot-1 .podium-avatar { width: 90px; height: 90px; }
+            .podium-slot-2 .podium-avatar { width: 72px; height: 72px; }
+            .podium-slot-3 .podium-avatar { width: 64px; height: 64px; }
+            .podium-platform { width: 90px; font-size: 1.6rem; }
+            .podium-slot-1 .podium-platform { height: 70px; }
+            .podium-slot-2 .podium-platform { height: 52px; }
+            .podium-slot-3 .podium-platform { height: 40px; }
+            .podium-name { max-width: 100px; font-size: 0.82rem; }
+            .ranking-cards { grid-template-columns: 1fr !important; }
         }
     </style>
 </head>
@@ -46028,6 +46641,26 @@ body.header-offscreen .header-kicker::after {
             return item.startsWith('Excel Mela') || note.startsWith('Excel Mela');
         }
 
+        // Shared completion check for resource transactions. Used by both the
+        // Resources Transactions card and the student-dropdown narrowing logic
+        // so they always agree on what "settled" means.
+        function isResourceTransactionCompleted(txn) {
+            if (!txn) return false;
+            if (txn.pending_settlement) return false;
+            const mode = String(txn.type || '').trim().toLowerCase();
+            if (mode === 'redeem_points') return true;
+            if (mode === 'free_quota') return true;
+            if (mode !== 'cash_purchase') return true;
+            const cashPaid = Math.max(0, parseFloat(txn.cash_paid) || 0);
+            const charged = Math.max(0, parseFloat(txn.cash_charged) || 0) || Math.max(0, parseFloat(txn.total_cost) || 0);
+            const bal = computeResourceCashBalance(charged, cashPaid);
+            const pendingRaw = parseFloat(txn.cash_due);
+            const returnRaw = parseFloat(txn.cash_return_due);
+            const pending = Math.max(0, Number.isFinite(pendingRaw) ? pendingRaw : bal.pending);
+            const ret = Math.max(0, Number.isFinite(returnRaw) ? returnRaw : bal.return_due);
+            return pending <= 0 && ret <= 0;
+        }
+
         function formatMoneyValue(value) {
             const num = Number(value);
             if (!Number.isFinite(num)) return '0';
@@ -46203,6 +46836,9 @@ body.header-offscreen .header-kicker::after {
                 if (postName.includes('RM') || postName.includes('RESOURCE MANAGER')) {
                     return 'rm';
                 }
+                if (postName.includes('DWI') || (postName.includes('DISCIPLINE') && postName.includes('WELFARE'))) {
+                    return 'dwi';
+                }
                 return 'other_post_holder';
             }
 
@@ -46226,7 +46862,7 @@ body.header-offscreen .header-kicker::after {
 
         function getStudentFreeQuotaAmount(studentId) {
             const role = getStudentFreeQuotaRole(studentId);
-            const FREE_QUOTA_MAP = { leader: 50, co_leader: 35, lop: 30, rm: 25, other_post_holder: 20, normal: 15 };
+            const FREE_QUOTA_MAP = { leader: 50, lop: 40, co_leader: 30, dwi: 25, rm: 25, other_post_holder: 25, normal: 15 };
             return FREE_QUOTA_MAP[role] || 15;
         }
 
@@ -46261,11 +46897,6 @@ body.header-offscreen .header-kicker::after {
         }
 
         function getStudentFreeQuotaRemaining(studentId, monthKey) {
-            const role = getStudentFreeQuotaRole(studentId);
-            if (role === 'co_leader') {
-                const combinedUsed = getCoLeaderCombinedFreeQuotaUsed(monthKey);
-                return Math.max(0, 35 - combinedUsed);
-            }
             const quota = getStudentFreeQuotaAmount(studentId);
             const used = getStudentFreeQuotaUsed(studentId, monthKey);
             return Math.max(0, quota - used);
@@ -46276,11 +46907,30 @@ body.header-offscreen .header-kicker::after {
                 leader: 'Leader',
                 co_leader: 'Co-Leader',
                 lop: 'LoP',
+                dwi: 'DWI',
                 rm: 'RM',
                 other_post_holder: 'Post Holder',
                 normal: 'Student'
             };
             return LABELS[role] || 'Student';
+        }
+
+        // High-ranking post holders: Leader, CoL, LoP, DWI, RM.
+        const FREE_QUOTA_HIGH_RANKING_ROLES = new Set(['leader', 'co_leader', 'lop', 'dwi', 'rm']);
+
+        // Color-coded role badge with tier-based styling and icons.
+        //   High Ranking → gold gradient + crown icon
+        //   Post Holder  → teal + id-badge icon
+        //   Student      → muted blue + user icon
+        function getFreeQuotaRoleBadge(role) {
+            const label = getFreeQuotaRoleLabel(role);
+            if (FREE_QUOTA_HIGH_RANKING_ROLES.has(role)) {
+                return `<span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:6px;background:linear-gradient(135deg,rgba(251,191,36,0.25),rgba(245,158,11,0.18));color:#fcd34d;border:1px solid rgba(251,191,36,0.35);"><i class="fas fa-crown" style="font-size:9px;margin-right:4px;"></i>${escapeHtml(label)}</span>`;
+            }
+            if (role === 'other_post_holder') {
+                return `<span style="font-size:11px;font-weight:600;padding:3px 10px;border-radius:6px;background:rgba(20,184,166,0.15);color:#5eead4;border:1px solid rgba(20,184,166,0.3);"><i class="fas fa-id-badge" style="font-size:9px;margin-right:4px;"></i>${escapeHtml(label)}</span>`;
+            }
+            return `<span style="font-size:11px;font-weight:600;padding:3px 10px;border-radius:6px;background:rgba(99,102,241,0.12);color:#a5b4fc;border:1px solid rgba(99,102,241,0.2);"><i class="fas fa-user" style="font-size:9px;margin-right:4px;"></i>${escapeHtml(label)}</span>`;
         }
 
         // Free Quota Counter lazy-load state. The full list is NOT rendered on tab
@@ -46301,9 +46951,11 @@ body.header-offscreen .header-kicker::after {
         function resetFreeQuotaCounterFilters() {
             const monthInput = document.getElementById('freeQuotaCounterMonth');
             const filterSelect = document.getElementById('freeQuotaCounterFilter');
+            const roleFilterSelect = document.getElementById('freeQuotaCounterRoleFilter');
             const searchInput = document.getElementById('freeQuotaCounterSearch');
             if (monthInput) monthInput.value = getCurrentMonthKey();
             if (filterSelect) filterSelect.value = 'availed';
+            if (roleFilterSelect) roleFilterSelect.value = 'all';
             if (searchInput) searchInput.value = '';
             freeQuotaListViewed = false;
             renderFreeQuotaCounterPlaceholder();
@@ -46333,11 +46985,14 @@ body.header-offscreen .header-kicker::after {
             const allStudents = (db.getStudents() || []);
             let students;
             if (filter === 'inactive') {
-                students = allStudents.filter(s => s.status === 'inactive');
+                // Explicitly deactivated for the selected month.
+                students = allStudents.filter(s => !isStudentActiveForMonth(s, monthKey));
             } else if (filter === 'all') {
+                // "All Students" intentionally includes deactivated ones.
                 students = allStudents;
             } else {
-                students = allStudents.filter(s => s.status !== 'inactive');
+                // availed / remaining / active → only students active for this month.
+                students = allStudents.filter(s => isStudentActiveForMonth(s, monthKey));
             }
             const rows = students.map(s => {
                 const sid = parseInt(s.id, 10);
@@ -46365,9 +47020,22 @@ body.header-offscreen .header-kicker::after {
                 ].join('');
             }
 
+            // Role filter — separates Students, Post Holders (Normal), and Post
+            // Holders (High Ranking: Leader, CoL, LoP, DWI, RM).
+            const roleFilterSelect = document.getElementById('freeQuotaCounterRoleFilter');
+            const roleFilter = roleFilterSelect ? String(roleFilterSelect.value || 'all').trim().toLowerCase() : 'all';
+
             let filtered = rows;
-            if (filter === 'availed') filtered = rows.filter(r => r.used > 0);
-            else if (filter === 'remaining') filtered = rows.filter(r => r.remaining > 0);
+            if (filter === 'availed') filtered = filtered.filter(r => r.used > 0);
+            else if (filter === 'remaining') filtered = filtered.filter(r => r.remaining > 0);
+
+            if (roleFilter === 'students') {
+                filtered = filtered.filter(r => r.role === 'normal');
+            } else if (roleFilter === 'post_normal') {
+                filtered = filtered.filter(r => r.role === 'other_post_holder');
+            } else if (roleFilter === 'post_high') {
+                filtered = filtered.filter(r => FREE_QUOTA_HIGH_RANKING_ROLES.has(r.role));
+            }
 
             if (searchTerm) {
                 filtered = filtered.filter(r => {
@@ -46377,7 +47045,13 @@ body.header-offscreen .header-kicker::after {
                 });
             }
 
-            filtered.sort((a, b) => b.pct - a.pct || b.used - a.used);
+            // Sort group-wise (A, B, C…), then roll number ascending within each group.
+            filtered.sort((a, b) => {
+                const ga = getGroupSortRank(getStudentGroup(a.s));
+                const gb = getGroupSortRank(getStudentGroup(b.s));
+                if (ga !== gb) return ga - gb;
+                return String(a.s.roll || '').localeCompare(String(b.s.roll || ''), undefined, { numeric: true });
+            });
 
             const colCount = canMarkAvailed ? 10 : 9;
             if (!filtered.length) {
@@ -46385,10 +47059,19 @@ body.header-offscreen .header-kicker::after {
                 return;
             }
 
-            tbody.innerHTML = filtered.map((r, idx) => {
+            // Build rows with group separator headers.
+            let htmlParts = [];
+            let currentGroup = null;
+            let rowIdx = 0;
+            filtered.forEach(r => {
+                const group = getStudentGroup(r.s);
+                if (group !== currentGroup) {
+                    currentGroup = group;
+                    htmlParts.push(`<tr style="background:rgba(148,163,184,0.08);"><td colspan="${colCount}" style="padding:6px 14px;font-weight:700;font-size:12px;color:#94a3b8;letter-spacing:0.5px;text-transform:uppercase;border-bottom:2px solid rgba(148,163,184,0.2);"><i class="fas fa-layer-group" style="margin-right:6px;font-size:10px;"></i>Group ${escapeHtml(String(group || '?'))}</td></tr>`);
+                }
+                rowIdx++;
                 const name = String(r.s.base_name || r.s.name || '').trim();
                 const roll = formatRollDisplay(r.s.roll);
-                const roleLabel = getFreeQuotaRoleLabel(r.role);
                 const pct = r.pct;
                 // Color gradient: green (0%) → yellow (50%) → red (100%)
                 let barColor;
@@ -46410,20 +47093,21 @@ body.header-offscreen .header-kicker::after {
                 const markCell = canMarkAvailed
                     ? `<td><button class="btn-sm" style="padding:4px 10px;font-size:11px;border-radius:6px;border:1px solid rgba(20,184,166,0.45);background:rgba(20,184,166,0.12);color:#14b8a6;cursor:pointer;" onclick="markStudentAvailedSubsidy(${r.sid}, '${monthKey}', this)" title="Manually mark this student as having availed Academy subsidy"><i class="fas fa-check"></i> Mark Availed</button></td>`
                     : '';
-                return `
+                htmlParts.push(`
                     <tr>
-                        <td>${idx + 1}</td>
+                        <td>${rowIdx}</td>
                         <td>${escapeHtml(name)}</td>
                         <td>${escapeHtml(roll)}</td>
-                        <td><span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:4px;background:rgba(99,102,241,0.15);color:#a5b4fc;">${escapeHtml(roleLabel)}</span></td>
+                        <td>${getFreeQuotaRoleBadge(r.role)}</td>
                         <td style="font-weight:600;">₹${r.quota}</td>
                         <td style="color:#fbbf24;font-weight:600;">₹${Math.round(r.used)}</td>
                         <td style="color:${r.remaining > 0 ? '#4ade80' : '#ef4444'};font-weight:600;">₹${Math.round(r.remaining)}</td>
                         <td>${barHtml}</td>
                         <td><button class="btn-sm" style="padding:4px 10px;font-size:11px;border-radius:6px;border:1px solid rgba(99,102,241,0.4);background:rgba(99,102,241,0.1);color:#a5b4fc;cursor:pointer;" onclick="showFreeQuotaDetails(${r.sid}, '${monthKey}')"><i class="fas fa-info-circle"></i> Details</button></td>
                         ${markCell}
-                    </tr>`;
-            }).join('');
+                    </tr>`);
+            });
+            tbody.innerHTML = htmlParts.join('');
         }
 
         // Manually record that a student availed Academy subsidy (free quota) without
@@ -46512,7 +47196,6 @@ body.header-offscreen .header-kicker::after {
             const studentName = student ? String(student.base_name || student.name || '').trim() : 'Unknown';
             const roll = student ? formatRollDisplay(student.roll) : '-';
             const role = getStudentFreeQuotaRole(sid);
-            const roleLabel = getFreeQuotaRoleLabel(role);
             const quota = getStudentFreeQuotaAmount(sid);
             const used = getStudentFreeQuotaUsed(sid, monthKey);
             const remaining = getStudentFreeQuotaRemaining(sid, monthKey);
@@ -46545,7 +47228,7 @@ body.header-offscreen .header-kicker::after {
                     <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:16px;">
                         <div><span style="color:#94a3b8;font-size:12px;">Student</span><div style="font-weight:600;font-size:15px;">${escapeHtml(studentName)}</div></div>
                         <div><span style="color:#94a3b8;font-size:12px;">Roll</span><div style="font-weight:600;">${escapeHtml(roll)}</div></div>
-                        <div><span style="color:#94a3b8;font-size:12px;">Role</span><div><span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:4px;background:rgba(99,102,241,0.15);color:#a5b4fc;">${escapeHtml(roleLabel)}</span></div></div>
+                        <div><span style="color:#94a3b8;font-size:12px;">Role</span><div>${getFreeQuotaRoleBadge(role)}</div></div>
                         <div><span style="color:#94a3b8;font-size:12px;">Month</span><div style="font-weight:600;">${escapeHtml(monthKey)}</div></div>
                     </div>
                     <div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;">
@@ -47112,11 +47795,12 @@ body.header-offscreen .header-kicker::after {
             if (!select) return;
             const statusFilter = String(getElementValue('resourceStudentStatusFilter') || 'active').trim().toLowerCase();
             const classFilter = String(getElementValue('resourceStudentClassFilter') || 'all').trim();
+            const monthKey = getResourceContextMonthKey();
             let students = (db.getStudents() || []).slice();
             if (statusFilter === 'active') {
-                students = students.filter(s => s && s.active !== false);
+                students = students.filter(s => isStudentActiveForMonth(s, monthKey));
             } else if (statusFilter === 'inactive') {
-                students = students.filter(s => s && s.active === false);
+                students = students.filter(s => !isStudentActiveForMonth(s, monthKey));
             }
             if (classFilter && classFilter !== 'all') {
                 students = students.filter(s => String(s && s.class || '').trim() === classFilter);
@@ -47665,12 +48349,31 @@ body.header-offscreen .header-kicker::after {
             const select = document.getElementById('resourceTransactionsStudentFilter');
             if (!select) return;
             const prev = String(select.value || 'all');
-            const txns = getResourceTransactions() || [];
             const studentById = new Map((db.getStudents() || []).map(s => [parseInt(s.id, 10), s]));
-            const seen = new Set();
-            const options = [{ value: 'all', label: 'All Students' }];
 
+            // Read the active Filter (completion) and Source filters so the student
+            // dropdown only lists students who actually have transactions matching
+            // the current view — e.g., "Not Completed" shows only students with ≥1
+            // unsettled transaction (respecting the Source filter too).
+            const filter = String(getElementValue('resourceTransactionsFilter') || 'all').trim().toLowerCase();
+            const sourceFilter = String(getElementValue('resourceTransactionsSourceFilter') || 'all').trim().toLowerCase();
+
+            let txns = getResourceTransactions() || [];
+            // Apply source filter first.
+            if (sourceFilter === 'resources') txns = txns.filter(t => !isMelaTransaction(t));
+            else if (sourceFilter === 'mela') txns = txns.filter(isMelaTransaction);
+
+            // Determine which students have at least one transaction matching the
+            // completion filter. Map student value → {label} for qualifying students.
+            const qualifying = new Map(); // value → label
             txns.forEach(txn => {
+                const completed = isResourceTransactionCompleted(txn);
+                let matches = false;
+                if (filter === 'completed') matches = completed;
+                else if (filter === 'not_completed') matches = !completed;
+                else matches = true; // 'all'
+                if (!matches) return;
+
                 const sid = parseInt(txn && txn.studentId, 10) || 0;
                 const student = sid ? studentById.get(sid) : null;
                 const roll = String((txn && txn.student_roll) || (student && student.roll) || '').trim();
@@ -47678,18 +48381,18 @@ body.header-offscreen .header-kicker::after {
                 let value = '';
                 if (sid > 0) value = `id:${sid}`;
                 else if (roll) value = `roll:${normalizeRoll(roll)}`;
-                if (!value || seen.has(value)) return;
-                seen.add(value);
+                if (!value || qualifying.has(value)) return;
                 const label = `${name || 'Unknown'}${roll ? ` (${formatRollDisplay(roll)})` : ''}`;
-                options.push({ value, label });
+                qualifying.set(value, label);
             });
 
-            options.sort((a, b) => {
-                if (a.value === 'all') return -1;
-                if (b.value === 'all') return 1;
-                return String(a.label || '').localeCompare(String(b.label || ''));
-            });
+            const options = [{ value: 'all', label: 'All Students' }];
+            const sorted = Array.from(qualifying.entries()).sort((a, b) => String(a[1] || '').localeCompare(String(b[1] || '')));
+            sorted.forEach(([value, label]) => options.push({ value, label }));
+
             select.innerHTML = options.map(opt => `<option value="${escapeHtml(opt.value)}">${escapeHtml(opt.label)}</option>`).join('');
+            // Preserve the current selection if it's still in the narrowed list;
+            // otherwise reset to "All Students".
             select.value = options.some(opt => opt.value === prev) ? prev : 'all';
         }
 
@@ -47707,21 +48410,7 @@ body.header-offscreen .header-kicker::after {
             const monthFilter = String(getElementValue('resourceTransactionsMonthFilter') || '').trim();
             let rows = getResourceTransactions().slice().sort((a, b) => parseSyncStamp((b && (b.created_at || b.updated_at)) || '') - parseSyncStamp((a && (a.created_at || a.updated_at)) || ''));
 
-            const isCompleted = (txn) => {
-                if (txn && txn.pending_settlement) return false;
-                const mode = String(txn && txn.type || '').trim().toLowerCase();
-                if (mode === 'redeem_points') return true;
-                if (mode === 'free_quota') return true;
-                if (mode !== 'cash_purchase') return true;
-                const cashPaid = Math.max(0, parseFloat(txn && txn.cash_paid) || 0);
-                const charged = Math.max(0, parseFloat(txn && txn.cash_charged) || 0) || Math.max(0, parseFloat(txn && txn.total_cost) || 0);
-                const bal = computeResourceCashBalance(charged, cashPaid);
-                const pendingRaw = parseFloat(txn && txn.cash_due);
-                const returnRaw = parseFloat(txn && txn.cash_return_due);
-                const pending = Math.max(0, Number.isFinite(pendingRaw) ? pendingRaw : bal.pending);
-                const ret = Math.max(0, Number.isFinite(returnRaw) ? returnRaw : bal.return_due);
-                return pending <= 0 && ret <= 0;
-            };
+            const isCompleted = isResourceTransactionCompleted;
 
             if (filter === 'completed') {
                 rows = rows.filter(isCompleted);
@@ -49424,23 +50113,33 @@ body.header-offscreen .header-kicker::after {
             if (!select) return;
             const prev = String(select.value || 'all');
             const studentById = new Map((db.getStudents() || []).map(s => [parseInt(s.id, 10), s]));
-            const seen = new Set();
-            const options = [{ value: 'all', label: 'All Students' }];
+
+            // Narrow the student dropdown based on the Mela Status filter, mirroring
+            // the Resources tab: "Pending Settlement" shows only students with ≥1
+            // unsettled Mela txn; "Settled" shows only students with ≥1 settled one.
+            const statusFilter = String(getElementValue('melaTxnStatusFilter') || 'all').trim().toLowerCase();
+
+            const qualifying = new Map(); // value → label
             getResourceTransactions().filter(isMelaTransaction).forEach(txn => {
+                const completed = isResourceTransactionCompleted(txn);
+                let matches = false;
+                if (statusFilter === 'open') matches = !completed;
+                else if (statusFilter === 'settled') matches = completed;
+                else matches = true; // 'all'
+                if (!matches) return;
+
                 const sid = parseInt(txn && txn.studentId, 10) || 0;
                 const student = sid ? studentById.get(sid) : null;
                 const roll = String((txn && txn.student_roll) || (student && student.roll) || '').trim();
                 const name = String((student && (student.base_name || student.name)) || '').trim();
                 let value = sid > 0 ? `id:${sid}` : (roll ? `roll:${normalizeRoll(roll)}` : '');
-                if (!value || seen.has(value)) return;
-                seen.add(value);
-                options.push({ value, label: `${name || 'Unknown'}${roll ? ` (${formatRollDisplay(roll)})` : ''}` });
+                if (!value || qualifying.has(value)) return;
+                qualifying.set(value, `${name || 'Unknown'}${roll ? ` (${formatRollDisplay(roll)})` : ''}`);
             });
-            options.sort((a, b) => {
-                if (a.value === 'all') return -1;
-                if (b.value === 'all') return 1;
-                return String(a.label || '').localeCompare(String(b.label || ''));
-            });
+
+            const options = [{ value: 'all', label: 'All Students' }];
+            Array.from(qualifying.entries()).sort((a, b) => String(a[1] || '').localeCompare(String(b[1] || '')))
+                .forEach(([value, label]) => options.push({ value, label }));
             select.innerHTML = options.map(o => `<option value="${escapeHtml(o.value)}">${escapeHtml(o.label)}</option>`).join('');
             select.value = options.some(o => o.value === prev) ? prev : 'all';
         }
@@ -49461,17 +50160,7 @@ body.header-offscreen .header-kicker::after {
                 .slice()
                 .sort((a, b) => parseSyncStamp((b && (b.created_at || b.updated_at)) || '') - parseSyncStamp((a && (a.created_at || a.updated_at)) || ''));
 
-            const isCompleted = (txn) => {
-                if (txn && txn.pending_settlement) return false;
-                const mode = String(txn && txn.type || '').trim().toLowerCase();
-                if (mode !== 'cash_purchase') return true;
-                const cashPaid = Math.max(0, parseFloat(txn && txn.cash_paid) || 0);
-                const charged = Math.max(0, parseFloat(txn && txn.cash_charged) || 0) || Math.max(0, parseFloat(txn && txn.total_cost) || 0);
-                const bal = computeResourceCashBalance(charged, cashPaid);
-                const pending = Math.max(0, Number.isFinite(parseFloat(txn && txn.cash_due)) ? parseFloat(txn.cash_due) : bal.pending);
-                const ret = Math.max(0, Number.isFinite(parseFloat(txn && txn.cash_return_due)) ? parseFloat(txn.cash_return_due) : bal.return_due);
-                return pending <= 0 && ret <= 0;
-            };
+            const isCompleted = isResourceTransactionCompleted;
 
             if (statusFilter === 'open') rows = rows.filter(t => !isCompleted(t));
             else if (statusFilter === 'settled') rows = rows.filter(isCompleted);
