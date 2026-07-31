@@ -1207,7 +1207,36 @@
             { flavor: 'Strivers', color: '#db2777', bg: 'rgba(219,39,119,.1)', border: 'rgba(219,39,119,.25)' },
         ];
         const PUBLIC_RANKING_MEDALS = { 1: '🥇', 2: '🥈', 3: '🥉' };
+        const PUBLIC_RANKING_ANIMATION_INTERVAL_MS = 5000;
         let publicRankingRaf = null;
+        let publicRankingLoop = null;
+
+        function isPublicRankingVisible() {
+            return activeTab === 'ranking' && !document.hidden;
+        }
+        function stopPublicRankingAnimationLoop() {
+            if (publicRankingLoop) {
+                clearInterval(publicRankingLoop);
+                publicRankingLoop = null;
+            }
+            if (publicRankingRaf) {
+                cancelAnimationFrame(publicRankingRaf);
+                publicRankingRaf = null;
+            }
+            const canvas = document.getElementById('publicRankingFireworks');
+            if (canvas) {
+                const ctx = canvas.getContext('2d');
+                if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+            }
+        }
+        function startPublicRankingAnimationLoop() {
+            stopPublicRankingAnimationLoop();
+            if (!isPublicRankingVisible()) return;
+            publicRankingLoop = setInterval(() => {
+                if (isPublicRankingVisible()) replayPublicRanking();
+                else stopPublicRankingAnimationLoop();
+            }, PUBLIC_RANKING_ANIMATION_INTERVAL_MS);
+        }
 
         function publicRankingInitials(row) {
             const name = String((row && row.name) || '').trim();
@@ -1235,6 +1264,7 @@
             if (!body) return;
             const rows = publicRankingRows(month).filter(row => !row.masked && Number(row.rank) <= 15);
             if (!rows.length) {
+                stopPublicRankingAnimationLoop();
                 body.innerHTML = '<div class="empty" style="padding:40px;text-align:center;color:var(--muted);">No public ranking data available for this month.</div>';
                 return;
             }
@@ -1277,7 +1307,10 @@
             }).join('');
 
             body.innerHTML = '<div class="public-ranking-podium">' + podium + '</div>' + groupHtml + '<p class="public-ranking-note">Showing the top 15 public positions. Full student details remain protected.</p>';
-            requestAnimationFrame(() => triggerPublicRankingFireworks());
+            if (isPublicRankingVisible()) {
+                startPublicRankingAnimationLoop();
+                requestAnimationFrame(() => triggerPublicRankingFireworks());
+            }
         }
         function renderRanking(data) {
             scoresData = data;
@@ -1305,6 +1338,7 @@
             triggerPublicRankingFireworks();
         }
         function triggerPublicRankingFireworks() {
+            if (!isPublicRankingVisible()) return;
             const canvas = document.getElementById('publicRankingFireworks');
             const host = document.getElementById('publicRankingContainer');
             if (!canvas || !host) return;
@@ -1401,7 +1435,13 @@
             if (isLoggedIn() && (isScoreboard || isRanking || tabKey === 'info')) {
                 loadScores().then(d => { renderScoreboard(d); renderRanking(d); renderInfo(d); }).catch(() => {});
             }
+            if (isRanking) startPublicRankingAnimationLoop();
+            else stopPublicRankingAnimationLoop();
         }
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) stopPublicRankingAnimationLoop();
+            else if (activeTab === 'ranking') startPublicRankingAnimationLoop();
+        });
         tabHome.addEventListener('click', () => setActiveTab('home'));
         tabScoreboard.addEventListener('click', () => {
             if (!isLoggedIn()) { openLoginModal(); return; }

@@ -15682,7 +15682,14 @@ body.header-offscreen .header-kicker::after {
             });
             // Badge updates are low-priority background ops — safe to defer via _idle.
             localStorage.setItem(ACTIVE_TAB_KEY, tabName);
+            if (tabName === 'ranking') startRankingAnimationLoop();
+            else stopRankingAnimationLoop();
         }
+
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) stopRankingAnimationLoop();
+            else if (getActiveTabName() === 'ranking') startRankingAnimationLoop();
+        });
 
         function toggleColumn(key, isVisible) {
             columnVisibility[key] = isVisible;
@@ -30246,9 +30253,58 @@ body.header-offscreen .header-kicker::after {
             return escapeHtml((parts[0] && parts[0][0]) || '?').toUpperCase();
         }
 
+        const RANKING_ANIMATION_INTERVAL_MS = 5000;
+        let _rankingAnimationLoop = null;
+        let _rankingFireworksTimeout = null;
+
+        function isRankingTabVisible() {
+            const tab = document.getElementById('ranking-tab');
+            return !!tab && !tab.classList.contains('hidden') && !document.hidden;
+        }
+
+        function stopRankingAnimationLoop() {
+            if (_rankingAnimationLoop) {
+                clearInterval(_rankingAnimationLoop);
+                _rankingAnimationLoop = null;
+            }
+            if (_rankingFireworksTimeout) {
+                clearTimeout(_rankingFireworksTimeout);
+                _rankingFireworksTimeout = null;
+            }
+            if (_rankingFireworksRaf) {
+                cancelAnimationFrame(_rankingFireworksRaf);
+                _rankingFireworksRaf = null;
+            }
+            const canvas = document.getElementById('rankingFireworksCanvas');
+            if (canvas) {
+                const ctx = canvas.getContext('2d');
+                if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+            }
+        }
+
+        function startRankingAnimationLoop() {
+            stopRankingAnimationLoop();
+            if (!isRankingTabVisible()) return;
+            _rankingAnimationLoop = setInterval(() => {
+                if (isRankingTabVisible()) replayRankingAnimations();
+                else stopRankingAnimationLoop();
+            }, RANKING_ANIMATION_INTERVAL_MS);
+        }
+
+        function scheduleRankingFireworks(delay = 400) {
+            if (_rankingFireworksTimeout) clearTimeout(_rankingFireworksTimeout);
+            _rankingFireworksTimeout = setTimeout(() => {
+                _rankingFireworksTimeout = null;
+                if (isRankingTabVisible()) triggerRankingFireworks();
+            }, delay);
+        }
+
         function loadRankings() {
             const month = document.getElementById('rankingMonth').value;
-            if (!month) return;
+            if (!month) {
+                stopRankingAnimationLoop();
+                return;
+            }
 
             const scoreboard = db.getMonthlyScoreboard(month);
             const content = document.getElementById('rankingContent');
@@ -30256,6 +30312,7 @@ body.header-offscreen .header-kicker::after {
             if (!content) return;
 
             if (!scoreboard || scoreboard.length === 0) {
+                stopRankingAnimationLoop();
                 content.innerHTML = `<div class="ranking-placeholder"><i class="fas fa-trophy" style="font-size:48px;color:var(--text-muted);margin-bottom:16px;"></i><p style="color:var(--text-muted);font-size:1.1rem;">No data for this month</p></div>`;
                 if (replayGroup) replayGroup.style.display = 'none';
                 return;
@@ -30348,8 +30405,9 @@ body.header-offscreen .header-kicker::after {
                 });
             });
 
+            startRankingAnimationLoop();
             // Fireworks when podium renders
-            setTimeout(() => triggerRankingFireworks(), 400);
+            scheduleRankingFireworks();
         }
 
         function replayRankingAnimations() {
@@ -30379,12 +30437,13 @@ body.header-offscreen .header-kicker::after {
                 void slot.offsetWidth;
                 slot.style.animation = '';
             });
-            setTimeout(() => triggerRankingFireworks(), 400);
+            scheduleRankingFireworks();
         }
 
         // ── Fireworks / Confetti animation ──────────────────────────────────
         var _rankingFireworksRaf = null;
         function triggerRankingFireworks() {
+            if (!isRankingTabVisible()) return;
             const canvas = document.getElementById('rankingFireworksCanvas');
             if (!canvas) return;
             const ctx = canvas.getContext('2d');
