@@ -750,6 +750,309 @@
         @media (max-width: 980px) { #rankingPanel .public-ranking-cards { grid-template-columns: repeat(3,minmax(0,1fr)); } }
         @media (max-width: 640px) { #rankingPanel .public-ranking-podium { gap: 5px; padding: 22px 7px 16px; } #rankingPanel .rank-1 .public-podium-avatar { width: 94px; height: 94px; } #rankingPanel .rank-2 .public-podium-avatar { width: 76px; height: 76px; } #rankingPanel .rank-3 .public-podium-avatar { width: 68px; height: 68px; } #rankingPanel .public-podium-platform { width: 88px; } #rankingPanel .rank-1 .public-podium-platform { height: 70px; } #rankingPanel .rank-2 .public-podium-platform { height: 52px; } #rankingPanel .rank-3 .public-podium-platform { height: 40px; } #rankingPanel .public-ranking-cards { grid-template-columns: repeat(2,minmax(0,1fr)); } #rankingPanel .public-ranking-meta { width: 100%; margin-left: 0; } }
         @media (max-width: 450px) { #rankingPanel .public-ranking-cards { grid-template-columns: 1fr; } #rankingPanel .public-podium-name { max-width: 96px; font-size: .75rem; } }
+
+        /* ════════════════════════════════════════════════════════════
+           PARTY STANDINGS — floating bubbles + green water-fill
+           ════════════════════════════════════════════════════════════ */
+        #partiesPanel .public-parties-wrap { padding: 16px; }
+        #partiesPanel .public-parties-controls {
+            display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 18px;
+        }
+        #partiesPanel .public-parties-controls label { font-weight: 700; color: var(--primary); }
+        #partiesPanel .public-parties-controls select { min-width: 150px; }
+        #partiesPanel .public-parties-meta { margin-left: auto; color: var(--muted); font-size: .82rem; }
+        #partiesPanel .public-parties-legend {
+            display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+            margin: 0 0 14px; font-size: .76rem; color: var(--muted);
+        }
+        #partiesPanel .public-parties-legend .legend-swatch {
+            width: 12px; height: 12px; border-radius: 50%;
+            background: linear-gradient(180deg, #22c55e 0%, #15803d 100%);
+            box-shadow: 0 0 8px rgba(34,197,94,.5);
+        }
+        .parties-bubble-field {
+            position: relative;
+            min-height: 460px;
+            padding: 10px 6px 30px;
+            display: flex; flex-wrap: wrap; justify-content: center; align-items: flex-end;
+            gap: 26px 30px;
+            overflow: hidden;
+            border-radius: 18px;
+            background:
+                radial-gradient(ellipse at 50% 120%, rgba(34,197,94,.06), transparent 60%),
+                linear-gradient(180deg, rgba(124,58,237,.03) 0%, rgba(34,197,94,.04) 100%);
+            border: 1px solid var(--line);
+        }
+        body.dark .parties-bubble-field {
+            background:
+                radial-gradient(ellipse at 50% 120%, rgba(34,197,94,.10), transparent 60%),
+                linear-gradient(180deg, rgba(124,58,237,.05) 0%, rgba(34,197,94,.06) 100%);
+            border-color: rgba(34,197,94,.14);
+        }
+        .party-bubble {
+            position: relative;
+            flex: 0 0 auto;
+            width: 132px; height: 132px;
+            border-radius: 50%;
+            cursor: pointer;
+            overflow: hidden;
+            isolation: isolate;
+            background: rgba(255,255,255,.06);
+            border: 2px solid var(--party-color, #64748b);
+            box-shadow:
+                0 10px 26px rgba(0,0,0,.18),
+                0 0 22px color-mix(in srgb, var(--party-color, #64748b) 40%, transparent),
+                inset 0 2px 14px rgba(255,255,255,.18);
+            transition: transform .25s cubic-bezier(.34,1.56,.64,1), box-shadow .25s;
+            animation: partyFloat 7s ease-in-out infinite;
+            animation-delay: var(--float-delay, 0s);
+        }
+        .party-bubble:hover {
+            transform: scale(1.10) translateY(-6px);
+            box-shadow:
+                0 18px 40px rgba(0,0,0,.26),
+                0 0 38px color-mix(in srgb, var(--party-color, #64748b) 65%, transparent),
+                inset 0 2px 18px rgba(255,255,255,.22);
+            z-index: 5;
+        }
+        .party-bubble:focus-visible { outline: 3px solid var(--primary); outline-offset: 4px; }
+        body.dark .party-bubble {
+            background: rgba(8,8,8,.55);
+            box-shadow:
+                0 10px 26px rgba(0,0,0,.5),
+                0 0 26px color-mix(in srgb, var(--party-color, #64748b) 50%, transparent),
+                inset 0 2px 14px rgba(255,255,255,.06);
+        }
+        /* Green water fill — rises from the bottom to the vote-power % height */
+        .party-bubble .water {
+            position: absolute; left: 0; right: 0; bottom: 0;
+            height: 0%;
+            background: linear-gradient(180deg,
+                rgba(34,197,94,.85) 0%,
+                rgba(22,163,74,.92) 40%,
+                rgba(5,150,105,.95) 100%);
+            z-index: 0;
+            transition: height 1.6s cubic-bezier(.22,1,.36,1);
+        }
+        .party-bubble .water::before {
+            /* shimmering surface wave */
+            content: ''; position: absolute; top: -6px; left: -50%; right: -50%; height: 12px;
+            background: radial-gradient(ellipse at 50% 100%, rgba(255,255,255,.55), transparent 70%);
+            animation: partyWave 3.2s linear infinite;
+            opacity: .7;
+        }
+        .party-bubble .water::after {
+            /* second slower wave for depth */
+            content: ''; position: absolute; top: -3px; left: -50%; right: -50%; height: 8px;
+            background: radial-gradient(ellipse at 50% 100%, rgba(255,255,255,.30), transparent 70%);
+            animation: partyWave 4.8s linear infinite reverse;
+        }
+        .party-bubble .bubble-content {
+            position: absolute; inset: 0; z-index: 2;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            text-align: center; padding: 6px;
+            pointer-events: none;
+        }
+        .party-bubble .bubble-symbol { font-size: 1.7rem; line-height: 1; filter: drop-shadow(0 1px 3px rgba(0,0,0,.4)); }
+        .party-bubble .bubble-code {
+            font: 800 .82rem/1 "Poppins", sans-serif;
+            color: #fff; margin-top: 3px;
+            text-shadow: 0 1px 4px rgba(0,0,0,.55);
+            letter-spacing: .5px;
+        }
+        .party-bubble .bubble-vp {
+            font: 700 .68rem/1 "Poppins", sans-serif;
+            color: #d1fae5; margin-top: 2px;
+            text-shadow: 0 1px 3px rgba(0,0,0,.6);
+        }
+        .party-bubble .bubble-rank {
+            position: absolute; top: 6px; left: 8px; z-index: 3;
+            font: 800 .62rem/1 "Poppins", sans-serif;
+            color: #fff; background: rgba(0,0,0,.42);
+            border-radius: 999px; padding: 3px 7px;
+            backdrop-filter: blur(4px);
+        }
+        .party-bubble.bubble-empty { opacity: .55; }
+        .party-bubble.bubble-empty .water { height: 8% !important; }
+
+        @keyframes partyFloat {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-12px); }
+        }
+        @keyframes partyWave {
+            0% { transform: translateX(-25%); }
+            100% { transform: translateX(25%); }
+        }
+        @keyframes partyBubbleIn {
+            from { opacity: 0; transform: translateY(30px) scale(.6); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        .party-bubble { animation: partyFloat 7s ease-in-out infinite, partyBubbleIn .6s cubic-bezier(.34,1.56,.64,1) backwards; }
+        @media (max-width: 640px) {
+            .party-bubble { width: 108px; height: 108px; }
+            .party-bubble .bubble-symbol { font-size: 1.4rem; }
+            .party-bubble .bubble-code { font-size: .72rem; }
+            .parties-bubble-field { gap: 18px 20px; min-height: 380px; }
+        }
+
+        /* ── Party detail modal ── */
+        .party-modal-overlay {
+            position: fixed; inset: 0; z-index: 200;
+            background: rgba(0,0,0,.62);
+            backdrop-filter: blur(8px);
+            display: flex; align-items: center; justify-content: center;
+            padding: 20px;
+            opacity: 0; pointer-events: none;
+            transition: opacity .3s;
+        }
+        .party-modal-overlay.open { opacity: 1; pointer-events: auto; }
+        .party-modal {
+            width: min(560px, 100%); max-height: 86vh; overflow-y: auto;
+            border-radius: 20px;
+            background: var(--surface);
+            border: 1px solid var(--line);
+            box-shadow: 0 30px 70px rgba(0,0,0,.35);
+            transform: translateY(24px) scale(.96);
+            transition: transform .35s cubic-bezier(.34,1.56,.64,1);
+            position: relative;
+        }
+        .party-modal-overlay.open .party-modal { transform: translateY(0) scale(1); }
+        body.dark .party-modal { background: #0a0a0a; border-color: rgba(255,255,255,.1); }
+        .party-modal-header {
+            position: relative; padding: 26px 24px 20px; text-align: center;
+            background: linear-gradient(135deg,
+                color-mix(in srgb, var(--party-color, #1a4d2e) 22%, var(--surface)),
+                var(--surface));
+            border-bottom: 1px solid var(--line);
+            border-radius: 20px 20px 0 0;
+            overflow: hidden;
+        }
+        body.dark .party-modal-header {
+            background: linear-gradient(135deg,
+                color-mix(in srgb, var(--party-color, #22c55e) 26%, #0a0a0a),
+                #050505);
+            border-bottom-color: rgba(255,255,255,.08);
+        }
+        .party-modal-header::before {
+            content: ''; position: absolute; inset: 0;
+            background: radial-gradient(circle at 50% 0%, color-mix(in srgb, var(--party-color, #1a4d2e) 30%, transparent), transparent 65%);
+            opacity: .5; pointer-events: none;
+        }
+        .party-modal-symbol { font-size: 2.6rem; line-height: 1; position: relative; }
+        .party-modal-code {
+            font: 800 1.5rem/1.1 "Poppins", sans-serif; color: var(--party-color, var(--primary));
+            margin: 6px 0 2px; position: relative;
+        }
+        .party-modal-fullname {
+            font: 400 .9rem/1.3 "Lora", Georgia, serif; color: var(--muted);
+            position: relative;
+        }
+        .party-modal-rank-badge {
+            display: inline-block; margin-top: 10px; position: relative;
+            font: 700 .72rem/1 "Poppins", sans-serif;
+            padding: 5px 14px; border-radius: 999px;
+            background: color-mix(in srgb, var(--party-color, #1a4d2e) 16%, transparent);
+            color: var(--party-color, var(--primary));
+            border: 1px solid color-mix(in srgb, var(--party-color, #1a4d2e) 35%, transparent);
+        }
+        .party-modal-stats {
+            display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;
+            padding: 18px 20px 14px;
+        }
+        .party-modal-stat {
+            text-align: center; padding: 12px 6px; border-radius: 12px;
+            background: var(--surface-2); border: 1px solid var(--line);
+        }
+        body.dark .party-modal-stat { background: #111; border-color: rgba(255,255,255,.07); }
+        .party-modal-stat .stat-val {
+            font: 800 1.25rem/1 "Poppins", sans-serif; color: var(--party-color, var(--primary));
+        }
+        .party-modal-stat .stat-label {
+            font: 600 .62rem/1 "Poppins", sans-serif; color: var(--muted);
+            margin-top: 5px; text-transform: uppercase; letter-spacing: .5px;
+        }
+        .party-modal-powerbar-wrap { padding: 0 20px 16px; }
+        .party-modal-powerbar-label {
+            display: flex; justify-content: space-between; align-items: baseline;
+            font: 600 .72rem/1 "Poppins", sans-serif; color: var(--muted); margin-bottom: 6px;
+        }
+        .party-modal-powerbar {
+            position: relative; height: 14px; border-radius: 999px; overflow: hidden;
+            background: var(--surface-2); border: 1px solid var(--line);
+        }
+        body.dark .party-modal-powerbar { background: #111; border-color: rgba(255,255,255,.08); }
+        .party-modal-powerbar .powerbar-fill {
+            position: absolute; left: 0; top: 0; bottom: 0; width: 0%;
+            background: linear-gradient(90deg, #22c55e 0%, #16a34a 60%, #15803d 100%);
+            border-radius: 999px;
+            transition: width 1.2s cubic-bezier(.22,1,.36,1);
+            box-shadow: 0 0 12px rgba(34,197,94,.5);
+        }
+        .party-modal-powerbar .powerbar-fill::after {
+            content: ''; position: absolute; inset: 0;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,.4), transparent);
+            animation: partyPowerShine 2s linear infinite;
+        }
+        @keyframes partyPowerShine { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
+        .party-modal-section-title {
+            font: 700 .78rem/1 "Poppins", sans-serif; color: var(--primary);
+            text-transform: uppercase; letter-spacing: .6px;
+            padding: 4px 20px 10px; margin: 0;
+        }
+        .party-modal-members { list-style: none; margin: 0; padding: 0 16px 22px; }
+        .party-modal-member {
+            display: flex; align-items: center; gap: 12px;
+            padding: 10px 12px; margin-bottom: 8px; border-radius: 12px;
+            background: var(--surface-2); border: 1px solid var(--line);
+            animation: partyMemberIn .4s ease backwards;
+        }
+        body.dark .party-modal-member { background: #0d0d0d; border-color: rgba(255,255,255,.07); }
+        .party-modal-member .m-avatar {
+            flex: 0 0 38px; width: 38px; height: 38px; border-radius: 50%;
+            display: grid; place-items: center;
+            font: 800 .85rem/1 "Poppins", sans-serif; color: #fff;
+            background: var(--party-color, var(--primary));
+            box-shadow: 0 0 12px color-mix(in srgb, var(--party-color, #1a4d2e) 45%, transparent);
+        }
+        .party-modal-member .m-info { flex: 1 1 auto; min-width: 0; }
+        .party-modal-member .m-name {
+            font: 700 .9rem/1.2 "Poppins", sans-serif; color: var(--text);
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .party-modal-member .m-sub {
+            font: 400 .72rem/1.2 "Lora", Georgia, serif; color: var(--muted); margin-top: 2px;
+        }
+        .party-modal-member .m-role {
+            flex: 0 0 auto; font: 700 .62rem/1 "Poppins", sans-serif;
+            padding: 4px 9px; border-radius: 999px; text-transform: uppercase; letter-spacing: .4px;
+            background: color-mix(in srgb, var(--party-color, #1a4d2e) 14%, transparent);
+            color: var(--party-color, var(--primary));
+            border: 1px solid color-mix(in srgb, var(--party-color, #1a4d2e) 28%, transparent);
+        }
+        .party-modal-member .m-score {
+            flex: 0 0 auto; text-align: right;
+        }
+        .party-modal-member .m-score .m-score-val {
+            font: 800 1rem/1 "Poppins", sans-serif; color: var(--party-color, var(--primary));
+        }
+        .party-modal-member .m-score .m-vp {
+            font: 600 .62rem/1 "Poppins", sans-serif; color: var(--muted); margin-top: 2px;
+        }
+        @keyframes partyMemberIn { from { opacity: 0; transform: translateX(-14px); } to { opacity: 1; transform: translateX(0); } }
+        .party-modal-close {
+            position: absolute; top: 14px; right: 14px; z-index: 4;
+            width: 34px; height: 34px; border-radius: 50%;
+            display: grid; place-items: center; cursor: pointer;
+            background: rgba(0,0,0,.35); color: #fff; border: none;
+            font-size: 1.1rem; line-height: 1;
+            transition: background .2s, transform .2s;
+        }
+        .party-modal-close:hover { background: rgba(0,0,0,.6); transform: rotate(90deg); }
+        .party-modal-empty { text-align: center; color: var(--muted); padding: 50px 20px; font-size: .9rem; }
+        @media (max-width: 480px) {
+            .party-modal-stats { grid-template-columns: repeat(2, 1fr); }
+            .party-modal-member .m-role { display: none; }
+        }
     </style>
 </head>
 <body>
@@ -773,6 +1076,7 @@
             <button id="tabHome" class="tab-btn active" type="button">Home</button>
             <button id="tabScoreboard" class="tab-btn" type="button">Scoreboard</button>
             <button id="tabRanking" class="tab-btn" type="button">Ranking</button>
+            <button id="tabParties" class="tab-btn" type="button">Parties</button>
             <button id="tabInfo" class="tab-btn" type="button">Information</button>
         </nav>
     </header>
@@ -930,6 +1234,35 @@
             </div>
         </section>
 
+        <section id="partiesPanel" class="panel panel-shell">
+            <div class="login-gate" id="partiesGate">
+                <div class="login-gate-icon">🫧</div>
+                <h2>Party Standings</h2>
+                <p>The live party standings and combined vote-power showcase is available to logged-in users.</p>
+                <p style="font-size:0.85rem;color:var(--muted);margin-bottom:18px;">Log in to view floating party bubbles with real-time vote-power charging.</p>
+                <button type="button" class="cta-button" id="partiesLoginLink">🔐 Login to View Parties</button>
+            </div>
+            <div id="partiesContent" hidden>
+                <div class="auth-bar">
+                    <span id="partiesAuthUser"></span>
+                    <span class="auth-spacer"></span>
+                    <button type="button" class="logout-btn" data-logout>Logout</button>
+                </div>
+                <div class="public-parties-wrap">
+                    <div class="public-parties-controls">
+                        <label for="partiesMonthSelect">Month</label>
+                        <select id="partiesMonthSelect"></select>
+                        <span class="public-parties-meta" id="partiesMeta"></span>
+                    </div>
+                    <div class="public-parties-legend">
+                        <span class="legend-swatch"></span>
+                        <span>Green fill = combined vote power as % of the strongest party this month. Click a bubble for full details.</span>
+                    </div>
+                    <div id="partiesBubbleField" class="parties-bubble-field"></div>
+                </div>
+            </div>
+        </section>
+
         <section id="infoPanel" class="panel panel-shell">
             <div class="login-gate" id="infoGate">
                 <div class="login-gate-icon">🔒</div>
@@ -974,6 +1307,14 @@
         </div>
     </div>
 
+    <!-- ── PARTY DETAIL MODAL ── -->
+    <div class="party-modal-overlay" id="partyModal" aria-hidden="true" role="dialog" aria-modal="true">
+        <div class="party-modal" id="partyModalCard">
+            <button type="button" class="party-modal-close" id="partyModalClose" aria-label="Close">✕</button>
+            <div id="partyModalBody"></div>
+        </div>
+    </div>
+
     <script>
         // ════════════════════════════════════════════════════════════
         // CLIENT-SIDE LOGIN GATE (soft gate — see README.md)
@@ -988,10 +1329,12 @@
         const tabHome = document.getElementById('tabHome');
         const tabScoreboard = document.getElementById('tabScoreboard');
         const tabRanking = document.getElementById('tabRanking');
+        const tabParties = document.getElementById('tabParties');
         const tabInfo = document.getElementById('tabInfo');
         const homePanel = document.getElementById('homePanel');
         const scoreboardPanel = document.getElementById('scoreboardPanel');
         const rankingPanel = document.getElementById('rankingPanel');
+        const partiesPanel = document.getElementById('partiesPanel');
         const infoPanel = document.getElementById('infoPanel');
 
         const loginModal = document.getElementById('loginModal');
@@ -1123,20 +1466,25 @@
             const sbContent = document.getElementById('scoreboardContent');
             const rankingGate = document.getElementById('rankingGate');
             const rankingContent = document.getElementById('rankingContent');
+            const partiesGate = document.getElementById('partiesGate');
+            const partiesContent = document.getElementById('partiesContent');
             const infoGate = document.getElementById('infoGate');
             const infoContent = document.getElementById('infoContent');
             sbGate.hidden = loggedIn;
             sbContent.hidden = !loggedIn;
             rankingGate.hidden = loggedIn;
             rankingContent.hidden = !loggedIn;
+            partiesGate.hidden = loggedIn;
+            partiesContent.hidden = !loggedIn;
             infoGate.hidden = loggedIn;
             infoContent.hidden = !loggedIn;
 
             if (loggedIn) {
                 document.getElementById('scoreboardAuthUser').textContent = 'Signed in: ' + auth.roll;
                 document.getElementById('rankingAuthUser').textContent = 'Signed in: ' + auth.roll;
+                document.getElementById('partiesAuthUser').textContent = 'Signed in: ' + auth.roll;
                 document.getElementById('infoAuthUser').textContent = 'Signed in: ' + auth.roll;
-                if (scoresData) { renderScoreboard(scoresData); renderRanking(scoresData); renderInfo(scoresData); }
+                if (scoresData) { renderScoreboard(scoresData); renderRanking(scoresData); renderParties(scoresData); renderInfo(scoresData); }
             }
         }
 
@@ -1411,19 +1759,178 @@
             }).join('');
         }
 
+        // ════════════════════════════════════════════════════════════
+        // PARTY STANDINGS — floating bubbles + green water-fill
+        // ════════════════════════════════════════════════════════════
+        let partiesMonthSelect = null;
+        let partiesCurrentMonth = '';
+
+        function renderParties(data) {
+            scoresData = data;
+            const months = (data && data.months) || [];
+            partiesMonthSelect = document.getElementById('partiesMonthSelect');
+            partiesMonthSelect.innerHTML = months.map(m => '<option value="' + escapeHtml(m) + '">' + escapeHtml(formatPartyMonthLabel(m)) + '</option>').join('');
+            const meta = document.getElementById('partiesMeta');
+            if (data && data.updated_at) {
+                const d = new Date(data.updated_at);
+                meta.textContent = 'Updated ' + (isNaN(d) ? data.updated_at : d.toLocaleString());
+            } else {
+                meta.textContent = '';
+            }
+            if (months.length) {
+                partiesCurrentMonth = months[0];
+                partiesMonthSelect.value = months[0];
+                partiesMonthSelect.onchange = () => { partiesCurrentMonth = partiesMonthSelect.value; renderPartyBubbles(); };
+                renderPartyBubbles();
+            } else {
+                document.getElementById('partiesBubbleField').innerHTML = '<div class="party-modal-empty">No party standings data available.</div>';
+            }
+        }
+
+        function formatPartyMonthLabel(m) {
+            const d = new Date(String(m) + '-01');
+            return isNaN(d) ? m : d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+        }
+
+        function renderPartyBubbles() {
+            const field = document.getElementById('partiesBubbleField');
+            if (!field || !scoresData) return;
+            const allParties = (scoresData.parties && scoresData.parties[partiesCurrentMonth]) || [];
+            if (!allParties.length) {
+                field.innerHTML = '<div class="party-modal-empty">No party data for this month.</div>';
+                return;
+            }
+            const maxVp = Math.max(1, ...allParties.map(p => p.votePower || 0));
+            // Sort by vote power desc so the strongest bubble appears first (left).
+            const sorted = allParties.slice().sort((a, b) => (b.votePower || 0) - (a.votePower || 0));
+            field.innerHTML = sorted.map((p, i) => {
+                const fillPct = Math.max(8, Math.round(((p.votePower || 0) / maxVp) * 100));
+                const empty = !(p.memberCount > 0);
+                const delay = (i * 0.18).toFixed(2) + 's';
+                const floatDelay = (i * 0.9).toFixed(2) + 's';
+                return '<button type="button" class="party-bubble' + (empty ? ' bubble-empty' : '') + '" '
+                    + 'style="--party-color:' + escapeHtml(p.color || '#64748b') + ';--float-delay:' + floatDelay + ';animation-delay:' + delay + ';" '
+                    + 'data-party-code="' + escapeHtml(p.code) + '" '
+                    + 'aria-label="' + escapeHtml(p.fullName || p.code) + ' — vote power ' + (p.votePower || 0) + '" '
+                    + 'data-fill="' + fillPct + '">'
+                    + '<span class="bubble-rank">#' + (p.rank || (i + 1)) + '</span>'
+                    + '<span class="water"></span>'
+                    + '<span class="bubble-content">'
+                    + '<span class="bubble-symbol">' + escapeHtml(p.symbol || '🫧') + '</span>'
+                    + '<span class="bubble-code">' + escapeHtml(p.code) + '</span>'
+                    + '<span class="bubble-vp">VP ' + (p.votePower || 0) + '</span>'
+                    + '</span></button>';
+            }).join('');
+            // Bind click → open detail modal
+            field.querySelectorAll('.party-bubble').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const code = btn.getAttribute('data-party-code');
+                    const party = allParties.find(p => p.code === code);
+                    if (party) openPartyModal(party, maxVp);
+                });
+            });
+            animatePartyBubbles();
+        }
+
+        // Trigger the water-fill rise after the bubbles are in the DOM.
+        function animatePartyBubbles() {
+            if (activeTab !== 'parties') return;
+            const field = document.getElementById('partiesBubbleField');
+            if (!field) return;
+            const bubbles = field.querySelectorAll('.party-bubble');
+            bubbles.forEach((b, i) => {
+                const water = b.querySelector('.water');
+                if (!water) return;
+                water.style.height = '0%';
+                setTimeout(() => {
+                    const fill = parseInt(b.getAttribute('data-fill'), 10) || 0;
+                    water.style.height = fill + '%';
+                }, 120 + i * 90);
+            });
+        }
+
+        // ── Party detail modal ──
+        const partyModal = document.getElementById('partyModal');
+        const partyModalBody = document.getElementById('partyModalBody');
+        const partyModalCard = document.getElementById('partyModalCard');
+
+        function openPartyModal(party, maxVp) {
+            const fillPct = Math.max(0, Math.round(((party.votePower || 0) / Math.max(1, maxVp)) * 100));
+            const members = party.members || [];
+            const rankLabel = party.rank === 1 ? 'Leading' : ('Rank #' + (party.rank || '-'));
+            const stats = [
+                { val: (party.votePower || 0), label: 'Vote Power' },
+                { val: (party.totalScore || 0), label: 'Total Score' },
+                { val: (party.avgScore || 0), label: 'Avg Score' },
+                { val: (party.memberCount || 0), label: 'Members' },
+            ];
+            const membersHtml = members.length
+                ? members.map((m, i) => {
+                    const initials = (m.name || '?').trim().split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase() || '?';
+                    return '<li class="party-modal-member" style="animation-delay:' + (i * 0.06) + 's;">'
+                        + '<span class="m-avatar">' + escapeHtml(initials) + '</span>'
+                        + '<span class="m-info">'
+                        + '<span class="m-name">' + escapeHtml(m.name || '-') + '</span>'
+                        + '<span class="m-sub">' + escapeHtml(m.roll || '-') + (m.class ? ' · ' + escapeHtml(m.class) : '') + '</span>'
+                        + '</span>'
+                        + (m.role && m.role !== 'Member' ? '<span class="m-role">' + escapeHtml(m.role) + '</span>' : '')
+                        + '<span class="m-score"><span class="m-score-val">' + (m.score || 0) + '</span><span class="m-vp">VP ' + (m.votePower || 1) + '</span></span>'
+                        + '</li>';
+                }).join('')
+                : '<li class="party-modal-empty">No active members for this month.</li>';
+
+            partyModalCard.style.setProperty('--party-color', party.color || '#64748b');
+            partyModalBody.innerHTML =
+                '<div class="party-modal-header">'
+                + '<div class="party-modal-symbol">' + escapeHtml(party.symbol || '🫧') + '</div>'
+                + '<div class="party-modal-code">' + escapeHtml(party.code) + '</div>'
+                + '<div class="party-modal-fullname">' + escapeHtml(party.fullName || party.code) + '</div>'
+                + '<span class="party-modal-rank-badge">' + escapeHtml(rankLabel) + '</span>'
+                + '</div>'
+                + '<div class="party-modal-stats">'
+                + stats.map(s => '<div class="party-modal-stat"><div class="stat-val">' + s.val + '</div><div class="stat-label">' + s.label + '</div></div>').join('')
+                + '</div>'
+                + '<div class="party-modal-powerbar-wrap">'
+                + '<div class="party-modal-powerbar-label"><span>Power Charge</span><span>' + fillPct + '%</span></div>'
+                + '<div class="party-modal-powerbar"><span class="powerbar-fill" data-fill="' + fillPct + '"></span></div>'
+                + '</div>'
+                + '<h4 class="party-modal-section-title">Active Members</h4>'
+                + '<ul class="party-modal-members">' + membersHtml + '</ul>';
+
+            partyModal.classList.add('open');
+            partyModal.setAttribute('aria-hidden', 'false');
+            // Animate the power bar fill after the modal transition starts.
+            requestAnimationFrame(() => {
+                const fillEl = partyModalBody.querySelector('.powerbar-fill');
+                if (fillEl) setTimeout(() => { fillEl.style.width = (parseInt(fillEl.getAttribute('data-fill'), 10) || 0) + '%'; }, 80);
+            });
+            partyModalCard.focus();
+        }
+
+        function closePartyModal() {
+            partyModal.classList.remove('open');
+            partyModal.setAttribute('aria-hidden', 'true');
+        }
+        document.getElementById('partyModalClose').addEventListener('click', closePartyModal);
+        partyModal.addEventListener('click', (e) => { if (e.target === partyModal) closePartyModal(); });
+        document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && partyModal.classList.contains('open')) closePartyModal(); });
+
         // ── Tabs ──
         function setActiveTab(tabKey) {
             activeTab = tabKey;
             const isHome = tabKey === 'home';
             const isScoreboard = tabKey === 'scoreboard';
             const isRanking = tabKey === 'ranking';
+            const isParties = tabKey === 'parties';
             tabHome.classList.toggle('active', isHome);
             tabScoreboard.classList.toggle('active', isScoreboard);
             tabRanking.classList.toggle('active', isRanking);
+            tabParties.classList.toggle('active', isParties);
             tabInfo.classList.toggle('active', tabKey === 'info');
             homePanel.classList.toggle('active', isHome);
             scoreboardPanel.classList.toggle('active', isScoreboard);
             rankingPanel.classList.toggle('active', isRanking);
+            partiesPanel.classList.toggle('active', isParties);
             infoPanel.classList.toggle('active', tabKey === 'info');
             if (isHome) {
                 document.querySelectorAll('.appear').forEach((el, idx) => {
@@ -1432,15 +1939,17 @@
                 });
             }
             // Preload data when an authenticated user opens a locked tab
-            if (isLoggedIn() && (isScoreboard || isRanking || tabKey === 'info')) {
-                loadScores().then(d => { renderScoreboard(d); renderRanking(d); renderInfo(d); }).catch(() => {});
+            if (isLoggedIn() && (isScoreboard || isRanking || isParties || tabKey === 'info')) {
+                loadScores().then(d => { renderScoreboard(d); renderRanking(d); renderParties(d); renderInfo(d); }).catch(() => {});
             }
             if (isRanking) startPublicRankingAnimationLoop();
             else stopPublicRankingAnimationLoop();
+            if (isParties) animatePartyBubbles();
         }
         document.addEventListener('visibilitychange', () => {
             if (document.hidden) stopPublicRankingAnimationLoop();
             else if (activeTab === 'ranking') startPublicRankingAnimationLoop();
+            else if (activeTab === 'parties') animatePartyBubbles();
         });
         tabHome.addEventListener('click', () => setActiveTab('home'));
         tabScoreboard.addEventListener('click', () => {
@@ -1450,6 +1959,10 @@
         tabRanking.addEventListener('click', () => {
             if (!isLoggedIn()) { activeTab = 'ranking'; openLoginModal(); return; }
             setActiveTab('ranking');
+        });
+        tabParties.addEventListener('click', () => {
+            if (!isLoggedIn()) { activeTab = 'parties'; openLoginModal(); return; }
+            setActiveTab('parties');
         });
         tabInfo.addEventListener('click', () => {
             if (!isLoggedIn()) { openLoginModal(); return; }
@@ -1463,6 +1976,7 @@
         });
         document.getElementById('scoreboardLoginLink').addEventListener('click', openLoginModal);
         document.getElementById('rankingLoginLink').addEventListener('click', openLoginModal);
+        document.getElementById('partiesLoginLink').addEventListener('click', openLoginModal);
         document.getElementById('publicRankingReplay').addEventListener('click', replayPublicRanking);
         document.getElementById('infoLoginLink').addEventListener('click', openLoginModal);
 
@@ -1476,7 +1990,7 @@
         });
         // If already authenticated from a previous session, preload the data
         if (isLoggedIn()) {
-            loadScores().then(d => { renderScoreboard(d); renderRanking(d); renderInfo(d); }).catch(() => {});
+            loadScores().then(d => { renderScoreboard(d); renderRanking(d); renderParties(d); renderInfo(d); }).catch(() => {});
         }
 
         // ── ZOOM ──

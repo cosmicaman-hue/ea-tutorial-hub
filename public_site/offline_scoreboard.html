@@ -9941,15 +9941,22 @@ body.header-offscreen .header-kicker::after {
             });
         }
 
-        function getStudentVotePower(student) {
+        function getStudentVotePower(student, monthKey) {
             if (!student) return 0;
-            // computed_total_score may be null / non-numeric / stale — only trust a real
-            // finite number, otherwise fall back to the live month total so the displayed
-            // vote power is accurate instead of silently clamping to the 1-point floor.
+            // computed_total_score is a side-effect of rendering a month's scoreboard and
+            // is only valid for the month it was computed for (tracked via
+            // computed_total_score_month). Only trust the cache when it is a real finite
+            // number AND matches the target month; otherwise fall back to the live month
+            // total so the displayed vote power is accurate instead of silently showing a
+            // stale previous-month value or clamping to the 1-point floor.
+            const targetMonth = String(monthKey || getCurrentMonthKey()).trim();
             const cached = student.computed_total_score;
-            const total = (cached !== undefined && cached !== null && Number.isFinite(Number(cached)))
+            const cachedMonth = String(student.computed_total_score_month || '').trim();
+            const cacheValid = (cached !== undefined && cached !== null
+                && Number.isFinite(Number(cached)) && cachedMonth === targetMonth);
+            const total = cacheValid
                 ? Number(cached)
-                : getStudentMonthTotal(student.id, getCurrentMonthKey());
+                : getStudentMonthTotal(student.id, targetMonth);
             return computeVotePower(total);
         }
 
@@ -15211,6 +15218,9 @@ body.header-offscreen .header-kicker::after {
                         total = parseFloat(row.monthlyImportedTotal) || 0;
                     }
                     row.rawStudent.computed_total_score = total;
+                    // Track which month this cached total corresponds to so vote-power
+                    // lookups for a different month don't reuse a stale value.
+                    row.rawStudent.computed_total_score_month = String(month || '').trim();
                     return {
                         student: row.student,
                         dailyScores,
@@ -20213,6 +20223,75 @@ body.header-offscreen .header-kicker::after {
             }).filter(Boolean);
         }
 
+        // Build a serializable party-standings snapshot for a single month, mirroring
+        // the logic in renderPartyStandings but returning plain data (no DOM). Used by
+        // buildPublicSnapshotFromLAN so the Cloudflare public site can render the
+        // floating-bubble party visualization without access to the live db.
+        function _buildPublicPartyStandingsForMonth(month) {
+            const targetMonth = String(month || '').trim();
+            if (!targetMonth) return [];
+            const data = db.getData();
+            const parties = Array.isArray(data.parties) ? data.parties : [];
+            const students = db.getStudents ? (db.getStudents() || []) : (data.students || []);
+            const studentMap = new Map(students.map(s => [parseInt(s.id, 10), s]));
+            const sb = db.getMonthlyScoreboard(targetMonth);
+            const scoreboardMap = new Map();
+            (sb || []).forEach(r => {
+                const sid = r && r.student ? parseInt(r.student.id, 10) : 0;
+                if (sid) scoreboardMap.set(sid, r);
+            });
+            const rows = [];
+            parties.forEach(party => {
+                const code = normalizePartyCode(party.code) || String(party.code || '').trim().toUpperCase();
+                if (!code) return;
+                const activeMembers = (party.members || []).filter(m => {
+                    if (normalizePostHolderStatus(m.status || 'active') !== 'active') return false;
+                    const sid = parseInt(m.studentId, 10);
+                    const student = studentMap.get(sid);
+                    return !!(student && !isStudentExplicitlyDeactivated(student, targetMonth));
+                });
+                let totalScore = 0;
+                let votePower = 0;
+                const memberRows = [];
+                activeMembers.forEach(m => {
+                    const sid = parseInt(m.studentId, 10);
+                    const student = studentMap.get(sid);
+                    if (!student) return;
+                    const sbRow = scoreboardMap.get(sid);
+                    const memberScore = sbRow ? (Number(sbRow.total) || 0) : getStudentMonthTotal(sid, targetMonth);
+                    totalScore += memberScore;
+                    const memberVp = getStudentVotePower(student, targetMonth);
+                    votePower += memberVp;
+                    const designation = String(m.designation || '').trim().toLowerCase();
+                    const role = designation === 'president' ? 'President'
+                        : designation === 'deputy_president' ? 'Deputy President' : 'Member';
+                    memberRows.push({
+                        roll: String(student.roll || '').trim().toUpperCase() || '-',
+                        name: _cleanPublicName(student.base_name || student.name || ''),
+                        class: String(student.class || '').trim(),
+                        role: role,
+                        score: Math.round(memberScore) || 0,
+                        votePower: memberVp
+                    });
+                });
+                memberRows.sort((a, b) => b.score - a.score);
+                rows.push({
+                    code: code,
+                    fullName: String(party.fullName || party.full_name || '').trim() || code,
+                    symbol: (party.symbol !== undefined && party.symbol !== null) ? String(party.symbol) : '',
+                    color: String(party.color || PARTY_COLORS[code] || '#64748b').trim(),
+                    memberCount: memberRows.length,
+                    totalScore: Math.round(totalScore) || 0,
+                    avgScore: memberRows.length ? Math.round(totalScore / memberRows.length) : 0,
+                    votePower: votePower,
+                    members: memberRows
+                });
+            });
+            rows.sort((a, b) => b.totalScore - a.totalScore);
+            rows.forEach((r, i) => { r.rank = i + 1; });
+            return rows;
+        }
+
         function buildPublicSnapshotFromLAN() {
             const months = _publicRecentMonths();
             const scoreboard = {};
@@ -20238,11 +20317,16 @@ body.header-offscreen .header-kicker::after {
                 });
             });
             const data = db.getData();
+            const parties = {};
+            months.forEach(month => {
+                parties[month] = _buildPublicPartyStandingsForMonth(month);
+            });
             return {
                 updated_at: new Date().toISOString(),
                 top_full_count: 15,
                 months,
                 scoreboard,
+                parties,
                 public_information: _sanitizePublicInformationForExport(data.public_information || [])
             };
         }
@@ -30708,7 +30792,9 @@ body.header-offscreen .header-kicker::after {
                     // Vote power is per-student and has a base floor of 1 — do NOT gate on
                     // sbRow, otherwise a party whose active members have no scores this
                     // month shows 0 vote power even though every member is worth >= 1.
-                    votePower += getStudentVotePower(student);
+                    // Pass the selected standings month so vote power reflects that month
+                    // instead of a stale cached total from a different month's render.
+                    votePower += getStudentVotePower(student, month);
                 });
                 rows.push({
                     party: party,
