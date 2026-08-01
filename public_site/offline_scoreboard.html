@@ -184,7 +184,7 @@
         <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
         <link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@900&display=swap" rel="stylesheet">
     </noscript>
-    <link rel="stylesheet" href="/static/css/offline-scoreboard.css?v=7">
+    <link rel="stylesheet" href="/static/css/offline-scoreboard.css?v=8">
 
 <script>
     // System Performance Overhaul: Async localstorage debouncer (Per-Key Isolated)
@@ -1928,8 +1928,8 @@ body.header-offscreen .header-kicker::after {
                                 <th class="sticky-left sticky-left-2" style="width: var(--sb-name-w);">Student Name</th>
                                 <th class="sticky-left sticky-left-3" style="width: var(--sb-class-w);">Class</th>
                                 <th class="sticky-left sticky-left-4" style="width: var(--sb-fees-w);" data-col="fees">Fees</th>
-                                <th class="sticky-right sticky-right-1 total-cell" style="width: 112px; background: #fbbf24 !important;">Total<br>Score</th>
-                                <th class="sticky-right vote-cell" style="width: 72px;">Vote<br>Power</th>
+                                <th class="sticky-right sticky-right-1 total-cell" style="width: 150px; background: #fbbf24 !important;">Total<br>Score</th>
+                                <th class="sticky-right vote-cell" style="width: 96px;">Vote<br>Power</th>
                             </tr>
                         </thead>
                         <tbody id="scoreboardBody">
@@ -22057,14 +22057,16 @@ body.header-offscreen .header-kicker::after {
             const tbody = document.getElementById('scoreboardBody');
 
             // Update header with dates
-            const dateHeaders = dates.map(date => {
+            const dateHeaders = dates.map((date, dateIndex) => {
                 const parsedDate = parseDateKeyToLocalDate(date);
                 const dayLabel = parsedDate && !Number.isNaN(parsedDate.getTime())
                     ? String(parsedDate.getDate()).padStart(2, '0')
                     : date.slice(-2);
-                return `<th style="padding-left: 3px; padding-right: 3px;" data-score-date="${date}" title="${escapeHtml(formatDateMonthDayLabel(date))}">${dayLabel}</th>`;
+                const lastClass = dateIndex === dates.length - 1 ? ' class="score-date-last"' : '';
+                return `<th${lastClass} data-score-date="${date}" title="${escapeHtml(formatDateMonthDayLabel(date))}">${dayLabel}</th>`;
             }).join('');
-            const rightPinnedBase = 72 + 112;
+            // Keep the pinned-column geometry aligned with the rendered 150px/96px columns.
+            const rightPinnedBase = 96 + 150;
             const extraPinnedMeta = monthExtraCols.map((col, idx) => {
                 const right = rightPinnedBase + ((monthExtraCols.length - 1 - idx) * 95);
                 return { ...col, right };
@@ -22281,10 +22283,11 @@ body.header-offscreen .header-kicker::after {
                         ? String(coalesce(displayValue, ''))
                         : escapeHtml(displayValue);
                     const _cellDate = allDates[dateIndex] || '';
+                    const _dayCellClass = _cellDate === dates[dates.length - 1] ? 'score-day-last' : '';
                     const _cellInteract = (Number.isFinite(_cellSid) && _cellDate)
                         ? ` data-sid="${_cellSid}" data-date="${_cellDate}" onclick="openCellMenu(event,this)"`
                         : '';
-                    return `<td class="${cellClass}"${titleAttr}${reasonAttr}${_cellInteract}>${cellInner}</td>`;
+                    return `<td class="${_dayCellClass} ${cellClass}"${titleAttr}${reasonAttr}${_cellInteract}>${cellInner}</td>`;
                 }).join('');
                 const extraValues = extraPinnedMeta.map((col, idx) => {
                     const item = safeProp(row.extraValues, idx) || {};
