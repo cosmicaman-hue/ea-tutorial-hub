@@ -6,6 +6,7 @@
     <title>Excel Academy</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Arvo:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
         :root {
             --bg: #faf8f3;
@@ -1075,6 +1076,76 @@
             .party-modal-stats { grid-template-columns: repeat(2, 1fr); }
             .party-modal-member .m-role { display: none; }
         }
+        #chessPanel .public-chess-shell { position: relative; overflow: hidden; padding: 18px; background: radial-gradient(circle at 10% 0%, rgba(245,158,11,.12), transparent 38%), linear-gradient(145deg, #07101c, #111a35 52%, #050812); color: #e2e8f0; }
+        #chessPanel .public-chess-hero { position: relative; overflow: hidden; padding: 44px 22px 34px; border: 1px solid rgba(250,204,21,.25); border-radius: 22px; text-align: center; background: radial-gradient(circle at 82% 15%, rgba(99,102,241,.24), transparent 40%), linear-gradient(145deg, rgba(15,23,42,.95), rgba(2,6,23,.95)); box-shadow: 0 18px 48px rgba(0,0,0,.25); }
+        #chessPanel .public-chess-hero::after { content: ''; position: absolute; inset: 0; pointer-events: none; background-image: linear-gradient(rgba(250,204,21,.04) 1px, transparent 1px), linear-gradient(90deg, rgba(250,204,21,.04) 1px, transparent 1px); background-size: 34px 34px; mask-image: linear-gradient(130deg, #000, transparent 80%); }
+        #chessPanel .public-chess-kicker { position: relative; z-index: 1; color: #facc15; font: 900 .66rem/1.2 "Poppins", sans-serif; letter-spacing: .18em; text-transform: uppercase; }
+        #chessPanel .public-chess-kicker i { margin-right: 6px; animation: publicChessFloat 3s ease-in-out infinite; }
+        #chessPanel .public-chess-hero h2 { position: relative; z-index: 1; margin: 12px 0 8px; color: #fff7d6; font: 900 clamp(2rem, 5vw, 4.3rem)/.98 "Poppins", sans-serif; letter-spacing: .02em; }
+        #chessPanel .public-chess-hero p { position: relative; z-index: 1; max-width: 650px; margin: 0 auto; color: #b8c5dc; font-size: .96rem; line-height: 1.6; }
+        #chessPanel .public-chess-stage { position: relative; z-index: 1; display: flex; justify-content: center; flex-wrap: wrap; gap: 7px; margin-top: 22px; }
+        #chessPanel .public-chess-stage span { padding: 7px 10px; border: 1px solid rgba(148,163,184,.21); border-radius: 999px; color: #72809a; background: rgba(15,23,42,.55); font: 800 .62rem/1 "Poppins", sans-serif; letter-spacing: .08em; text-transform: uppercase; }
+        #chessPanel .public-chess-stage span.is-active { border-color: rgba(250,204,21,.65); color: #fff7d6; background: rgba(161,98,7,.28); box-shadow: 0 0 18px rgba(250,204,21,.16); }
+        #chessPanel .public-chess-stage span.is-passed { border-color: rgba(74,222,128,.28); color: #86efac; }
+        #chessPanel .public-chess-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin: 14px 0; }
+        #chessPanel .public-chess-stat { min-height: 95px; padding: 13px; border: 1px solid rgba(148,163,184,.16); border-radius: 15px; background: rgba(15,23,42,.75); animation: publicChessCardIn .5s cubic-bezier(.16,1,.3,1) both; }
+        #chessPanel .public-chess-stat i { display: block; margin-bottom: 9px; color: #facc15; }
+        #chessPanel .public-chess-stat small { display: block; color: #8290aa; font: 700 .62rem/1.2 "Poppins", sans-serif; letter-spacing: .08em; text-transform: uppercase; }
+        #chessPanel .public-chess-stat strong { display: block; overflow: hidden; margin-top: 5px; color: #f8fafc; font: 900 1.1rem/1.15 "Poppins", sans-serif; text-overflow: ellipsis; white-space: nowrap; }
+        #chessPanel .public-chess-stat span { display: block; margin-top: 5px; color: #aebbd1; font-size: .69rem; }
+        #chessPanel .public-chess-grid { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(300px, .9fr); gap: 14px; }
+        #chessPanel .public-chess-card { overflow: hidden; border: 1px solid rgba(148,163,184,.16); border-radius: 18px; background: rgba(5,9,20,.72); box-shadow: 0 12px 32px rgba(0,0,0,.18); }
+        #chessPanel .public-chess-card-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; padding: 15px 16px 12px; border-bottom: 1px solid rgba(148,163,184,.11); }
+        #chessPanel .public-chess-card-heading small { display: block; color: #facc15; font: 900 .6rem/1.2 "Poppins", sans-serif; letter-spacing: .14em; text-transform: uppercase; }
+        #chessPanel .public-chess-card-heading strong { display: block; margin-top: 4px; color: #f8fafc; font: 900 1rem/1.2 "Poppins", sans-serif; }
+        #chessPanel .public-chess-card-heading > span:last-child,
+        #chessPanel .public-chess-card-heading > i { color: #7886a2; font-size: .68rem; }
+        #chessPanel .public-chess-card-heading > i { color: #facc15; font-size: 1rem; }
+        #chessPanel .public-chess-table-wrap { overflow-x: auto; }
+        #chessPanel .public-chess-table { width: 100%; min-width: 560px; border-collapse: collapse; font-family: "Poppins", "Segoe UI", sans-serif; }
+        #chessPanel .public-chess-table th { padding: 9px 10px; color: #7785a0; background: rgba(15,23,42,.75); font-size: .59rem; letter-spacing: .1em; text-align: left; text-transform: uppercase; }
+        #chessPanel .public-chess-table td { padding: 10px; border-top: 1px solid rgba(148,163,184,.08); color: #cbd5e1; font-size: .72rem; }
+        #chessPanel .public-chess-table tbody tr { animation: publicChessRowIn .45s cubic-bezier(.16,1,.3,1) both; }
+        #chessPanel .public-chess-table tbody tr:hover { background: rgba(250,204,21,.055); }
+        #chessPanel .public-chess-rank { display: grid; width: 25px; height: 25px; place-items: center; border: 1px solid rgba(148,163,184,.25); border-radius: 50%; color: #aebbd1; font-weight: 900; }
+        #chessPanel .public-chess-name { display: block; color: #f8fafc; font-weight: 800; }
+        #chessPanel .public-chess-sub { display: block; margin-top: 3px; color: #71819c; font-size: .6rem; }
+        #chessPanel .public-chess-points { color: #fde68a; font-size: .98rem; font-weight: 950; }
+        #chessPanel .public-chess-matches { padding: 12px; }
+        #chessPanel .public-chess-match { margin-bottom: 9px; padding: 11px; border: 1px solid rgba(129,140,248,.2); border-radius: 13px; background: rgba(15,23,42,.62); animation: publicChessMatchIn .48s cubic-bezier(.16,1,.3,1) both; }
+        #chessPanel .public-chess-match:last-child { margin-bottom: 0; }
+        #chessPanel .public-chess-match-top { display: flex; justify-content: space-between; color: #74829d; font: 800 .58rem/1.2 "Poppins", sans-serif; letter-spacing: .1em; text-transform: uppercase; }
+        #chessPanel .public-chess-match-top b { color: #86efac; }
+        #chessPanel .public-chess-versus { display: grid; grid-template-columns: minmax(0, 1fr) 25px minmax(0, 1fr); align-items: center; gap: 5px; margin-top: 10px; }
+        #chessPanel .public-chess-versus > span { color: #facc15; font-size: .58rem; font-weight: 900; text-align: center; }
+        #chessPanel .public-chess-versus > div:last-child { text-align: right; }
+        #chessPanel .public-chess-versus > div:last-child .public-chess-player { align-items: flex-end; }
+        #chessPanel .public-chess-player { display: inline-flex; align-items: flex-start; flex-direction: column; gap: 3px; color: #e2e8f0; font-size: .68rem; font-weight: 800; }
+        #chessPanel .public-chess-player.is-winner { color: #fde68a; }
+        #chessPanel .public-chess-player small { color: #71819c; font-size: .58rem; font-weight: 600; }
+        #chessPanel .public-chess-match-note { margin-top: 9px; color: #aebbd1; font-size: .62rem; }
+        #chessPanel .public-chess-bracket-card { margin-top: 14px; }
+        #chessPanel .public-chess-bracket { display: flex; gap: 11px; overflow-x: auto; padding: 14px; }
+        #chessPanel .public-chess-bracket-column { min-width: 205px; flex: 1 0 205px; }
+        #chessPanel .public-chess-bracket-column h4 { margin: 0 0 9px; color: #facc15; font: 900 .62rem/1.2 "Poppins", sans-serif; letter-spacing: .13em; text-transform: uppercase; }
+        #chessPanel .public-chess-bracket-match { margin-bottom: 9px; padding: 9px; border: 1px solid rgba(129,140,248,.2); border-radius: 12px; background: rgba(15,23,42,.62); animation: publicChessBracketIn .5s cubic-bezier(.16,1,.3,1) both; }
+        #chessPanel .public-chess-bracket-match > small { display: block; margin-bottom: 5px; color: #71819c; font-size: .56rem; }
+        #chessPanel .public-chess-bracket-player { display: flex; justify-content: space-between; gap: 6px; padding: 7px 5px; color: #cbd5e1; font: 700 .65rem/1.2 "Poppins", sans-serif; }
+        #chessPanel .public-chess-bracket-player + .public-chess-bracket-player { border-top: 1px solid rgba(148,163,184,.1); }
+        #chessPanel .public-chess-bracket-player.is-winner { color: #fde68a; }
+        #chessPanel .public-chess-bracket-player b { color: #86efac; }
+        #chessPanel .public-chess-bracket-status { margin-top: 6px; color: #71819c; font-size: .57rem; }
+        #chessPanel .public-chess-empty { padding: 42px 18px; color: #8494ae; font: 700 .76rem/1.5 "Poppins", sans-serif; text-align: center; }
+        #chessPanel .public-chess-empty i { display: block; margin-bottom: 10px; color: #facc15; font-size: 1.8rem; }
+        @keyframes publicChessFloat { 0%, 100% { transform: translateY(0) rotate(-5deg); } 50% { transform: translateY(-5px) rotate(5deg); } }
+        @keyframes publicChessCardIn { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes publicChessRowIn { from { opacity: 0; transform: translateX(-8px); } to { opacity: 1; transform: translateX(0); } }
+        @keyframes publicChessMatchIn { from { opacity: 0; transform: translateX(10px); } to { opacity: 1; transform: translateX(0); } }
+        @keyframes publicChessBracketIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        body.dark #chessPanel .public-chess-shell { background: radial-gradient(circle at 10% 0%, rgba(245,158,11,.12), transparent 38%), linear-gradient(145deg, #020604, #07140c 52%, #000); }
+        @media (max-width: 900px) { #chessPanel .public-chess-grid { grid-template-columns: 1fr; } }
+        @media (max-width: 680px) { #chessPanel .public-chess-shell { padding: 10px; } #chessPanel .public-chess-hero { padding: 34px 14px 26px; } #chessPanel .public-chess-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } #chessPanel .public-chess-card-heading { padding-left: 12px; padding-right: 12px; } }
+        @media (prefers-reduced-motion: reduce) { #chessPanel .public-chess-kicker i, #chessPanel .public-chess-stat, #chessPanel .public-chess-table tbody tr, #chessPanel .public-chess-match, #chessPanel .public-chess-bracket-match { animation: none !important; } }
     </style>
 </head>
 <body>
@@ -1099,6 +1170,7 @@
             <button id="tabScoreboard" class="tab-btn" type="button">Scoreboard</button>
             <button id="tabRanking" class="tab-btn" type="button">Ranking</button>
             <button id="tabParties" class="tab-btn" type="button">Parties</button>
+            <button id="tabChess" class="tab-btn" type="button">Chess Champion</button>
             <button id="tabInfo" class="tab-btn" type="button">Information</button>
         </nav>
     </header>
@@ -1285,6 +1357,46 @@
             </div>
         </section>
 
+        <section id="chessPanel" class="panel panel-shell">
+            <div class="login-gate" id="chessGate">
+                <div class="login-gate-icon"><i class="fas fa-chess-knight"></i></div>
+                <h2>Excel Chess Champion</h2>
+                <p>The tournament bracket and live standings are available to logged-in users.</p>
+                <p style="font-size:0.85rem;color:var(--muted);margin-bottom:18px;">Follow the league table, knockout rounds, semifinals, and finale from Cloudflare.</p>
+                <button type="button" class="cta-button" id="chessLoginLink">Login to View Championship</button>
+            </div>
+            <div id="chessContent" hidden>
+                <div class="auth-bar">
+                    <span id="chessAuthUser"></span>
+                    <span class="auth-spacer"></span>
+                    <button type="button" class="logout-btn" data-logout>Logout</button>
+                </div>
+                <div class="public-chess-shell">
+                    <div class="public-chess-hero">
+                        <div class="public-chess-kicker"><i class="fas fa-chess-knight"></i> Excel Academy tournament arena</div>
+                        <h2 id="publicChessTitle">Excel Chess Champion</h2>
+                        <p id="publicChessSubtitle">Waiting for the first board to be scheduled.</p>
+                        <div id="publicChessStage" class="public-chess-stage"></div>
+                    </div>
+                    <div id="publicChessStats" class="public-chess-stats"></div>
+                    <div class="public-chess-grid">
+                        <section class="public-chess-card">
+                            <div class="public-chess-card-heading"><span><small>Live table</small><strong>Standings</strong></span><span id="publicChessStandingsMeta"></span></div>
+                            <div id="publicChessStandings"></div>
+                        </section>
+                        <section class="public-chess-card">
+                            <div class="public-chess-card-heading"><span><small>Next boards</small><strong>Match room</strong></span><i class="fas fa-bolt"></i></div>
+                            <div id="publicChessMatches"></div>
+                        </section>
+                    </div>
+                    <section class="public-chess-card public-chess-bracket-card">
+                        <div class="public-chess-card-heading"><span><small>From league to legacy</small><strong>Knockout bracket</strong></span><span>Elimination · Semifinals · Finale</span></div>
+                        <div id="publicChessBracket"></div>
+                    </section>
+                </div>
+            </div>
+        </section>
+
         <section id="infoPanel" class="panel panel-shell">
             <div class="login-gate" id="infoGate">
                 <div class="login-gate-icon">🔒</div>
@@ -1352,11 +1464,13 @@
         const tabScoreboard = document.getElementById('tabScoreboard');
         const tabRanking = document.getElementById('tabRanking');
         const tabParties = document.getElementById('tabParties');
+        const tabChess = document.getElementById('tabChess');
         const tabInfo = document.getElementById('tabInfo');
         const homePanel = document.getElementById('homePanel');
         const scoreboardPanel = document.getElementById('scoreboardPanel');
         const rankingPanel = document.getElementById('rankingPanel');
         const partiesPanel = document.getElementById('partiesPanel');
+        const chessPanel = document.getElementById('chessPanel');
         const infoPanel = document.getElementById('infoPanel');
 
         const loginModal = document.getElementById('loginModal');
@@ -1490,6 +1604,8 @@
             const rankingContent = document.getElementById('rankingContent');
             const partiesGate = document.getElementById('partiesGate');
             const partiesContent = document.getElementById('partiesContent');
+            const chessGate = document.getElementById('chessGate');
+            const chessContent = document.getElementById('chessContent');
             const infoGate = document.getElementById('infoGate');
             const infoContent = document.getElementById('infoContent');
             sbGate.hidden = loggedIn;
@@ -1498,6 +1614,8 @@
             rankingContent.hidden = !loggedIn;
             partiesGate.hidden = loggedIn;
             partiesContent.hidden = !loggedIn;
+            chessGate.hidden = loggedIn;
+            chessContent.hidden = !loggedIn;
             infoGate.hidden = loggedIn;
             infoContent.hidden = !loggedIn;
 
@@ -1505,8 +1623,9 @@
                 document.getElementById('scoreboardAuthUser').textContent = 'Signed in: ' + auth.roll;
                 document.getElementById('rankingAuthUser').textContent = 'Signed in: ' + auth.roll;
                 document.getElementById('partiesAuthUser').textContent = 'Signed in: ' + auth.roll;
+                document.getElementById('chessAuthUser').textContent = 'Signed in: ' + auth.roll;
                 document.getElementById('infoAuthUser').textContent = 'Signed in: ' + auth.roll;
-                if (scoresData) { renderScoreboard(scoresData); renderRanking(scoresData); renderParties(scoresData); renderInfo(scoresData); }
+                if (scoresData) { renderScoreboard(scoresData); renderRanking(scoresData); renderParties(scoresData); renderChessChampion(scoresData); renderInfo(scoresData); }
             }
         }
 
@@ -1698,13 +1817,9 @@
             else document.getElementById('publicRankingBody').innerHTML = '<div class="empty" style="padding:40px;text-align:center;color:var(--muted);">No ranking months available.</div>';
         }
         function replayPublicRanking() {
-            const body = document.getElementById('publicRankingBody');
-            if (!body) return;
-            body.querySelectorAll('.public-podium-slot,.public-ranking-group,.public-ranking-card').forEach(el => {
-                el.style.animation = 'none';
-                void el.offsetWidth;
-                el.style.animation = '';
-            });
+            if (!isPublicRankingVisible()) return;
+            // The ranking content is rendered once and remains still. Replays only
+            // launch the fireworks layer, including the 5-second animation loop.
             triggerPublicRankingFireworks();
         }
         function triggerPublicRankingFireworks() {
@@ -1740,6 +1855,109 @@
                 else { ctx.clearRect(0, 0, canvas.width, canvas.height); publicRankingRaf = null; }
             }
             publicRankingRaf = requestAnimationFrame(frame);
+        }
+
+        function publicChessName(player) {
+            return escapeHtml((player && player.name) || 'TBD');
+        }
+        function publicChessClass(player) {
+            if (!player) return '';
+            return `Class ${escapeHtml(player.class || '—')}`;
+        }
+        function publicChessPoints(value) {
+            const number = Number(value || 0);
+            return Number.isInteger(number) ? String(number) : number.toFixed(1).replace(/\.0$/, '');
+        }
+        function publicChessStageRibbon(stage) {
+            const labels = { registration: 'Registration', basic: 'Basic rounds', elimination: 'Elimination', semifinal: 'Semifinals', finale: 'Finale', complete: 'Champion crowned' };
+            const order = Object.keys(labels);
+            const current = order.includes(stage) ? stage : 'registration';
+            return order.map(item => {
+                const index = order.indexOf(item);
+                const currentIndex = order.indexOf(current);
+                const classes = item === current ? 'is-active' : (index < currentIndex ? 'is-passed' : '');
+                return `<span class="${classes}">${index < currentIndex ? '✓ ' : ''}${labels[item]}</span>`;
+            }).join('');
+        }
+        function publicChessStageLabel(match) {
+            if (!match) return 'Tournament';
+            if (match.stage === 'basic') return `Basic round ${match.round || 1}`;
+            if (match.stage === 'elimination') return `Elimination ${match.round || 1}`;
+            if (match.stage === 'semifinal') return 'Semifinals';
+            if (match.stage === 'finale') return 'Finale';
+            return 'Tournament';
+        }
+        function publicChessPlayerMarkup(player, isWinner) {
+            if (!player) return '<span class="public-chess-player"><span>TBD</span></span>';
+            return `<span class="public-chess-player ${isWinner ? 'is-winner' : ''}"><span>${publicChessName(player)}</span><small>${escapeHtml(player.roll || '—')} · ${publicChessClass(player)}</small></span>`;
+        }
+        function renderPublicChessMatches(chess) {
+            const target = document.getElementById('publicChessMatches');
+            if (!target) return;
+            const matches = Array.isArray(chess && chess.matches) ? chess.matches : [];
+            const currentStage = chess && chess.stage;
+            const currentRound = Number(chess && chess.round) || 0;
+            let visible = matches.filter(match => match.stage === currentStage && (!currentRound || Number(match.round) === currentRound));
+            if (!visible.length) visible = matches.slice(-4).reverse();
+            if (!visible.length) {
+                target.innerHTML = '<div class="public-chess-empty"><i class="fas fa-chess-board"></i>No boards have been scheduled yet.</div>';
+                return;
+            }
+            target.innerHTML = `<div class="public-chess-matches">${visible.slice(0, 6).map((match, index) => {
+                const complete = match.status === 'completed' || ['white', 'black', 'draw', 'bye'].includes(match.result);
+                const resultLabel = match.result === 'draw' ? 'Draw' : (complete ? (match.result === 'bye' ? 'BYE' : 'Result recorded') : 'Scheduled');
+                const duration = Number(match.durationSeconds || 0) > 0 ? `${Math.round(Number(match.durationSeconds) / 60)} min` : '';
+                const kills = Number(match.killPoints || 0) > 0 ? `${publicChessPoints(match.killPoints)} kill pts` : '';
+                return `<article class="public-chess-match" style="animation-delay:${index * .06}s"><div class="public-chess-match-top"><span>${escapeHtml(publicChessStageLabel(match))} · Board ${escapeHtml(match.board || '')}</span><b>${resultLabel}</b></div><div class="public-chess-versus"><div>${publicChessPlayerMarkup(match.white, match.winnerSide === 'white')}</div><span>VS</span><div>${publicChessPlayerMarkup(match.black, match.winnerSide === 'black')}</div></div>${duration || kills ? `<div class="public-chess-match-note">${escapeHtml([duration, kills].filter(Boolean).join(' · '))}</div>` : ''}</article>`;
+            }).join('')}</div>`;
+        }
+        function renderPublicChessBracket(chess) {
+            const target = document.getElementById('publicChessBracket');
+            if (!target) return;
+            const matches = Array.isArray(chess && chess.matches) ? chess.matches.filter(match => ['elimination', 'semifinal', 'finale'].includes(match.stage)) : [];
+            if (!matches.length) {
+                target.innerHTML = '<div class="public-chess-empty"><i class="fas fa-diagram-project"></i>The bracket will appear when the league rounds qualify the finalists.</div>';
+                return;
+            }
+            const groups = [];
+            matches.forEach(match => {
+                const key = `${match.stage}-${match.round}`;
+                let group = groups.find(item => item.key === key);
+                if (!group) { group = { key, label: publicChessStageLabel(match), matches: [] }; groups.push(group); }
+                group.matches.push(match);
+            });
+            const order = { elimination: 0, semifinal: 1, finale: 2 };
+            groups.sort((a, b) => order[(a.matches[0] || {}).stage] - order[(b.matches[0] || {}).stage] || Number((a.matches[0] || {}).round) - Number((b.matches[0] || {}).round));
+            target.innerHTML = `<div class="public-chess-bracket">${groups.map((group, groupIndex) => `<div class="public-chess-bracket-column"><h4>${escapeHtml(group.label)}</h4>${group.matches.map((match, index) => `<article class="public-chess-bracket-match" style="animation-delay:${(groupIndex * .1 + index * .05).toFixed(2)}s"><small>Board ${escapeHtml(match.board || '')}</small><div class="public-chess-bracket-player ${match.winnerSide === 'white' ? 'is-winner' : ''}"><span>${publicChessName(match.white)}</span><b>${match.winnerSide === 'white' ? publicChessPoints(match.whitePoints) : '—'}</b></div><div class="public-chess-bracket-player ${match.winnerSide === 'black' ? 'is-winner' : ''}"><span>${publicChessName(match.black)}</span><b>${match.winnerSide === 'black' ? publicChessPoints(match.blackPoints) : '—'}</b></div><div class="public-chess-bracket-status">${escapeHtml(match.result ? (match.result === 'draw' ? 'Draw' : 'Result recorded') : 'Awaiting board')}</div></article>`).join('')}</div>`).join('<div style="display:grid;place-items:center;min-width:15px;color:rgba(250,204,21,.55);"><i class="fas fa-chevron-right"></i></div>')}</div>`;
+        }
+        function renderChessChampion(data) {
+            scoresData = data;
+            const chess = data && data.chess_champion ? data.chess_champion : { eventName: 'Excel Chess Champion', stage: 'registration', stageLabel: 'Registration', enrolledCount: 0, completedMatches: 0, qualificationCount: 8, basicRoundCount: 3, standings: [], matches: [] };
+            const title = document.getElementById('publicChessTitle');
+            const subtitle = document.getElementById('publicChessSubtitle');
+            const stage = document.getElementById('publicChessStage');
+            const stats = document.getElementById('publicChessStats');
+            const standingsTarget = document.getElementById('publicChessStandings');
+            const standingsMeta = document.getElementById('publicChessStandingsMeta');
+            if (title) title.textContent = chess.eventName || 'Excel Chess Champion';
+            if (subtitle) subtitle.textContent = chess.stageLabel ? `${chess.stageLabel} · Live from the Cloudflare snapshot.` : 'Waiting for the first board to be scheduled.';
+            if (stage) stage.innerHTML = publicChessStageRibbon(chess.stage);
+            if (stats) {
+                const leader = Array.isArray(chess.standings) && chess.standings[0];
+                stats.innerHTML = [
+                    { icon: 'fa-users', label: 'Registered players', value: chess.enrolledCount || 0, detail: 'Admin opt-in roster' },
+                    { icon: 'fa-ranking-star', label: 'Current leader', value: leader ? leader.name : '—', detail: leader ? `${publicChessPoints(leader.points)} pts · ${leader.wins || 0}W ${leader.draws || 0}D` : 'No results yet' },
+                    { icon: 'fa-chess-board', label: 'Matches played', value: chess.completedMatches || 0, detail: `${(chess.matches || []).length} boards in snapshot` },
+                    { icon: 'fa-layer-group', label: 'Qualification', value: chess.qualificationCount || 8, detail: `Top ${chess.qualificationCount || 8} · ${chess.basicRoundCount || 3} basic rounds` }
+                ].map(item => `<article class="public-chess-stat"><i class="fas ${item.icon}"></i><small>${escapeHtml(item.label)}</small><strong>${escapeHtml(String(item.value))}</strong><span>${escapeHtml(item.detail)}</span></article>`).join('');
+            }
+            const rows = Array.isArray(chess.standings) ? chess.standings : [];
+            if (standingsMeta) standingsMeta.textContent = `${rows.length} player${rows.length === 1 ? '' : 's'} · points descending`;
+            if (standingsTarget) {
+                standingsTarget.innerHTML = rows.length ? `<div class="public-chess-table-wrap"><table class="public-chess-table"><thead><tr><th>#</th><th>Player</th><th>Record</th><th>Points</th><th>Kill pts</th></tr></thead><tbody>${rows.map((row, index) => `<tr style="animation-delay:${index * .035}s"><td><span class="public-chess-rank">${escapeHtml(row.rank || index + 1)}</span></td><td><span class="public-chess-name">${publicChessName(row)}</span><small class="public-chess-sub">${escapeHtml(row.roll || '—')} · ${publicChessClass(row)}</small></td><td>${row.wins || 0}W · ${row.draws || 0}D · ${row.losses || 0}L</td><td class="public-chess-points">${publicChessPoints(row.points)}</td><td>${publicChessPoints(row.killPoints)}</td></tr>`).join('')}</tbody></table></div>` : '<div class="public-chess-empty"><i class="fas fa-chess-knight"></i>No registered players are published yet.</div>';
+            }
+            renderPublicChessMatches(chess);
+            renderPublicChessBracket(chess);
         }
 
         // ── Information rendering ──
@@ -1947,15 +2165,18 @@
             const isScoreboard = tabKey === 'scoreboard';
             const isRanking = tabKey === 'ranking';
             const isParties = tabKey === 'parties';
+            const isChess = tabKey === 'chess';
             tabHome.classList.toggle('active', isHome);
             tabScoreboard.classList.toggle('active', isScoreboard);
             tabRanking.classList.toggle('active', isRanking);
             tabParties.classList.toggle('active', isParties);
+            tabChess.classList.toggle('active', isChess);
             tabInfo.classList.toggle('active', tabKey === 'info');
             homePanel.classList.toggle('active', isHome);
             scoreboardPanel.classList.toggle('active', isScoreboard);
             rankingPanel.classList.toggle('active', isRanking);
             partiesPanel.classList.toggle('active', isParties);
+            chessPanel.classList.toggle('active', isChess);
             infoPanel.classList.toggle('active', tabKey === 'info');
             if (isHome) {
                 document.querySelectorAll('.appear').forEach((el, idx) => {
@@ -1964,8 +2185,8 @@
                 });
             }
             // Preload data when an authenticated user opens a locked tab
-            if (isLoggedIn() && (isScoreboard || isRanking || isParties || tabKey === 'info')) {
-                loadScores().then(d => { renderScoreboard(d); renderRanking(d); renderParties(d); renderInfo(d); }).catch(() => {});
+            if (isLoggedIn() && (isScoreboard || isRanking || isParties || isChess || tabKey === 'info')) {
+                loadScores().then(d => { renderScoreboard(d); renderRanking(d); renderParties(d); renderChessChampion(d); renderInfo(d); }).catch(() => {});
             }
             if (isRanking) startPublicRankingAnimationLoop();
             else stopPublicRankingAnimationLoop();
@@ -1989,6 +2210,10 @@
             if (!isLoggedIn()) { activeTab = 'parties'; openLoginModal(); return; }
             setActiveTab('parties');
         });
+        tabChess.addEventListener('click', () => {
+            if (!isLoggedIn()) { activeTab = 'chess'; openLoginModal(); return; }
+            setActiveTab('chess');
+        });
         tabInfo.addEventListener('click', () => {
             if (!isLoggedIn()) { openLoginModal(); return; }
             setActiveTab('info');
@@ -2002,6 +2227,7 @@
         document.getElementById('scoreboardLoginLink').addEventListener('click', openLoginModal);
         document.getElementById('rankingLoginLink').addEventListener('click', openLoginModal);
         document.getElementById('partiesLoginLink').addEventListener('click', openLoginModal);
+        document.getElementById('chessLoginLink').addEventListener('click', openLoginModal);
         document.getElementById('publicRankingReplay').addEventListener('click', replayPublicRanking);
         document.getElementById('infoLoginLink').addEventListener('click', openLoginModal);
 
@@ -2015,7 +2241,7 @@
         });
         // If already authenticated from a previous session, preload the data
         if (isLoggedIn()) {
-            loadScores().then(d => { renderScoreboard(d); renderRanking(d); renderParties(d); renderInfo(d); }).catch(() => {});
+            loadScores().then(d => { renderScoreboard(d); renderRanking(d); renderParties(d); renderChessChampion(d); renderInfo(d); }).catch(() => {});
         }
 
         // ── ZOOM ──

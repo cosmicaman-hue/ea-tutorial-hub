@@ -184,7 +184,7 @@
         <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
         <link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@900&display=swap" rel="stylesheet">
     </noscript>
-    <link rel="stylesheet" href="/static/css/offline-scoreboard.css?v=8">
+    <link rel="stylesheet" href="/static/css/offline-scoreboard.css?v=9">
 
 <script>
     // System Performance Overhaul: Async localstorage debouncer (Per-Key Isolated)
@@ -1115,6 +1115,7 @@ body.header-offscreen .header-kicker::after {
         <button class="sidebar-nav-item" data-tab="group-scoreboard" onclick="switchTab('group-scoreboard')" title="Group Scoreboard"><i class="fas fa-layer-group" style="color:#a855f7"></i><span class="sidebar-link-text">Group Scoreboard</span></button>
         <button class="sidebar-nav-item" data-tab="party-standings" onclick="switchTab('party-standings')" title="Party Standings"><i class="fas fa-flag" style="color:#f97316"></i><span class="sidebar-link-text">Party Standings</span></button>
         <button class="sidebar-nav-item" data-tab="team-competition" onclick="switchTab('team-competition')" title="Team Competition"><i class="fas fa-people-group" style="color:#22c55e"></i><span class="sidebar-link-text">Team Competition</span></button>
+        <button class="sidebar-nav-item" data-tab="excel-chess-champion" onclick="switchTab('excel-chess-champion')" title="Excel Chess Champion"><i class="fas fa-chess-knight" style="color:#facc15"></i><span class="sidebar-link-text">Excel Chess Champion</span></button>
         <div class="sidebar-section-label">Governance</div>
         <button class="sidebar-nav-item" data-tab="gr" onclick="switchTab('gr')" title="Class Representative"><i class="fas fa-user-check" style="color:#ec4899"></i><span class="sidebar-link-text">Group Rep (GR)</span></button>
         <button class="sidebar-nav-item" data-tab="teachers" onclick="switchTab('teachers')" title="Teachers"><i class="fas fa-chalkboard-teacher" style="color:#06b6d4"></i><span class="sidebar-link-text">Teachers</span></button>
@@ -1759,6 +1760,9 @@ body.header-offscreen .header-kicker::after {
             </button>
             <button class="tab-button" onclick="switchTab('team-competition')" style="--tab-icon: #22c55e;">
                 <i class="fas fa-people-group"></i> Team Competition
+            </button>
+            <button class="tab-button" onclick="switchTab('excel-chess-champion')" style="--tab-icon: #facc15;">
+                <i class="fas fa-chess-knight"></i> Excel Chess Champion
             </button>
             <button class="tab-button" onclick="switchTab('gr')" style="--tab-icon: #ec4899;">
                 <i class="fas fa-user-check"></i> Group Representative (GR)
@@ -4301,73 +4305,56 @@ body.header-offscreen .header-kicker::after {
 
         <!-- TAB: GROUP SCOREBOARD -->
         <div id="group-scoreboard-tab" class="tab-content hidden">
-            <div class="controls">
-                <div class="control-group">
-                    <label>Select Month</label>
-                    <select id="groupMonthFilter" onchange="renderGroupScoreboard()"></select>
+            <section class="group-scoreboard-shell" aria-labelledby="groupScoreboardTitle">
+                <div class="group-scoreboard-ambient" aria-hidden="true">
+                    <span class="group-scoreboard-orb group-scoreboard-orb-left"></span>
+                    <span class="group-scoreboard-orb group-scoreboard-orb-right"></span>
+                    <span class="group-scoreboard-scanline"></span>
                 </div>
-                <div class="control-group">
-                    <label>Filter Group</label>
-                    <select id="groupFilterSelect" onchange="renderGroupScoreboard()">
-                        <option value="all">All Groups</option>
-                        <option value="A">Group A</option>
-                        <option value="B">Group B</option>
-                        <option value="C">Group C</option>
-                        <option value="D">Group D</option>
-                        <option value="E">Group E</option>
-                        <option value="F">Group F</option>
-                        <option value="G">Group G</option>
-                        <option value="H">Group H</option>
-                        <option value="Z">Group Z</option>
-                    </select>
+                <div class="group-scoreboard-toolbar">
+                    <div class="group-scoreboard-intro">
+                        <span class="group-scoreboard-kicker"><i class="fas fa-layer-group"></i> Monthly group league</span>
+                        <h2 id="groupScoreboardTitle">Group Scoreboard</h2>
+                        <p>One stage. One total. Let the month decide who leads.</p>
+                    </div>
+                    <div class="group-scoreboard-controls" aria-label="Group scoreboard filters">
+                        <div class="group-scoreboard-filter">
+                            <label for="groupMonthFilter">Period</label>
+                            <select id="groupMonthFilter" onchange="renderGroupScoreboard()"></select>
+                        </div>
+                        <div class="group-scoreboard-filter">
+                            <label for="groupFilterSelect">Focus</label>
+                            <select id="groupFilterSelect" onchange="renderGroupScoreboard()">
+                                <option value="all">All Groups</option>
+                                <option value="A">Group A</option>
+                                <option value="B">Group B</option>
+                                <option value="C">Group C</option>
+                                <option value="D">Group D</option>
+                                <option value="E">Group E</option>
+                                <option value="F">Group F</option>
+                                <option value="G">Group G</option>
+                                <option value="H">Group H</option>
+                                <option value="Z">Group Z</option>
+                            </select>
+                        </div>
+                    </div>
                 </div>
-            </div>
-            <div class="scoreboard-wrapper">
-                <div class="scoreboard-scroll">
-                    <table class="scoreboard" id="groupScoreboardTable">
-                        <thead>
-                            <tr>
-                                <th style="width: 90px;">Rank</th>
-                                <th style="width: 140px;">Group</th>
-                                <th style="width: 150px;">Students</th>
-                                <th style="width: 140px;">Total Score</th>
-                                <th style="width: 140px;">Avg Score</th>
-                                <th style="width: 140px;">Vote Power</th>
-                                <th style="width: 120px;">Stars</th>
-                                <th style="width: 120px;">VETOs</th>
-                            </tr>
-                        </thead>
-                        <tbody id="groupScoreboardBody">
-                            <tr>
-                                <td colspan="8" class="text-center loading">Loading...</td>
-                            </tr>
-                        </tbody>
-                    </table>
+                <div class="group-scoreboard-rule" aria-hidden="true"><span></span></div>
+                <div class="group-scoreboard-caption">
+                    <div>
+                        <span class="group-scoreboard-caption-kicker">The board</span>
+                        <span id="groupScoreboardMonthLabel">Monthly totals</span>
+                    </div>
+                    <span class="group-scoreboard-caption-meta">Total points · descending order</span>
                 </div>
-            </div>
-            <div class="scoreboard-wrapper" style="margin-top: 18px;">
-                <div class="scoreboard-scroll">
-                    <table class="scoreboard" id="groupRosterTable">
-                        <thead>
-                            <tr>
-                                <th style="width: 140px;">Group</th>
-                                <th style="width: 120px;">Roll No.</th>
-                                <th>Student</th>
-                                <th style="width: 90px;">Class</th>
-                                <th style="width: 130px;">Total</th>
-                                <th style="width: 110px;">Vote</th>
-                                <th style="width: 90px;">Stars</th>
-                                <th style="width: 90px;">VETOs</th>
-                            </tr>
-                        </thead>
-                        <tbody id="groupRosterBody">
-                            <tr>
-                                <td colspan="8" class="text-center loading">Loading...</td>
-                            </tr>
-                        </tbody>
-                    </table>
+                <div id="groupScoreboardBody" class="group-scorecard-grid" role="list" aria-live="polite">
+                    <div class="group-scorecard-empty" role="status">
+                        <i class="fas fa-spinner fa-spin" aria-hidden="true"></i>
+                        <strong>Loading the board</strong>
+                        <span>Gathering the month’s totals…</span>
+                    </div>
                 </div>
-            </div>
+            </section>
         </div>
 
         <!-- TAB: PARTY STANDINGS -->
@@ -4556,6 +4543,105 @@ body.header-offscreen .header-kicker::after {
 
                 <div id="teamCompetitionBoard"></div>
             </div>
+        </div>
+
+        <!-- TAB: EXCEL CHESS CHAMPION -->
+        <div id="excel-chess-champion-tab" class="tab-content hidden">
+            <section class="chess-champion-shell" aria-labelledby="chessChampionTitle">
+                <div class="chess-champion-stars" aria-hidden="true"></div>
+                <div class="chess-champion-orbit chess-champion-orbit-one" aria-hidden="true"></div>
+                <div class="chess-champion-orbit chess-champion-orbit-two" aria-hidden="true"></div>
+                <header class="chess-champion-hero">
+                    <div class="chess-champion-kicker"><i class="fas fa-chess-knight"></i> Excel Academy tournament arena</div>
+                    <h1 id="chessChampionTitle">Excel Chess Champion</h1>
+                    <p>Every move counts. Climb the league table, survive the bracket, and claim the crown.</p>
+                    <div id="chessChampionStageRibbon" class="chess-champion-stage-ribbon" aria-live="polite"></div>
+                </header>
+
+                <div id="chessChampionStats" class="chess-champion-stats" aria-live="polite"></div>
+
+                <div class="chess-champion-main-grid">
+                    <section class="chess-champion-panel chess-champion-standings-panel">
+                        <div class="chess-champion-panel-heading">
+                            <div>
+                                <span class="chess-champion-eyebrow">The championship table</span>
+                                <h2>Live standings</h2>
+                            </div>
+                            <span id="chessChampionStandingsMeta" class="chess-champion-panel-meta"></span>
+                        </div>
+                        <div id="chessChampionStandings" class="chess-champion-standings"></div>
+                    </section>
+
+                    <aside class="chess-champion-panel chess-champion-next-panel">
+                        <div class="chess-champion-panel-heading">
+                            <div>
+                                <span class="chess-champion-eyebrow">Next on the boards</span>
+                                <h2>Match room</h2>
+                            </div>
+                            <i class="fas fa-bolt chess-champion-heading-icon"></i>
+                        </div>
+                        <div id="chessChampionMatchRoom" class="chess-champion-match-room"></div>
+                    </aside>
+                </div>
+
+                <section class="chess-champion-panel chess-champion-bracket-panel">
+                    <div class="chess-champion-panel-heading">
+                        <div>
+                            <span class="chess-champion-eyebrow">From league to legacy</span>
+                            <h2>Knockout bracket</h2>
+                        </div>
+                        <span class="chess-champion-panel-meta">Elimination · semifinals · finale</span>
+                    </div>
+                    <div id="chessChampionBracket" class="chess-champion-bracket"></div>
+                </section>
+
+                <section id="chessChampionAdminPanel" class="chess-champion-panel chess-champion-admin-panel" style="display:none;">
+                    <div class="chess-champion-panel-heading">
+                        <div>
+                            <span class="chess-champion-eyebrow">Admin control room</span>
+                            <h2>Run the tournament</h2>
+                        </div>
+                        <span class="chess-champion-panel-meta">Only Admin can change results or advance rounds</span>
+                    </div>
+                    <div class="chess-champion-admin-grid">
+                        <div class="chess-champion-admin-card">
+                            <h3><i class="fas fa-sliders"></i> Tournament settings</h3>
+                            <div class="chess-champion-form-grid">
+                                <label>Event name<input id="chessChampionEventName" type="text" data-role-only="admin" maxlength="80"></label>
+                                <label>Basic rounds<input id="chessChampionBasicRounds" type="number" data-role-only="admin" min="1" max="12"></label>
+                                <label>Qualifiers<select id="chessChampionQualificationCount" data-role-only="admin"><option value="2">Top 2</option><option value="4">Top 4</option><option value="8">Top 8</option><option value="16">Top 16</option></select></label>
+                                <label>Fast win threshold (min)<input id="chessChampionFastMinutes" type="number" data-role-only="admin" min="1" max="180"></label>
+                                <label>Standard threshold (min)<input id="chessChampionStandardMinutes" type="number" data-role-only="admin" min="1" max="240"></label>
+                            </div>
+                            <h4>IPL-style scoring</h4>
+                            <div class="chess-champion-form-grid chess-champion-scoring-grid">
+                                <label>Win points<input id="chessChampionWinPoints" type="number" data-role-only="admin" min="0" max="100"></label>
+                                <label>Draw points<input id="chessChampionDrawPoints" type="number" data-role-only="admin" min="0" max="100"></label>
+                                <label>Loss points<input id="chessChampionLossPoints" type="number" data-role-only="admin" min="0" max="100"></label>
+                                <label>Class level bonus<input id="chessChampionClassBonus" type="number" data-role-only="admin" min="0" max="20" step="0.5"></label>
+                                <label>Opponent bonus / 5 pts<input id="chessChampionOpponentBonus" type="number" data-role-only="admin" min="0" max="20" step="0.5"></label>
+                                <label>Fast time bonus<input id="chessChampionFastBonus" type="number" data-role-only="admin" min="0" max="50"></label>
+                                <label>Standard time bonus<input id="chessChampionStandardBonus" type="number" data-role-only="admin" min="0" max="50"></label>
+                                <label>Kill-point multiplier<input id="chessChampionKillMultiplier" type="number" data-role-only="admin" min="0" max="20" step="0.5"></label>
+                            </div>
+                            <div class="chess-champion-admin-actions">
+                                <button class="secondary" type="button" data-role-only="admin" onclick="saveChessChampionConfig()"><i class="fas fa-save"></i> Save settings</button>
+                                <button class="secondary" type="button" data-role-only="admin" onclick="advanceChessChampionTournament()"><i class="fas fa-forward-step"></i> Generate / advance round</button>
+                                <button class="danger" type="button" data-role-only="admin" onclick="resetChessChampionTournament()"><i class="fas fa-rotate-left"></i> Reset event</button>
+                            </div>
+                        </div>
+                        <div class="chess-champion-admin-card">
+                            <h3><i class="fas fa-user-plus"></i> Register players</h3>
+                            <p class="chess-champion-admin-help">Opt in active students to this event. Registered players stay attached to the tournament even if the academy roster changes later.</p>
+                            <div class="chess-champion-roster-actions">
+                                <button class="secondary" type="button" data-role-only="admin" onclick="selectAllChessChampionParticipants()"><i class="fas fa-check-double"></i> Select all active</button>
+                                <button class="secondary" type="button" data-role-only="admin" onclick="clearChessChampionParticipants()"><i class="fas fa-broom"></i> Clear</button>
+                            </div>
+                            <div id="chessChampionRoster" class="chess-champion-roster"></div>
+                        </div>
+                    </div>
+                </section>
+            </section>
         </div>
 
         <!-- TAB: CLASS REPRESENTATIVES -->
@@ -12697,6 +12783,798 @@ body.header-offscreen .header-kicker::after {
             };
         })();
 
+        const CHESS_CHAMPION_STAGE_LABELS = {
+            registration: 'Registration',
+            basic: 'Basic rounds',
+            elimination: 'Elimination',
+            semifinal: 'Semifinals',
+            finale: 'Finale',
+            complete: 'Champion crowned'
+        };
+
+        function getDefaultChessChampionState() {
+            return {
+                version: 1,
+                eventName: 'Excel Chess Champion',
+                stage: 'registration',
+                status: 'registration',
+                round: 0,
+                basicRoundCount: 3,
+                qualificationCount: 8,
+                enrolledStudentIds: [],
+                qualifiedStudentIds: [],
+                scoring: {
+                    winPoints: 3,
+                    drawPoints: 1,
+                    lossPoints: 0,
+                    classBonusPerLevel: 1,
+                    opponentBonusPerFivePoints: 1,
+                    fastWinSeconds: 600,
+                    standardWinSeconds: 1200,
+                    fastTimeBonus: 3,
+                    standardTimeBonus: 1,
+                    killPointMultiplier: 1
+                },
+                matches: [],
+                updatedAt: ''
+            };
+        }
+
+        function chessChampionNumber(value, fallback = 0) {
+            const number = Number(value);
+            return Number.isFinite(number) ? number : fallback;
+        }
+
+        function chessChampionClamp(value, min, max, fallback) {
+            return Math.min(max, Math.max(min, chessChampionNumber(value, fallback)));
+        }
+
+        function chessChampionId(prefix = 'chess') {
+            return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        }
+
+        function normalizeChessChampionMatch(raw, index = 0) {
+            const match = raw && typeof raw === 'object' ? raw : {};
+            const stages = ['basic', 'elimination', 'semifinal', 'finale'];
+            const stage = stages.includes(String(match.stage || '').trim()) ? String(match.stage).trim() : 'basic';
+            const results = ['', 'white', 'black', 'draw', 'bye'];
+            const result = results.includes(String(match.result || '').trim()) ? String(match.result || '').trim() : '';
+            const awards = match.awards && typeof match.awards === 'object' ? match.awards : {};
+            const breakdown = match.breakdown && typeof match.breakdown === 'object' ? match.breakdown : {};
+            return {
+                id: String(match.id || chessChampionId(`match-${index}`)),
+                stage,
+                round: Math.max(1, parseInt(match.round, 10) || 1),
+                board: Math.max(1, parseInt(match.board, 10) || index + 1),
+                whiteId: parseInt(match.whiteId, 10) || 0,
+                blackId: parseInt(match.blackId, 10) || 0,
+                status: ['scheduled', 'completed'].includes(String(match.status || '').trim()) ? String(match.status).trim() : (result ? 'completed' : 'scheduled'),
+                result,
+                winnerId: parseInt(match.winnerId, 10) || 0,
+                durationSeconds: Math.max(0, Math.round(chessChampionNumber(match.durationSeconds, 0))),
+                killPoints: Math.max(0, chessChampionNumber(match.killPoints, 0)),
+                awards,
+                breakdown,
+                notes: String(match.notes || '').trim().slice(0, 240),
+                createdAt: String(match.createdAt || '').trim(),
+                updatedAt: String(match.updatedAt || '').trim()
+            };
+        }
+
+        function normalizeChessChampionState(raw) {
+            const defaults = getDefaultChessChampionState();
+            const source = raw && typeof raw === 'object' ? raw : {};
+            const scoring = source.scoring && typeof source.scoring === 'object' ? source.scoring : {};
+            const state = {
+                ...defaults,
+                ...source,
+                eventName: String(source.eventName || defaults.eventName).trim().slice(0, 80) || defaults.eventName,
+                stage: Object.prototype.hasOwnProperty.call(CHESS_CHAMPION_STAGE_LABELS, String(source.stage || '')) ? String(source.stage) : defaults.stage,
+                status: Object.prototype.hasOwnProperty.call(CHESS_CHAMPION_STAGE_LABELS, String(source.status || '')) ? String(source.status) : defaults.status,
+                round: Math.max(0, parseInt(source.round, 10) || 0),
+                basicRoundCount: Math.round(chessChampionClamp(source.basicRoundCount, 1, 12, defaults.basicRoundCount)),
+                qualificationCount: [2, 4, 8, 16].includes(parseInt(source.qualificationCount, 10)) ? parseInt(source.qualificationCount, 10) : defaults.qualificationCount,
+                enrolledStudentIds: Array.from(new Set((Array.isArray(source.enrolledStudentIds) ? source.enrolledStudentIds : []).map(id => parseInt(id, 10)).filter(Boolean))),
+                qualifiedStudentIds: Array.from(new Set((Array.isArray(source.qualifiedStudentIds) ? source.qualifiedStudentIds : []).map(id => parseInt(id, 10)).filter(Boolean))),
+                scoring: {
+                    winPoints: Math.max(0, chessChampionNumber(scoring.winPoints, defaults.scoring.winPoints)),
+                    drawPoints: Math.max(0, chessChampionNumber(scoring.drawPoints, defaults.scoring.drawPoints)),
+                    lossPoints: Math.max(0, chessChampionNumber(scoring.lossPoints, defaults.scoring.lossPoints)),
+                    classBonusPerLevel: Math.max(0, chessChampionNumber(scoring.classBonusPerLevel, defaults.scoring.classBonusPerLevel)),
+                    opponentBonusPerFivePoints: Math.max(0, chessChampionNumber(scoring.opponentBonusPerFivePoints, defaults.scoring.opponentBonusPerFivePoints)),
+                    fastWinSeconds: Math.max(60, Math.round(chessChampionNumber(scoring.fastWinSeconds, defaults.scoring.fastWinSeconds))),
+                    standardWinSeconds: Math.max(60, Math.round(chessChampionNumber(scoring.standardWinSeconds, defaults.scoring.standardWinSeconds))),
+                    fastTimeBonus: Math.max(0, chessChampionNumber(scoring.fastTimeBonus, defaults.scoring.fastTimeBonus)),
+                    standardTimeBonus: Math.max(0, chessChampionNumber(scoring.standardTimeBonus, defaults.scoring.standardTimeBonus)),
+                    killPointMultiplier: Math.max(0, chessChampionNumber(scoring.killPointMultiplier, defaults.scoring.killPointMultiplier))
+                },
+                matches: Array.isArray(source.matches) ? source.matches.map(normalizeChessChampionMatch) : [],
+                updatedAt: String(source.updatedAt || '').trim()
+            };
+            if (state.scoring.standardWinSeconds < state.scoring.fastWinSeconds) {
+                state.scoring.standardWinSeconds = state.scoring.fastWinSeconds;
+            }
+            return state;
+        }
+
+        function getChessChampionState() {
+            const data = db.getData();
+            return normalizeChessChampionState(data.chess_champion);
+        }
+
+        function saveChessChampionState(nextState) {
+            const data = db.getData();
+            const state = normalizeChessChampionState(nextState);
+            state.updatedAt = new Date().toISOString();
+            data.chess_champion = state;
+            db.saveData(data);
+            return state;
+        }
+
+        function getChessChampionStudents() {
+            const data = db.getData();
+            const students = db.getStudents ? db.getStudents() : (data.students || []);
+            return Array.isArray(students) ? students.filter(Boolean) : [];
+        }
+
+        function chessChampionStudentMap() {
+            return new Map(getChessChampionStudents().map(student => [parseInt(student.id, 10), student]));
+        }
+
+        function chessChampionStudentName(student) {
+            return String((student && (student.base_name || student.name)) || 'Unknown player').replace(/\s+/g, ' ').trim() || 'Unknown player';
+        }
+
+        function chessChampionStudentClass(student) {
+            return String((student && (student.class || student.class_name)) || '—').trim() || '—';
+        }
+
+        function chessChampionClassNumber(student) {
+            const value = chessChampionStudentClass(student).match(/\d+/);
+            return value ? parseInt(value[0], 10) : 0;
+        }
+
+        function chessChampionStudentGroup(student) {
+            return String((student && (student.group || student.group_name)) || '').trim().toUpperCase();
+        }
+
+        function chessChampionRoll(student) {
+            return String((student && student.roll) || '—').trim().toUpperCase() || '—';
+        }
+
+        function chessChampionIsActive(student) {
+            return !!student && student.active !== false;
+        }
+
+        function chessChampionEnrolledStudents(state) {
+            const map = chessChampionStudentMap();
+            return state.enrolledStudentIds.map(id => map.get(parseInt(id, 10))).filter(Boolean);
+        }
+
+        function chessChampionActiveEnrolledIds(state) {
+            const map = chessChampionStudentMap();
+            return state.enrolledStudentIds.map(id => parseInt(id, 10)).filter(id => {
+                const student = map.get(id);
+                return id > 0 && chessChampionIsActive(student);
+            });
+        }
+
+        function chessChampionMatchComplete(match) {
+            return !!match && (match.status === 'completed' || ['white', 'black', 'draw', 'bye'].includes(match.result));
+        }
+
+        function chessChampionMatchPlayedBy(match, studentId) {
+            const id = parseInt(studentId, 10) || 0;
+            return !!match && id > 0 && (parseInt(match.whiteId, 10) === id || parseInt(match.blackId, 10) === id);
+        }
+
+        function chessChampionHasPlayed(state, firstId, secondId) {
+            const a = parseInt(firstId, 10) || 0;
+            const b = parseInt(secondId, 10) || 0;
+            return state.matches.some(match => chessChampionMatchComplete(match) && ((parseInt(match.whiteId, 10) === a && parseInt(match.blackId, 10) === b) || (parseInt(match.whiteId, 10) === b && parseInt(match.blackId, 10) === a)));
+        }
+
+        function chessChampionCompletedMatches(state) {
+            return state.matches.filter(chessChampionMatchComplete);
+        }
+
+        function getChessChampionStandings(state = getChessChampionState(), excludeMatchId = '') {
+            const map = chessChampionStudentMap();
+            const rows = new Map();
+            state.enrolledStudentIds.forEach(id => {
+                const sid = parseInt(id, 10) || 0;
+                const student = map.get(sid);
+                rows.set(sid, {
+                    id: sid,
+                    student: student || { id: sid, name: 'Unknown player', roll: '—', class: '—' },
+                    points: 0,
+                    matches: 0,
+                    wins: 0,
+                    draws: 0,
+                    losses: 0,
+                    killPoints: 0,
+                    basePoints: 0,
+                    classBonus: 0,
+                    opponentBonus: 0,
+                    timeBonus: 0,
+                    killBonus: 0
+                });
+            });
+            state.matches.forEach(match => {
+                if (!chessChampionMatchComplete(match) || String(match.id) === String(excludeMatchId)) return;
+                const participantIds = [parseInt(match.whiteId, 10) || 0, parseInt(match.blackId, 10) || 0].filter(Boolean);
+                participantIds.forEach(id => {
+                    if (!rows.has(id)) rows.set(id, { id, student: map.get(id) || { id, name: 'Unknown player', roll: '—', class: '—' }, points: 0, matches: 0, wins: 0, draws: 0, losses: 0, killPoints: 0, basePoints: 0, classBonus: 0, opponentBonus: 0, timeBonus: 0, killBonus: 0 });
+                    const row = rows.get(id);
+                    row.matches += 1;
+                    const side = parseInt(match.whiteId, 10) === id ? 'white' : 'black';
+                    const breakdown = match.breakdown && match.breakdown[side] && typeof match.breakdown[side] === 'object' ? match.breakdown[side] : {};
+                    const award = chessChampionNumber(match.awards && match.awards[String(id)], chessChampionNumber(match.awards && match.awards[id], 0));
+                    row.points += award;
+                    row.basePoints += chessChampionNumber(breakdown.base, 0);
+                    row.classBonus += chessChampionNumber(breakdown.classBonus, 0);
+                    row.opponentBonus += chessChampionNumber(breakdown.opponentBonus, 0);
+                    row.timeBonus += chessChampionNumber(breakdown.timeBonus, 0);
+                    row.killBonus += chessChampionNumber(breakdown.killBonus, 0);
+                    row.killPoints += chessChampionNumber(breakdown.killPoints, 0);
+                    if (match.result === 'draw') row.draws += 1;
+                    else if (parseInt(match.winnerId, 10) === id || match.result === 'bye') row.wins += 1;
+                    else row.losses += 1;
+                });
+            });
+            return Array.from(rows.values()).sort((a, b) => {
+                return b.points - a.points || b.wins - a.wins || b.killPoints - a.killPoints || b.opponentBonus - a.opponentBonus || chessChampionStudentName(a.student).localeCompare(chessChampionStudentName(b.student));
+            }).map((row, index) => ({ ...row, rank: index + 1 }));
+        }
+
+        function chessChampionStageLabel(stage, round = 0) {
+            if (stage === 'basic') return `Basic rounds · Round ${round || 1}`;
+            if (stage === 'elimination') return `Elimination · Round ${round || 1}`;
+            if (stage === 'semifinal') return 'Semifinals';
+            if (stage === 'finale') return 'Finale';
+            return CHESS_CHAMPION_STAGE_LABELS[stage] || 'Tournament';
+        }
+
+        function chessChampionCurrentMatches(state = getChessChampionState()) {
+            if (!['basic', 'elimination', 'semifinal', 'finale'].includes(state.stage)) return [];
+            return state.matches.filter(match => match.stage === state.stage && parseInt(match.round, 10) === parseInt(state.round, 10));
+        }
+
+        function chessChampionEffectiveQualificationCount(state, count) {
+            const configured = [2, 4, 8, 16].includes(parseInt(state.qualificationCount, 10)) ? parseInt(state.qualificationCount, 10) : 8;
+            const available = Math.max(0, parseInt(count, 10) || 0);
+            let value = Math.min(configured, available);
+            let power = 1;
+            while ((power * 2) <= value) power *= 2;
+            return power >= 2 ? power : 0;
+        }
+
+        function chessChampionCreateMatch(stage, round, whiteId, blackId, board) {
+            const now = new Date().toISOString();
+            return {
+                id: chessChampionId('match'),
+                stage,
+                round,
+                board,
+                whiteId: parseInt(whiteId, 10) || 0,
+                blackId: parseInt(blackId, 10) || 0,
+                status: 'scheduled',
+                result: '',
+                winnerId: 0,
+                durationSeconds: 0,
+                killPoints: 0,
+                awards: {},
+                breakdown: {},
+                notes: '',
+                createdAt: now,
+                updatedAt: now
+            };
+        }
+
+        function chessChampionCreateBye(stage, round, studentId, board, state) {
+            const points = chessChampionNumber(state.scoring.winPoints, 3);
+            const now = new Date().toISOString();
+            return {
+                ...chessChampionCreateMatch(stage, round, studentId, 0, board),
+                status: 'completed',
+                result: 'bye',
+                winnerId: parseInt(studentId, 10) || 0,
+                awards: { [String(studentId)]: points },
+                breakdown: { white: { base: points, classBonus: 0, opponentBonus: 0, timeBonus: 0, killPoints: 0, killBonus: 0, total: points } },
+                updatedAt: now
+            };
+        }
+
+        function chessChampionPairIds(state, ids, stage, round) {
+            const standings = getChessChampionStandings(state);
+            const ranking = new Map(standings.map((row, index) => [row.id, { row, index }]));
+            const studentMap = chessChampionStudentMap();
+            const remaining = [...new Set(ids.map(id => parseInt(id, 10)).filter(Boolean))].sort((a, b) => {
+                const aRank = ranking.get(a);
+                const bRank = ranking.get(b);
+                if (aRank && bRank && aRank.row.points !== bRank.row.points) return bRank.row.points - aRank.row.points;
+                return chessChampionRoll(studentMap.get(a)).localeCompare(chessChampionRoll(studentMap.get(b)));
+            });
+            const matches = [];
+            let board = 1;
+            while (remaining.length > 1) {
+                const first = remaining.shift();
+                const firstInfo = ranking.get(first) || { row: { points: 0 }, index: 999 };
+                const candidates = remaining.map((id, index) => {
+                    const student = studentMap.get(id);
+                    const info = ranking.get(id) || { row: { points: 0 }, index: 999 };
+                    const sameClass = chessChampionClassNumber(student) === chessChampionClassNumber(studentMap.get(first)) && chessChampionClassNumber(student) > 0;
+                    const repeated = chessChampionHasPlayed(state, first, id);
+                    return {
+                        id,
+                        index,
+                        repeated,
+                        sameClass,
+                        scoreGap: Math.abs(chessChampionNumber(firstInfo.row.points, 0) - chessChampionNumber(info.row.points, 0)),
+                        rankGap: Math.abs(firstInfo.index - info.index)
+                    };
+                }).sort((a, b) => Number(a.repeated) - Number(b.repeated) || Number(a.sameClass) - Number(b.sameClass) || a.scoreGap - b.scoreGap || a.rankGap - b.rankGap || a.index - b.index);
+                const opponent = candidates[0];
+                if (!opponent) {
+                    matches.push(chessChampionCreateBye(stage, round, first, board++, state));
+                    continue;
+                }
+                remaining.splice(opponent.index, 1);
+                matches.push(chessChampionCreateMatch(stage, round, first, opponent.id, board++));
+            }
+            if (remaining.length === 1) matches.push(chessChampionCreateBye(stage, round, remaining[0], board, state));
+            return matches;
+        }
+
+        function chessChampionKnockoutMatches(state, ids, stage, round) {
+            const rankedIds = ids.map(id => parseInt(id, 10)).filter(Boolean);
+            const matches = [];
+            for (let index = 0; index < Math.floor(rankedIds.length / 2); index += 1) {
+                matches.push(chessChampionCreateMatch(stage, round, rankedIds[index], rankedIds[rankedIds.length - index - 1], index + 1));
+            }
+            return matches;
+        }
+
+        function chessChampionWinners(state, stage, round) {
+            return state.matches.filter(match => match.stage === stage && parseInt(match.round, 10) === parseInt(round, 10) && chessChampionMatchComplete(match)).map(match => parseInt(match.winnerId, 10) || 0).filter(Boolean);
+        }
+
+        function chessChampionCalculateAwards(state, match, result, durationSeconds, killPoints) {
+            const scores = new Map(getChessChampionStandings(state, match.id).map(row => [row.id, row]));
+            const white = chessChampionStudentMap().get(parseInt(match.whiteId, 10));
+            const black = chessChampionStudentMap().get(parseInt(match.blackId, 10));
+            const scoring = state.scoring;
+            if (result === 'draw') {
+                const draw = scoring.drawPoints;
+                return {
+                    awards: { [String(match.whiteId)]: draw, [String(match.blackId)]: draw },
+                    breakdown: {
+                        white: { base: draw, classBonus: 0, opponentBonus: 0, timeBonus: 0, killPoints: 0, killBonus: 0, total: draw },
+                        black: { base: draw, classBonus: 0, opponentBonus: 0, timeBonus: 0, killPoints: 0, killBonus: 0, total: draw }
+                    }
+                };
+            }
+            const winnerSide = result === 'white' ? 'white' : 'black';
+            const loserSide = winnerSide === 'white' ? 'black' : 'white';
+            const winnerId = winnerSide === 'white' ? parseInt(match.whiteId, 10) : parseInt(match.blackId, 10);
+            const loserId = winnerSide === 'white' ? parseInt(match.blackId, 10) : parseInt(match.whiteId, 10);
+            const winnerStudent = winnerSide === 'white' ? white : black;
+            const loserStudent = winnerSide === 'white' ? black : white;
+            const winnerBefore = scores.get(winnerId) || { points: 0 };
+            const loserBefore = scores.get(loserId) || { points: 0 };
+            const classBonus = Math.max(0, chessChampionClassNumber(loserStudent) - chessChampionClassNumber(winnerStudent)) * scoring.classBonusPerLevel;
+            const opponentBonus = Math.floor(Math.max(0, chessChampionNumber(loserBefore.points, 0)) / 5) * scoring.opponentBonusPerFivePoints;
+            const timeBonus = durationSeconds > 0 && durationSeconds <= scoring.fastWinSeconds
+                ? scoring.fastTimeBonus
+                : (durationSeconds > 0 && durationSeconds <= scoring.standardWinSeconds ? scoring.standardTimeBonus : 0);
+            const killBonus = Math.max(0, killPoints) * scoring.killPointMultiplier;
+            const winnerBreakdown = { base: scoring.winPoints, classBonus, opponentBonus, timeBonus, killPoints: Math.max(0, killPoints), killBonus, total: scoring.winPoints + classBonus + opponentBonus + timeBonus + killBonus };
+            const loserBreakdown = { base: scoring.lossPoints, classBonus: 0, opponentBonus: 0, timeBonus: 0, killPoints: 0, killBonus: 0, total: scoring.lossPoints };
+            return {
+                awards: { [String(winnerId)]: winnerBreakdown.total, [String(loserId)]: loserBreakdown.total },
+                breakdown: { [winnerSide]: winnerBreakdown, [loserSide]: loserBreakdown }
+            };
+        }
+
+        function chessChampionPlayerMarkup(student, extraClass = '') {
+            const name = chessChampionStudentName(student);
+            return `<span class="chess-champion-player ${extraClass}"><span class="chess-champion-player-name">${escapeHtml(name)}</span><span class="chess-champion-player-meta">${escapeHtml(chessChampionRoll(student))} · Class ${escapeHtml(chessChampionStudentClass(student))}</span></span>`;
+        }
+
+        function chessChampionFormatPoints(value) {
+            const number = chessChampionNumber(value, 0);
+            return Number.isInteger(number) ? String(number) : number.toFixed(1).replace(/\.0$/, '');
+        }
+
+        function renderChessChampionStats(state, standings) {
+            const stats = document.getElementById('chessChampionStats');
+            const stageRibbon = document.getElementById('chessChampionStageRibbon');
+            if (!stats || !stageRibbon) return;
+            const leader = standings[0];
+            const completed = chessChampionCompletedMatches(state).length;
+            const enrolled = state.enrolledStudentIds.length;
+            const stageOrder = ['registration', 'basic', 'elimination', 'semifinal', 'finale', 'complete'];
+            stageRibbon.innerHTML = stageOrder.map(stage => {
+                const active = stage === state.stage;
+                const passed = stageOrder.indexOf(stage) < stageOrder.indexOf(state.stage);
+                return `<span class="chess-champion-stage ${active ? 'is-active' : ''} ${passed ? 'is-passed' : ''}"><i class="fas ${passed ? 'fa-check' : active ? 'fa-circle-play' : 'fa-circle'}"></i>${escapeHtml(CHESS_CHAMPION_STAGE_LABELS[stage])}</span>`;
+            }).join('<span class="chess-champion-stage-line" aria-hidden="true"></span>');
+            stats.innerHTML = [
+                { icon: 'fa-users', label: 'Registered players', value: enrolled, detail: enrolled >= 2 ? 'Opted in by Admin' : 'Waiting for registration' },
+                { icon: 'fa-ranking-star', label: 'Current leader', value: leader ? chessChampionStudentName(leader.student) : '—', detail: leader ? `${chessChampionFormatPoints(leader.points)} pts · ${leader.wins}W ${leader.draws}D` : 'No standings yet' },
+                { icon: 'fa-chess-board', label: 'Matches played', value: completed, detail: `${state.matches.length} scheduled in the ledger` },
+                { icon: 'fa-layer-group', label: 'Qualification', value: state.qualificationCount, detail: `Top ${state.qualificationCount} target · ${state.basicRoundCount} basic rounds` }
+            ].map(item => `<article class="chess-champion-stat-card"><i class="fas ${item.icon}"></i><span class="chess-champion-stat-label">${escapeHtml(item.label)}</span><strong>${escapeHtml(String(item.value))}</strong><small>${escapeHtml(item.detail)}</small></article>`).join('');
+        }
+
+        function renderChessChampionStandings(state, standings) {
+            const body = document.getElementById('chessChampionStandings');
+            const meta = document.getElementById('chessChampionStandingsMeta');
+            if (!body || !meta) return;
+            meta.textContent = `${standings.length} player${standings.length === 1 ? '' : 's'} · points descending`;
+            if (!standings.length) {
+                body.innerHTML = '<div class="chess-champion-empty"><i class="fas fa-chess-knight"></i><strong>No registered players yet</strong><span>Admin can register active students from the control room below.</span></div>';
+                return;
+            }
+            body.innerHTML = `<div class="chess-champion-table-wrap"><table class="chess-champion-table"><thead><tr><th>#</th><th>Player</th><th>Record</th><th>Points</th><th>Kill pts</th><th>Bonus trail</th></tr></thead><tbody>${standings.map(row => {
+                const record = `${row.wins}W · ${row.draws}D · ${row.losses}L`;
+                const bonus = row.classBonus + row.opponentBonus + row.timeBonus + row.killBonus;
+                return `<tr class="${row.rank <= 3 ? `is-rank-${row.rank}` : ''}"><td><span class="chess-champion-rank">${row.rank}</span></td><td>${chessChampionPlayerMarkup(row.student)}${row.rank === 1 ? '<span class="chess-champion-leader-tag">LEADER</span>' : ''}</td><td class="chess-champion-record">${record}<small>${row.matches} match${row.matches === 1 ? '' : 'es'}</small></td><td class="chess-champion-points">${chessChampionFormatPoints(row.points)}</td><td>${chessChampionFormatPoints(row.killPoints)}</td><td class="chess-champion-bonus-trail">+${chessChampionFormatPoints(bonus)}</td></tr>`;
+            }).join('')}</tbody></table></div>`;
+        }
+
+        function chessChampionMatchResultLabel(match, studentMap) {
+            if (match.result === 'draw') return 'Draw';
+            if (match.result === 'bye') return 'Bye';
+            if (match.result === 'white' || match.result === 'black') {
+                const winner = studentMap.get(parseInt(match.winnerId, 10));
+                return `${chessChampionStudentName(winner)} wins`;
+            }
+            return 'Awaiting result';
+        }
+
+        function chessChampionMatchFormMarkup(match, state, studentMap) {
+            const admin = currentUserRole === 'admin';
+            const white = studentMap.get(parseInt(match.whiteId, 10));
+            const black = studentMap.get(parseInt(match.blackId, 10));
+            if (match.result === 'bye') {
+                return `<div class="chess-champion-match-card is-complete"><div class="chess-champion-match-top"><span>Board ${match.board}</span><b>BYE</b></div>${chessChampionPlayerMarkup(white, 'is-winner')}<div class="chess-champion-match-award">+${chessChampionFormatPoints(match.awards && match.awards[String(match.whiteId)])} points</div></div>`;
+            }
+            const winnerSide = match.result === 'white' || match.result === 'black' ? match.result : '';
+            const winner = match.result ? chessChampionStudentName(studentMap.get(parseInt(match.winnerId, 10))) : '';
+            const breakdown = match.breakdown && winnerSide && match.breakdown[winnerSide] ? match.breakdown[winnerSide] : null;
+            const summary = match.result ? `<div class="chess-champion-match-summary"><strong>${escapeHtml(chessChampionMatchResultLabel(match, studentMap))}</strong><span>${match.durationSeconds ? `${Math.round(match.durationSeconds / 60)} min` : 'Time not entered'} · ${chessChampionFormatPoints(match.killPoints)} kill pts</span>${breakdown ? `<small>Base ${chessChampionFormatPoints(breakdown.base)} + class ${chessChampionFormatPoints(breakdown.classBonus)} + opponent ${chessChampionFormatPoints(breakdown.opponentBonus)} + time ${chessChampionFormatPoints(breakdown.timeBonus)} + kills ${chessChampionFormatPoints(breakdown.killBonus)}</small>` : ''}</div>` : '';
+            if (!admin) {
+                return `<div class="chess-champion-match-card ${match.result ? 'is-complete' : ''}"><div class="chess-champion-match-top"><span>Board ${match.board}</span><b>${escapeHtml(match.result ? 'COMPLETED' : 'SCHEDULED')}</b></div><div class="chess-champion-match-versus"><div>${chessChampionPlayerMarkup(white, winnerSide === 'white' ? 'is-winner' : '')}</div><span>VS</span><div>${chessChampionPlayerMarkup(black, winnerSide === 'black' ? 'is-winner' : '')}</div></div>${summary}</div>`;
+            }
+            return `<div class="chess-champion-match-card ${match.result ? 'is-complete' : ''}"><div class="chess-champion-match-top"><span>Board ${match.board}</span><b>${escapeHtml(match.result ? 'COMPLETED' : 'ADMIN ENTRY')}</b></div><div class="chess-champion-match-versus"><div>${chessChampionPlayerMarkup(white, winnerSide === 'white' ? 'is-winner' : '')}</div><span>VS</span><div>${chessChampionPlayerMarkup(black, winnerSide === 'black' ? 'is-winner' : '')}</div></div>${match.result ? summary : ''}<div class="chess-champion-match-form"><label>Result<select id="chessChampionResult-${escapeHtml(match.id)}"><option value="">Select result</option><option value="white" ${winnerSide === 'white' ? 'selected' : ''}>White wins</option><option value="black" ${winnerSide === 'black' ? 'selected' : ''}>Black wins</option>${match.stage === 'basic' ? `<option value="draw" ${match.result === 'draw' ? 'selected' : ''}>Draw</option>` : ''}</select></label><label>Duration (min)<input id="chessChampionDuration-${escapeHtml(match.id)}" type="number" min="0" max="600" step="1" value="${match.durationSeconds ? Math.round(match.durationSeconds / 60) : ''}"></label><label>Kill points<input id="chessChampionKills-${escapeHtml(match.id)}" type="number" min="0" max="1000" step="1" value="${match.killPoints || ''}"></label><button class="secondary" type="button" onclick="saveChessChampionMatch('${escapeHtml(match.id)}')"><i class="fas fa-check"></i> ${match.result ? 'Save revision' : 'Record result'}</button>${match.result ? `<button class="chess-champion-text-button" type="button" onclick="editChessChampionMatch('${escapeHtml(match.id)}')">Revise</button>` : ''}</div></div>`;
+        }
+
+        function renderChessChampionMatchRoom(state) {
+            const room = document.getElementById('chessChampionMatchRoom');
+            if (!room) return;
+            const studentMap = chessChampionStudentMap();
+            const current = chessChampionCurrentMatches(state);
+            if (state.stage === 'registration') {
+                room.innerHTML = '<div class="chess-champion-empty chess-champion-empty-compact"><i class="fas fa-hourglass-start"></i><strong>Registration is open</strong><span>Admin registers players, then generates the first balanced round.</span></div>';
+                return;
+            }
+            if (state.stage === 'complete') {
+                const standings = getChessChampionStandings(state);
+                const champion = standings[0];
+                room.innerHTML = champion ? `<div class="chess-champion-champion-card"><i class="fas fa-crown"></i><span>Excel Chess Champion</span><strong>${escapeHtml(chessChampionStudentName(champion.student))}</strong><small>${chessChampionFormatPoints(champion.points)} tournament points</small></div>` : '<div class="chess-champion-empty chess-champion-empty-compact">The event is complete.</div>';
+                return;
+            }
+            if (!current.length) {
+                room.innerHTML = `<div class="chess-champion-empty chess-champion-empty-compact"><i class="fas fa-forward-step"></i><strong>${escapeHtml(chessChampionStageLabel(state.stage, state.round))} is ready to advance</strong><span>All boards are complete. Admin can generate the next round.</span></div>`;
+                return;
+            }
+            room.innerHTML = `<div class="chess-champion-room-label">${escapeHtml(chessChampionStageLabel(state.stage, state.round))}</div>${current.map(match => chessChampionMatchFormMarkup(match, state, studentMap)).join('')}`;
+        }
+
+        function renderChessChampionBracket(state) {
+            const bracket = document.getElementById('chessChampionBracket');
+            if (!bracket) return;
+            const knockout = state.matches.filter(match => ['elimination', 'semifinal', 'finale'].includes(match.stage));
+            if (!knockout.length) {
+                bracket.innerHTML = '<div class="chess-champion-empty chess-champion-empty-compact"><i class="fas fa-diagram-project"></i><strong>The bracket appears after the basic rounds</strong><span>Qualifiers are selected automatically from the live standings.</span></div>';
+                return;
+            }
+            const studentMap = chessChampionStudentMap();
+            const groups = [];
+            knockout.forEach(match => {
+                const key = `${match.stage}-${match.round}`;
+                let group = groups.find(item => item.key === key);
+                if (!group) { group = { key, stage: match.stage, round: match.round, matches: [] }; groups.push(group); }
+                group.matches.push(match);
+            });
+            groups.sort((a, b) => {
+                const order = ['elimination', 'semifinal', 'finale'];
+                return order.indexOf(a.stage) - order.indexOf(b.stage) || a.round - b.round;
+            });
+            bracket.innerHTML = groups.map(group => `<div class="chess-champion-bracket-column"><div class="chess-champion-bracket-column-title">${escapeHtml(chessChampionStageLabel(group.stage, group.round))}</div>${group.matches.map(match => {
+                const white = studentMap.get(parseInt(match.whiteId, 10));
+                const black = studentMap.get(parseInt(match.blackId, 10));
+                const winnerId = parseInt(match.winnerId, 10) || 0;
+                return `<article class="chess-champion-bracket-match ${chessChampionMatchComplete(match) ? 'is-complete' : ''}"><span class="chess-champion-bracket-board">Board ${match.board}</span><div class="chess-champion-bracket-player ${winnerId === parseInt(match.whiteId, 10) ? 'is-winner' : ''}"><span>${escapeHtml(chessChampionStudentName(white))}</span><b>${match.result === 'white' ? chessChampionFormatPoints(match.awards && match.awards[String(match.whiteId)]) : '—'}</b></div><div class="chess-champion-bracket-player ${winnerId === parseInt(match.blackId, 10) ? 'is-winner' : ''}"><span>${escapeHtml(chessChampionStudentName(black))}</span><b>${match.result === 'black' ? chessChampionFormatPoints(match.awards && match.awards[String(match.blackId)]) : '—'}</b></div><div class="chess-champion-bracket-status">${escapeHtml(match.result ? (match.result === 'draw' ? 'Draw' : 'Result recorded') : 'Awaiting board')}</div></article>`;
+            }).join('')}</div>`).join('<div class="chess-champion-bracket-connector" aria-hidden="true"><i class="fas fa-chevron-right"></i></div>');
+        }
+
+        function renderChessChampionRoster(state) {
+            const roster = document.getElementById('chessChampionRoster');
+            if (!roster) return;
+            const admin = currentUserRole === 'admin' && state.stage === 'registration';
+            const enrolled = new Set(state.enrolledStudentIds);
+            const students = getChessChampionStudents().filter(chessChampionIsActive).sort((a, b) => chessChampionStudentClass(a).localeCompare(chessChampionStudentClass(b), undefined, { numeric: true }) || chessChampionStudentName(a).localeCompare(chessChampionStudentName(b)));
+            roster.innerHTML = students.length ? students.map(student => {
+                const id = parseInt(student.id, 10);
+                return `<label class="chess-champion-roster-row ${enrolled.has(id) ? 'is-enrolled' : ''}"><input type="checkbox" ${enrolled.has(id) ? 'checked' : ''} ${admin ? '' : 'disabled'} onchange="toggleChessChampionParticipant(${id}, this.checked)"><span class="chess-champion-roster-check"><i class="fas fa-check"></i></span><span class="chess-champion-roster-name">${escapeHtml(chessChampionStudentName(student))}<small>${escapeHtml(chessChampionRoll(student))} · Class ${escapeHtml(chessChampionStudentClass(student))}${chessChampionStudentGroup(student) ? ` · Group ${escapeHtml(chessChampionStudentGroup(student))}` : ''}</small></span></label>`;
+            }).join('') : '<div class="chess-champion-empty chess-champion-empty-compact">No active students are available.</div>';
+        }
+
+        function renderChessChampionAdmin(state) {
+            const panel = document.getElementById('chessChampionAdminPanel');
+            if (!panel) return;
+            const admin = currentUserRole === 'admin';
+            panel.style.display = admin ? '' : 'none';
+            if (!admin) return;
+            const values = {
+                chessChampionEventName: state.eventName,
+                chessChampionBasicRounds: state.basicRoundCount,
+                chessChampionQualificationCount: state.qualificationCount,
+                chessChampionFastMinutes: Math.round(state.scoring.fastWinSeconds / 60),
+                chessChampionStandardMinutes: Math.round(state.scoring.standardWinSeconds / 60),
+                chessChampionWinPoints: state.scoring.winPoints,
+                chessChampionDrawPoints: state.scoring.drawPoints,
+                chessChampionLossPoints: state.scoring.lossPoints,
+                chessChampionClassBonus: state.scoring.classBonusPerLevel,
+                chessChampionOpponentBonus: state.scoring.opponentBonusPerFivePoints,
+                chessChampionFastBonus: state.scoring.fastTimeBonus,
+                chessChampionStandardBonus: state.scoring.standardTimeBonus,
+                chessChampionKillMultiplier: state.scoring.killPointMultiplier
+            };
+            Object.entries(values).forEach(([id, value]) => { const input = document.getElementById(id); if (input) input.value = value; });
+            panel.querySelectorAll('[data-role-only="admin"]').forEach(el => { el.disabled = state.stage !== 'registration' && !el.closest('#chessChampionRoster'); });
+            renderChessChampionRoster(state);
+        }
+
+        function renderChessChampionTab() {
+            const state = getChessChampionState();
+            const standings = getChessChampionStandings(state);
+            renderChessChampionStats(state, standings);
+            renderChessChampionStandings(state, standings);
+            renderChessChampionMatchRoom(state);
+            renderChessChampionBracket(state);
+            renderChessChampionAdmin(state);
+        }
+
+        function loadChessChampionTab() {
+            renderChessChampionTab();
+        }
+
+        function chessChampionAdminGuard() {
+            if (currentUserRole !== 'admin') {
+                showAlert('Only Admin can manage Excel Chess Champion.', 'warning');
+                return false;
+            }
+            return true;
+        }
+
+        function toggleChessChampionParticipant(studentId, checked) {
+            if (!chessChampionAdminGuard()) return;
+            const state = getChessChampionState();
+            if (state.stage !== 'registration') { showAlert('Player registration closes when the first round begins.', 'warning'); renderChessChampionTab(); return; }
+            const id = parseInt(studentId, 10) || 0;
+            const next = new Set(state.enrolledStudentIds);
+            if (checked) next.add(id); else next.delete(id);
+            state.enrolledStudentIds = Array.from(next);
+            saveChessChampionState(state);
+            renderChessChampionTab();
+        }
+
+        function selectAllChessChampionParticipants() {
+            if (!chessChampionAdminGuard()) return;
+            const state = getChessChampionState();
+            if (state.stage !== 'registration') { showAlert('Player registration closes when the first round begins.', 'warning'); return; }
+            state.enrolledStudentIds = getChessChampionStudents().filter(chessChampionIsActive).map(student => parseInt(student.id, 10)).filter(Boolean);
+            saveChessChampionState(state);
+            renderChessChampionTab();
+        }
+
+        function clearChessChampionParticipants() {
+            if (!chessChampionAdminGuard()) return;
+            const state = getChessChampionState();
+            if (state.stage !== 'registration') { showAlert('Player registration closes when the first round begins.', 'warning'); return; }
+            state.enrolledStudentIds = [];
+            saveChessChampionState(state);
+            renderChessChampionTab();
+        }
+
+        function saveChessChampionConfig() {
+            if (!chessChampionAdminGuard()) return;
+            const state = getChessChampionState();
+            if (state.stage !== 'registration') { showAlert('Settings are locked after the first round begins.', 'warning'); return; }
+            const value = id => document.getElementById(id)?.value;
+            state.eventName = String(value('chessChampionEventName') || state.eventName).trim() || 'Excel Chess Champion';
+            state.basicRoundCount = Math.round(chessChampionClamp(value('chessChampionBasicRounds'), 1, 12, state.basicRoundCount));
+            state.qualificationCount = [2, 4, 8, 16].includes(parseInt(value('chessChampionQualificationCount'), 10)) ? parseInt(value('chessChampionQualificationCount'), 10) : state.qualificationCount;
+            state.scoring.fastWinSeconds = Math.max(60, Math.round(chessChampionNumber(value('chessChampionFastMinutes'), 10) * 60));
+            state.scoring.standardWinSeconds = Math.max(state.scoring.fastWinSeconds, Math.round(chessChampionNumber(value('chessChampionStandardMinutes'), 20) * 60));
+            state.scoring.winPoints = Math.max(0, chessChampionNumber(value('chessChampionWinPoints'), state.scoring.winPoints));
+            state.scoring.drawPoints = Math.max(0, chessChampionNumber(value('chessChampionDrawPoints'), state.scoring.drawPoints));
+            state.scoring.lossPoints = Math.max(0, chessChampionNumber(value('chessChampionLossPoints'), state.scoring.lossPoints));
+            state.scoring.classBonusPerLevel = Math.max(0, chessChampionNumber(value('chessChampionClassBonus'), state.scoring.classBonusPerLevel));
+            state.scoring.opponentBonusPerFivePoints = Math.max(0, chessChampionNumber(value('chessChampionOpponentBonus'), state.scoring.opponentBonusPerFivePoints));
+            state.scoring.fastTimeBonus = Math.max(0, chessChampionNumber(value('chessChampionFastBonus'), state.scoring.fastTimeBonus));
+            state.scoring.standardTimeBonus = Math.max(0, chessChampionNumber(value('chessChampionStandardBonus'), state.scoring.standardTimeBonus));
+            state.scoring.killPointMultiplier = Math.max(0, chessChampionNumber(value('chessChampionKillMultiplier'), state.scoring.killPointMultiplier));
+            saveChessChampionState(state);
+            renderChessChampionTab();
+            showAlert('Excel Chess Champion settings saved.', 'success');
+        }
+
+        function advanceChessChampionTournament() {
+            if (!chessChampionAdminGuard()) return;
+            const state = getChessChampionState();
+            const activeIds = chessChampionActiveEnrolledIds(state);
+            if (state.stage === 'registration') {
+                if (activeIds.length < 2) { showAlert('Register at least two active players before starting.', 'warning'); return; }
+                state.stage = 'basic';
+                state.status = 'basic';
+                state.round = 1;
+                state.matches.push(...chessChampionPairIds(state, activeIds, 'basic', 1));
+                saveChessChampionState(state);
+                renderChessChampionTab();
+                showAlert('Basic Round 1 generated with balanced Swiss pairings.', 'success');
+                return;
+            }
+            const current = chessChampionCurrentMatches(state);
+            if (current.some(match => !chessChampionMatchComplete(match))) { showAlert('Record every current board result before advancing.', 'warning'); return; }
+            if (state.stage === 'basic') {
+                if (state.round < state.basicRoundCount) {
+                    state.round += 1;
+                    state.matches.push(...chessChampionPairIds(state, activeIds, 'basic', state.round));
+                    saveChessChampionState(state);
+                    renderChessChampionTab();
+                    showAlert(`Basic Round ${state.round} generated.`, 'success');
+                    return;
+                }
+                const standings = getChessChampionStandings(state);
+                const qualifierCount = chessChampionEffectiveQualificationCount(state, standings.length);
+                if (qualifierCount < 2) { showAlert('At least two players are needed for the knockout bracket.', 'warning'); return; }
+                state.qualifiedStudentIds = standings.slice(0, qualifierCount).map(row => row.id);
+                state.stage = 'elimination';
+                state.status = 'elimination';
+                state.round = 1;
+                state.matches.push(...chessChampionKnockoutMatches(state, state.qualifiedStudentIds, 'elimination', 1));
+                saveChessChampionState(state);
+                renderChessChampionTab();
+                showAlert(`Top ${qualifierCount} qualified. Elimination bracket generated.`, 'success');
+                return;
+            }
+            const winners = chessChampionWinners(state, state.stage, state.round);
+            if (state.stage === 'elimination') {
+                if (winners.length > 4) {
+                    state.round += 1;
+                    state.matches.push(...chessChampionKnockoutMatches(state, winners, 'elimination', state.round));
+                } else if (winners.length === 4) {
+                    state.stage = 'semifinal';
+                    state.status = 'semifinal';
+                    state.round = 1;
+                    state.matches.push(...chessChampionKnockoutMatches(state, winners, 'semifinal', 1));
+                } else if (winners.length === 2) {
+                    state.stage = 'finale';
+                    state.status = 'finale';
+                    state.round = 1;
+                    state.matches.push(...chessChampionKnockoutMatches(state, winners, 'finale', 1));
+                }
+            } else if (state.stage === 'semifinal' && winners.length === 2) {
+                state.stage = 'finale';
+                state.status = 'finale';
+                state.round = 1;
+                state.matches.push(...chessChampionKnockoutMatches(state, winners, 'finale', 1));
+            } else if (state.stage === 'finale' && winners.length === 1) {
+                state.stage = 'complete';
+                state.status = 'complete';
+                state.round = 0;
+            }
+            saveChessChampionState(state);
+            renderChessChampionTab();
+            showAlert(state.stage === 'complete' ? 'Excel Chess Champion crowned.' : `${chessChampionStageLabel(state.stage, state.round)} is ready.`, 'success');
+        }
+
+        function saveChessChampionMatch(matchId) {
+            if (!chessChampionAdminGuard()) return;
+            const state = getChessChampionState();
+            const match = state.matches.find(item => String(item.id) === String(matchId));
+            if (!match) return;
+            const result = document.getElementById(`chessChampionResult-${matchId}`)?.value || '';
+            const durationMinutes = Math.max(0, chessChampionNumber(document.getElementById(`chessChampionDuration-${matchId}`)?.value, 0));
+            const killPoints = Math.max(0, chessChampionNumber(document.getElementById(`chessChampionKills-${matchId}`)?.value, 0));
+            if (!['white', 'black', 'draw'].includes(result) || (match.stage !== 'basic' && result === 'draw')) { showAlert('Choose a valid match result.', 'warning'); return; }
+            if (result !== 'draw' && (!match.whiteId || !match.blackId)) { showAlert('This board cannot receive a knockout result.', 'warning'); return; }
+            const durationSeconds = Math.round(durationMinutes * 60);
+            const awards = chessChampionCalculateAwards(state, match, result, durationSeconds, killPoints);
+            match.result = result;
+            match.status = 'completed';
+            match.winnerId = result === 'white' ? match.whiteId : (result === 'black' ? match.blackId : 0);
+            match.durationSeconds = durationSeconds;
+            match.killPoints = result === 'draw' ? 0 : killPoints;
+            match.awards = awards.awards;
+            match.breakdown = awards.breakdown;
+            match.updatedAt = new Date().toISOString();
+            saveChessChampionState(state);
+            renderChessChampionTab();
+            showAlert('Match result recorded and standings updated.', 'success');
+        }
+
+        function editChessChampionMatch(matchId) {
+            if (!chessChampionAdminGuard()) return;
+            const state = getChessChampionState();
+            const match = state.matches.find(item => String(item.id) === String(matchId));
+            if (!match) return;
+            match.result = '';
+            match.status = 'scheduled';
+            match.winnerId = 0;
+            match.durationSeconds = 0;
+            match.killPoints = 0;
+            match.awards = {};
+            match.breakdown = {};
+            match.updatedAt = new Date().toISOString();
+            saveChessChampionState(state);
+            renderChessChampionTab();
+        }
+
+        function resetChessChampionTournament() {
+            if (!chessChampionAdminGuard()) return;
+            if (!confirm('Reset Excel Chess Champion? This clears registrations, rounds, results, and the bracket.')) return;
+            const state = getDefaultChessChampionState();
+            saveChessChampionState(state);
+            renderChessChampionTab();
+            showAlert('Excel Chess Champion reset. Registration is open again.', 'success');
+        }
+
+        function buildChessChampionPublicSnapshot(data = db.getData()) {
+            const state = normalizeChessChampionState(data && data.chess_champion);
+            const students = Array.isArray(data && data.students) ? data.students : getChessChampionStudents();
+            const studentMap = new Map(students.map(student => [parseInt(student.id, 10), student]));
+            const standings = getChessChampionStandings(state);
+            const publicStudent = id => {
+                const student = studentMap.get(parseInt(id, 10));
+                if (!student) return null;
+                return { roll: chessChampionRoll(student), name: _cleanPublicName(student.base_name || student.name || ''), class: chessChampionStudentClass(student), group: chessChampionStudentGroup(student) };
+            };
+            const matches = state.matches.map(match => ({
+                id: String(match.id),
+                stage: match.stage,
+                round: match.round,
+                board: match.board,
+                status: match.status,
+                result: match.result,
+                winnerSide: match.result === 'white' || match.result === 'black' ? match.result : '',
+                white: publicStudent(match.whiteId),
+                black: publicStudent(match.blackId),
+                durationSeconds: match.durationSeconds,
+                killPoints: match.killPoints,
+                awards: match.awards || {},
+                updatedAt: match.updatedAt || match.createdAt || ''
+            })).filter(match => match.white || match.black);
+            return {
+                eventName: state.eventName,
+                stage: state.stage,
+                stageLabel: chessChampionStageLabel(state.stage, state.round),
+                round: state.round,
+                basicRoundCount: state.basicRoundCount,
+                qualificationCount: state.qualificationCount,
+                enrolledCount: state.enrolledStudentIds.length,
+                qualifiedCount: state.qualifiedStudentIds.length,
+                updatedAt: state.updatedAt || data.updated_at || '',
+                scoring: { ...state.scoring },
+                standings: standings.map(row => ({ rank: row.rank, ...publicStudent(row.id), points: row.points, matches: row.matches, wins: row.wins, draws: row.draws, losses: row.losses, killPoints: row.killPoints, bonusPoints: row.classBonus + row.opponentBonus + row.timeBonus + row.killBonus })).filter(row => row.name),
+                matches
+            };
+        }
+
         class ScoreboardDB {
             constructor() {
                 this.storageKey = 'ea_scoreboard_data';
@@ -12962,6 +13840,7 @@ body.header-offscreen .header-kicker::after {
                     awf_expenses: [],
                     postholder_tickets: {},
                     postholder_ticket_log: [],
+                    chess_champion: getDefaultChessChampionState(),
                     app_settings: getDefaultAppSettings(),
                     updated_at: null
                 };
@@ -13056,6 +13935,7 @@ body.header-offscreen .header-kicker::after {
                 if (!Array.isArray(data.public_information)) data.public_information = [];
                 if (!data.score_adjustment_actions) data.score_adjustment_actions = [];
                 if (!Array.isArray(data.awf_expenses)) data.awf_expenses = [];
+                data.chess_champion = normalizeChessChampionState(data.chess_champion);
                 if (!data.app_settings || typeof data.app_settings !== 'object') data.app_settings = getDefaultAppSettings();
                 data.students = (data.students || [])
                     .map(student => normalizeStudentMeta(student))
@@ -15634,6 +16514,7 @@ body.header-offscreen .header-kicker::after {
                 'group-scoreboard':      loadGroupScoreboard,
                 'party-standings':       loadPartyStandings,
                 'team-competition':      loadTeamCompetitionTab,
+                'excel-chess-champion':  loadChessChampionTab,
                 'voting':                loadVotingTab,
                 'teachers':              loadTeachersTab,
                 'appeals':               loadAppealsTab,
@@ -15766,7 +16647,7 @@ body.header-offscreen .header-kicker::after {
         }
 
         function autoAdjustTableFontsNow() {
-            ['scoreboardTable', 'recordStudentsTable', 'studentsList', 'duplicateRollTable', 'feesTable', 'resourceCabinetTable', 'resourceRequestsTable', 'resourceTransactionsTable', 'resourceEligibilityTable', 'syllabusLectureTable', 'groupScoreboardTable', 'groupRosterTable', 'crGroupTable', 'appealsTable', 'attendanceTable', 'attendanceReportTable', 'attendanceStudentReportTable', 'postHistoryTable', 'profilePostHistoryTable']
+            ['scoreboardTable', 'recordStudentsTable', 'studentsList', 'duplicateRollTable', 'feesTable', 'resourceCabinetTable', 'resourceRequestsTable', 'resourceTransactionsTable', 'resourceEligibilityTable', 'syllabusLectureTable', 'crGroupTable', 'appealsTable', 'attendanceTable', 'attendanceReportTable', 'attendanceStudentReportTable', 'postHistoryTable', 'profilePostHistoryTable']
                 .forEach(id => autoAdjustSingleTableFont(document.getElementById(id)));
         }
 
@@ -15818,6 +16699,7 @@ body.header-offscreen .header-kicker::after {
                 else if (tabName === 'syllabus') loadSyllabusTab();
                 else if (tabName === 'ranking') initRankingForm();
                 else if (tabName === 'group-scoreboard') loadGroupScoreboard();
+                else if (tabName === 'excel-chess-champion') loadChessChampionTab();
                 else if (tabName === 'gr') loadCRTab();
                 else if (tabName === 'teachers') loadTeachersTab();
                 else if (tabName === 'party') { initPartyColorSwatches(); loadParties(); }
@@ -17497,7 +18379,7 @@ body.header-offscreen .header-kicker::after {
             const isStudent = !isAdmin && !isTeacher;
             // Tabs visible to everyone (students, teachers, admins)
             if (['scoreboard', 'group-scoreboard', 'information', 'rules', 'syllabus',
-                 'resources', 'excel-mela', 'team-competition', 'awf', 'good-conduct',
+                 'resources', 'excel-mela', 'team-competition', 'excel-chess-champion', 'awf', 'good-conduct',
                  'appeals', 'proposals', 'party-standings'].includes(tabName)) return true;
             // Student-only tabs
             if (tabName === 'my-dashboard') return isStudent;
@@ -17533,6 +18415,7 @@ body.header-offscreen .header-kicker::after {
             setTabVisibility('resources', true);
             setTabVisibility('excel-mela', true);
             setTabVisibility('team-competition', true);
+            setTabVisibility('excel-chess-champion', true);
             setTabVisibility('awf', true);
             setTabVisibility('good-conduct', true);
             setTabVisibility('appeals', true);
@@ -17682,6 +18565,9 @@ body.header-offscreen .header-kicker::after {
                 });
             }
 
+            document.querySelectorAll('[data-role-only="admin"]').forEach(el => {
+                el.disabled = !isAdmin;
+            });
             enforceTeacherCurrentMonthOnlyUi();
         }
 
@@ -20327,6 +21213,7 @@ body.header-offscreen .header-kicker::after {
                 months,
                 scoreboard,
                 parties,
+                chess_champion: buildChessChampionPublicSnapshot(data),
                 public_information: _sanitizePublicInformationForExport(data.public_information || [])
             };
         }
@@ -21050,26 +21937,6 @@ body.header-offscreen .header-kicker::after {
                 rollCell.style.whiteSpace = 'nowrap';
                 rollCell.style.textOverflow = 'clip';
                 rollCell.style.zIndex = '44';
-                rollCell.style.isolation = 'isolate';
-            });
-        }
-
-        function sanitizeGroupRosterRollCells() {
-            const tbody = document.getElementById('groupRosterBody');
-            if (!tbody) return;
-            tbody.querySelectorAll('tr').forEach((tr) => {
-                const cells = tr.querySelectorAll('td');
-                const rollCell = cells[1];
-                if (!rollCell) return;
-                const rawText = String(rollCell.textContent || '').toUpperCase();
-                const match = rawText.match(/EA[A-Z0-9]{5}/);
-                const roll = match ? match[0] : '';
-                if (!roll) return;
-                rollCell.textContent = roll;
-                rollCell.style.overflow = 'hidden';
-                rollCell.style.whiteSpace = 'nowrap';
-                rollCell.style.textOverflow = 'clip';
-                rollCell.style.zIndex = '2';
                 rollCell.style.isolation = 'isolate';
             });
         }
@@ -30493,38 +31360,16 @@ body.header-offscreen .header-kicker::after {
             });
 
             startRankingAnimationLoop();
-            // Fireworks when podium renders
-            scheduleRankingFireworks();
+            // Play fireworks immediately when the month first renders. The 5-second
+            // loop below only repeats the fireworks; ranking content stays still.
+            scheduleRankingFireworks(0);
         }
 
         function replayRankingAnimations() {
-            const content = document.getElementById('rankingContent');
-            if (!content) return;
-            // Re-trigger CSS animations by removing and re-adding the elements
-            const podium = content.querySelector('.ranking-podium');
-            const groups = content.querySelectorAll('.ranking-group');
-            if (podium) {
-                podium.style.animation = 'none';
-                void podium.offsetWidth;
-                podium.style.animation = '';
-            }
-            groups.forEach(gEl => {
-                gEl.style.animation = 'none';
-                void gEl.offsetWidth;
-                gEl.style.animation = '';
-                gEl.querySelectorAll('.ranking-card').forEach(card => {
-                    card.style.animation = 'none';
-                    void card.offsetWidth;
-                    card.style.animation = '';
-                });
-            });
-            // Also re-trigger podium slot animations
-            content.querySelectorAll('.podium-slot').forEach(slot => {
-                slot.style.animation = 'none';
-                void slot.offsetWidth;
-                slot.style.animation = '';
-            });
-            scheduleRankingFireworks();
+            if (!isRankingTabVisible()) return;
+            // Keep this function for the existing Replay Animation button and timer,
+            // but do not reset/replay the podium, groups, cards, or their contents.
+            scheduleRankingFireworks(0);
         }
 
         // ── Fireworks / Confetti animation ──────────────────────────────────
@@ -30621,12 +31466,19 @@ body.header-offscreen .header-kicker::after {
 
         function renderGroupScoreboard() {
             const month = getElementValue('groupMonthFilter');
-            const tbody = document.getElementById('groupScoreboardBody');
-            const rosterBody = document.getElementById('groupRosterBody');
+            const scorecardGrid = document.getElementById('groupScoreboardBody');
+            const monthLabel = document.getElementById('groupScoreboardMonthLabel');
             const selectedGroup = getElementValue('groupFilterSelect') || 'all';
-            if (!month || !tbody) return;
+            if (!month || !scorecardGrid) return;
 
-            let rows = db.getMonthlyScoreboard(month);
+            if (monthLabel) {
+                const date = new Date(month + '-01');
+                monthLabel.textContent = Number.isNaN(date.getTime())
+                    ? month
+                    : date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+            }
+
+            let rows = db.getMonthlyScoreboard(month) || [];
             if (selectedGroup !== 'all') {
                 rows = rows.filter(row => getStudentGroup(row.student) === selectedGroup);
             }
@@ -30640,97 +31492,59 @@ body.header-offscreen .header-kicker::after {
                     return rollMatch;
                 });
             }
+
             const groups = {};
             rows.forEach(row => {
                 const key = getStudentGroup(row.student) || 'UNGROUPED';
                 if (!groups[key]) {
-                    groups[key] = {
-                        group: key,
-                        students: 0,
-                        total: 0,
-                        votePower: 0,
-                        stars: 0,
-                        vetos: 0
-                    };
+                    groups[key] = { group: key, total: 0 };
                 }
-                groups[key].students += 1;
-                groups[key].total += row.total;
-                groups[key].votePower += computeVotePower(row.total);
-                groups[key].stars += parseInt(row.monthlyStars, 10) || 0;
-                groups[key].vetos += parseInt(row.monthlyVetos, 10) || 0;
+                const score = Number(row.total);
+                groups[key].total += Number.isFinite(score) ? score : 0;
             });
 
             const ranked = Object.values(groups).sort((a, b) => {
+                const scoreDiff = Number(b.total) - Number(a.total);
+                if (scoreDiff !== 0) return scoreDiff;
                 const groupDiff = getGroupSortRank(a.group) - getGroupSortRank(b.group);
                 if (groupDiff !== 0) return groupDiff;
                 return String(a.group || '').localeCompare(String(b.group || ''));
             });
-            tbody.innerHTML = ranked.map((row, idx) => `
-                <tr class="${getGroupRowClass(row.group)}">
-                    <td class="rank-cell">${idx + 1}</td>
-                    <td><strong>${row.group}</strong></td>
-                    <td>${row.students}</td>
-                    <td class="total-cell">${row.total}</td>
-                    <td>${row.students ? Math.round(row.total / row.students) : 0}</td>
-                    <td class="vote-cell">${row.votePower}</td>
-                    <td>${row.stars}</td>
-                    <td>${row.vetos}</td>
-                </tr>
-            `).join('');
 
-            if (!ranked.length) {
-                tbody.innerHTML = `<tr><td colspan="8" class="text-center" style="padding: 30px;">No data for selected month</td></tr>`;
-            }
-
-            if (rosterBody) {
-                const _rosterHtmlRows = rows
-                    .sort((a, b) => {
-                        // First, sort by group rank (A, B, C, D, E, F, G, H, etc.)
-                        const g = getGroupSortRank(getStudentGroup(a.student)) - getGroupSortRank(getStudentGroup(b.student));
-                        if (g !== 0) return g;
-
-                        // Then, sort by last 3 characters of roll number (e.g., A01, A02, A03...)
-                        const aRoll = getLast3CharsFromRoll(a.student.roll);
-                        const bRoll = getLast3CharsFromRoll(b.student.roll);
-                        return aRoll.localeCompare(bRoll);
-                    })
-                    .map(row => `
-                        <tr class="${getGroupRowClass(getStudentGroup(row.student) || 'UNGROUPED')}">
-                            <td><strong>${getStudentGroup(row.student) || '-'}</strong></td>
-                            <td>${escapeHtml(formatRollDisplay(row.student.roll) || '-')}</td>
-                            <td>${renderStudentName(row.student, month)}</td>
-                            <td>${row.student.class || '-'}</td>
-                            <td class="total-cell">${row.total}</td>
-                            <td class="vote-cell">${computeVotePower(row.total)}</td>
-                            <td>${coalesce(row.monthlyStars, 0)}</td>
-                            <td>${coalesce(row.monthlyVetos, 0)}</td>
-                        </tr>
-                    `);
-
-                // Write roster rows to DOM in chunks for smoother rendering.
-                eaChunkedInnerHtml(rosterBody, _rosterHtmlRows, {
-                    chunkSize: 60,
-                    onDone() {
-                        if (rosterBody.children.length === 0) {
-                            rosterBody.innerHTML = `<tr><td colspan="8" class="text-center" style="padding: 30px;">No students for selected filters</td></tr>`;
-                        }
-                        // Defer animations, sanitize, and font adjustments to next rAF so the
-                        // innerHTML content paints before we force reflows.
-                        eaScheduleRender(() => {
-                            animateTableRows(tbody);
-                            animateTableRows(rosterBody);
-                            sanitizeGroupRosterRollCells();
-                            autoAdjustTableFonts();
-                        });
-                    }
-                });
-            } else {
-                // No roster body — just animate the group summary table.
-                eaScheduleRender(() => {
-                    animateTableRows(tbody);
-                    autoAdjustTableFonts();
-                });
-            }
+            scorecardGrid.innerHTML = ranked.length ? ranked.map((row, idx) => {
+                const group = String(row.group || 'UNGROUPED').trim().toUpperCase();
+                const groupTitle = group === 'UNGROUPED' ? 'Ungrouped' : `Group ${group}`;
+                const score = Number.isFinite(Number(row.total)) ? Number(row.total) : 0;
+                const rank = String(idx + 1).padStart(2, '0');
+                const rankClass = idx < 3 ? `is-rank-${idx + 1}` : '';
+                const delay = Math.min(idx, 8) * 65;
+                return `
+                    <article class="group-scorecard ${getGroupRowClass(group)} ${rankClass}" role="listitem" style="--scorecard-delay:${delay}ms">
+                        <div class="group-scorecard-topline">
+                            <div class="group-scorecard-rank">
+                                <span>Rank</span>
+                                <strong>${rank}</strong>
+                            </div>
+                            <div class="group-scorecard-sigil" aria-hidden="true">${escapeHtml(group === 'UNGROUPED' ? '?' : group.charAt(0))}</div>
+                        </div>
+                        <div class="group-scorecard-content">
+                            <span class="group-scorecard-overline">Group total</span>
+                            <h3>${escapeHtml(groupTitle)}</h3>
+                            <div class="group-scorecard-score">
+                                <strong>${score}</strong>
+                                <span>Points</span>
+                            </div>
+                        </div>
+                        <div class="group-scorecard-footer" aria-hidden="true"><span></span></div>
+                    </article>
+                `;
+            }).join('') : `
+                <div class="group-scorecard-empty" role="status">
+                    <i class="fas fa-moon" aria-hidden="true"></i>
+                    <strong>No totals for this period</strong>
+                    <span>Try another period or widen the group focus.</span>
+                </div>
+            `;
         }
 
         function loadPartyStandings() {

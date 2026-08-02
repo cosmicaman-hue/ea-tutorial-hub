@@ -6956,19 +6956,6 @@
             border-bottom: 1px solid rgba(55, 1, 100, 0.65);
             box-shadow: inset 0 0 0 1px rgba(140, 60, 210, 0.22);
         }
-        #groupRosterTable td:nth-child(2) {
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: clip;
-            position: relative;
-            z-index: 2;
-            isolation: isolate;
-        }
-        #groupRosterTable td:nth-child(3) {
-            position: relative;
-            z-index: 1;
-            overflow: hidden;
-        }
         .group-e-row td {
             background: linear-gradient(90deg, rgba(124, 58, 237, 0.72), rgba(167, 139, 250, 0.32));
             border-top: 1px solid rgba(196, 181, 253, 0.9);
@@ -7713,5 +7700,731 @@
                 animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
                 mix-blend-mode: normal;
             }
+        }
+
+        #group-scoreboard-tab.tab-content {
+            content-visibility: visible !important;
+            contain: none !important;
+        }
+
+        #group-scoreboard-tab .group-scoreboard-shell {
+            position: relative;
+            isolation: isolate;
+            overflow: hidden;
+            min-height: 620px;
+            padding: clamp(22px, 4vw, 52px);
+            border: 1px solid rgba(125, 211, 252, 0.18);
+            border-radius: 30px;
+            background:
+                radial-gradient(900px 520px at 8% 0%, rgba(99, 102, 241, 0.18), transparent 62%),
+                radial-gradient(700px 420px at 100% 18%, rgba(168, 85, 247, 0.17), transparent 62%),
+                linear-gradient(152deg, #070b16 0%, #10172a 48%, #060912 100%);
+            box-shadow: 0 30px 80px rgba(2, 6, 23, 0.52), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+        }
+
+        #group-scoreboard-tab .group-scoreboard-shell::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            z-index: -1;
+            background-image:
+                linear-gradient(rgba(125, 211, 252, 0.045) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(125, 211, 252, 0.045) 1px, transparent 1px);
+            background-size: 42px 42px;
+            mask-image: linear-gradient(180deg, black 0%, rgba(0, 0, 0, 0.72) 58%, transparent 100%);
+            pointer-events: none;
+        }
+
+        #group-scoreboard-tab .group-scoreboard-shell::after {
+            content: '';
+            position: absolute;
+            inset: 12px;
+            z-index: -1;
+            border: 1px solid rgba(255, 255, 255, 0.045);
+            border-radius: 22px;
+            pointer-events: none;
+        }
+
+        #group-scoreboard-tab .group-scoreboard-ambient {
+            position: absolute;
+            inset: 0;
+            z-index: -1;
+            overflow: hidden;
+            pointer-events: none;
+        }
+
+        #group-scoreboard-tab .group-scoreboard-orb {
+            position: absolute;
+            display: block;
+            width: 260px;
+            height: 260px;
+            border-radius: 50%;
+            filter: blur(30px);
+            opacity: 0.34;
+            animation: groupScoreboardFloat 10s ease-in-out infinite alternate;
+        }
+
+        #group-scoreboard-tab .group-scoreboard-orb-left {
+            top: 20%;
+            left: -12%;
+            background: radial-gradient(circle, rgba(56, 189, 248, 0.42), transparent 70%);
+        }
+
+        #group-scoreboard-tab .group-scoreboard-orb-right {
+            right: -10%;
+            bottom: -15%;
+            background: radial-gradient(circle, rgba(217, 70, 239, 0.34), transparent 70%);
+            animation-delay: -4s;
+        }
+
+        #group-scoreboard-tab .group-scoreboard-scanline {
+            position: absolute;
+            top: -35%;
+            left: -30%;
+            display: block;
+            width: 24%;
+            height: 170%;
+            background: linear-gradient(90deg, transparent, rgba(186, 230, 253, 0.16), transparent);
+            transform: skewX(-18deg);
+            animation: groupScoreboardScan 9s cubic-bezier(0.4, 0, 0.6, 1) 1s infinite;
+        }
+
+        #group-scoreboard-tab .group-scoreboard-toolbar,
+        #group-scoreboard-tab .group-scoreboard-rule,
+        #group-scoreboard-tab .group-scoreboard-caption,
+        #group-scoreboard-tab .group-scorecard-grid {
+            position: relative;
+            z-index: 1;
+        }
+
+        #group-scoreboard-tab .group-scoreboard-toolbar {
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-between;
+            gap: 28px;
+        }
+
+        #group-scoreboard-tab .group-scoreboard-intro {
+            max-width: 620px;
+        }
+
+        #group-scoreboard-tab .group-scoreboard-kicker {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            color: #a5b4fc;
+            font-size: 0.7rem;
+            font-weight: 850;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+        }
+
+        #group-scoreboard-tab .group-scoreboard-kicker i {
+            color: #67e8f9;
+            filter: drop-shadow(0 0 8px rgba(103, 232, 249, 0.55));
+        }
+
+        #group-scoreboard-tab .group-scoreboard-intro h2 {
+            margin: 12px 0 8px;
+            color: #f8fafc;
+            font-family: var(--display-font);
+            font-size: clamp(2rem, 4.6vw, 4.3rem);
+            font-weight: 900;
+            letter-spacing: 0.025em;
+            line-height: 1;
+            text-shadow: 0 10px 35px rgba(99, 102, 241, 0.34);
+        }
+
+        #group-scoreboard-tab .group-scoreboard-intro p {
+            margin: 0;
+            color: #aebbd1;
+            font-size: clamp(0.88rem, 1.3vw, 1.08rem);
+            line-height: 1.6;
+        }
+
+        #group-scoreboard-tab .group-scoreboard-controls {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(145px, 1fr));
+            gap: 10px;
+            width: min(100%, 360px);
+            flex: 0 0 auto;
+        }
+
+        #group-scoreboard-tab .group-scoreboard-filter {
+            padding: 10px;
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            border-radius: 14px;
+            background: rgba(2, 6, 23, 0.48);
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+        }
+
+        #group-scoreboard-tab .group-scoreboard-filter label {
+            display: block;
+            margin: 0 0 6px;
+            color: #8494ae;
+            font-size: 0.62rem;
+            font-weight: 850;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+        }
+
+        #group-scoreboard-tab .group-scoreboard-filter select {
+            width: 100%;
+            min-width: 0;
+            padding: 8px 9px;
+            border: 1px solid rgba(125, 211, 252, 0.22);
+            border-radius: 9px;
+            outline: none;
+            background: rgba(15, 23, 42, 0.86);
+            color: #e2e8f0;
+            font-size: 0.82rem;
+            font-weight: 700;
+        }
+
+        #group-scoreboard-tab .group-scoreboard-filter select:focus {
+            border-color: #67e8f9;
+            box-shadow: 0 0 0 3px rgba(103, 232, 249, 0.14);
+        }
+
+        #group-scoreboard-tab .group-scoreboard-rule {
+            height: 1px;
+            margin: clamp(24px, 4vw, 42px) 0 16px;
+            background: linear-gradient(90deg, rgba(103, 232, 249, 0.72), rgba(167, 139, 250, 0.3) 42%, transparent 100%);
+        }
+
+        #group-scoreboard-tab .group-scoreboard-rule span {
+            display: block;
+            width: 90px;
+            height: 3px;
+            margin-top: -1px;
+            border-radius: 99px;
+            background: linear-gradient(90deg, #67e8f9, #a78bfa);
+            box-shadow: 0 0 18px rgba(103, 232, 249, 0.5);
+        }
+
+        #group-scoreboard-tab .group-scoreboard-caption {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 14px;
+            color: #dbeafe;
+            font-size: 0.84rem;
+            font-weight: 750;
+        }
+
+        #group-scoreboard-tab .group-scoreboard-caption > div {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        #group-scoreboard-tab .group-scoreboard-caption-kicker {
+            color: #67e8f9;
+            font-size: 0.64rem;
+            font-weight: 900;
+            letter-spacing: 0.16em;
+            text-transform: uppercase;
+        }
+
+        #group-scoreboard-tab .group-scoreboard-caption-meta {
+            color: #71819c;
+            font-size: 0.7rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        #group-scoreboard-tab .group-scorecard-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 14px;
+            min-width: 0;
+        }
+
+        #group-scoreboard-tab .group-scorecard {
+            --scorecard-rgb: 148, 163, 184;
+            --scorecard-accent: #cbd5e1;
+            position: relative;
+            display: flex;
+            min-height: 230px;
+            flex-direction: column;
+            justify-content: space-between;
+            overflow: hidden;
+            padding: 20px;
+            border: 1px solid rgba(var(--scorecard-rgb), 0.34);
+            border-radius: 21px;
+            background:
+                radial-gradient(circle at 88% 12%, rgba(var(--scorecard-rgb), 0.2), transparent 42%),
+                linear-gradient(145deg, rgba(30, 41, 59, 0.93), rgba(10, 16, 30, 0.96));
+            box-shadow: 0 16px 32px rgba(2, 6, 23, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+            opacity: 0;
+            transform: translateY(18px) scale(0.97);
+            animation: groupScorecardIn 620ms cubic-bezier(0.16, 1, 0.3, 1) var(--scorecard-delay, 0ms) both;
+            transition: transform 260ms cubic-bezier(0.16, 1, 0.3, 1), border-color 260ms ease, box-shadow 260ms ease;
+        }
+
+        #group-scoreboard-tab .group-scorecard::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background:
+                linear-gradient(rgba(var(--scorecard-rgb), 0.055) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(var(--scorecard-rgb), 0.055) 1px, transparent 1px),
+                linear-gradient(125deg, rgba(255, 255, 255, 0.08), transparent 35%);
+            background-size: 30px 30px, 30px 30px, auto;
+            opacity: 0.8;
+            pointer-events: none;
+        }
+
+        #group-scoreboard-tab .group-scorecard::after {
+            content: '';
+            position: absolute;
+            right: -58px;
+            bottom: -72px;
+            width: 190px;
+            height: 190px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(var(--scorecard-rgb), 0.24), transparent 68%);
+            pointer-events: none;
+        }
+
+        #group-scoreboard-tab .group-scorecard:hover {
+            border-color: rgba(var(--scorecard-rgb), 0.72);
+            box-shadow: 0 24px 46px rgba(2, 6, 23, 0.46), 0 0 30px rgba(var(--scorecard-rgb), 0.12);
+            transform: translateY(-7px) scale(1.01);
+        }
+
+        #group-scoreboard-tab .group-scorecard-topline,
+        #group-scoreboard-tab .group-scorecard-content,
+        #group-scoreboard-tab .group-scorecard-footer {
+            position: relative;
+            z-index: 1;
+        }
+
+        #group-scoreboard-tab .group-scorecard-topline {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 12px;
+        }
+
+        #group-scoreboard-tab .group-scorecard-rank {
+            display: flex;
+            flex-direction: column;
+            gap: 1px;
+        }
+
+        #group-scoreboard-tab .group-scorecard-rank span,
+        #group-scoreboard-tab .group-scorecard-overline {
+            color: #8190aa;
+            font-size: 0.62rem;
+            font-weight: 900;
+            letter-spacing: 0.16em;
+            text-transform: uppercase;
+        }
+
+        #group-scoreboard-tab .group-scorecard-rank strong {
+            color: var(--scorecard-accent);
+            font-family: var(--counter-font);
+            font-size: 1.7rem;
+            font-weight: 950;
+            line-height: 1;
+            text-shadow: 0 0 18px rgba(var(--scorecard-rgb), 0.34);
+        }
+
+        #group-scoreboard-tab .group-scorecard-sigil {
+            color: rgba(var(--scorecard-rgb), 0.28);
+            font-family: var(--display-font);
+            font-size: clamp(3.8rem, 6vw, 5.2rem);
+            font-weight: 900;
+            line-height: 0.72;
+            text-shadow: 0 0 26px rgba(var(--scorecard-rgb), 0.2);
+        }
+
+        #group-scoreboard-tab .group-scorecard-content {
+            margin-top: 22px;
+        }
+
+        #group-scoreboard-tab .group-scorecard-content h3 {
+            margin: 6px 0 18px;
+            color: #f8fafc;
+            font-size: clamp(1.3rem, 2vw, 1.7rem);
+            font-weight: 850;
+            letter-spacing: 0.01em;
+            line-height: 1.1;
+        }
+
+        #group-scoreboard-tab .group-scorecard-score {
+            display: flex;
+            align-items: baseline;
+            gap: 8px;
+        }
+
+        #group-scoreboard-tab .group-scorecard-score strong {
+            color: var(--scorecard-accent);
+            font-family: var(--counter-font);
+            font-size: clamp(2.6rem, 4.7vw, 4.3rem);
+            font-weight: 950;
+            letter-spacing: -0.06em;
+            line-height: 0.95;
+            text-shadow: 0 0 24px rgba(var(--scorecard-rgb), 0.32);
+        }
+
+        #group-scoreboard-tab .group-scorecard-score span {
+            color: #8494ae;
+            font-size: 0.67rem;
+            font-weight: 900;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+        }
+
+        #group-scoreboard-tab .group-scorecard-footer {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 22px;
+        }
+
+        #group-scoreboard-tab .group-scorecard-footer::before {
+            content: '';
+            display: block;
+            width: 54%;
+            height: 2px;
+            border-radius: 99px;
+            background: linear-gradient(90deg, var(--scorecard-accent), transparent);
+            box-shadow: 0 0 10px rgba(var(--scorecard-rgb), 0.35);
+        }
+
+        #group-scoreboard-tab .group-scorecard.is-rank-1 {
+            grid-column: span 2;
+            min-height: 282px;
+            border-color: rgba(251, 191, 36, 0.58);
+            background:
+                radial-gradient(circle at 76% 0%, rgba(251, 191, 36, 0.24), transparent 48%),
+                linear-gradient(145deg, rgba(76, 55, 16, 0.62), rgba(17, 24, 39, 0.98) 68%);
+            box-shadow: 0 22px 48px rgba(2, 6, 23, 0.45), 0 0 36px rgba(251, 191, 36, 0.12), inset 0 1px 0 rgba(255, 251, 235, 0.12);
+        }
+
+        #group-scoreboard-tab .group-scorecard.is-rank-1,
+        #group-scoreboard-tab .group-scorecard.is-rank-2,
+        #group-scoreboard-tab .group-scorecard.is-rank-3 {
+            --scorecard-rgb: 251, 191, 36;
+            --scorecard-accent: #fcd34d;
+        }
+
+        #group-scoreboard-tab .group-scorecard.is-rank-2 {
+            --scorecard-rgb: 203, 213, 225;
+            --scorecard-accent: #e2e8f0;
+        }
+
+        #group-scoreboard-tab .group-scorecard.is-rank-3 {
+            --scorecard-rgb: 251, 146, 60;
+            --scorecard-accent: #fdba74;
+        }
+
+        #group-scoreboard-tab .group-scorecard.is-rank-1 .group-scorecard-score strong {
+            font-size: clamp(3.8rem, 7vw, 6rem);
+        }
+
+        #group-scoreboard-tab .group-scorecard.group-a-row { --scorecard-rgb: 148, 163, 184; --scorecard-accent: #e2e8f0; }
+        #group-scoreboard-tab .group-scorecard.group-b-row { --scorecard-rgb: 34, 197, 94; --scorecard-accent: #86efac; }
+        #group-scoreboard-tab .group-scorecard.group-c-row { --scorecard-rgb: 56, 189, 248; --scorecard-accent: #7dd3fc; }
+        #group-scoreboard-tab .group-scorecard.group-d-row { --scorecard-rgb: 168, 85, 247; --scorecard-accent: #d8b4fe; }
+        #group-scoreboard-tab .group-scorecard.group-e-row { --scorecard-rgb: 139, 92, 246; --scorecard-accent: #c4b5fd; }
+        #group-scoreboard-tab .group-scorecard.group-f-row { --scorecard-rgb: 239, 68, 68; --scorecard-accent: #fca5a5; }
+        #group-scoreboard-tab .group-scorecard.group-g-row { --scorecard-rgb: 20, 184, 166; --scorecard-accent: #99f6e4; }
+        #group-scoreboard-tab .group-scorecard.group-h-row { --scorecard-rgb: 245, 158, 11; --scorecard-accent: #fcd34d; }
+        #group-scoreboard-tab .group-scorecard.group-ungrouped-row { --scorecard-rgb: 100, 116, 139; --scorecard-accent: #cbd5e1; }
+
+        #group-scoreboard-tab .group-scorecard.is-rank-1,
+        #group-scoreboard-tab .group-scorecard.is-rank-2,
+        #group-scoreboard-tab .group-scorecard.is-rank-3 {
+            border-color: rgba(var(--scorecard-rgb), 0.58);
+        }
+
+        #group-scoreboard-tab .group-scorecard-empty {
+            grid-column: 1 / -1;
+            display: grid;
+            place-items: center;
+            min-height: 280px;
+            gap: 8px;
+            padding: 40px 20px;
+            border: 1px dashed rgba(148, 163, 184, 0.28);
+            border-radius: 21px;
+            background: rgba(15, 23, 42, 0.44);
+            color: #94a3b8;
+            text-align: center;
+        }
+
+        #group-scoreboard-tab .group-scorecard-empty i {
+            margin-bottom: 4px;
+            color: #67e8f9;
+            font-size: 1.7rem;
+        }
+
+        #group-scoreboard-tab .group-scorecard-empty strong {
+            color: #e2e8f0;
+            font-size: 1rem;
+        }
+
+        #group-scoreboard-tab .group-scorecard-empty span {
+            color: #71819c;
+            font-size: 0.82rem;
+        }
+
+        body.light-mode #group-scoreboard-tab .group-scoreboard-filter select {
+            background: rgba(15, 23, 42, 0.92);
+            color: #f8fafc;
+        }
+
+        @keyframes groupScorecardIn {
+            from { opacity: 0; transform: translateY(18px) scale(0.97); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        @keyframes groupScoreboardFloat {
+            from { transform: translate3d(0, 0, 0) scale(1); }
+            to { transform: translate3d(34px, -20px, 0) scale(1.12); }
+        }
+
+        @keyframes groupScoreboardScan {
+            0% { transform: translateX(-220%) skewX(-18deg); opacity: 0; }
+            10%, 84% { opacity: 1; }
+            100% { transform: translateX(720%) skewX(-18deg); opacity: 0; }
+        }
+
+        @media (max-width: 1080px) {
+            #group-scoreboard-tab .group-scorecard-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+        }
+
+        @media (max-width: 760px) {
+            #group-scoreboard-tab .group-scoreboard-shell { padding: 24px 18px; border-radius: 22px; }
+            #group-scoreboard-tab .group-scoreboard-toolbar { align-items: stretch; flex-direction: column; gap: 22px; }
+            #group-scoreboard-tab .group-scoreboard-controls { width: 100%; }
+            #group-scoreboard-tab .group-scorecard-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            #group-scoreboard-tab .group-scorecard.is-rank-1 { grid-column: span 2; }
+            #group-scoreboard-tab .group-scorecard { min-height: 215px; padding: 17px; }
+            #group-scoreboard-tab .group-scorecard.is-rank-1 { min-height: 250px; }
+            #group-scoreboard-tab .group-scoreboard-caption { align-items: flex-start; flex-direction: column; }
+        }
+
+        @media (max-width: 500px) {
+            #group-scoreboard-tab .group-scoreboard-shell { min-height: 0; padding: 22px 14px 28px; }
+            #group-scoreboard-tab .group-scoreboard-controls { grid-template-columns: 1fr; }
+            #group-scoreboard-tab .group-scoreboard-intro h2 { font-size: clamp(2rem, 12vw, 3rem); }
+            #group-scoreboard-tab .group-scorecard-grid { grid-template-columns: 1fr; }
+            #group-scoreboard-tab .group-scorecard.is-rank-1 { grid-column: span 1; }
+            #group-scoreboard-tab .group-scorecard-score strong { font-size: 3.2rem; }
+            #group-scoreboard-tab .group-scorecard.is-rank-1 .group-scorecard-score strong { font-size: 4.2rem; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            #group-scoreboard-tab .group-scoreboard-orb,
+            #group-scoreboard-tab .group-scoreboard-scanline,
+            #group-scoreboard-tab .group-scorecard {
+                animation: none !important;
+                opacity: 1 !important;
+                transform: none !important;
+            }
+        }
+
+        /* ── EXCEL CHESS CHAMPION ───────────────────────────────────────────── */
+        #excel-chess-champion-tab.tab-content { content-visibility: visible !important; contain: none !important; }
+        #excel-chess-champion-tab .chess-champion-shell {
+            position: relative;
+            isolation: isolate;
+            overflow: hidden;
+            min-height: 780px;
+            padding: clamp(18px, 3vw, 42px);
+            border: 1px solid rgba(250, 204, 21, .22);
+            border-radius: 32px;
+            background:
+                radial-gradient(620px 420px at 8% 5%, rgba(245, 158, 11, .16), transparent 66%),
+                radial-gradient(720px 480px at 94% 12%, rgba(99, 102, 241, .22), transparent 62%),
+                linear-gradient(145deg, #070b17 0%, #11152c 48%, #04050c 100%);
+            box-shadow: 0 32px 100px rgba(2, 6, 23, .58), inset 0 1px 0 rgba(255, 255, 255, .07);
+        }
+        #excel-chess-champion-tab .chess-champion-shell::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            z-index: -2;
+            opacity: .45;
+            background-image: linear-gradient(rgba(250, 204, 21, .045) 1px, transparent 1px), linear-gradient(90deg, rgba(250, 204, 21, .045) 1px, transparent 1px);
+            background-size: 38px 38px;
+            mask-image: linear-gradient(180deg, #000, transparent 86%);
+            pointer-events: none;
+        }
+        #excel-chess-champion-tab .chess-champion-stars,
+        #excel-chess-champion-tab .chess-champion-stars::before,
+        #excel-chess-champion-tab .chess-champion-stars::after {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            content: '';
+        }
+        #excel-chess-champion-tab .chess-champion-stars { z-index: -1; opacity: .6; background-image: radial-gradient(circle, rgba(255,255,255,.75) 0 1px, transparent 1.5px); background-size: 87px 103px; animation: chessChampionStars 19s linear infinite; }
+        #excel-chess-champion-tab .chess-champion-stars::before { background-image: radial-gradient(circle, rgba(250,204,21,.7) 0 1px, transparent 1.5px); background-size: 131px 149px; animation: chessChampionStars 29s linear reverse infinite; }
+        #excel-chess-champion-tab .chess-champion-stars::after { background: linear-gradient(120deg, transparent 34%, rgba(250,204,21,.10) 48%, transparent 53%); transform: translateX(-100%); animation: chessChampionSweep 8s ease-in-out infinite; }
+        #excel-chess-champion-tab .chess-champion-orbit { position: absolute; z-index: -1; border: 1px solid rgba(250,204,21,.16); border-radius: 50%; pointer-events: none; animation: chessChampionOrbit 13s linear infinite; }
+        #excel-chess-champion-tab .chess-champion-orbit-one { top: -120px; right: -70px; width: 430px; height: 430px; box-shadow: 0 0 70px rgba(250,204,21,.08), inset 0 0 50px rgba(99,102,241,.08); }
+        #excel-chess-champion-tab .chess-champion-orbit-two { top: -30px; right: 20px; width: 250px; height: 250px; animation-direction: reverse; animation-duration: 9s; border-color: rgba(129,140,248,.18); }
+        #excel-chess-champion-tab .chess-champion-hero { position: relative; z-index: 1; text-align: center; padding: 14px 12px 24px; }
+        #excel-chess-champion-tab .chess-champion-kicker,
+        #excel-chess-champion-tab .chess-champion-eyebrow { color: #fde68a; font-size: .67rem; font-weight: 900; letter-spacing: .2em; text-transform: uppercase; }
+        #excel-chess-champion-tab .chess-champion-kicker { display: inline-flex; align-items: center; gap: 8px; color: #facc15; }
+        #excel-chess-champion-tab .chess-champion-kicker i { filter: drop-shadow(0 0 9px rgba(250,204,21,.75)); animation: chessChampionPieceFloat 3.5s ease-in-out infinite; }
+        #excel-chess-champion-tab .chess-champion-hero h1 { margin: 12px 0 10px; color: #fff7d6; font-family: var(--display-font); font-size: clamp(2.2rem, 6vw, 5.7rem); font-weight: 950; letter-spacing: .04em; line-height: .95; text-shadow: 0 0 22px rgba(250,204,21,.18), 0 16px 46px rgba(2,6,23,.7); }
+        #excel-chess-champion-tab .chess-champion-hero p { max-width: 650px; margin: 0 auto; color: #b9c4dd; font-size: clamp(.88rem, 1.35vw, 1.06rem); line-height: 1.6; }
+        #excel-chess-champion-tab .chess-champion-stage-ribbon { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 8px; margin: 25px auto 0; max-width: 920px; }
+        #excel-chess-champion-tab .chess-champion-stage { display: inline-flex; align-items: center; gap: 6px; padding: 7px 10px; border: 1px solid rgba(148,163,184,.18); border-radius: 999px; color: #71809e; background: rgba(15,23,42,.42); font-size: .64rem; font-weight: 850; letter-spacing: .05em; text-transform: uppercase; transition: color .25s ease, border-color .25s ease, background .25s ease, box-shadow .25s ease; }
+        #excel-chess-champion-tab .chess-champion-stage.is-active { color: #fff7d6; border-color: rgba(250,204,21,.6); background: rgba(161,98,7,.23); box-shadow: 0 0 20px rgba(250,204,21,.14); }
+        #excel-chess-champion-tab .chess-champion-stage.is-passed { color: #86efac; border-color: rgba(74,222,128,.25); }
+        #excel-chess-champion-tab .chess-champion-stage-line { width: 24px; height: 1px; background: linear-gradient(90deg, rgba(250,204,21,.45), rgba(129,140,248,.15)); }
+        #excel-chess-champion-tab .chess-champion-stats { position: relative; z-index: 1; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 0 0 18px; }
+        #excel-chess-champion-tab .chess-champion-stat-card { position: relative; overflow: hidden; min-height: 118px; padding: 15px 17px; border: 1px solid rgba(148,163,184,.17); border-radius: 18px; background: linear-gradient(145deg, rgba(15,23,42,.82), rgba(4,7,17,.78)); box-shadow: inset 0 1px 0 rgba(255,255,255,.05); animation: chessChampionCardIn .55s cubic-bezier(.16,1,.3,1) both; }
+        #excel-chess-champion-tab .chess-champion-stat-card::after { content: ''; position: absolute; right: -26px; bottom: -38px; width: 100px; height: 100px; border-radius: 50%; background: radial-gradient(circle, rgba(250,204,21,.18), transparent 70%); }
+        #excel-chess-champion-tab .chess-champion-stat-card i { display: block; margin-bottom: 10px; color: #facc15; font-size: 1rem; }
+        #excel-chess-champion-tab .chess-champion-stat-card strong { display: block; overflow: hidden; color: #f8fafc; font-size: clamp(1.05rem, 2vw, 1.55rem); font-weight: 900; line-height: 1.15; text-overflow: ellipsis; white-space: nowrap; }
+        #excel-chess-champion-tab .chess-champion-stat-label,
+        #excel-chess-champion-tab .chess-champion-stat-card small { display: block; color: #8494ae; font-size: .68rem; font-weight: 750; letter-spacing: .08em; text-transform: uppercase; }
+        #excel-chess-champion-tab .chess-champion-stat-card small { margin-top: 7px; color: #aebbd1; font-size: .7rem; letter-spacing: 0; text-transform: none; }
+        #excel-chess-champion-tab .chess-champion-main-grid { position: relative; z-index: 1; display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(310px, .85fr); gap: 16px; }
+        #excel-chess-champion-tab .chess-champion-panel { position: relative; overflow: hidden; border: 1px solid rgba(148,163,184,.17); border-radius: 22px; background: rgba(5,9,20,.74); box-shadow: 0 18px 44px rgba(2,6,23,.26), inset 0 1px 0 rgba(255,255,255,.045); }
+        #excel-chess-champion-tab .chess-champion-panel-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 18px 20px 14px; border-bottom: 1px solid rgba(148,163,184,.12); }
+        #excel-chess-champion-tab .chess-champion-panel-heading h2 { margin: 5px 0 0; color: #f8fafc; font-size: 1.2rem; font-weight: 900; letter-spacing: .01em; }
+        #excel-chess-champion-tab .chess-champion-panel-meta { color: #71819c; font-size: .7rem; font-weight: 750; letter-spacing: .06em; text-transform: uppercase; text-align: right; }
+        #excel-chess-champion-tab .chess-champion-heading-icon { color: #facc15; filter: drop-shadow(0 0 10px rgba(250,204,21,.5)); }
+        #excel-chess-champion-tab .chess-champion-table-wrap { overflow-x: auto; }
+        #excel-chess-champion-tab .chess-champion-table { width: 100%; min-width: 680px; border-collapse: collapse; }
+        #excel-chess-champion-tab .chess-champion-table th { padding: 10px 12px; color: #71819c; background: rgba(15,23,42,.65); font-size: .63rem; font-weight: 900; letter-spacing: .14em; text-align: left; text-transform: uppercase; }
+        #excel-chess-champion-tab .chess-champion-table td { padding: 11px 12px; border-top: 1px solid rgba(148,163,184,.095); color: #cbd5e1; font-size: .78rem; vertical-align: middle; }
+        #excel-chess-champion-tab .chess-champion-table tbody tr { transition: background .25s ease, transform .25s ease; animation: chessChampionRowIn .5s cubic-bezier(.16,1,.3,1) both; }
+        #excel-chess-champion-tab .chess-champion-table tbody tr:hover { background: rgba(250,204,21,.055); }
+        #excel-chess-champion-tab .chess-champion-table tbody tr.is-rank-1 { background: linear-gradient(90deg, rgba(250,204,21,.11), transparent 78%); }
+        #excel-chess-champion-tab .chess-champion-table tbody tr.is-rank-2 { background: linear-gradient(90deg, rgba(203,213,225,.07), transparent 78%); }
+        #excel-chess-champion-tab .chess-champion-table tbody tr.is-rank-3 { background: linear-gradient(90deg, rgba(249,115,22,.07), transparent 78%); }
+        #excel-chess-champion-tab .chess-champion-rank { display: grid; width: 29px; height: 29px; place-items: center; border: 1px solid rgba(148,163,184,.23); border-radius: 50%; color: #94a3b8; font-weight: 900; }
+        #excel-chess-champion-tab .is-rank-1 .chess-champion-rank { color: #111827; border-color: #facc15; background: #facc15; box-shadow: 0 0 18px rgba(250,204,21,.35); }
+        #excel-chess-champion-tab .is-rank-2 .chess-champion-rank { color: #0f172a; border-color: #cbd5e1; background: #cbd5e1; }
+        #excel-chess-champion-tab .is-rank-3 .chess-champion-rank { color: #431407; border-color: #fb923c; background: #fb923c; }
+        #excel-chess-champion-tab .chess-champion-player { display: inline-flex; flex-direction: column; gap: 3px; min-width: 150px; }
+        #excel-chess-champion-tab .chess-champion-player-name { color: #f8fafc; font-weight: 850; }
+        #excel-chess-champion-tab .chess-champion-player-meta { color: #71819c; font-size: .67rem; }
+        #excel-chess-champion-tab .chess-champion-leader-tag { display: inline-block; margin-left: 8px; padding: 3px 6px; border: 1px solid rgba(250,204,21,.3); border-radius: 999px; color: #fde68a; font-size: .55rem; font-weight: 900; letter-spacing: .1em; }
+        #excel-chess-champion-tab .chess-champion-record { color: #dbeafe; font-weight: 800; white-space: nowrap; }
+        #excel-chess-champion-tab .chess-champion-record small { display: block; margin-top: 4px; color: #71819c; font-size: .66rem; font-weight: 600; }
+        #excel-chess-champion-tab .chess-champion-points { color: #fde68a !important; font-size: 1.05rem !important; font-weight: 950; }
+        #excel-chess-champion-tab .chess-champion-bonus-trail { color: #86efac; font-weight: 850; }
+        #excel-chess-champion-tab .chess-champion-match-room { padding: 14px; }
+        #excel-chess-champion-tab .chess-champion-room-label { margin: 0 4px 10px; color: #facc15; font-size: .66rem; font-weight: 900; letter-spacing: .14em; text-transform: uppercase; }
+        #excel-chess-champion-tab .chess-champion-match-card { position: relative; margin-bottom: 11px; padding: 13px; border: 1px solid rgba(129,140,248,.21); border-radius: 16px; background: linear-gradient(145deg, rgba(30,41,59,.68), rgba(15,23,42,.48)); animation: chessChampionMatchIn .5s cubic-bezier(.16,1,.3,1) both; }
+        #excel-chess-champion-tab .chess-champion-match-card.is-complete { border-color: rgba(74,222,128,.25); background: linear-gradient(145deg, rgba(20,83,45,.26), rgba(15,23,42,.48)); }
+        #excel-chess-champion-tab .chess-champion-match-top { display: flex; justify-content: space-between; margin-bottom: 10px; color: #71819c; font-size: .62rem; font-weight: 900; letter-spacing: .12em; text-transform: uppercase; }
+        #excel-chess-champion-tab .chess-champion-match-top b { color: #a5b4fc; }
+        #excel-chess-champion-tab .chess-champion-match-card.is-complete .chess-champion-match-top b { color: #86efac; }
+        #excel-chess-champion-tab .chess-champion-match-versus { display: grid; grid-template-columns: minmax(0, 1fr) 28px minmax(0, 1fr); align-items: center; gap: 7px; }
+        #excel-chess-champion-tab .chess-champion-match-versus > span { color: #facc15; font-size: .62rem; font-weight: 950; text-align: center; }
+        #excel-chess-champion-tab .chess-champion-match-versus > div:last-child { text-align: right; }
+        #excel-chess-champion-tab .chess-champion-match-versus > div:last-child .chess-champion-player { align-items: flex-end; }
+        #excel-chess-champion-tab .chess-champion-player.is-winner .chess-champion-player-name { color: #fde68a; }
+        #excel-chess-champion-tab .chess-champion-player.is-winner::before { content: 'WINNER'; display: block; color: #86efac; font-size: .54rem; font-weight: 900; letter-spacing: .12em; }
+        #excel-chess-champion-tab .chess-champion-match-form { display: grid; grid-template-columns: 1.2fr .8fr .8fr; gap: 7px; margin-top: 13px; padding-top: 11px; border-top: 1px solid rgba(148,163,184,.12); }
+        #excel-chess-champion-tab .chess-champion-match-form label,
+        #excel-chess-champion-tab .chess-champion-form-grid label { display: flex; flex-direction: column; gap: 5px; color: #8494ae; font-size: .61rem; font-weight: 850; letter-spacing: .08em; text-transform: uppercase; }
+        #excel-chess-champion-tab .chess-champion-match-form select,
+        #excel-chess-champion-tab .chess-champion-match-form input,
+        #excel-chess-champion-tab .chess-champion-form-grid input,
+        #excel-chess-champion-tab .chess-champion-form-grid select { width: 100%; min-width: 0; padding: 8px 9px; border: 1px solid rgba(148,163,184,.2); border-radius: 8px; outline: none; background: rgba(2,6,23,.65); color: #e2e8f0; font-size: .75rem; font-weight: 700; text-transform: none; }
+        #excel-chess-champion-tab .chess-champion-match-form button { grid-column: 1 / -1; justify-self: stretch; padding: 8px 10px; font-size: .72rem; }
+        #excel-chess-champion-tab .chess-champion-match-summary { display: flex; flex-direction: column; gap: 3px; margin-top: 11px; color: #bbf7d0; font-size: .7rem; }
+        #excel-chess-champion-tab .chess-champion-match-summary span { color: #aebbd1; }
+        #excel-chess-champion-tab .chess-champion-match-summary small { color: #8494ae; font-size: .64rem; line-height: 1.4; }
+        #excel-chess-champion-tab .chess-champion-match-award { margin-top: 7px; color: #fde68a; font-size: .74rem; font-weight: 900; text-align: right; }
+        #excel-chess-champion-tab .chess-champion-text-button { grid-column: 1 / -1; border: 0; color: #a5b4fc; background: transparent; font-size: .68rem; cursor: pointer; }
+        #excel-chess-champion-tab .chess-champion-empty { display: flex; min-height: 245px; align-items: center; justify-content: center; flex-direction: column; gap: 9px; padding: 30px; color: #8494ae; text-align: center; }
+        #excel-chess-champion-tab .chess-champion-empty i { color: #facc15; font-size: 2rem; filter: drop-shadow(0 0 14px rgba(250,204,21,.4)); }
+        #excel-chess-champion-tab .chess-champion-empty strong { color: #dbeafe; font-size: .95rem; }
+        #excel-chess-champion-tab .chess-champion-empty span { max-width: 320px; font-size: .76rem; line-height: 1.5; }
+        #excel-chess-champion-tab .chess-champion-empty-compact { min-height: 180px; }
+        #excel-chess-champion-tab .chess-champion-champion-card { display: flex; align-items: center; flex-direction: column; gap: 8px; padding: 28px 14px; color: #facc15; text-align: center; }
+        #excel-chess-champion-tab .chess-champion-champion-card i { font-size: 2.3rem; filter: drop-shadow(0 0 16px rgba(250,204,21,.55)); animation: chessChampionPieceFloat 2.8s ease-in-out infinite; }
+        #excel-chess-champion-tab .chess-champion-champion-card span { color: #aebbd1; font-size: .66rem; font-weight: 900; letter-spacing: .16em; text-transform: uppercase; }
+        #excel-chess-champion-tab .chess-champion-champion-card strong { color: #fff7d6; font-size: 1.35rem; }
+        #excel-chess-champion-tab .chess-champion-champion-card small { color: #86efac; }
+        #excel-chess-champion-tab .chess-champion-bracket-panel { z-index: 1; margin-top: 16px; }
+        #excel-chess-champion-tab .chess-champion-bracket { display: flex; align-items: stretch; gap: 13px; overflow-x: auto; padding: 16px 18px 22px; }
+        #excel-chess-champion-tab .chess-champion-bracket-column { display: flex; min-width: 230px; flex: 1 0 230px; flex-direction: column; gap: 11px; }
+        #excel-chess-champion-tab .chess-champion-bracket-column-title { color: #facc15; font-size: .66rem; font-weight: 900; letter-spacing: .16em; text-transform: uppercase; }
+        #excel-chess-champion-tab .chess-champion-bracket-match { position: relative; overflow: hidden; padding: 11px; border: 1px solid rgba(129,140,248,.2); border-radius: 14px; background: rgba(15,23,42,.62); animation: chessChampionBracketIn .55s cubic-bezier(.16,1,.3,1) both; }
+        #excel-chess-champion-tab .chess-champion-bracket-match.is-complete { border-color: rgba(74,222,128,.25); }
+        #excel-chess-champion-tab .chess-champion-bracket-board { display: block; margin-bottom: 7px; color: #71819c; font-size: .59rem; font-weight: 850; letter-spacing: .1em; text-transform: uppercase; }
+        #excel-chess-champion-tab .chess-champion-bracket-player { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 7px; color: #cbd5e1; font-size: .73rem; }
+        #excel-chess-champion-tab .chess-champion-bracket-player + .chess-champion-bracket-player { border-top: 1px solid rgba(148,163,184,.11); }
+        #excel-chess-champion-tab .chess-champion-bracket-player.is-winner { color: #fde68a; font-weight: 900; }
+        #excel-chess-champion-tab .chess-champion-bracket-player b { color: #86efac; font-size: .72rem; }
+        #excel-chess-champion-tab .chess-champion-bracket-status { margin-top: 7px; color: #71819c; font-size: .61rem; }
+        #excel-chess-champion-tab .chess-champion-bracket-connector { display: grid; min-width: 18px; place-items: center; color: rgba(250,204,21,.55); }
+        #excel-chess-champion-tab .chess-champion-admin-panel { z-index: 1; margin-top: 16px; }
+        #excel-chess-champion-tab .chess-champion-admin-grid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(280px, .85fr); gap: 16px; padding: 16px; }
+        #excel-chess-champion-tab .chess-champion-admin-card { padding: 16px; border: 1px solid rgba(129,140,248,.17); border-radius: 18px; background: rgba(15,23,42,.48); }
+        #excel-chess-champion-tab .chess-champion-admin-card h3 { margin: 0 0 14px; color: #e0e7ff; font-size: .95rem; }
+        #excel-chess-champion-tab .chess-champion-admin-card h3 i { margin-right: 7px; color: #facc15; }
+        #excel-chess-champion-tab .chess-champion-admin-card h4 { margin: 18px 0 10px; color: #fde68a; font-size: .72rem; font-weight: 900; letter-spacing: .14em; text-transform: uppercase; }
+        #excel-chess-champion-tab .chess-champion-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+        #excel-chess-champion-tab .chess-champion-scoring-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+        #excel-chess-champion-tab .chess-champion-admin-actions,
+        #excel-chess-champion-tab .chess-champion-roster-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 15px; }
+        #excel-chess-champion-tab .chess-champion-admin-actions button,
+        #excel-chess-champion-tab .chess-champion-roster-actions button { padding: 8px 11px; font-size: .7rem; }
+        #excel-chess-champion-tab .chess-champion-admin-help { margin: 0 0 12px; color: #aebbd1; font-size: .74rem; line-height: 1.5; }
+        #excel-chess-champion-tab .chess-champion-roster { display: grid; max-height: 400px; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; overflow-y: auto; padding: 2px; }
+        #excel-chess-champion-tab .chess-champion-roster-row { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 8px; border: 1px solid rgba(148,163,184,.13); border-radius: 10px; background: rgba(2,6,23,.4); cursor: pointer; transition: border-color .2s ease, background .2s ease, transform .2s ease; }
+        #excel-chess-champion-tab .chess-champion-roster-row:hover { border-color: rgba(250,204,21,.36); transform: translateY(-1px); }
+        #excel-chess-champion-tab .chess-champion-roster-row.is-enrolled { border-color: rgba(74,222,128,.3); background: rgba(20,83,45,.18); }
+        #excel-chess-champion-tab .chess-champion-roster-row input { position: absolute; opacity: 0; pointer-events: none; }
+        #excel-chess-champion-tab .chess-champion-roster-check { display: grid; width: 21px; height: 21px; flex: 0 0 21px; place-items: center; border: 1px solid rgba(148,163,184,.3); border-radius: 6px; color: transparent; font-size: .65rem; }
+        #excel-chess-champion-tab .chess-champion-roster-row.is-enrolled .chess-champion-roster-check { border-color: #4ade80; color: #052e16; background: #4ade80; }
+        #excel-chess-champion-tab .chess-champion-roster-name { overflow: hidden; color: #e2e8f0; font-size: .7rem; font-weight: 800; text-overflow: ellipsis; white-space: nowrap; }
+        #excel-chess-champion-tab .chess-champion-roster-name small { display: block; margin-top: 3px; overflow: hidden; color: #71819c; font-size: .59rem; font-weight: 600; text-overflow: ellipsis; }
+        @keyframes chessChampionStars { from { transform: translateY(0); } to { transform: translateY(38px); } }
+        @keyframes chessChampionSweep { 0%, 25% { transform: translateX(-100%); } 70%, 100% { transform: translateX(100%); } }
+        @keyframes chessChampionOrbit { to { transform: rotate(360deg); } }
+        @keyframes chessChampionPieceFloat { 0%, 100% { transform: translateY(0) rotate(-5deg); } 50% { transform: translateY(-5px) rotate(5deg); } }
+        @keyframes chessChampionCardIn { from { opacity: 0; transform: translateY(16px) scale(.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+        @keyframes chessChampionRowIn { from { opacity: 0; transform: translateX(-10px); } to { opacity: 1; transform: translateX(0); } }
+        @keyframes chessChampionMatchIn { from { opacity: 0; transform: translateX(12px); } to { opacity: 1; transform: translateX(0); } }
+        @keyframes chessChampionBracketIn { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
+        @media (max-width: 980px) {
+            #excel-chess-champion-tab .chess-champion-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            #excel-chess-champion-tab .chess-champion-main-grid,
+            #excel-chess-champion-tab .chess-champion-admin-grid { grid-template-columns: 1fr; }
+            #excel-chess-champion-tab .chess-champion-scoring-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        }
+        @media (max-width: 620px) {
+            #excel-chess-champion-tab .chess-champion-shell { padding: 14px 10px 24px; border-radius: 22px; }
+            #excel-chess-champion-tab .chess-champion-hero h1 { font-size: clamp(2rem, 12vw, 3.5rem); }
+            #excel-chess-champion-tab .chess-champion-stage-line { width: 10px; }
+            #excel-chess-champion-tab .chess-champion-stage { padding: 6px 7px; font-size: .56rem; }
+            #excel-chess-champion-tab .chess-champion-stats { gap: 8px; }
+            #excel-chess-champion-tab .chess-champion-stat-card { min-height: 105px; padding: 12px; }
+            #excel-chess-champion-tab .chess-champion-stat-card strong { font-size: 1rem; }
+            #excel-chess-champion-tab .chess-champion-panel-heading { padding: 15px 14px 12px; }
+            #excel-chess-champion-tab .chess-champion-match-form { grid-template-columns: 1fr 1fr; }
+            #excel-chess-champion-tab .chess-champion-match-form label:first-child { grid-column: 1 / -1; }
+            #excel-chess-champion-tab .chess-champion-form-grid,
+            #excel-chess-champion-tab .chess-champion-scoring-grid,
+            #excel-chess-champion-tab .chess-champion-roster { grid-template-columns: 1fr; }
+            #excel-chess-champion-tab .chess-champion-admin-grid { padding: 10px; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            #excel-chess-champion-tab .chess-champion-stars,
+            #excel-chess-champion-tab .chess-champion-orbit,
+            #excel-chess-champion-tab .chess-champion-kicker i,
+            #excel-chess-champion-tab .chess-champion-champion-card i,
+            #excel-chess-champion-tab .chess-champion-stat-card,
+            #excel-chess-champion-tab .chess-champion-table tbody tr,
+            #excel-chess-champion-tab .chess-champion-match-card,
+            #excel-chess-champion-tab .chess-champion-bracket-match { animation: none !important; }
         }
 

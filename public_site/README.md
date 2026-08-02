@@ -3,8 +3,8 @@
 This folder contains public files for static hosting on Cloudflare Pages.
 
 ## Files
-- `index.html` - public read-only site (client-side login gate + scoreboard/ranking/info rendering)
-- `scores.json` - exported scoreboard snapshot (scoreboard + ranking rows + `public_information`)
+- `index.html` - public read-only site (client-side login gate + scoreboard/ranking/party/chess/info rendering)
+- `scores.json` - exported scoreboard snapshot (scoreboard + ranking rows + party standings + `chess_champion` + `public_information`)
 - `credentials.json` - per-student salted SHA-256 login credentials (manually maintained)
 - `offline_scoreboard.html` - full SPA scoreboard (cross-origin mode via meta tag; no longer linked from the public UI)
 - `static/css/offline-scoreboard.css` - SPA stylesheet
@@ -20,7 +20,8 @@ entirely in the browser. There is **no server and no routing to the local SPA**:
 3. The browser fetches `credentials.json`, finds the matching roll, and computes
    `SHA-256(salt + password)` (UTF-8) via Web Crypto.
 4. On a hash match, the tabs unlock and render directly from `scores.json`.
-5. The login is remembered in `localStorage`; **Logout** clears it.
+5. The Excel Chess Champion tab shows the read-only tournament standings, live match room, and knockout bracket from the published `chess_champion` snapshot.
+6. The login is remembered in `localStorage`; **Logout** clears it.
 
 This is a **soft gate only**. `credentials.json` is a public static file — anyone
 can download it and brute-force the hashes offline. Use strong, unique passwords
