@@ -20263,8 +20263,8 @@ body.header-offscreen .header-kicker::after {
                     const memberVp = getStudentVotePower(student, targetMonth);
                     votePower += memberVp;
                     const designation = String(m.designation || '').trim().toLowerCase();
-                    const role = designation === 'president' ? 'President'
-                        : designation === 'deputy_president' ? 'Deputy President' : 'Member';
+                    const role = ['president', 'party president', 'pp'].includes(designation) ? 'President'
+                        : ['deputy_president', 'deputy party president', 'dpp'].includes(designation) ? 'Deputy President' : 'Member';
                     memberRows.push({
                         roll: String(student.roll || '').trim().toUpperCase() || '-',
                         name: _cleanPublicName(student.base_name || student.name || ''),
