@@ -1014,13 +1014,30 @@
             background: var(--party-color, var(--primary));
             box-shadow: 0 0 12px color-mix(in srgb, var(--party-color, #1a4d2e) 45%, transparent);
         }
-        .party-modal-member .m-info { flex: 1 1 auto; min-width: 0; }
+        .party-modal-member .m-info {
+            flex: 1 1 auto; min-width: 0; padding: 1px 4px 1px 0;
+        }
         .party-modal-member .m-name {
-            font: 700 .9rem/1.2 "Poppins", sans-serif; color: var(--text);
+            display: block;
+            font: 700 .9rem/1.25 "Poppins", sans-serif; color: var(--text);
             white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
         }
         .party-modal-member .m-sub {
-            font: 400 .72rem/1.2 "Lora", Georgia, serif; color: var(--muted); margin-top: 2px;
+            display: flex; align-items: center; flex-wrap: wrap; gap: 7px;
+            margin-top: 5px;
+            color: var(--muted);
+        }
+        .party-modal-member .m-roll {
+            display: inline-block;
+            font-family: "Arial Narrow", "Roboto Condensed", "Segoe UI", Arial, sans-serif;
+            font-size: .68rem; font-weight: 700; font-stretch: condensed; line-height: 1.1;
+            letter-spacing: .08em; color: var(--text); text-transform: uppercase;
+            white-space: nowrap;
+        }
+        .party-modal-member .m-class {
+            display: inline-block;
+            font: 400 .68rem/1.1 "Lora", Georgia, serif;
+            white-space: nowrap;
         }
         .party-modal-member .m-role {
             flex: 0 0 auto; font: 700 .62rem/1 "Poppins", sans-serif;
@@ -1030,13 +1047,18 @@
             border: 1px solid color-mix(in srgb, var(--party-color, #1a4d2e) 28%, transparent);
         }
         .party-modal-member .m-score {
-            flex: 0 0 auto; text-align: right;
+            flex: 0 0 auto; min-width: 54px; padding-left: 10px;
+            text-align: right; border-left: 1px solid var(--line);
         }
         .party-modal-member .m-score .m-score-val {
+            display: block;
             font: 800 1rem/1 "Poppins", sans-serif; color: var(--party-color, var(--primary));
+            white-space: nowrap;
         }
         .party-modal-member .m-score .m-vp {
-            font: 600 .62rem/1 "Poppins", sans-serif; color: var(--muted); margin-top: 2px;
+            display: block; margin-top: 5px;
+            font: 600 .62rem/1 "Poppins", sans-serif; color: var(--muted);
+            letter-spacing: .04em; white-space: nowrap;
         }
         @keyframes partyMemberIn { from { opacity: 0; transform: translateX(-14px); } to { opacity: 1; transform: translateX(0); } }
         .party-modal-close {
@@ -1871,10 +1893,13 @@
                         + '<span class="m-avatar">' + escapeHtml(initials) + '</span>'
                         + '<span class="m-info">'
                         + '<span class="m-name">' + escapeHtml(m.name || '-') + '</span>'
-                        + '<span class="m-sub">' + escapeHtml(m.roll || '-') + (m.class ? ' · ' + escapeHtml(m.class) : '') + '</span>'
+                        + '<span class="m-sub">'
+                        + '<span class="m-roll">' + escapeHtml(m.roll || '-') + '</span>'
+                        + (m.class ? '<span class="m-class">Class ' + escapeHtml(m.class) + '</span>' : '')
+                        + '</span>'
                         + '</span>'
                         + (m.role && m.role !== 'Member' ? '<span class="m-role">' + escapeHtml(m.role) + '</span>' : '')
-                        + '<span class="m-score"><span class="m-score-val">' + (m.score || 0) + '</span><span class="m-vp">VP ' + (m.votePower || 1) + '</span></span>'
+                        + '<span class="m-score"><span class="m-score-val">' + (m.score || 0) + '</span><span class="m-vp">VP&nbsp;' + (m.votePower || 1) + '</span></span>'
                         + '</li>';
                 }).join('')
                 : '<li class="party-modal-empty">No active members for this month.</li>';
