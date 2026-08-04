@@ -390,8 +390,8 @@ var LZString=function(){var r=String.fromCharCode,o="ABCDEFGHIJKLMNOPQRSTUVWXYZa
     --sb-border: rgba(255,255,255,0.07);
 
     /* Asymmetric curves: smooth ease-out on open, crisp snap on close */
-    --sb-open:  200ms cubic-bezier(0.16, 1, 0.3, 1);
-    --sb-close: 140ms cubic-bezier(0.4, 0, 0.2, 1);
+    --sb-open:  220ms cubic-bezier(0.22, 1, 0.36, 1);
+    --sb-close: 180ms cubic-bezier(0.4, 0, 0.2, 1);
     --sb-ease: var(--sb-open);
     --sb-hover-zone: 20px;
 }
@@ -402,8 +402,7 @@ var LZString=function(){var r=String.fromCharCode,o="ABCDEFGHIJKLMNOPQRSTUVWXYZa
     display: flex; flex-direction: column;
     z-index: 9000;
     overflow: hidden;
-    /* width on position:fixed only reflows sidebar children, not the page */
-    transition: width var(--sb-open), box-shadow 200ms ease;
+    transition: transform var(--sb-open), box-shadow 200ms ease;
     transform: translate3d(0, 0, 0);
     backface-visibility: hidden;
     contain: layout style;
@@ -411,26 +410,41 @@ var LZString=function(){var r=String.fromCharCode,o="ABCDEFGHIJKLMNOPQRSTUVWXYZa
     border-right: 1px solid rgba(255,255,255,0.04);
 }
 body.sidebar-collapsed .app-sidebar {
-    width: var(--sb-collapsed);
+    width: var(--sb-width);
+    transform: translate3d(calc(var(--sb-collapsed) - var(--sb-width)), 0, 0);
     box-shadow: 1px 0 8px rgba(0,0,0,0.3);
 }
 /* Closing: swap to sharp snap curve */
 body.sb-closing .app-sidebar {
-    transition: width var(--sb-close), box-shadow 160ms ease;
+    transition: transform var(--sb-close), box-shadow 160ms ease;
+}
+/* Instant: suppress all transitions for immediate state changes (tab-switch close) */
+body.sb-instant .app-sidebar,
+body.sb-instant .main-content-wrapper,
+body.sb-instant .sidebar-nav-item,
+body.sb-instant .sidebar-brand-text,
+body.sb-instant .sidebar-link-text,
+body.sb-instant .sidebar-section-label,
+body.sb-instant .sidebar-collapse-btn {
+    transition: none !important;
 }
 
 /* Hover-reveal: collapsed sidebar expands on mouse approach */
 body.sidebar-collapsed.sidebar-hover-reveal .app-sidebar {
-    width: var(--sb-width);
+    transform: translate3d(0, 0, 0);
     box-shadow: 4px 0 28px rgba(0,0,0,0.55);
 }
-body.sidebar-collapsed.sidebar-hover-reveal .main-content-wrapper {
-    margin-left: var(--sb-width);
-}
 body.sidebar-collapsed.sidebar-hover-reveal .sidebar-brand-text,
-body.sidebar-collapsed.sidebar-hover-reveal .sidebar-link-text,
-body.sidebar-collapsed.sidebar-hover-reveal .sidebar-section-label {
+body.sidebar-collapsed.sidebar-hover-reveal .sidebar-link-text {
     opacity: 1; max-width: 170px;
+    transform: translateX(0) translateZ(0);
+    pointer-events: auto;
+}
+body.sidebar-collapsed.sidebar-hover-reveal .sidebar-section-label {
+    opacity: 1; max-height: 40px;
+    padding: 14px 16px 3px;
+    transform: translateX(0) translateZ(0);
+    pointer-events: auto;
 }
 body.sidebar-collapsed.sidebar-hover-reveal .sidebar-collapse-btn {
     transform: rotate(0deg);
@@ -451,7 +465,7 @@ body.sidebar-collapsed.sidebar-hover-reveal .sidebar-nav-item {
     contain: layout paint;
 }
 body.sidebar-collapsed .sidebar-hover-zone { display: block; }
-body.sidebar-collapsed.sidebar-hover-reveal .sidebar-hover-zone { width: var(--sb-width); }
+body.sidebar-collapsed.sidebar-hover-reveal .sidebar-hover-zone { width: var(--sb-collapsed); }
 
 /* Peek indicator: subtle accent line when collapsed */
 .app-sidebar::after {
@@ -577,14 +591,53 @@ body.sb-closing .sidebar-link-text { transition: opacity var(--sb-close), transf
 }
 .sidebar-nav-item.active i { color: var(--sb-accent); }
 
-/* Collapsed state: center icons, hide text */
-body.sidebar-collapsed .sidebar-nav-item {
-    padding: 10px 0; justify-content: center;
-    margin-right: 0; width: 100%;
-    border-left-width: 0; border-radius: 0;
+/* Collapsed state: align icons inside the visible translated rail */
+body.sidebar-collapsed .sidebar-header {
+    justify-content: flex-end;
+    gap: 4px;
+    padding-left: 4px;
+    padding-right: 4px;
 }
+body.sidebar-collapsed .sidebar-brand {
+    width: 20px;
+    flex: 0 0 20px;
+    justify-content: flex-end;
+}
+body.sidebar-collapsed .sidebar-brand-text,
+body.sidebar-collapsed .sidebar-link-text {
+    width: 0;
+    max-width: 0;
+    flex: 0 0 0;
+    margin: 0;
+}
+body.sidebar-collapsed .sidebar-nav-item {
+    padding: 10px 10px 10px 0;
+    justify-content: flex-end;
+    margin-right: 0;
+    width: 100%;
+    border-left-width: 0;
+    border-radius: 0;
+}
+body.sidebar-collapsed .sidebar-collapse-btn { padding: 6px; }
 body.sidebar-collapsed .sidebar-nav-item.active {
     background: rgba(102,126,234,0.18);
+}
+body.sidebar-collapsed.sidebar-hover-reveal .sidebar-header {
+    justify-content: space-between;
+    gap: 0;
+    padding-left: 16px;
+    padding-right: 8px;
+}
+body.sidebar-collapsed.sidebar-hover-reveal .sidebar-brand {
+    width: auto;
+    flex: 0 1 auto;
+    justify-content: flex-start;
+}
+body.sidebar-collapsed.sidebar-hover-reveal .sidebar-brand-text,
+body.sidebar-collapsed.sidebar-hover-reveal .sidebar-link-text {
+    width: auto;
+    max-width: 170px;
+    flex: 0 1 auto;
 }
 
 .sidebar-footer { border-top:1px solid var(--sb-border); padding:6px 0; flex-shrink:0; }
@@ -602,7 +655,8 @@ body.sidebar-collapsed .sidebar-nav-item.active {
 }
 body.sidebar-collapsed .main-content-wrapper { margin-left: var(--sb-collapsed); }
 body.sb-closing .main-content-wrapper { transition: margin-left var(--sb-close); }
-body.sidebar-collapsed .sidebar-nav-item { transition: color .2s var(--ease-out), background .2s var(--ease-out), border-color .2s var(--ease-out), transform .18s var(--spring-soft), padding var(--sb-close), margin-right var(--sb-close), width var(--sb-close), border-left-width var(--sb-close), border-radius var(--sb-close); }
+body.sidebar-collapsed:not(.sidebar-hover-reveal) .sidebar-nav-item,
+body.sb-closing .sidebar-nav-item { transition: color .2s var(--ease-out), background .2s var(--ease-out), border-color .2s var(--ease-out), transform .18s var(--spring-soft), padding var(--sb-close), margin-right var(--sb-close), width var(--sb-close), border-left-width var(--sb-close), border-radius var(--sb-close); }
 
 /* Hidden checkbox (kept for accessibility) */
 #sidebarCheckbox { display: none; }
@@ -630,12 +684,31 @@ body.sidebar-collapsed .sidebar-nav-item { transition: color .2s var(--ease-out)
         transform:translateX(0); visibility:visible;
         transition: transform 320ms cubic-bezier(0.34, 1.2, 0.64, 1), visibility 0s;
     }
+    body.sidebar-collapsed .app-sidebar { transform:translateX(-100%); }
+    body.sidebar-collapsed .app-sidebar.mobile-open { transform:translateX(0); }
     .sidebar-close-btn { display:flex; }
     .sidebar-collapse-btn { display:none; }
     .main-content-wrapper { margin-left:0 !important; }
     .mobile-topbar { display:flex; }
     .sidebar-hover-zone { display:none !important; }
     body.sidebar-collapsed .app-sidebar::after { display:none; }
+    body.sidebar-collapsed .sidebar-brand-text,
+    body.sidebar-collapsed .sidebar-link-text {
+        opacity: 1; width: auto; max-width: 170px; flex: 0 1 auto;
+        transform: translateX(0) translateZ(0);
+        pointer-events: auto;
+    }
+    body.sidebar-collapsed .sidebar-section-label {
+        opacity: 1; max-height: 40px;
+        padding: 14px 16px 3px;
+        transform: translateX(0) translateZ(0);
+        pointer-events: auto;
+    }
+    body.sidebar-collapsed .sidebar-nav-item {
+        padding: 7px 14px 7px 16px; justify-content: flex-start;
+        margin-right: 6px; width: calc(100% - 6px);
+        border-left-width: 3px; border-radius: 0 6px 6px 0;
+    }
 }
 @media (min-width: 769px) {
     .sidebar-overlay { opacity:0 !important; pointer-events:none !important; }
@@ -1014,7 +1087,7 @@ body.sidebar-collapsed .sidebar-nav-item { transition: color .2s var(--ease-out)
     function promoteLayer(el) {
         if (!el) return;
         // translateZ(0) forces a GPU layer without holding will-change permanently
-        if (!el.style.transform || !el.style.transform.includes('translateZ')) {
+        if (!el.classList.contains('app-sidebar') && (!el.style.transform || !el.style.transform.includes('translateZ'))) {
             el.style.transform = (el.style.transform || '') + ' translateZ(0)';
         }
         el.style.backfaceVisibility = 'hidden';
@@ -1081,7 +1154,10 @@ body.header-offscreen .header-kicker::after {
 
 
 <body>
-<script>if(localStorage.getItem('ea_theme')==='light'){document.body.classList.add('light-mode');}</script>
+<script>
+if(localStorage.getItem('ea_theme')==='light'){document.body.classList.add('light-mode');}
+try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body.classList.add('sidebar-collapsed'); } catch (e) {}
+</script>
 
 <!-- Hidden checkbox for pure-CSS mobile sidebar toggle -->
 <input type="checkbox" id="sidebarCheckbox" aria-hidden="true">
@@ -1125,7 +1201,6 @@ body.header-offscreen .header-kicker::after {
         <button class="sidebar-nav-item" id="sidebarAppealsBtn" data-tab="appeals" onclick="switchTab('appeals')" title="Appeals"><i class="fas fa-bullhorn" style="color:#ef4444"></i><span class="sidebar-link-text">Appeals</span></button>
         <button class="sidebar-nav-item" id="sidebarNotificationsBtn" data-tab="notifications" onclick="switchTab('notifications')" title="Notifications"><i class="fas fa-bell" style="color:#f43f5e"></i><span class="sidebar-link-text">Notifications</span></button>
         <button class="sidebar-nav-item" id="sidebarProposalsBtn" data-tab="proposals" onclick="switchTab('proposals')" title="Proposals"><i class="fas fa-comments" style="color:#14b8a6"></i><span class="sidebar-link-text">Proposals</span></button>
-        <button class="sidebar-nav-item" id="sidebarActivityBtn" data-tab="activity-log" onclick="switchTab('activity-log')" title="Activity Log"><i class="fas fa-clipboard-list" style="color:#f59e0b"></i><span class="sidebar-link-text">Activity Log</span></button>
         <div class="sidebar-section-label">Records</div>
         <button class="sidebar-nav-item" data-tab="notebooks" onclick="switchTab('notebooks')" title="Notebooks Check"><i class="fas fa-clipboard-check" style="color:#a78bfa"></i><span class="sidebar-link-text">Notebooks Check</span></button>
         <button class="sidebar-nav-item" data-tab="attendance" onclick="switchTab('attendance')" title="Attendance"><i class="fas fa-user-check" style="color:#10b981"></i><span class="sidebar-link-text">Attendance</span></button>
@@ -1787,9 +1862,6 @@ body.header-offscreen .header-kicker::after {
             </button>
             <button class="tab-button" id="proposalsTabButton" onclick="switchTab('proposals')" style="--tab-icon: #14b8a6;">
                 <i class="fas fa-comments"></i> Proposals
-            </button>
-            <button class="tab-button" id="activityLogTabButton" onclick="switchTab('activity-log')" style="--tab-icon: #f59e0b;">
-                <i class="fas fa-clipboard-list"></i> Activity Log
             </button>
             <button class="tab-button" onclick="switchTab('attendance')" style="--tab-icon: #10b981;">
                 <i class="fas fa-user-check"></i> Attendance
@@ -4624,11 +4696,29 @@ body.header-offscreen .header-kicker::after {
                                 <label>Standard time bonus<input id="chessChampionStandardBonus" type="number" data-role-only="admin" min="0" max="50"></label>
                                 <label>Kill-point multiplier<input id="chessChampionKillMultiplier" type="number" data-role-only="admin" min="0" max="20" step="0.5"></label>
                             </div>
+                            <p class="chess-champion-admin-help">Winner total = base result points + lower-class upset bonus + opponent-strength bonus + time bonus + Admin-entered kill points × multiplier. Pairings stay in nearby score bands, avoid repeats, and prefer different classes.</p>
                             <div class="chess-champion-admin-actions">
                                 <button class="secondary" type="button" data-role-only="admin" onclick="saveChessChampionConfig()"><i class="fas fa-save"></i> Save settings</button>
                                 <button class="secondary" type="button" data-role-only="admin" onclick="advanceChessChampionTournament()"><i class="fas fa-forward-step"></i> Generate / advance round</button>
-                                <button class="danger" type="button" data-role-only="admin" onclick="resetChessChampionTournament()"><i class="fas fa-rotate-left"></i> Reset event</button>
+                                <button class="danger" type="button" data-role-only="admin" onclick="resetChessChampionTournament(false)"><i class="fas fa-rotate-left"></i> Reset active event</button>
+                                <button class="secondary" type="button" data-role-only="admin" onclick="resetChessChampionTournament(true)"><i class="fas fa-box-archive"></i> Archive series & reset</button>
                             </div>
+                            <div id="chessChampionSeriesArchive" class="chess-champion-series-archive"></div>
+                        </div>
+                        <div id="chessChampionHistoricalCard" class="chess-champion-admin-card">
+                            <h3><i class="fas fa-clock-rotate-left"></i> Add held basic round</h3>
+                            <p class="chess-champion-admin-help">Enter a match that was already played. Only active students are shown by default. Use override to replace the same system-generated pairing without creating a duplicate.</p>
+                            <div class="chess-champion-form-grid">
+                                <label>Basic round<input id="chessChampionHistoricalRound" type="number" data-role-only="admin" min="1" max="12"></label>
+                                <label>White player<select id="chessChampionHistoricalWhite" data-role-only="admin"></select></label>
+                                <label>Black player<select id="chessChampionHistoricalBlack" data-role-only="admin"></select></label>
+                                <label class="chess-champion-checkbox-label"><span>Override system pairing</span><input id="chessChampionHistoricalOverride" type="checkbox" data-role-only="admin"></label>
+                            </div>
+                            <div class="chess-champion-admin-actions">
+                                <button class="secondary" type="button" data-role-only="admin" onclick="addChessChampionHistoricalMatch()"><i class="fas fa-plus"></i> Add held match</button>
+                                <button class="danger" type="button" data-role-only="admin" onclick="resetChessChampionHeldMatches()"><i class="fas fa-eraser"></i> Reset held matches</button>
+                            </div>
+                            <div id="chessChampionHistoricalStatus" class="chess-champion-admin-help"></div>
                         </div>
                         <div class="chess-champion-admin-card">
                             <h3><i class="fas fa-user-plus"></i> Register players</h3>
@@ -4642,6 +4732,30 @@ body.header-offscreen .header-kicker::after {
                     </div>
                 </section>
             </section>
+        </div>
+
+        <div id="chessChampionEndMatchModal" class="chess-champion-modal hidden" role="dialog" aria-modal="true" aria-labelledby="chessChampionEndMatchTitle">
+            <div class="chess-champion-modal-card">
+                <div class="chess-champion-modal-header">
+                    <div>
+                        <span class="chess-champion-eyebrow">Admin result desk</span>
+                        <h2 id="chessChampionEndMatchTitle">End match</h2>
+                        <p id="chessChampionEndMatchPlayers"></p>
+                    </div>
+                    <button class="chess-champion-modal-close" type="button" onclick="closeChessChampionEndMatch()" aria-label="Close"><i class="fas fa-xmark"></i></button>
+                </div>
+                <div class="chess-champion-kill-entry-grid">
+                    <label><span id="chessChampionWhiteKillLabel">White kill points</span><input id="chessChampionWhiteKillPoints" type="number" min="0" max="1000" step="1" inputmode="numeric" oninput="previewChessChampionEndMatch()"></label>
+                    <label><span id="chessChampionBlackKillLabel">Black kill points</span><input id="chessChampionBlackKillPoints" type="number" min="0" max="1000" step="1" inputmode="numeric" oninput="previewChessChampionEndMatch()"></label>
+                    <label><span>Duration (minutes)</span><input id="chessChampionEndMatchDuration" type="number" min="0" max="600" step="1" inputmode="numeric"></label>
+                </div>
+                <div id="chessChampionEndMatchPreview" class="chess-champion-end-match-preview"></div>
+                <p class="chess-champion-admin-help">Kill points are entered directly for each player. Higher kills wins; if kills tie, the higher class-level bonus wins; if that also ties, the match is recorded as a draw. Each player’s kill points are added to their IPL score using the configured multiplier.</p>
+                <div class="chess-champion-modal-actions">
+                    <button class="secondary" type="button" onclick="saveChessChampionKillPointsOnly()"><i class="fas fa-floppy-disk"></i> Save kill points</button>
+                    <button class="secondary" type="button" onclick="finishChessChampionMatch()"><i class="fas fa-flag-checkered"></i> End match & update ranking</button>
+                </div>
+            </div>
         </div>
 
         <!-- TAB: CLASS REPRESENTATIVES -->
@@ -6332,70 +6446,6 @@ body.header-offscreen .header-kicker::after {
                             <button class="secondary" onclick="sendProposalMessage()" data-allow="true"><i class="fas fa-paper-plane"></i> Send</button>
                             <button class="secondary" onclick="loadProposalMessages()" data-allow="true"><i class="fas fa-sync-alt"></i> Refresh Chat</button>
                         </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- TAB: ACTIVITY LOG -->
-        <div id="activity-log-tab" class="tab-content hidden">
-            <div class="form-card">
-                <h3><i class="fas fa-clipboard-list"></i> Activity Log</h3>
-                <p class="section-subtitle">Auditable user activity stream. Filter by user, class, student, month, or date range.</p>
-                <div class="form-grid">
-                    <div class="form-group">
-                        <label>User</label>
-                        <select id="activityLogUserFilter" onchange="loadActivityLogTab()">
-                            <option value="">All Users</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>Class</label>
-                        <select id="activityLogClassFilter" onchange="loadActivityLogTab()">
-                            <option value="">All Classes</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>Student</label>
-                        <input type="text" id="activityLogStudentFilter" placeholder="Roll or name" oninput="loadActivityLogTab()">
-                    </div>
-                    <div class="form-group">
-                        <label>Month</label>
-                        <input type="month" id="activityLogMonthFilter" onchange="loadActivityLogTab()">
-                    </div>
-                    <div class="form-group">
-                        <label>Date From</label>
-                        <input type="date" id="activityLogFromDate" onchange="loadActivityLogTab()">
-                    </div>
-                    <div class="form-group">
-                        <label>Date To</label>
-                        <input type="date" id="activityLogToDate" onchange="loadActivityLogTab()">
-                    </div>
-                </div>
-                <div class="form-buttons" style="margin-top:8px;">
-                    <button class="secondary" onclick="resetActivityLogFilters()" data-allow="true"><i class="fas fa-eraser"></i> Reset Filters</button>
-                    <button class="secondary" onclick="loadActivityLogTab()" data-allow="true"><i class="fas fa-sync-alt"></i> Refresh</button>
-                </div>
-                <div class="scoreboard-wrapper" style="margin-top:12px;">
-                    <div class="scoreboard-scroll">
-                        <table class="scoreboard">
-                            <thead>
-                                <tr>
-                                    <th style="width: 170px;">Timestamp</th>
-                                    <th style="width: 130px;">User</th>
-                                    <th style="width: 80px;">Role</th>
-                                    <th style="width: 70px;">Class</th>
-                                    <th style="width: 190px;">Student</th>
-                                    <th style="width: 130px;">Entity</th>
-                                    <th style="width: 110px;">Action</th>
-                                    <th style="width: 120px;">Date</th>
-                                    <th>Detail</th>
-                                </tr>
-                            </thead>
-                            <tbody id="activityLogBody">
-                                <tr><td colspan="9" class="text-center loading">Loading...</td></tr>
-                            </tbody>
-                        </table>
                     </div>
                 </div>
             </div>
@@ -8492,8 +8542,6 @@ body.header-offscreen .header-kicker::after {
         const LOCAL_BACKUP_LIMIT = 1;
         const LOCAL_BACKUP_MAX_BYTES = 900000;
         const LOCAL_BACKUP_INTERVAL = 5 * 60 * 1000;
-        // Keep browser payload under localStorage quota. Full audit history should live on server.
-        const LOCAL_ACTIVITY_LOG_MAX = 1200;
         const LOCAL_NOTIFICATION_HISTORY_MAX = 400;
         // Minimal fallback poll when SSE/event-driven sync is unavailable.
         const MINIMAL_SYNC_POLL_INTERVAL_MS = 2 * 60 * 1000;
@@ -8683,6 +8731,33 @@ body.header-offscreen .header-kicker::after {
         const TEAM_COMPETITION_STATE_KEY = 'ea_team_competition_state';
         const LEADERSHIP_SELECTION_STATE_KEY = 'ea_leadership_selection_state';
         const SCOREBOARD_CACHE_RESET_KEY = 'ea_scoreboard_cache_reset_v1';
+
+        // ── Multi-browser-tab routing ──────────────────────────────────────
+        // Each browser tab gets its own active in-app tab via URL hash (#tab=fees)
+        // and sessionStorage (per-tab, not shared like localStorage).  This lets
+        // the user open Fees in one browser tab and Resources in another, with
+        // each remaining independent.  Data sync across browser tabs is handled
+        // by the BroadcastChannel above.
+        let _suppressHashChange = false;
+        function _readTabFromHash() {
+            const h = window.location.hash || '';
+            const m = h.match(/^#tab=([a-zA-Z0-9_-]+)$/);
+            return m ? m[1] : null;
+        }
+        function _writeTabToHash(tabName) {
+            if (_readTabFromHash() === tabName) return;
+            _suppressHashChange = true;
+            try { history.replaceState(null, '', '#tab=' + tabName); } catch (e) {}
+            // replaceState does not fire hashchange, but reset the flag next tick
+            setTimeout(function() { _suppressHashChange = false; }, 0);
+        }
+        function _readTabFromSession() {
+            try { return sessionStorage.getItem(ACTIVE_TAB_KEY); } catch (e) { return null; }
+        }
+        function _writeTabToSession(tabName) {
+            try { sessionStorage.setItem(ACTIVE_TAB_KEY, tabName); } catch (e) {}
+        }
+
         let lastLocalBackupAt = 0;
         let pendingSyncPayload = null;
         let syncTimer = null;
@@ -9652,9 +9727,6 @@ body.header-offscreen .header-kicker::after {
                 snapshot.month_roster_profiles = dropLockedMonthMapEntries(src.month_roster_profiles);
                 snapshot.role_veto_monthly = dropLockedMonthMapEntries(src.role_veto_monthly);
             }
-            if (Array.isArray(snapshot.activity_log) && snapshot.activity_log.length > LOCAL_ACTIVITY_LOG_MAX) {
-                snapshot.activity_log = snapshot.activity_log.slice(-LOCAL_ACTIVITY_LOG_MAX);
-            }
             if (Array.isArray(snapshot.notification_history) && snapshot.notification_history.length > LOCAL_NOTIFICATION_HISTORY_MAX) {
                 snapshot.notification_history = snapshot.notification_history.slice(-LOCAL_NOTIFICATION_HISTORY_MAX);
             }
@@ -9664,7 +9736,6 @@ body.header-offscreen .header-kicker::after {
         function buildEmergencyLocalStorageSnapshot(data) {
             const snapshot = buildLocalStorageSnapshot(data);
             // Last-resort browser cache compaction for quota pressure.
-            snapshot.activity_log = [];
             snapshot.notification_history = [];
             if (Array.isArray(snapshot.proposal_messages) && snapshot.proposal_messages.length > 250) {
                 snapshot.proposal_messages = snapshot.proposal_messages.slice(-250);
@@ -12794,7 +12865,7 @@ body.header-offscreen .header-kicker::after {
 
         function getDefaultChessChampionState() {
             return {
-                version: 1,
+                version: 2,
                 eventName: 'Excel Chess Champion',
                 stage: 'registration',
                 status: 'registration',
@@ -12803,6 +12874,8 @@ body.header-offscreen .header-kicker::after {
                 qualificationCount: 8,
                 enrolledStudentIds: [],
                 qualifiedStudentIds: [],
+                championStudentId: 0,
+                seriesArchive: [],
                 scoring: {
                     winPoints: 3,
                     drawPoints: 1,
@@ -12829,6 +12902,10 @@ body.header-offscreen .header-kicker::after {
             return Math.min(max, Math.max(min, chessChampionNumber(value, fallback)));
         }
 
+        function chessChampionBounded(value, min, max, fallback) {
+            return Math.min(max, Math.max(min, chessChampionNumber(value, fallback)));
+        }
+
         function chessChampionId(prefix = 'chess') {
             return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
         }
@@ -12841,23 +12918,71 @@ body.header-offscreen .header-kicker::after {
             const result = results.includes(String(match.result || '').trim()) ? String(match.result || '').trim() : '';
             const awards = match.awards && typeof match.awards === 'object' ? match.awards : {};
             const breakdown = match.breakdown && typeof match.breakdown === 'object' ? match.breakdown : {};
+            const legacyKillPoints = Math.max(0, chessChampionNumber(match.killPoints, 0));
+            const rawKillPointsBySide = match.killPointsBySide && typeof match.killPointsBySide === 'object' ? match.killPointsBySide : {};
+            const legacyWinnerSide = result === 'white' || result === 'black' ? result : '';
+            const killPointsBySide = {
+                white: chessChampionBounded(rawKillPointsBySide.white, 0, 1000, legacyWinnerSide === 'white' ? legacyKillPoints : 0),
+                black: chessChampionBounded(rawKillPointsBySide.black, 0, 1000, legacyWinnerSide === 'black' ? legacyKillPoints : 0)
+            };
+            const whiteId = parseInt(match.whiteId, 10) || 0;
+            const blackId = parseInt(match.blackId, 10) || 0;
+            const whiteSeed = Math.max(0, Math.min(1000, parseInt(match.whiteSeed, 10) || 0));
+            const blackSeed = Math.max(0, Math.min(1000, parseInt(match.blackSeed, 10) || 0));
+            let winnerId = parseInt(match.winnerId, 10) || 0;
+            if (result === 'white') winnerId = whiteId;
+            else if (result === 'black') winnerId = blackId;
+            else if (result === 'draw' || result === 'bye') winnerId = 0;
+            let advancingId = parseInt(match.advancingId, 10) || 0;
+            if (!advancingId && (result === 'white' || result === 'black')) {
+                advancingId = winnerId;
+            }
+            if (!advancingId && result === 'draw' && stage !== 'basic' && whiteSeed > 0 && blackSeed > 0) {
+                advancingId = whiteSeed < blackSeed ? whiteId : blackId;
+            }
             return {
                 id: String(match.id || chessChampionId(`match-${index}`)),
                 stage,
-                round: Math.max(1, parseInt(match.round, 10) || 1),
-                board: Math.max(1, parseInt(match.board, 10) || index + 1),
-                whiteId: parseInt(match.whiteId, 10) || 0,
-                blackId: parseInt(match.blackId, 10) || 0,
+                round: Math.max(1, Math.min(12, parseInt(match.round, 10) || 1)),
+                board: Math.max(1, Math.min(1000, parseInt(match.board, 10) || index + 1)),
+                whiteId,
+                blackId,
+                whiteSeed,
+                blackSeed,
                 status: ['scheduled', 'completed'].includes(String(match.status || '').trim()) ? String(match.status).trim() : (result ? 'completed' : 'scheduled'),
                 result,
-                winnerId: parseInt(match.winnerId, 10) || 0,
-                durationSeconds: Math.max(0, Math.round(chessChampionNumber(match.durationSeconds, 0))),
-                killPoints: Math.max(0, chessChampionNumber(match.killPoints, 0)),
+                winnerId,
+                advancingId,
+                durationSeconds: chessChampionBounded(Math.round(chessChampionNumber(match.durationSeconds, 0)), 0, 36000, 0),
+                killPoints: Math.max(killPointsBySide.white, killPointsBySide.black),
+                killPointsBySide,
                 awards,
                 breakdown,
+                revisionHistory: Array.isArray(match.revisionHistory) ? match.revisionHistory.slice(-5) : [],
                 notes: String(match.notes || '').trim().slice(0, 240),
                 createdAt: String(match.createdAt || '').trim(),
+                origin: ['system', 'historical', 'manual'].includes(String(match.origin || '').trim()) ? String(match.origin).trim() : 'system',
                 updatedAt: String(match.updatedAt || '').trim()
+            };
+        }
+
+        function normalizeChessChampionArchive(raw, index = 0) {
+            const source = raw && typeof raw === 'object' ? raw : {};
+            const normalized = normalizeChessChampionState({ ...source, seriesArchive: [] });
+            return {
+                id: String(source.id || chessChampionId(`series-${index}`)),
+                eventName: normalized.eventName,
+                stage: normalized.stage,
+                status: normalized.status,
+                round: normalized.round,
+                basicRoundCount: normalized.basicRoundCount,
+                qualificationCount: normalized.qualificationCount,
+                enrolledStudentIds: normalized.enrolledStudentIds,
+                qualifiedStudentIds: normalized.qualifiedStudentIds,
+                championStudentId: normalized.championStudentId,
+                scoring: normalized.scoring,
+                matches: normalized.matches,
+                archivedAt: String(source.archivedAt || source.updatedAt || '').trim()
             };
         }
 
@@ -12868,25 +12993,28 @@ body.header-offscreen .header-kicker::after {
             const state = {
                 ...defaults,
                 ...source,
+                version: Math.max(2, parseInt(source.version, 10) || defaults.version),
                 eventName: String(source.eventName || defaults.eventName).trim().slice(0, 80) || defaults.eventName,
                 stage: Object.prototype.hasOwnProperty.call(CHESS_CHAMPION_STAGE_LABELS, String(source.stage || '')) ? String(source.stage) : defaults.stage,
                 status: Object.prototype.hasOwnProperty.call(CHESS_CHAMPION_STAGE_LABELS, String(source.status || '')) ? String(source.status) : defaults.status,
-                round: Math.max(0, parseInt(source.round, 10) || 0),
+                round: Math.max(0, Math.min(12, parseInt(source.round, 10) || 0)),
                 basicRoundCount: Math.round(chessChampionClamp(source.basicRoundCount, 1, 12, defaults.basicRoundCount)),
                 qualificationCount: [2, 4, 8, 16].includes(parseInt(source.qualificationCount, 10)) ? parseInt(source.qualificationCount, 10) : defaults.qualificationCount,
-                enrolledStudentIds: Array.from(new Set((Array.isArray(source.enrolledStudentIds) ? source.enrolledStudentIds : []).map(id => parseInt(id, 10)).filter(Boolean))),
-                qualifiedStudentIds: Array.from(new Set((Array.isArray(source.qualifiedStudentIds) ? source.qualifiedStudentIds : []).map(id => parseInt(id, 10)).filter(Boolean))),
+                enrolledStudentIds: Array.from(new Set((Array.isArray(source.enrolledStudentIds) ? source.enrolledStudentIds : []).map(id => parseInt(id, 10)).filter(id => id > 0))),
+                qualifiedStudentIds: Array.from(new Set((Array.isArray(source.qualifiedStudentIds) ? source.qualifiedStudentIds : []).map(id => parseInt(id, 10)).filter(id => id > 0))),
+                championStudentId: Math.max(0, parseInt(source.championStudentId, 10) || 0),
+                seriesArchive: Array.isArray(source.seriesArchive) ? source.seriesArchive.slice(-20).map(normalizeChessChampionArchive).filter(Boolean) : [],
                 scoring: {
-                    winPoints: Math.max(0, chessChampionNumber(scoring.winPoints, defaults.scoring.winPoints)),
-                    drawPoints: Math.max(0, chessChampionNumber(scoring.drawPoints, defaults.scoring.drawPoints)),
-                    lossPoints: Math.max(0, chessChampionNumber(scoring.lossPoints, defaults.scoring.lossPoints)),
-                    classBonusPerLevel: Math.max(0, chessChampionNumber(scoring.classBonusPerLevel, defaults.scoring.classBonusPerLevel)),
-                    opponentBonusPerFivePoints: Math.max(0, chessChampionNumber(scoring.opponentBonusPerFivePoints, defaults.scoring.opponentBonusPerFivePoints)),
-                    fastWinSeconds: Math.max(60, Math.round(chessChampionNumber(scoring.fastWinSeconds, defaults.scoring.fastWinSeconds))),
-                    standardWinSeconds: Math.max(60, Math.round(chessChampionNumber(scoring.standardWinSeconds, defaults.scoring.standardWinSeconds))),
-                    fastTimeBonus: Math.max(0, chessChampionNumber(scoring.fastTimeBonus, defaults.scoring.fastTimeBonus)),
-                    standardTimeBonus: Math.max(0, chessChampionNumber(scoring.standardTimeBonus, defaults.scoring.standardTimeBonus)),
-                    killPointMultiplier: Math.max(0, chessChampionNumber(scoring.killPointMultiplier, defaults.scoring.killPointMultiplier))
+                    winPoints: chessChampionBounded(scoring.winPoints, 0, 100, defaults.scoring.winPoints),
+                    drawPoints: chessChampionBounded(scoring.drawPoints, 0, 100, defaults.scoring.drawPoints),
+                    lossPoints: chessChampionBounded(scoring.lossPoints, 0, 100, defaults.scoring.lossPoints),
+                    classBonusPerLevel: chessChampionBounded(scoring.classBonusPerLevel, 0, 20, defaults.scoring.classBonusPerLevel),
+                    opponentBonusPerFivePoints: chessChampionBounded(scoring.opponentBonusPerFivePoints, 0, 20, defaults.scoring.opponentBonusPerFivePoints),
+                    fastWinSeconds: chessChampionBounded(Math.round(chessChampionNumber(scoring.fastWinSeconds, defaults.scoring.fastWinSeconds)), 60, 10800, defaults.scoring.fastWinSeconds),
+                    standardWinSeconds: chessChampionBounded(Math.round(chessChampionNumber(scoring.standardWinSeconds, defaults.scoring.standardWinSeconds)), 60, 14400, defaults.scoring.standardWinSeconds),
+                    fastTimeBonus: chessChampionBounded(scoring.fastTimeBonus, 0, 50, defaults.scoring.fastTimeBonus),
+                    standardTimeBonus: chessChampionBounded(scoring.standardTimeBonus, 0, 50, defaults.scoring.standardTimeBonus),
+                    killPointMultiplier: chessChampionBounded(scoring.killPointMultiplier, 0, 20, defaults.scoring.killPointMultiplier)
                 },
                 matches: Array.isArray(source.matches) ? source.matches.map(normalizeChessChampionMatch) : [],
                 updatedAt: String(source.updatedAt || '').trim()
@@ -12943,7 +13071,12 @@ body.header-offscreen .header-kicker::after {
         }
 
         function chessChampionIsActive(student) {
-            return !!student && student.active !== false;
+            if (!student) return false;
+            const activeFlag = String(student.active === undefined || student.active === null ? '' : student.active).trim().toLowerCase();
+            if (student.active === false || student.active === 0 || ['false', '0', 'no', 'inactive', 'retired'].includes(activeFlag)) return false;
+            return typeof isStudentActiveForMonth === 'function'
+                ? isStudentActiveForMonth(student, getCurrentMonthKey(), getChessChampionStudents())
+                : true;
         }
 
         function chessChampionEnrolledStudents(state) {
@@ -12959,8 +13092,43 @@ body.header-offscreen .header-kicker::after {
             });
         }
 
+        function chessChampionIsKnockoutStage(stage) {
+            return ['elimination', 'semifinal', 'finale'].includes(String(stage || '').trim());
+        }
+
+        function chessChampionMatchAdvancingId(match) {
+            return parseInt(match && (match.advancingId || match.winnerId), 10) || 0;
+        }
+
+        function chessChampionHigherSeedId(match) {
+            const whiteId = parseInt(match && match.whiteId, 10) || 0;
+            const blackId = parseInt(match && match.blackId, 10) || 0;
+            const whiteSeed = parseInt(match && match.whiteSeed, 10) || 0;
+            const blackSeed = parseInt(match && match.blackSeed, 10) || 0;
+            if (!whiteId || !blackId) return 0;
+            if (whiteSeed > 0 && blackSeed > 0 && whiteSeed !== blackSeed) {
+                return whiteSeed < blackSeed ? whiteId : blackId;
+            }
+            return 0;
+        }
+
+        function chessChampionSeedForId(state, studentId, fallback = 0) {
+            const id = parseInt(studentId, 10) || 0;
+            if (!id) return Math.max(0, parseInt(fallback, 10) || 0);
+            const matches = state.matches
+                .filter(match => chessChampionIsKnockoutStage(match.stage) && chessChampionMatchComplete(match) && chessChampionMatchAdvancingId(match) === id)
+                .sort((a, b) => parseInt(b.round, 10) - parseInt(a.round, 10));
+            const previous = matches[0];
+            if (previous) {
+                return parseInt(previous.whiteId, 10) === id
+                    ? (parseInt(previous.whiteSeed, 10) || fallback)
+                    : (parseInt(previous.blackSeed, 10) || fallback);
+            }
+            return Math.max(0, parseInt(fallback, 10) || 0);
+        }
+
         function chessChampionMatchComplete(match) {
-            return !!match && (match.status === 'completed' || ['white', 'black', 'draw', 'bye'].includes(match.result));
+            return !!match && ['white', 'black', 'draw', 'bye'].includes(String(match.result || '').trim()) && (match.status === 'completed' || match.result === 'bye');
         }
 
         function chessChampionMatchPlayedBy(match, studentId) {
@@ -13023,7 +13191,7 @@ body.header-offscreen .header-kicker::after {
                 });
             });
             return Array.from(rows.values()).sort((a, b) => {
-                return b.points - a.points || b.wins - a.wins || b.killPoints - a.killPoints || b.opponentBonus - a.opponentBonus || chessChampionStudentName(a.student).localeCompare(chessChampionStudentName(b.student));
+                return b.points - a.points || b.wins - a.wins || b.killPoints - a.killPoints || (b.classBonus + b.opponentBonus + b.timeBonus + b.killBonus) - (a.classBonus + a.opponentBonus + a.timeBonus + a.killBonus) || chessChampionStudentName(a.student).localeCompare(chessChampionStudentName(b.student));
             }).map((row, index) => ({ ...row, rank: index + 1 }));
         }
 
@@ -13058,14 +13226,20 @@ body.header-offscreen .header-kicker::after {
                 board,
                 whiteId: parseInt(whiteId, 10) || 0,
                 blackId: parseInt(blackId, 10) || 0,
+                whiteSeed: 0,
+                blackSeed: 0,
                 status: 'scheduled',
                 result: '',
                 winnerId: 0,
+                advancingId: 0,
                 durationSeconds: 0,
                 killPoints: 0,
+                killPointsBySide: { white: 0, black: 0 },
                 awards: {},
                 breakdown: {},
+                revisionHistory: [],
                 notes: '',
+                origin: 'system',
                 createdAt: now,
                 updatedAt: now
             };
@@ -13130,46 +13304,117 @@ body.header-offscreen .header-kicker::after {
             const rankedIds = ids.map(id => parseInt(id, 10)).filter(Boolean);
             const matches = [];
             for (let index = 0; index < Math.floor(rankedIds.length / 2); index += 1) {
-                matches.push(chessChampionCreateMatch(stage, round, rankedIds[index], rankedIds[rankedIds.length - index - 1], index + 1));
+                const whiteId = rankedIds[index];
+                const blackId = rankedIds[rankedIds.length - index - 1];
+                const match = chessChampionCreateMatch(stage, round, whiteId, blackId, index + 1);
+                match.whiteSeed = chessChampionSeedForId(state, whiteId, index + 1) || index + 1;
+                match.blackSeed = chessChampionSeedForId(state, blackId, rankedIds.length - index) || rankedIds.length - index;
+                matches.push(match);
+            }
+            if (rankedIds.length % 2 === 1) {
+                const byeId = rankedIds[Math.floor(rankedIds.length / 2)];
+                const bye = chessChampionCreateBye(stage, round, byeId, matches.length + 1, state);
+                bye.whiteSeed = chessChampionSeedForId(state, byeId, Math.ceil(rankedIds.length / 2)) || Math.ceil(rankedIds.length / 2);
+                bye.advancingId = byeId;
+                matches.push(bye);
             }
             return matches;
         }
 
         function chessChampionWinners(state, stage, round) {
-            return state.matches.filter(match => match.stage === stage && parseInt(match.round, 10) === parseInt(round, 10) && chessChampionMatchComplete(match)).map(match => parseInt(match.winnerId, 10) || 0).filter(Boolean);
+            return Array.from(new Set(state.matches
+                .filter(match => match.stage === stage && parseInt(match.round, 10) === parseInt(round, 10) && chessChampionMatchComplete(match))
+                .map(match => chessChampionMatchAdvancingId(match))
+                .filter(Boolean)));
         }
 
-        function chessChampionCalculateAwards(state, match, result, durationSeconds, killPoints) {
+        function chessChampionNormalizeKillPointsBySide(match, killPointsBySide) {
+            const source = killPointsBySide && typeof killPointsBySide === 'object' ? killPointsBySide : {};
+            const legacy = Math.max(0, chessChampionNumber(match && match.killPoints, 0));
+            const result = String(match && match.result || '').trim();
+            return {
+                white: Math.max(0, chessChampionNumber(source.white, result === 'white' ? legacy : 0)),
+                black: Math.max(0, chessChampionNumber(source.black, result === 'black' ? legacy : 0))
+            };
+        }
+
+        function chessChampionClassBonusForSide(state, match, side) {
+            const first = side === 'white' ? chessChampionStudentMap().get(parseInt(match.whiteId, 10)) : chessChampionStudentMap().get(parseInt(match.blackId, 10));
+            const opponent = side === 'white' ? chessChampionStudentMap().get(parseInt(match.blackId, 10)) : chessChampionStudentMap().get(parseInt(match.whiteId, 10));
+            const firstClass = chessChampionClassNumber(first);
+            const opponentClass = chessChampionClassNumber(opponent);
+            if (!firstClass || !opponentClass) return 0;
+            return Math.max(0, opponentClass - firstClass) * state.scoring.classBonusPerLevel;
+        }
+
+        function chessChampionResolveResult(state, match, killPointsBySide) {
+            const kills = chessChampionNormalizeKillPointsBySide(match, killPointsBySide);
+            if (kills.white > kills.black) return 'white';
+            if (kills.black > kills.white) return 'black';
+            const whiteClassBonus = chessChampionClassBonusForSide(state, match, 'white');
+            const blackClassBonus = chessChampionClassBonusForSide(state, match, 'black');
+            if (whiteClassBonus > blackClassBonus) return 'white';
+            if (blackClassBonus > whiteClassBonus) return 'black';
+            return 'draw';
+        }
+
+        function chessChampionAdvancingIdForResult(state, match, result) {
+            if (result === 'white') return parseInt(match.whiteId, 10) || 0;
+            if (result === 'black') return parseInt(match.blackId, 10) || 0;
+            if (result !== 'draw' || !chessChampionIsKnockoutStage(match.stage)) return 0;
+            const seeded = chessChampionHigherSeedId(match);
+            if (seeded) return seeded;
+            const standings = getChessChampionStandings(state, match.id);
+            const whiteRank = standings.findIndex(row => row.id === parseInt(match.whiteId, 10));
+            const blackRank = standings.findIndex(row => row.id === parseInt(match.blackId, 10));
+            if (whiteRank < 0 && blackRank < 0) return 0;
+            if (whiteRank < 0) return parseInt(match.blackId, 10) || 0;
+            if (blackRank < 0) return parseInt(match.whiteId, 10) || 0;
+            return whiteRank <= blackRank ? parseInt(match.whiteId, 10) || 0 : parseInt(match.blackId, 10) || 0;
+        }
+
+        function chessChampionCalculateAwards(state, match, result, durationSeconds, killPointsBySide) {
             const scores = new Map(getChessChampionStandings(state, match.id).map(row => [row.id, row]));
-            const white = chessChampionStudentMap().get(parseInt(match.whiteId, 10));
-            const black = chessChampionStudentMap().get(parseInt(match.blackId, 10));
+            const whiteId = parseInt(match.whiteId, 10) || 0;
+            const blackId = parseInt(match.blackId, 10) || 0;
+            const white = chessChampionStudentMap().get(whiteId);
+            const black = chessChampionStudentMap().get(blackId);
             const scoring = state.scoring;
+            const kills = chessChampionNormalizeKillPointsBySide(match, killPointsBySide);
+            const killBonus = side => Math.max(0, chessChampionNumber(kills[side], 0)) * scoring.killPointMultiplier;
+            const drawBreakdown = side => {
+                const base = scoring.drawPoints;
+                const sideKillPoints = kills[side];
+                const sideKillBonus = killBonus(side);
+                const iplTotal = base;
+                return { base, classBonus: 0, opponentBonus: 0, timeBonus: 0, iplTotal, killPoints: sideKillPoints, killBonus: sideKillBonus, total: iplTotal + sideKillBonus };
+            };
             if (result === 'draw') {
-                const draw = scoring.drawPoints;
+                const whiteBreakdown = drawBreakdown('white');
+                const blackBreakdown = drawBreakdown('black');
                 return {
-                    awards: { [String(match.whiteId)]: draw, [String(match.blackId)]: draw },
-                    breakdown: {
-                        white: { base: draw, classBonus: 0, opponentBonus: 0, timeBonus: 0, killPoints: 0, killBonus: 0, total: draw },
-                        black: { base: draw, classBonus: 0, opponentBonus: 0, timeBonus: 0, killPoints: 0, killBonus: 0, total: draw }
-                    }
+                    awards: { [String(whiteId)]: whiteBreakdown.total, [String(blackId)]: blackBreakdown.total },
+                    breakdown: { white: whiteBreakdown, black: blackBreakdown }
                 };
             }
             const winnerSide = result === 'white' ? 'white' : 'black';
             const loserSide = winnerSide === 'white' ? 'black' : 'white';
-            const winnerId = winnerSide === 'white' ? parseInt(match.whiteId, 10) : parseInt(match.blackId, 10);
-            const loserId = winnerSide === 'white' ? parseInt(match.blackId, 10) : parseInt(match.whiteId, 10);
+            const winnerId = winnerSide === 'white' ? whiteId : blackId;
+            const loserId = winnerSide === 'white' ? blackId : whiteId;
             const winnerStudent = winnerSide === 'white' ? white : black;
             const loserStudent = winnerSide === 'white' ? black : white;
-            const winnerBefore = scores.get(winnerId) || { points: 0 };
             const loserBefore = scores.get(loserId) || { points: 0 };
             const classBonus = Math.max(0, chessChampionClassNumber(loserStudent) - chessChampionClassNumber(winnerStudent)) * scoring.classBonusPerLevel;
             const opponentBonus = Math.floor(Math.max(0, chessChampionNumber(loserBefore.points, 0)) / 5) * scoring.opponentBonusPerFivePoints;
             const timeBonus = durationSeconds > 0 && durationSeconds <= scoring.fastWinSeconds
                 ? scoring.fastTimeBonus
                 : (durationSeconds > 0 && durationSeconds <= scoring.standardWinSeconds ? scoring.standardTimeBonus : 0);
-            const killBonus = Math.max(0, killPoints) * scoring.killPointMultiplier;
-            const winnerBreakdown = { base: scoring.winPoints, classBonus, opponentBonus, timeBonus, killPoints: Math.max(0, killPoints), killBonus, total: scoring.winPoints + classBonus + opponentBonus + timeBonus + killBonus };
-            const loserBreakdown = { base: scoring.lossPoints, classBonus: 0, opponentBonus: 0, timeBonus: 0, killPoints: 0, killBonus: 0, total: scoring.lossPoints };
+            const winnerBase = scoring.winPoints;
+            const loserBase = scoring.lossPoints;
+            const winnerIplTotal = winnerBase + classBonus + opponentBonus + timeBonus;
+            const loserIplTotal = loserBase;
+            const winnerBreakdown = { base: winnerBase, classBonus, opponentBonus, timeBonus, iplTotal: winnerIplTotal, killPoints: kills[winnerSide], killBonus: killBonus(winnerSide), total: winnerIplTotal + killBonus(winnerSide) };
+            const loserBreakdown = { base: loserBase, classBonus: 0, opponentBonus: 0, timeBonus: 0, iplTotal: loserIplTotal, killPoints: kills[loserSide], killBonus: killBonus(loserSide), total: loserIplTotal + killBonus(loserSide) };
             return {
                 awards: { [String(winnerId)]: winnerBreakdown.total, [String(loserId)]: loserBreakdown.total },
                 breakdown: { [winnerSide]: winnerBreakdown, [loserSide]: loserBreakdown }
@@ -13224,7 +13469,10 @@ body.header-offscreen .header-kicker::after {
         }
 
         function chessChampionMatchResultLabel(match, studentMap) {
-            if (match.result === 'draw') return 'Draw';
+            if (match.result === 'draw') {
+                const advancing = studentMap.get(chessChampionMatchAdvancingId(match));
+                return advancing ? `Draw · ${chessChampionStudentName(advancing)} advances` : 'Draw';
+            }
             if (match.result === 'bye') return 'Bye';
             if (match.result === 'white' || match.result === 'black') {
                 const winner = studentMap.get(parseInt(match.winnerId, 10));
@@ -13234,20 +13482,20 @@ body.header-offscreen .header-kicker::after {
         }
 
         function chessChampionMatchFormMarkup(match, state, studentMap) {
-            const admin = currentUserRole === 'admin';
+            const admin = normalizeUserRole(currentUserRole) === 'admin';
             const white = studentMap.get(parseInt(match.whiteId, 10));
             const black = studentMap.get(parseInt(match.blackId, 10));
             if (match.result === 'bye') {
                 return `<div class="chess-champion-match-card is-complete"><div class="chess-champion-match-top"><span>Board ${match.board}</span><b>BYE</b></div>${chessChampionPlayerMarkup(white, 'is-winner')}<div class="chess-champion-match-award">+${chessChampionFormatPoints(match.awards && match.awards[String(match.whiteId)])} points</div></div>`;
             }
             const winnerSide = match.result === 'white' || match.result === 'black' ? match.result : '';
-            const winner = match.result ? chessChampionStudentName(studentMap.get(parseInt(match.winnerId, 10))) : '';
             const breakdown = match.breakdown && winnerSide && match.breakdown[winnerSide] ? match.breakdown[winnerSide] : null;
-            const summary = match.result ? `<div class="chess-champion-match-summary"><strong>${escapeHtml(chessChampionMatchResultLabel(match, studentMap))}</strong><span>${match.durationSeconds ? `${Math.round(match.durationSeconds / 60)} min` : 'Time not entered'} · ${chessChampionFormatPoints(match.killPoints)} kill pts</span>${breakdown ? `<small>Base ${chessChampionFormatPoints(breakdown.base)} + class ${chessChampionFormatPoints(breakdown.classBonus)} + opponent ${chessChampionFormatPoints(breakdown.opponentBonus)} + time ${chessChampionFormatPoints(breakdown.timeBonus)} + kills ${chessChampionFormatPoints(breakdown.killBonus)}</small>` : ''}</div>` : '';
+            const kills = chessChampionNormalizeKillPointsBySide(match, match.killPointsBySide);
+            const summary = match.result ? `<div class="chess-champion-match-summary"><strong>${escapeHtml(chessChampionMatchResultLabel(match, studentMap))}</strong><span>${match.durationSeconds ? `${Math.round(match.durationSeconds / 60)} min` : 'Time not entered'} · White ${chessChampionFormatPoints(kills.white)} kill pts · Black ${chessChampionFormatPoints(kills.black)} kill pts</span>${breakdown ? `<small>IPL ${chessChampionFormatPoints(breakdown.iplTotal)} + kill bonus ${chessChampionFormatPoints(breakdown.killBonus)} · ${match.result === 'draw' ? 'Equal kill/class tie' : 'Higher kill total or class-level tie-break'}</small>` : ''}</div>` : '';
             if (!admin) {
                 return `<div class="chess-champion-match-card ${match.result ? 'is-complete' : ''}"><div class="chess-champion-match-top"><span>Board ${match.board}</span><b>${escapeHtml(match.result ? 'COMPLETED' : 'SCHEDULED')}</b></div><div class="chess-champion-match-versus"><div>${chessChampionPlayerMarkup(white, winnerSide === 'white' ? 'is-winner' : '')}</div><span>VS</span><div>${chessChampionPlayerMarkup(black, winnerSide === 'black' ? 'is-winner' : '')}</div></div>${summary}</div>`;
             }
-            return `<div class="chess-champion-match-card ${match.result ? 'is-complete' : ''}"><div class="chess-champion-match-top"><span>Board ${match.board}</span><b>${escapeHtml(match.result ? 'COMPLETED' : 'ADMIN ENTRY')}</b></div><div class="chess-champion-match-versus"><div>${chessChampionPlayerMarkup(white, winnerSide === 'white' ? 'is-winner' : '')}</div><span>VS</span><div>${chessChampionPlayerMarkup(black, winnerSide === 'black' ? 'is-winner' : '')}</div></div>${match.result ? summary : ''}<div class="chess-champion-match-form"><label>Result<select id="chessChampionResult-${escapeHtml(match.id)}"><option value="">Select result</option><option value="white" ${winnerSide === 'white' ? 'selected' : ''}>White wins</option><option value="black" ${winnerSide === 'black' ? 'selected' : ''}>Black wins</option>${match.stage === 'basic' ? `<option value="draw" ${match.result === 'draw' ? 'selected' : ''}>Draw</option>` : ''}</select></label><label>Duration (min)<input id="chessChampionDuration-${escapeHtml(match.id)}" type="number" min="0" max="600" step="1" value="${match.durationSeconds ? Math.round(match.durationSeconds / 60) : ''}"></label><label>Kill points<input id="chessChampionKills-${escapeHtml(match.id)}" type="number" min="0" max="1000" step="1" value="${match.killPoints || ''}"></label><button class="secondary" type="button" onclick="saveChessChampionMatch('${escapeHtml(match.id)}')"><i class="fas fa-check"></i> ${match.result ? 'Save revision' : 'Record result'}</button>${match.result ? `<button class="chess-champion-text-button" type="button" onclick="editChessChampionMatch('${escapeHtml(match.id)}')">Revise</button>` : ''}</div></div>`;
+            return `<div class="chess-champion-match-card ${match.result ? 'is-complete' : ''}"><div class="chess-champion-match-top"><span>Board ${match.board}</span><b>${escapeHtml(match.result ? 'COMPLETED' : 'ADMIN ENTRY')}</b></div><div class="chess-champion-match-versus"><div>${chessChampionPlayerMarkup(white, winnerSide === 'white' ? 'is-winner' : '')}</div><span>VS</span><div>${chessChampionPlayerMarkup(black, winnerSide === 'black' ? 'is-winner' : '')}</div></div>${match.result ? summary : ''}<div class="chess-champion-match-form"><button class="secondary" type="button" onclick="openChessChampionEndMatch('${escapeHtml(match.id)}', false)"><i class="fas fa-crosshairs"></i> ${match.result ? 'Revise kill points' : 'Enter kill points'}</button><button class="secondary" type="button" onclick="openChessChampionEndMatch('${escapeHtml(match.id)}', true)"><i class="fas fa-flag-checkered"></i> ${match.result ? 'Recalculate result' : 'End match'}</button></div></div>`;
         }
 
         function renderChessChampionMatchRoom(state) {
@@ -13261,7 +13509,8 @@ body.header-offscreen .header-kicker::after {
             }
             if (state.stage === 'complete') {
                 const standings = getChessChampionStandings(state);
-                const champion = standings[0];
+                const championId = parseInt(state.championStudentId, 10) || 0;
+                const champion = standings.find(row => row.id === championId) || standings[0];
                 room.innerHTML = champion ? `<div class="chess-champion-champion-card"><i class="fas fa-crown"></i><span>Excel Chess Champion</span><strong>${escapeHtml(chessChampionStudentName(champion.student))}</strong><small>${chessChampionFormatPoints(champion.points)} tournament points</small></div>` : '<div class="chess-champion-empty chess-champion-empty-compact">The event is complete.</div>';
                 return;
             }
@@ -13295,15 +13544,17 @@ body.header-offscreen .header-kicker::after {
             bracket.innerHTML = groups.map(group => `<div class="chess-champion-bracket-column"><div class="chess-champion-bracket-column-title">${escapeHtml(chessChampionStageLabel(group.stage, group.round))}</div>${group.matches.map(match => {
                 const white = studentMap.get(parseInt(match.whiteId, 10));
                 const black = studentMap.get(parseInt(match.blackId, 10));
-                const winnerId = parseInt(match.winnerId, 10) || 0;
-                return `<article class="chess-champion-bracket-match ${chessChampionMatchComplete(match) ? 'is-complete' : ''}"><span class="chess-champion-bracket-board">Board ${match.board}</span><div class="chess-champion-bracket-player ${winnerId === parseInt(match.whiteId, 10) ? 'is-winner' : ''}"><span>${escapeHtml(chessChampionStudentName(white))}</span><b>${match.result === 'white' ? chessChampionFormatPoints(match.awards && match.awards[String(match.whiteId)]) : '—'}</b></div><div class="chess-champion-bracket-player ${winnerId === parseInt(match.blackId, 10) ? 'is-winner' : ''}"><span>${escapeHtml(chessChampionStudentName(black))}</span><b>${match.result === 'black' ? chessChampionFormatPoints(match.awards && match.awards[String(match.blackId)]) : '—'}</b></div><div class="chess-champion-bracket-status">${escapeHtml(match.result ? (match.result === 'draw' ? 'Draw' : 'Result recorded') : 'Awaiting board')}</div></article>`;
+                const advancingId = chessChampionMatchAdvancingId(match);
+                const advancingName = advancingId === parseInt(match.whiteId, 10) ? chessChampionStudentName(white) : (advancingId === parseInt(match.blackId, 10) ? chessChampionStudentName(black) : '');
+                const status = match.result === 'draw' && advancingName ? `Draw · ${advancingName} advances on higher seed` : (match.result ? 'Result recorded' : 'Awaiting board');
+                return `<article class="chess-champion-bracket-match ${chessChampionMatchComplete(match) ? 'is-complete' : ''}"><span class="chess-champion-bracket-board">Board ${match.board}</span><div class="chess-champion-bracket-player ${advancingId === parseInt(match.whiteId, 10) ? 'is-winner' : ''}"><span>${escapeHtml(chessChampionStudentName(white))}</span><b>${match.result === 'white' || (match.result === 'draw' && advancingId === parseInt(match.whiteId, 10)) ? chessChampionFormatPoints(match.awards && match.awards[String(match.whiteId)]) : '—'}</b></div><div class="chess-champion-bracket-player ${advancingId === parseInt(match.blackId, 10) ? 'is-winner' : ''}"><span>${escapeHtml(chessChampionStudentName(black))}</span><b>${match.result === 'black' || (match.result === 'draw' && advancingId === parseInt(match.blackId, 10)) ? chessChampionFormatPoints(match.awards && match.awards[String(match.blackId)]) : '—'}</b></div><div class="chess-champion-bracket-status">${escapeHtml(status)}</div></article>`;
             }).join('')}</div>`).join('<div class="chess-champion-bracket-connector" aria-hidden="true"><i class="fas fa-chevron-right"></i></div>');
         }
 
         function renderChessChampionRoster(state) {
             const roster = document.getElementById('chessChampionRoster');
             if (!roster) return;
-            const admin = currentUserRole === 'admin' && state.stage === 'registration';
+            const admin = normalizeUserRole(currentUserRole) === 'admin' && state.stage === 'registration';
             const enrolled = new Set(state.enrolledStudentIds);
             const students = getChessChampionStudents().filter(chessChampionIsActive).sort((a, b) => chessChampionStudentClass(a).localeCompare(chessChampionStudentClass(b), undefined, { numeric: true }) || chessChampionStudentName(a).localeCompare(chessChampionStudentName(b)));
             roster.innerHTML = students.length ? students.map(student => {
@@ -13312,10 +13563,137 @@ body.header-offscreen .header-kicker::after {
             }).join('') : '<div class="chess-champion-empty chess-champion-empty-compact">No active students are available.</div>';
         }
 
+        function renderChessChampionHistoricalForm(state) {
+            const roundInput = document.getElementById('chessChampionHistoricalRound');
+            const whiteSelect = document.getElementById('chessChampionHistoricalWhite');
+            const blackSelect = document.getElementById('chessChampionHistoricalBlack');
+            const status = document.getElementById('chessChampionHistoricalStatus');
+            if (!roundInput || !whiteSelect || !blackSelect) return;
+            const currentRound = Math.max(1, parseInt(roundInput.value, 10) || (state.stage === 'basic' ? state.round || 1 : 1));
+            const enrolledIds = new Set(state.enrolledStudentIds.map(id => parseInt(id, 10)));
+            const students = getChessChampionStudents().filter(student => chessChampionIsActive(student) && enrolledIds.has(parseInt(student.id, 10))).sort((a, b) => chessChampionStudentName(a).localeCompare(chessChampionStudentName(b)));
+            const currentWhite = whiteSelect.value;
+            const currentBlack = blackSelect.value;
+            const options = students.map(student => `<option value="${parseInt(student.id, 10)}">${escapeHtml(chessChampionStudentName(student))} · ${escapeHtml(chessChampionRoll(student))} · Class ${escapeHtml(chessChampionStudentClass(student))}</option>`).join('');
+            whiteSelect.innerHTML = `<option value="">Select white player</option>${options}`;
+            blackSelect.innerHTML = `<option value="">Select black player</option>${options}`;
+            if (currentWhite && students.some(student => String(student.id) === String(currentWhite))) whiteSelect.value = currentWhite;
+            if (currentBlack && students.some(student => String(student.id) === String(currentBlack))) blackSelect.value = currentBlack;
+            roundInput.value = currentRound;
+            if (status) status.textContent = `${students.length} active player${students.length === 1 ? '' : 's'} available. Add one held Basic match at a time, then enter its kill points and end it.`;
+        }
+
+        function addChessChampionHistoricalMatch() {
+            if (!chessChampionAdminGuard()) return;
+            const state = getChessChampionState();
+            const round = Math.max(1, Math.min(12, parseInt(document.getElementById('chessChampionHistoricalRound')?.value, 10) || 1));
+            const whiteId = parseInt(document.getElementById('chessChampionHistoricalWhite')?.value, 10) || 0;
+            const blackId = parseInt(document.getElementById('chessChampionHistoricalBlack')?.value, 10) || 0;
+            const override = !!document.getElementById('chessChampionHistoricalOverride')?.checked;
+            if (state.stage !== 'registration' && state.stage !== 'basic') {
+                showAlert('Held Basic matches can only be added before the knockout bracket begins.', 'warning');
+                return;
+            }
+            if (round > state.basicRoundCount) {
+                showAlert(`Basic Round ${round} is outside the configured ${state.basicRoundCount}-round league.`, 'warning');
+                return;
+            }
+            if (!whiteId || !blackId || whiteId === blackId) {
+                showAlert('Choose two different active students for the held match.', 'warning');
+                return;
+            }
+            const activeIds = new Set(chessChampionActiveEnrolledIds(state));
+            if (!activeIds.has(whiteId) || !activeIds.has(blackId)) {
+                showAlert('Register both players before adding a held match. Only active, opted-in students are allowed.', 'warning');
+                return;
+            }
+            if (state.stage === 'registration' && round !== 1) {
+                showAlert('The first held Basic match must belong to Round 1.', 'warning');
+                return;
+            }
+            if (state.stage === 'basic' && round < state.round) {
+                showAlert('Past Basic rounds are locked after the tournament advances.', 'warning');
+                return;
+            }
+            if (state.stage === 'basic' && round > state.round + 1) {
+                showAlert(`Cannot jump from Basic Round ${state.round} to Round ${round}. Complete the intermediate round first.`, 'warning');
+                return;
+            }
+            if (state.stage === 'basic' && round === state.round + 1 && chessChampionCurrentMatches(state).some(match => !chessChampionMatchComplete(match))) {
+                showAlert('Complete every board in the current Basic round before importing the next round.', 'warning');
+                return;
+            }
+            const existingPair = state.matches.find(match => match.stage === 'basic' && parseInt(match.round, 10) === round && ((parseInt(match.whiteId, 10) === whiteId && parseInt(match.blackId, 10) === blackId) || (parseInt(match.whiteId, 10) === blackId && parseInt(match.blackId, 10) === whiteId)));
+            const roundMatches = state.matches.filter(match => match.stage === 'basic' && parseInt(match.round, 10) === round && (!existingPair || String(match.id) !== String(existingPair.id)));
+            const busyMatch = roundMatches.some(match => [parseInt(match.whiteId, 10), parseInt(match.blackId, 10)].includes(whiteId));
+            const blackBusyMatch = roundMatches.some(match => [parseInt(match.whiteId, 10), parseInt(match.blackId, 10)].includes(blackId));
+            if (busyMatch || blackBusyMatch) {
+                showAlert('Each player can appear only once in a Basic round.', 'warning');
+                return;
+            }
+            let match = existingPair;
+            if (existingPair && !override) {
+                showAlert(existingPair.status === 'completed' ? 'That held pairing is already completed. Enable Override to revise it.' : 'That pairing already exists. Enable Override only when replacing it intentionally.', 'warning');
+                return;
+            }
+            if (existingPair && override) {
+                if (state.matches.some(item => item !== existingPair && (item.stage !== 'basic' || parseInt(item.round, 10) > round))) {
+                    showAlert('This pairing already has downstream rounds. Reset or rebuild the bracket before overriding it.', 'warning');
+                    return;
+                }
+                existingPair.revisionHistory = Array.isArray(existingPair.revisionHistory) ? existingPair.revisionHistory : [];
+                existingPair.revisionHistory.push({ at: new Date().toISOString(), result: existingPair.result, winnerId: existingPair.winnerId, advancingId: existingPair.advancingId || 0 });
+                existingPair.revisionHistory = existingPair.revisionHistory.slice(-5);
+                match.whiteId = whiteId;
+                match.blackId = blackId;
+                match.origin = 'historical';
+                match.result = '';
+                match.status = 'scheduled';
+                match.winnerId = 0;
+                match.advancingId = 0;
+                match.durationSeconds = 0;
+                match.killPoints = 0;
+                match.killPointsBySide = { white: 0, black: 0 };
+                match.awards = {};
+                match.breakdown = {};
+                match.updatedAt = new Date().toISOString();
+            } else if (!existingPair) {
+                const board = Math.max(0, ...state.matches.filter(item => item.stage === 'basic' && parseInt(item.round, 10) === round).map(item => parseInt(item.board, 10) || 0)) + 1;
+                match = chessChampionCreateMatch('basic', round, whiteId, blackId, board);
+                match.origin = 'historical';
+                state.matches.push(match);
+            }
+            if (state.stage === 'registration' || round > state.round) {
+                state.stage = 'basic';
+                state.status = 'basic';
+                state.round = round;
+            }
+            saveChessChampionState(state);
+            renderChessChampionTab();
+            showAlert(existingPair ? 'Held pairing overridden. Enter kill points and end the match.' : 'Held Basic match added. Enter kill points and end the match.', 'success');
+            setTimeout(() => openChessChampionEndMatch(match.id, false), 80);
+        }
+
+        function renderChessChampionSeriesArchive(state) {
+            const target = document.getElementById('chessChampionSeriesArchive');
+            if (!target) return;
+            const archives = Array.isArray(state.seriesArchive) ? state.seriesArchive.slice().reverse() : [];
+            if (!archives.length) {
+                target.innerHTML = '<div class="chess-champion-admin-help">No archived tournament series yet. Use Archive series & reset to preserve the current event before starting a new one.</div>';
+                return;
+            }
+            const studentMap = chessChampionStudentMap();
+            target.innerHTML = `<div class="chess-champion-series-title"><i class="fas fa-box-archive"></i> Saved tournament series</div>${archives.map(series => {
+                const champion = studentMap.get(parseInt(series.championStudentId, 10));
+                const completed = Array.isArray(series.matches) ? series.matches.filter(chessChampionMatchComplete).length : 0;
+                return `<article class="chess-champion-series-row"><div><strong>${escapeHtml(series.eventName)}</strong><small>${escapeHtml(series.archivedAt || 'Archived')} · ${completed}/${series.matches.length} matches · ${series.enrolledStudentIds.length} players</small></div><span>${escapeHtml(champion ? chessChampionStudentName(champion) : (series.stage === 'complete' ? 'No champion' : chessChampionStageLabel(series.stage, series.round)))}</span></article>`;
+            }).join('')}`;
+        }
+
         function renderChessChampionAdmin(state) {
             const panel = document.getElementById('chessChampionAdminPanel');
             if (!panel) return;
-            const admin = currentUserRole === 'admin';
+            const admin = normalizeUserRole(currentUserRole) === 'admin';
             panel.style.display = admin ? '' : 'none';
             if (!admin) return;
             const values = {
@@ -13334,18 +13712,33 @@ body.header-offscreen .header-kicker::after {
                 chessChampionKillMultiplier: state.scoring.killPointMultiplier
             };
             Object.entries(values).forEach(([id, value]) => { const input = document.getElementById(id); if (input) input.value = value; });
-            panel.querySelectorAll('[data-role-only="admin"]').forEach(el => { el.disabled = state.stage !== 'registration' && !el.closest('#chessChampionRoster'); });
+            panel.querySelectorAll('[data-role-only="admin"]').forEach(el => { el.disabled = state.stage !== 'registration' && !el.closest('#chessChampionRoster') && !el.closest('#chessChampionHistoricalCard'); });
             renderChessChampionRoster(state);
+            renderChessChampionHistoricalForm(state);
+            renderChessChampionSeriesArchive(state);
         }
 
         function renderChessChampionTab() {
             const state = getChessChampionState();
             const standings = getChessChampionStandings(state);
+            // Preserve scroll positions across re-renders so toggling a roster
+            // checkbox or saving a result does not jump the user back to top.
+            const roster = document.getElementById('chessChampionRoster');
+            const matchRoom = document.getElementById('chessChampionMatchRoom');
+            const bracket = document.getElementById('chessChampionBracket');
+            const preserved = {
+                rosterTop: roster ? roster.scrollTop : 0,
+                matchTop: matchRoom ? matchRoom.scrollTop : 0,
+                bracketLeft: bracket ? bracket.scrollLeft : 0
+            };
             renderChessChampionStats(state, standings);
             renderChessChampionStandings(state, standings);
             renderChessChampionMatchRoom(state);
             renderChessChampionBracket(state);
             renderChessChampionAdmin(state);
+            if (roster) roster.scrollTop = preserved.rosterTop;
+            if (matchRoom) matchRoom.scrollTop = preserved.matchTop;
+            if (bracket) bracket.scrollLeft = preserved.bracketLeft;
         }
 
         function loadChessChampionTab() {
@@ -13353,7 +13746,7 @@ body.header-offscreen .header-kicker::after {
         }
 
         function chessChampionAdminGuard() {
-            if (currentUserRole !== 'admin') {
+            if (normalizeUserRole(currentUserRole) !== 'admin') {
                 showAlert('Only Admin can manage Excel Chess Champion.', 'warning');
                 return false;
             }
@@ -13398,16 +13791,16 @@ body.header-offscreen .header-kicker::after {
             state.eventName = String(value('chessChampionEventName') || state.eventName).trim() || 'Excel Chess Champion';
             state.basicRoundCount = Math.round(chessChampionClamp(value('chessChampionBasicRounds'), 1, 12, state.basicRoundCount));
             state.qualificationCount = [2, 4, 8, 16].includes(parseInt(value('chessChampionQualificationCount'), 10)) ? parseInt(value('chessChampionQualificationCount'), 10) : state.qualificationCount;
-            state.scoring.fastWinSeconds = Math.max(60, Math.round(chessChampionNumber(value('chessChampionFastMinutes'), 10) * 60));
-            state.scoring.standardWinSeconds = Math.max(state.scoring.fastWinSeconds, Math.round(chessChampionNumber(value('chessChampionStandardMinutes'), 20) * 60));
-            state.scoring.winPoints = Math.max(0, chessChampionNumber(value('chessChampionWinPoints'), state.scoring.winPoints));
-            state.scoring.drawPoints = Math.max(0, chessChampionNumber(value('chessChampionDrawPoints'), state.scoring.drawPoints));
-            state.scoring.lossPoints = Math.max(0, chessChampionNumber(value('chessChampionLossPoints'), state.scoring.lossPoints));
-            state.scoring.classBonusPerLevel = Math.max(0, chessChampionNumber(value('chessChampionClassBonus'), state.scoring.classBonusPerLevel));
-            state.scoring.opponentBonusPerFivePoints = Math.max(0, chessChampionNumber(value('chessChampionOpponentBonus'), state.scoring.opponentBonusPerFivePoints));
-            state.scoring.fastTimeBonus = Math.max(0, chessChampionNumber(value('chessChampionFastBonus'), state.scoring.fastTimeBonus));
-            state.scoring.standardTimeBonus = Math.max(0, chessChampionNumber(value('chessChampionStandardBonus'), state.scoring.standardTimeBonus));
-            state.scoring.killPointMultiplier = Math.max(0, chessChampionNumber(value('chessChampionKillMultiplier'), state.scoring.killPointMultiplier));
+            state.scoring.fastWinSeconds = chessChampionBounded(Math.round(chessChampionNumber(value('chessChampionFastMinutes'), 10) * 60), 60, 10800, state.scoring.fastWinSeconds);
+            state.scoring.standardWinSeconds = chessChampionBounded(Math.round(chessChampionNumber(value('chessChampionStandardMinutes'), 20) * 60), state.scoring.fastWinSeconds, 14400, state.scoring.standardWinSeconds);
+            state.scoring.winPoints = chessChampionBounded(value('chessChampionWinPoints'), 0, 100, state.scoring.winPoints);
+            state.scoring.drawPoints = chessChampionBounded(value('chessChampionDrawPoints'), 0, 100, state.scoring.drawPoints);
+            state.scoring.lossPoints = chessChampionBounded(value('chessChampionLossPoints'), 0, 100, state.scoring.lossPoints);
+            state.scoring.classBonusPerLevel = chessChampionBounded(value('chessChampionClassBonus'), 0, 20, state.scoring.classBonusPerLevel);
+            state.scoring.opponentBonusPerFivePoints = chessChampionBounded(value('chessChampionOpponentBonus'), 0, 20, state.scoring.opponentBonusPerFivePoints);
+            state.scoring.fastTimeBonus = chessChampionBounded(value('chessChampionFastBonus'), 0, 50, state.scoring.fastTimeBonus);
+            state.scoring.standardTimeBonus = chessChampionBounded(value('chessChampionStandardBonus'), 0, 50, state.scoring.standardTimeBonus);
+            state.scoring.killPointMultiplier = chessChampionBounded(value('chessChampionKillMultiplier'), 0, 20, state.scoring.killPointMultiplier);
             saveChessChampionState(state);
             renderChessChampionTab();
             showAlert('Excel Chess Champion settings saved.', 'success');
@@ -13417,8 +13810,13 @@ body.header-offscreen .header-kicker::after {
             if (!chessChampionAdminGuard()) return;
             const state = getChessChampionState();
             const activeIds = chessChampionActiveEnrolledIds(state);
+            if (state.stage === 'complete') {
+                showAlert('Excel Chess Champion is already complete.', 'info');
+                return;
+            }
             if (state.stage === 'registration') {
                 if (activeIds.length < 2) { showAlert('Register at least two active players before starting.', 'warning'); return; }
+                state.championStudentId = 0;
                 state.stage = 'basic';
                 state.status = 'basic';
                 state.round = 1;
@@ -13429,6 +13827,14 @@ body.header-offscreen .header-kicker::after {
                 return;
             }
             const current = chessChampionCurrentMatches(state);
+            if (!current.length) { showAlert(`${chessChampionStageLabel(state.stage, state.round)} has no current boards to advance.`, 'warning'); return; }
+            if (state.stage === 'basic') {
+                const expectedBasicBoards = Math.ceil(Math.max(2, activeIds.length) / 2);
+                if (current.length < expectedBasicBoards) {
+                    showAlert(`Basic Round ${state.round} has ${current.length} of ${expectedBasicBoards} expected boards. Add the remaining held matches first.`, 'warning');
+                    return;
+                }
+            }
             if (current.some(match => !chessChampionMatchComplete(match))) { showAlert('Record every current board result before advancing.', 'warning'); return; }
             if (state.stage === 'basic') {
                 if (state.round < state.basicRoundCount) {
@@ -13439,22 +13845,41 @@ body.header-offscreen .header-kicker::after {
                     showAlert(`Basic Round ${state.round} generated.`, 'success');
                     return;
                 }
-                const standings = getChessChampionStandings(state);
+                const standings = getChessChampionStandings(state).filter(row => row.id > 0 && chessChampionStudentMap().has(row.id));
                 const qualifierCount = chessChampionEffectiveQualificationCount(state, standings.length);
                 if (qualifierCount < 2) { showAlert('At least two players are needed for the knockout bracket.', 'warning'); return; }
                 state.qualifiedStudentIds = standings.slice(0, qualifierCount).map(row => row.id);
-                state.stage = 'elimination';
-                state.status = 'elimination';
-                state.round = 1;
-                state.matches.push(...chessChampionKnockoutMatches(state, state.qualifiedStudentIds, 'elimination', 1));
+                state.championStudentId = 0;
+                if (qualifierCount === 2) {
+                    state.stage = 'finale';
+                    state.status = 'finale';
+                    state.round = 1;
+                    state.matches.push(...chessChampionKnockoutMatches(state, state.qualifiedStudentIds, 'finale', 1));
+                    showAlert(`Top ${qualifierCount} qualified. Finale generated.`, 'success');
+                } else if (qualifierCount === 4) {
+                    state.stage = 'semifinal';
+                    state.status = 'semifinal';
+                    state.round = 1;
+                    state.matches.push(...chessChampionKnockoutMatches(state, state.qualifiedStudentIds, 'semifinal', 1));
+                    showAlert(`Top ${qualifierCount} qualified. Semifinals generated.`, 'success');
+                } else {
+                    state.stage = 'elimination';
+                    state.status = 'elimination';
+                    state.round = 1;
+                    state.matches.push(...chessChampionKnockoutMatches(state, state.qualifiedStudentIds, 'elimination', 1));
+                    showAlert(`Top ${qualifierCount} qualified. Elimination bracket generated.`, 'success');
+                }
                 saveChessChampionState(state);
                 renderChessChampionTab();
-                showAlert(`Top ${qualifierCount} qualified. Elimination bracket generated.`, 'success');
                 return;
             }
             const winners = chessChampionWinners(state, state.stage, state.round);
+            if (!winners.length) {
+                showAlert('No player is marked to advance. Resolve the current knockout boards before continuing.', 'warning');
+                return;
+            }
             if (state.stage === 'elimination') {
-                if (winners.length > 4) {
+                if (winners.length > 4 || winners.length === 3) {
                     state.round += 1;
                     state.matches.push(...chessChampionKnockoutMatches(state, winners, 'elimination', state.round));
                 } else if (winners.length === 4) {
@@ -13467,68 +13892,237 @@ body.header-offscreen .header-kicker::after {
                     state.status = 'finale';
                     state.round = 1;
                     state.matches.push(...chessChampionKnockoutMatches(state, winners, 'finale', 1));
+                } else if (winners.length === 1) {
+                    state.championStudentId = winners[0];
+                    state.stage = 'complete';
+                    state.status = 'complete';
+                    state.round = 0;
+                } else {
+                    showAlert(`Elimination produced ${winners.length} advancing players, which is not a supported bracket size.`, 'warning');
+                    return;
                 }
-            } else if (state.stage === 'semifinal' && winners.length === 2) {
-                state.stage = 'finale';
-                state.status = 'finale';
-                state.round = 1;
-                state.matches.push(...chessChampionKnockoutMatches(state, winners, 'finale', 1));
+            } else if (state.stage === 'semifinal') {
+                if (winners.length === 2) {
+                    state.stage = 'finale';
+                    state.status = 'finale';
+                    state.round = 1;
+                    state.matches.push(...chessChampionKnockoutMatches(state, winners, 'finale', 1));
+                } else if (winners.length === 1) {
+                    state.championStudentId = winners[0];
+                    state.stage = 'complete';
+                    state.status = 'complete';
+                    state.round = 0;
+                } else {
+                    showAlert(`Semifinals produced ${winners.length} advancing players, which is not supported.`, 'warning');
+                    return;
+                }
             } else if (state.stage === 'finale' && winners.length === 1) {
+                state.championStudentId = winners[0];
                 state.stage = 'complete';
                 state.status = 'complete';
                 state.round = 0;
+            } else {
+                showAlert(`Finale produced ${winners.length} advancing players, which is not supported.`, 'warning');
+                return;
             }
             saveChessChampionState(state);
             renderChessChampionTab();
             showAlert(state.stage === 'complete' ? 'Excel Chess Champion crowned.' : `${chessChampionStageLabel(state.stage, state.round)} is ready.`, 'success');
         }
 
-        function saveChessChampionMatch(matchId) {
-            if (!chessChampionAdminGuard()) return;
+        let activeChessChampionMatchId = '';
+
+        function getChessChampionMatch(matchId) {
             const state = getChessChampionState();
-            const match = state.matches.find(item => String(item.id) === String(matchId));
+            return { state, match: state.matches.find(item => String(item.id) === String(matchId)) };
+        }
+
+        function getChessChampionEndMatchValues() {
+            return {
+                white: chessChampionBounded(document.getElementById('chessChampionWhiteKillPoints')?.value, 0, 1000, 0),
+                black: chessChampionBounded(document.getElementById('chessChampionBlackKillPoints')?.value, 0, 1000, 0),
+                durationSeconds: chessChampionBounded(Math.round(chessChampionNumber(document.getElementById('chessChampionEndMatchDuration')?.value, 0) * 60), 0, 36000, 0)
+            };
+        }
+
+        function chessChampionCanReviseMatch(state, match) {
+            if (!match || !match.result) return true;
+            if (match.stage !== state.stage || parseInt(match.round, 10) !== parseInt(state.round, 10)) {
+                showAlert('Past-round results are locked after the bracket advances.', 'warning');
+                return false;
+            }
+            return true;
+        }
+
+        function openChessChampionEndMatch(matchId) {
+            if (!chessChampionAdminGuard()) return;
+            const { state, match } = getChessChampionMatch(matchId);
+            if (!match || !match.whiteId || !match.blackId) {
+                showAlert('This board does not have two players yet.', 'warning');
+                return;
+            }
+            if (!chessChampionCanReviseMatch(state, match)) return;
+            activeChessChampionMatchId = String(match.id);
+            const studentMap = chessChampionStudentMap();
+            const kills = chessChampionNormalizeKillPointsBySide(match, match.killPointsBySide);
+            const modal = document.getElementById('chessChampionEndMatchModal');
+            if (!modal) return;
+            document.getElementById('chessChampionEndMatchTitle').textContent = match.result ? 'Revise / end match' : 'End match';
+            document.getElementById('chessChampionEndMatchPlayers').textContent = `${chessChampionStudentName(studentMap.get(match.whiteId))} vs ${chessChampionStudentName(studentMap.get(match.blackId))} · ${chessChampionStageLabel(match.stage, match.round)}`;
+            document.getElementById('chessChampionWhiteKillLabel').textContent = `${chessChampionStudentName(studentMap.get(match.whiteId))} kill points`;
+            document.getElementById('chessChampionBlackKillLabel').textContent = `${chessChampionStudentName(studentMap.get(match.blackId))} kill points`;
+            document.getElementById('chessChampionWhiteKillPoints').value = kills.white;
+            document.getElementById('chessChampionBlackKillPoints').value = kills.black;
+            document.getElementById('chessChampionEndMatchDuration').value = match.durationSeconds ? Math.round(match.durationSeconds / 60) : '';
+            modal.classList.remove('hidden');
+            modal.setAttribute('aria-hidden', 'false');
+            previewChessChampionEndMatch();
+            const firstInput = document.getElementById('chessChampionWhiteKillPoints');
+            if (firstInput) setTimeout(() => firstInput.focus(), 30);
+        }
+
+        function closeChessChampionEndMatch() {
+            const modal = document.getElementById('chessChampionEndMatchModal');
+            if (modal) {
+                modal.classList.add('hidden');
+                modal.setAttribute('aria-hidden', 'true');
+            }
+            activeChessChampionMatchId = '';
+        }
+
+        function previewChessChampionEndMatch() {
+            const target = document.getElementById('chessChampionEndMatchPreview');
+            if (!target || !activeChessChampionMatchId) return;
+            const { state, match } = getChessChampionMatch(activeChessChampionMatchId);
             if (!match) return;
-            const result = document.getElementById(`chessChampionResult-${matchId}`)?.value || '';
-            const durationMinutes = Math.max(0, chessChampionNumber(document.getElementById(`chessChampionDuration-${matchId}`)?.value, 0));
-            const killPoints = Math.max(0, chessChampionNumber(document.getElementById(`chessChampionKills-${matchId}`)?.value, 0));
-            if (!['white', 'black', 'draw'].includes(result) || (match.stage !== 'basic' && result === 'draw')) { showAlert('Choose a valid match result.', 'warning'); return; }
-            if (result !== 'draw' && (!match.whiteId || !match.blackId)) { showAlert('This board cannot receive a knockout result.', 'warning'); return; }
-            const durationSeconds = Math.round(durationMinutes * 60);
-            const awards = chessChampionCalculateAwards(state, match, result, durationSeconds, killPoints);
+            const values = getChessChampionEndMatchValues();
+            const result = chessChampionResolveResult(state, match, { white: values.white, black: values.black });
+            const whiteClass = chessChampionClassBonusForSide(state, match, 'white');
+            const blackClass = chessChampionClassBonusForSide(state, match, 'black');
+            const advancingId = chessChampionAdvancingIdForResult(state, match, result);
+            const advancingStudent = chessChampionStudentMap().get(advancingId);
+            const resultText = result === 'draw'
+                ? (chessChampionIsKnockoutStage(match.stage) ? `Draw: ${chessChampionStudentName(advancingStudent)} advances on higher seed` : 'Draw: kill points and class-level bonus are equal')
+                : `${result === 'white' ? 'White' : 'Black'} wins by ${values.white === values.black ? 'class-level bonus' : 'kill points'}`;
+            target.innerHTML = `<div class="chess-champion-preview-score"><span>White <strong>${chessChampionFormatPoints(values.white)}</strong></span><b>VS</b><span>Black <strong>${chessChampionFormatPoints(values.black)}</strong></span></div><div class="chess-champion-preview-result">${escapeHtml(resultText)}</div><small>Class-level tie-break · White ${chessChampionFormatPoints(whiteClass)} · Black ${chessChampionFormatPoints(blackClass)} · Kill multiplier ${chessChampionFormatPoints(state.scoring.killPointMultiplier)}</small>`;
+        }
+
+        function saveChessChampionKillPointsOnly() {
+            if (!chessChampionAdminGuard()) return;
+            const { state, match } = getChessChampionMatch(activeChessChampionMatchId);
+            if (!match || !chessChampionCanReviseMatch(state, match)) return;
+            const values = getChessChampionEndMatchValues();
+            match.killPointsBySide = { white: values.white, black: values.black };
+            match.killPoints = Math.max(values.white, values.black);
+            match.updatedAt = new Date().toISOString();
+            if (match.result) {
+                finishChessChampionMatch();
+                return;
+            }
+            saveChessChampionState(state);
+            closeChessChampionEndMatch();
+            renderChessChampionTab();
+            showAlert('Kill points saved. End the match when the result should update the ranking.', 'success');
+        }
+
+        function finishChessChampionMatch() {
+            if (!chessChampionAdminGuard()) return;
+            const { state, match } = getChessChampionMatch(activeChessChampionMatchId);
+            if (!match || !chessChampionCanReviseMatch(state, match)) return;
+            const values = getChessChampionEndMatchValues();
+            const killPointsBySide = { white: values.white, black: values.black };
+            const result = chessChampionResolveResult(state, match, killPointsBySide);
+            const awards = chessChampionCalculateAwards(state, match, result, values.durationSeconds, killPointsBySide);
+            const now = new Date().toISOString();
+            if (match.result) {
+                match.revisionHistory = Array.isArray(match.revisionHistory) ? match.revisionHistory : [];
+                match.revisionHistory.push({
+                    at: now,
+                    result: match.result,
+                    winnerId: parseInt(match.winnerId, 10) || 0,
+                    advancingId: parseInt(match.advancingId, 10) || 0,
+                    killPointsBySide: { ...(match.killPointsBySide || {}) }
+                });
+                match.revisionHistory = match.revisionHistory.slice(-5);
+            }
             match.result = result;
             match.status = 'completed';
             match.winnerId = result === 'white' ? match.whiteId : (result === 'black' ? match.blackId : 0);
-            match.durationSeconds = durationSeconds;
-            match.killPoints = result === 'draw' ? 0 : killPoints;
+            match.advancingId = chessChampionAdvancingIdForResult(state, match, result);
+            match.durationSeconds = values.durationSeconds;
+            match.killPointsBySide = killPointsBySide;
+            match.killPoints = Math.max(values.white, values.black);
             match.awards = awards.awards;
             match.breakdown = awards.breakdown;
-            match.updatedAt = new Date().toISOString();
+            match.endedAt = now;
+            match.updatedAt = now;
             saveChessChampionState(state);
+            closeChessChampionEndMatch();
             renderChessChampionTab();
-            showAlert('Match result recorded and standings updated.', 'success');
+            const advancingName = match.advancingId && match.advancingId !== match.winnerId
+                ? chessChampionStudentName(chessChampionStudentMap().get(match.advancingId))
+                : '';
+            showAlert(result === 'draw'
+                ? (chessChampionIsKnockoutStage(match.stage) ? `Match recorded as a draw. ${advancingName || 'Higher seed'} advances.` : 'Match recorded as a draw. Kill points and IPL score added to the ranking board.')
+                : `${result === 'white' ? 'White' : 'Black'} wins. Kill points and IPL score added to the ranking board.`, 'success');
+        }
+
+        function saveChessChampionMatch(matchId) {
+            openChessChampionEndMatch(matchId, true);
         }
 
         function editChessChampionMatch(matchId) {
-            if (!chessChampionAdminGuard()) return;
-            const state = getChessChampionState();
-            const match = state.matches.find(item => String(item.id) === String(matchId));
-            if (!match) return;
-            match.result = '';
-            match.status = 'scheduled';
-            match.winnerId = 0;
-            match.durationSeconds = 0;
-            match.killPoints = 0;
-            match.awards = {};
-            match.breakdown = {};
-            match.updatedAt = new Date().toISOString();
-            saveChessChampionState(state);
-            renderChessChampionTab();
+            openChessChampionEndMatch(matchId, true);
         }
 
-        function resetChessChampionTournament() {
+        function chessChampionArchiveFromState(state) {
+            const now = new Date().toISOString();
+            const archive = normalizeChessChampionArchive({
+                ...state,
+                id: chessChampionId('series'),
+                archivedAt: now,
+                seriesArchive: []
+            });
+            archive.archivedAt = now;
+            return archive;
+        }
+
+        function resetChessChampionHeldMatches() {
             if (!chessChampionAdminGuard()) return;
-            if (!confirm('Reset Excel Chess Champion? This clears registrations, rounds, results, and the bracket.')) return;
+            const state = getChessChampionState();
+            if (!['registration', 'basic'].includes(state.stage)) {
+                showAlert('Held matches can only be reset before the knockout bracket begins.', 'warning');
+                return;
+            }
+            const heldCount = state.matches.filter(match => match.origin === 'historical').length;
+            if (!heldCount) {
+                showAlert('There are no held matches to reset.', 'info');
+                return;
+            }
+            if (!confirm(`Reset ${heldCount} held match${heldCount === 1 ? '' : 'es'}? System-generated matches will remain.`)) return;
+            state.matches = state.matches.filter(match => match.origin !== 'historical');
+            const basicRounds = state.matches.filter(match => match.stage === 'basic');
+            const lastRound = Math.max(0, ...basicRounds.map(match => parseInt(match.round, 10) || 0));
+            state.stage = basicRounds.length ? 'basic' : 'registration';
+            state.status = state.stage;
+            state.round = basicRounds.length ? lastRound : 0;
+            state.qualifiedStudentIds = [];
+            state.championStudentId = 0;
+            saveChessChampionState(state);
+            renderChessChampionTab();
+            showAlert(`${heldCount} held match${heldCount === 1 ? '' : 'es'} reset.`, 'success');
+        }
+
+        function resetChessChampionTournament(archiveFirst = false) {
+            if (!chessChampionAdminGuard()) return;
+            if (!confirm(archiveFirst ? 'Archive this tournament series and reset the active event? The archived series will remain saved.' : 'Reset Excel Chess Champion? This clears registrations, rounds, results, and the bracket.')) return;
+            const previous = getChessChampionState();
             const state = getDefaultChessChampionState();
+            state.seriesArchive = Array.isArray(previous.seriesArchive) ? previous.seriesArchive.slice(-20) : [];
+            if (archiveFirst && (previous.matches.length || previous.enrolledStudentIds.length)) {
+                state.seriesArchive.push(chessChampionArchiveFromState(previous));
+                state.seriesArchive = state.seriesArchive.slice(-20);
+            }
             saveChessChampionState(state);
             renderChessChampionTab();
             showAlert('Excel Chess Champion reset. Registration is open again.', 'success');
@@ -13539,6 +14133,9 @@ body.header-offscreen .header-kicker::after {
             const students = Array.isArray(data && data.students) ? data.students : getChessChampionStudents();
             const studentMap = new Map(students.map(student => [parseInt(student.id, 10), student]));
             const standings = getChessChampionStandings(state);
+            const finalMatches = state.matches.filter(match => match.stage === 'finale' && chessChampionMatchComplete(match));
+            const finalMatch = finalMatches[finalMatches.length - 1];
+            const championId = parseInt(state.championStudentId, 10) || chessChampionMatchAdvancingId(finalMatch) || 0;
             const publicStudent = id => {
                 const student = studentMap.get(parseInt(id, 10));
                 if (!student) return null;
@@ -13552,13 +14149,31 @@ body.header-offscreen .header-kicker::after {
                 status: match.status,
                 result: match.result,
                 winnerSide: match.result === 'white' || match.result === 'black' ? match.result : '',
+                advancingSide: match.advancingId === match.whiteId ? 'white' : (match.advancingId === match.blackId ? 'black' : ''),
                 white: publicStudent(match.whiteId),
                 black: publicStudent(match.blackId),
                 durationSeconds: match.durationSeconds,
                 killPoints: match.killPoints,
+                whiteSeed: match.whiteSeed || 0,
+                blackSeed: match.blackSeed || 0,
                 awards: match.awards || {},
                 updatedAt: match.updatedAt || match.createdAt || ''
             })).filter(match => match.white || match.black);
+            const series = (state.seriesArchive || []).slice(-20).reverse().map(item => {
+                const champion = publicStudent(item.championStudentId);
+                return {
+                    id: String(item.id),
+                    eventName: item.eventName,
+                    stage: item.stage,
+                    stageLabel: chessChampionStageLabel(item.stage, item.round),
+                    round: item.round,
+                    enrolledCount: item.enrolledStudentIds.length,
+                    matchCount: item.matches.length,
+                    completedMatches: item.matches.filter(chessChampionMatchComplete).length,
+                    champion,
+                    archivedAt: item.archivedAt
+                };
+            });
             return {
                 eventName: state.eventName,
                 stage: state.stage,
@@ -13568,6 +14183,9 @@ body.header-offscreen .header-kicker::after {
                 qualificationCount: state.qualificationCount,
                 enrolledCount: state.enrolledStudentIds.length,
                 qualifiedCount: state.qualifiedStudentIds.length,
+                completedMatches: chessChampionCompletedMatches(state).length,
+                champion: publicStudent(championId),
+                series,
                 updatedAt: state.updatedAt || data.updated_at || '',
                 scoring: { ...state.scoring },
                 standings: standings.map(row => ({ rank: row.rank, ...publicStudent(row.id), points: row.points, matches: row.matches, wins: row.wins, draws: row.draws, losses: row.losses, killPoints: row.killPoints, bonusPoints: row.classBonus + row.opponentBonus + row.timeBonus + row.killBonus })).filter(row => row.name),
@@ -13828,7 +14446,6 @@ body.header-offscreen .header-kicker::after {
                     syllabus_seed_version: '',
                     post_holder_history: [],
                     notification_history: [],
-                    activity_log: [],
                     proposals: [],
                     proposal_votes: [],
                     proposal_messages: [],
@@ -13925,7 +14542,6 @@ body.header-offscreen .header-kicker::after {
                 if (!data.syllabus_seed_version) data.syllabus_seed_version = '';
                 if (!data.post_holder_history) data.post_holder_history = [];
                 if (!data.notification_history) data.notification_history = [];
-                if (!data.activity_log) data.activity_log = [];
                 if (!data.proposals) data.proposals = [];
                 if (!data.proposal_votes) data.proposal_votes = [];
                 if (!data.proposal_messages) data.proposal_messages = [];
@@ -16410,24 +17026,30 @@ body.header-offscreen .header-kicker::after {
             }
         }
 
-        // Uses requestIdleCallback when available; falls back to a short setTimeout.
-        // Use for tabs that don't need to paint instantly on click.
-        const _idle = typeof requestIdleCallback === 'function'
-            ? (fn) => requestIdleCallback(fn, { timeout: 400 })
-            : (fn) => setTimeout(fn, 60);
+        let _tabDomCache = null;
+        let _tabRenderFrame = 0;
+
+        function _getTabDomCache() {
+            if (!_tabDomCache) {
+                _tabDomCache = {
+                    tabs: document.querySelectorAll('.tab-content'),
+                    buttons: document.querySelectorAll('.tab-button, .sidebar-nav-item[data-tab]')
+                };
+            }
+            return _tabDomCache;
+        }
 
         function switchTab(tabName, evt) {
-            // View Transitions API: smooth cross-fade between tabs in supporting browsers
-            if (document.startViewTransition && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-                document.startViewTransition(() => _switchTabImpl(tabName, evt));
-            } else {
-                _switchTabImpl(tabName, evt);
+            if (typeof window.__eaRequestSidebarClose === 'function') {
+                window.__eaRequestSidebarClose();
             }
+            _switchTabImpl(tabName, evt);
         }
         function _switchTabImpl(tabName, evt) {
-            // Cache DOM queries once per call
-            const _allTabs = document.querySelectorAll('.tab-content');
-            const _allBtns = document.querySelectorAll('.tab-button');
+            const _tabDom = _getTabDomCache();
+            const _allTabs = _tabDom.tabs;
+            const _allBtns = _tabDom.buttons;
+            const _renderFrame = ++_tabRenderFrame;
 
             if (tabName !== 'tools' && localRosterNeedsRecovery()) {
                 rosterRecoveryQueuedTab = tabName || 'scoreboard';
@@ -16435,8 +17057,8 @@ body.header-offscreen .header-kicker::after {
                 _allBtns.forEach(btn => btn.classList.remove('active'));
                 const scoreboardTab = document.getElementById('scoreboard-tab');
                 if (scoreboardTab) scoreboardTab.classList.remove('hidden');
-                const scoreboardBtn = document.querySelector(`.tab-button[onclick*="switchTab('scoreboard')"]`);
-                if (scoreboardBtn) scoreboardBtn.classList.add('active');
+                const scoreboardBtns = document.querySelectorAll(`.sidebar-nav-item[data-tab="scoreboard"], .tab-button[onclick*="switchTab('scoreboard')"]`);
+                scoreboardBtns.forEach(btn => btn.classList.add('active'));
                 renderRosterRecoveryPlaceholder('Recovering safe roster from Master Server...');
                 attemptRosterRecovery();
                 return;
@@ -16466,7 +17088,7 @@ body.header-offscreen .header-kicker::after {
                 if (tabName !== 'add-score') {
                     newTabEl.classList.remove('tab-entering');
                     requestAnimationFrame(() => {
-                        newTabEl.classList.add('tab-entering');
+                        if (_renderFrame === _tabRenderFrame) newTabEl.classList.add('tab-entering');
                     });
                     newTabEl.addEventListener('animationend', () => {
                         newTabEl.classList.remove('tab-entering');
@@ -16484,52 +17106,55 @@ body.header-offscreen .header-kicker::after {
             }
 
             // Add active to clicked button
-            const targetButton = evt && evt.target ? evt.target.closest('.tab-button') : document.querySelector(`.tab-button[onclick*="switchTab('${tabName}')"]`);
-            if (targetButton) {
-                targetButton.classList.add('active');
-            }
+            const targetButtons = evt && evt.target
+                ? [evt.target.closest('.tab-button, .sidebar-nav-item[data-tab]')]
+                : document.querySelectorAll(`.sidebar-nav-item[data-tab="${tabName}"], .tab-button[onclick*="switchTab('${tabName}')"]`);
+            targetButtons.forEach(button => {
+                if (button) button.classList.add('active');
+            });
 
             // Initialize tab-specific content. _safeRender wraps each call in a
             // try/catch so a broken tab cannot crash the rest of the session.
             // _tabLastVer cache: skip the re-render entirely when the data version
             // hasn't changed since the last render of this tab — makes repeated
             // navigation between tabs near-instant.
-            const _tabRenderers = {
-                'scoreboard':            loadScoreboard,
-                'add-score':             initScoreForm,
-                'students':              loadStudents,
-                'fees':                  loadFeesTab,
-                'resources':             loadResourcesTab,
-                'excel-mela':            loadExcelMelaTab,
-                'syllabus':              loadSyllabusTab,
-                'rules':                 loadRulesTab,
-                'information':           loadInformationTab,
-                'attendance':            loadAttendanceTab,
-                'gr':                    loadCRTab,
-                'leadership':            loadLeadership,
-                'leadership-selection':  loadLeadershipSelectionTab,
-                'office':                loadOfficeHolders,
-                'party':                 loadParties,
-                'ranking':               initRankingForm,
-                'group-scoreboard':      loadGroupScoreboard,
-                'party-standings':       loadPartyStandings,
-                'team-competition':      loadTeamCompetitionTab,
-                'excel-chess-champion':  loadChessChampionTab,
-                'voting':                loadVotingTab,
-                'teachers':              loadTeachersTab,
-                'appeals':               loadAppealsTab,
-                'notifications':         loadNotificationsTab,
-                'proposals':             loadProposalsTab,
-                'activity-log':          loadActivityLogTab,
-                'profile':               loadProfileTab,
-                'good-conduct':          renderGoodConductBadge,
-                'tools':                 loadRestorePoints,
-                'settings':              loadSettingsTab,
-                'reports':               loadReportsTab,
-                'awf':                   loadAwfTab,
-                'notebooks':             loadNotebooksTab,
-            };
-            const _renderer = _tabRenderers[tabName];
+            if (!_tabDomCache.renderers) {
+                _tabDomCache.renderers = {
+                    'scoreboard':            loadScoreboard,
+                    'add-score':             initScoreForm,
+                    'students':              loadStudents,
+                    'fees':                  loadFeesTab,
+                    'resources':             loadResourcesTab,
+                    'excel-mela':            loadExcelMelaTab,
+                    'syllabus':              loadSyllabusTab,
+                    'rules':                 loadRulesTab,
+                    'information':           loadInformationTab,
+                    'attendance':            loadAttendanceTab,
+                    'gr':                    loadCRTab,
+                    'leadership':            loadLeadership,
+                    'leadership-selection':  loadLeadershipSelectionTab,
+                    'office':                loadOfficeHolders,
+                    'party':                 loadParties,
+                    'ranking':               initRankingForm,
+                    'group-scoreboard':      loadGroupScoreboard,
+                    'party-standings':       loadPartyStandings,
+                    'team-competition':      loadTeamCompetitionTab,
+                    'excel-chess-champion':  loadChessChampionTab,
+                    'voting':                loadVotingTab,
+                    'teachers':              loadTeachersTab,
+                    'appeals':               loadAppealsTab,
+                    'notifications':         loadNotificationsTab,
+                    'proposals':             loadProposalsTab,
+                    'profile':               loadProfileTab,
+                    'good-conduct':          renderGoodConductBadge,
+                    'tools':                 loadRestorePoints,
+                    'settings':              loadSettingsTab,
+                    'reports':               loadReportsTab,
+                    'awf':                   loadAwfTab,
+                    'notebooks':             loadNotebooksTab,
+                };
+            }
+            const _renderer = _tabDomCache.renderers[tabName];
             if (_renderer) {
                 if (_tabLastVer[tabName] !== _tabRenderVer) {
                     // Mark immediately to prevent double-queuing on rapid clicks.
@@ -16538,6 +17163,7 @@ body.header-offscreen .header-kicker::after {
                     // Defer the heavy DOM build to AFTER the browser paints the
                     // newly visible tab — makes every tab switch feel instant.
                     requestAnimationFrame(() => {
+                        if (_renderFrame !== _tabRenderFrame) return;
                         _safeRender(_renderer, tabName);
                     });
                 }
@@ -16546,33 +17172,8 @@ body.header-offscreen .header-kicker::after {
                 scoreboardRefreshPending = false;
                 stabilizeScoreboardLayout({ month: getElementValue('monthSelector') || getCurrentMonthKey() });
             }
-            // ── Tab pre-warming: render companion tabs in idle time ───────────────
-            // Neighbours are pre-rendered during browser idle so the next switch is
-            // a cache-hit (near-instant) rather than a fresh render.
-            const _companionMap = {
-                'students':   ['add-score', 'fees'],
-                'add-score':  ['students', 'fees'],
-                'fees':       ['students', 'office'],
-                'office':     ['fees', 'party'],
-                'scoreboard': ['add-score', 'students'],
-                'party':      ['office', 'voting'],
-            };
-            const _companions = _companionMap[tabName] || [];
-            _companions.forEach(_companion => {
-                if (_tabLastVer[_companion] !== _tabRenderVer) {
-                    const _compRenderer = _tabRenderers[_companion];
-                    if (_compRenderer) {
-                        _idle(() => {
-                            if (_tabLastVer[_companion] !== _tabRenderVer) {
-                                _safeRender(_compRenderer, _companion);
-                                _tabLastVer[_companion] = _tabRenderVer;
-                            }
-                        });
-                    }
-                }
-            });
-            // Badge updates are low-priority background ops — safe to defer via _idle.
-            localStorage.setItem(ACTIVE_TAB_KEY, tabName);
+            _writeTabToSession(tabName);
+            _writeTabToHash(tabName);
             if (tabName === 'ranking') startRankingAnimationLoop();
             else stopRankingAnimationLoop();
         }
@@ -16580,6 +17181,20 @@ body.header-offscreen .header-kicker::after {
         document.addEventListener('visibilitychange', () => {
             if (document.hidden) stopRankingAnimationLoop();
             else if (getActiveTabName() === 'ranking') startRankingAnimationLoop();
+        });
+
+        // ── hashchange: browser back/forward navigation between tabs ────────
+        // When the user hits Back/Forward, the URL hash changes and we switch
+        // to the corresponding in-app tab.  _suppressHashChange prevents a
+        // feedback loop when switchTab() itself called replaceState.
+        window.addEventListener('hashchange', function() {
+            if (_suppressHashChange) return;
+            const hashTab = _readTabFromHash();
+            if (!hashTab) return;
+            const current = getActiveTabName();
+            if (hashTab !== current) {
+                switchTab(hashTab);
+            }
         });
 
         function toggleColumn(key, isVisible) {
@@ -16667,7 +17282,7 @@ body.header-offscreen .header-kicker::after {
         }
 
         function getActiveTabName() {
-            const activeButton = document.querySelector('.tab-button.active');
+            const activeButton = document.querySelector('.tab-button.active, .sidebar-nav-item.active[data-tab]');
             if (!activeButton) return 'scoreboard';
             const onclickText = String(activeButton.getAttribute('onclick') || '');
             const match = onclickText.match(/switchTab\('([^']+)'\)/);
@@ -16689,6 +17304,7 @@ body.header-offscreen .header-kicker::after {
                     if (!isMobileViewport()) refreshRecordScoreTabFromSync();
                 }
                 else if (tabName === 'attendance') refreshAttendanceTabFromSync();
+                else if (tabName === 'excel-chess-champion') renderChessChampionTab();
             } else {
                 if (tabName === 'scoreboard') loadScoreboard();
                 else if (tabName === 'add-score') refreshRecordScoreTabFromSync();
@@ -16708,7 +17324,6 @@ body.header-offscreen .header-kicker::after {
                 else if (tabName === 'appeals') loadAppealsTab();
                 else if (tabName === 'notifications') loadNotificationsTab();
                 else if (tabName === 'proposals') loadProposalsTab();
-                else if (tabName === 'activity-log') loadActivityLogTab();
                 else if (tabName === 'attendance') refreshAttendanceTabFromSync();
                 else if (tabName === 'profile') loadProfileTab();
                 else if (tabName === 'leadership') { loadLeadership(); loadElectionPostsManager(); populateLeadershipPostSelect(); }
@@ -16900,7 +17515,7 @@ body.header-offscreen .header-kicker::after {
         }
 
         function toggleAdminHistoricalEditMode() {
-            if (currentUserRole !== 'admin') {
+            if (normalizeUserRole(currentUserRole) !== 'admin') {
                 showAlert('Only Admin can enable Historical Edit Mode.', 'warning');
                 return;
             }
@@ -16911,9 +17526,6 @@ body.header-offscreen .header-kicker::after {
                 ? 'Historical months are now editable. Changes will NOT sync to server.'
                 : 'Normal editing restrictions restored.';
             showAlert(`Admin Historical Edit Mode: ${state}. ${msg}`, window.__eaAdminHistoricalEditEnabled ? 'danger' : 'info');
-            if (typeof logActivity === 'function') {
-                logActivity(`Admin Historical Edit Mode ${state} by ${currentLoginId || 'admin'}`);
-            }
         }
 
         function canAdminEditHistoricalMonth(monthKey) {
@@ -18388,7 +19000,7 @@ body.header-offscreen .header-kicker::after {
                  'reports', 'office', 'voting', 'leadership-selection', 'notifications']
                 .includes(tabName)) return isAdmin || isTeacher;
             // Admin-only tabs
-            if (['teachers', 'party', 'leadership', 'activity-log', 'ranking', 'tools', 'settings']
+            if (['teachers', 'party', 'leadership', 'ranking', 'tools', 'settings']
                 .includes(tabName)) return isAdmin;
             // Fees module visible to admin only when enabled
             if (tabName === 'fees') return feesModuleEnabled && isAdmin;
@@ -18396,9 +19008,11 @@ body.header-offscreen .header-kicker::after {
         }
 
         function restoreLastActiveTab() {
-            const savedTab = localStorage.getItem(ACTIVE_TAB_KEY) || 'scoreboard';
-            const nextTab = isTabAccessibleForCurrentRole(savedTab) ? savedTab : 'scoreboard';
-            switchTab(nextTab);
+            // Priority: URL hash (#tab=fees) → sessionStorage → default 'scoreboard'
+            const hashTab = _readTabFromHash();
+            const sessionTab = _readTabFromSession();
+            const target = hashTab || sessionTab || 'scoreboard';
+            switchTab(target);
         }
 
         function applyRolePermissions() {
@@ -18442,7 +19056,6 @@ body.header-offscreen .header-kicker::after {
             setTabVisibility('teachers', isAdmin);
             setTabVisibility('party', isAdmin);
             setTabVisibility('leadership', isAdmin);
-            setTabVisibility('activity-log', isAdmin);
             setTabVisibility('ranking', isAdmin);
             setTabVisibility('tools', isAdmin);
             setTabVisibility('settings', isAdmin);
@@ -18831,7 +19444,7 @@ body.header-offscreen .header-kicker::after {
                     if (data.role) localStorage.setItem('ea_user_role', data.role);
                     if (data.expires_at) localStorage.setItem('ea_token_expires_at', data.expires_at);
                     currentLoginId = data.login_id;
-                    currentUserRole = data.role || 'student';
+                    currentUserRole = normalizeUserRole(data.role || 'student');
                     hasServerSession = true;
                     closeCrossOriginLoginModal();
                     updateAuthButtons();
@@ -20314,6 +20927,37 @@ body.header-offscreen .header-kicker::after {
             return result;
         }
 
+        function mergeChessChampionStatesForSync(localRaw, remoteRaw, preferRemote = false) {
+            const local = normalizeChessChampionState(localRaw);
+            const remote = normalizeChessChampionState(remoteRaw);
+            const localStamp = parseSyncStamp(local.updatedAt || '');
+            const remoteStamp = parseSyncStamp(remote.updatedAt || '');
+            if (!localRaw || (!local.matches.length && remote.matches.length)) return remote;
+            const remoteReset = String(remoteRaw && remoteRaw.stage || '').trim().toLowerCase() === 'registration'
+                && Array.isArray(remoteRaw && remoteRaw.matches)
+                && !remoteRaw.matches.length
+                && remoteStamp > localStamp;
+            if (remoteReset) return remote;
+            if (local.matches.length && !remote.matches.length) return local;
+            const remoteNewer = preferRemote || (remoteStamp > 0 && remoteStamp >= localStamp);
+            const base = { ...(remoteNewer ? local : remote), ...(remoteNewer ? remote : local) };
+            const byId = new Map();
+            [...local.matches, ...remote.matches].forEach(match => {
+                const id = String(match.id || '').trim();
+                if (!id) return;
+                const previous = byId.get(id);
+                if (!previous) { byId.set(id, match); return; }
+                const previousStamp = parseSyncStamp(previous.updatedAt || previous.createdAt || '');
+                const nextStamp = parseSyncStamp(match.updatedAt || match.createdAt || '');
+                const chosen = nextStamp > previousStamp || (nextStamp === previousStamp && remoteNewer) ? match : previous;
+                byId.set(id, { ...previous, ...chosen, revisionHistory: [...(previous.revisionHistory || []), ...(match.revisionHistory || [])].slice(-5) });
+            });
+            base.matches = Array.from(byId.values());
+            if (local.enrolledStudentIds.length && !base.enrolledStudentIds.length) base.enrolledStudentIds = local.enrolledStudentIds;
+            if (local.qualifiedStudentIds.length && !base.qualifiedStudentIds.length) base.qualifiedStudentIds = local.qualifiedStudentIds;
+            return normalizeChessChampionState(base);
+        }
+
         function applyRemoteSnapshot(serverData, serverUpdatedAt, showToast = false, options = {}) {
             if (!serverData) return false;
             if (isLikelyCorruptRoster(serverData)) {
@@ -20352,6 +20996,7 @@ body.header-offscreen .header-kicker::after {
                     post_holder_history: mergePostHolderHistorySuperset(localData.post_holder_history || [], serverData.post_holder_history || []),
                     postholder_tickets: mergePostholderTickets(localData.postholder_tickets || {}, serverData.postholder_tickets || {}),
                     postholder_ticket_log: mergePostholderTicketLog(localData.postholder_ticket_log || [], serverData.postholder_ticket_log || []),
+                    chess_champion: mergeChessChampionStatesForSync(localData.chess_champion, serverData.chess_champion, preferServerConflicts || authoritativeReplace),
                     // Protect local public_information deletions even in authoritative mode
                     // when the local client has unsynced changes.
                     public_information: _localHasUnsyncedChanges
@@ -20405,6 +21050,7 @@ body.header-offscreen .header-kicker::after {
                     post_holder_history: mergePostHolderHistorySuperset(localData.post_holder_history || [], serverData.post_holder_history || []),
                     postholder_tickets: mergePostholderTickets(localData.postholder_tickets || {}, serverData.postholder_tickets || {}),
                     postholder_ticket_log: mergePostholderTicketLog(localData.postholder_ticket_log || [], serverData.postholder_ticket_log || []),
+                    chess_champion: mergeChessChampionStatesForSync(localData.chess_champion, serverData.chess_champion, preferServerConflicts),
                     // public_information is NOT a superset-merged table — deletions would be
                     // silently undone by incoming server data if we let ...serverData overwrite
                     // it. When the local client has unsynced changes (e.g. a fresh deletion),
@@ -21224,7 +21870,7 @@ body.header-offscreen .header-kicker::after {
                 showAlert('Force Publish requires LAN server mode (http://...).', 'warning');
                 return;
             }
-            if (currentUserRole !== 'admin') {
+            if (normalizeUserRole(currentUserRole) !== 'admin') {
                 showAlert('Only Admin can use Force Publish.', 'warning');
                 return;
             }
@@ -23318,7 +23964,7 @@ body.header-offscreen .header-kicker::after {
         }
 
         function editMonthExtraValue(month, studentId, columnKey) {
-            if (currentUserRole !== 'admin') {
+            if (normalizeUserRole(currentUserRole) !== 'admin') {
                 showAlert('Only Admin can edit these values.', 'warning');
                 return;
             }
@@ -24734,7 +25380,7 @@ body.header-offscreen .header-kicker::after {
         }
 
         function savePointsStarConfig() {
-            if (currentUserRole !== 'admin') {
+            if (normalizeUserRole(currentUserRole) !== 'admin') {
                 showAlert('Only Admin can update minimum points criteria.', 'warning');
                 return;
             }
@@ -26537,7 +27183,7 @@ body.header-offscreen .header-kicker::after {
             // Apply role-based visibility for score limits
             const saveLimitsBtn = document.getElementById('nbSaveLimitsBtn');
             if (saveLimitsBtn) {
-                if (currentUserRole !== 'admin') {
+                if (normalizeUserRole(currentUserRole) !== 'admin') {
                     saveLimitsBtn.style.display = 'none';
                     document.getElementById('nbLimitMax').readOnly = true;
                     document.getElementById('nbLimitMin').readOnly = true;
@@ -28213,7 +28859,7 @@ body.header-offscreen .header-kicker::after {
                 event.preventDefault();
                 event.stopPropagation();
             }
-            if (currentUserRole !== 'admin') {
+            if (normalizeUserRole(currentUserRole) !== 'admin') {
                 showAlert('Only Admin can use tally repair.', 'warning');
                 return;
             }
@@ -28780,7 +29426,7 @@ body.header-offscreen .header-kicker::after {
         function initHistEditor() {
             const card = document.getElementById('histEditorCard');
             if (!card) return;
-            if (currentUserRole !== 'admin') { card.style.display = 'none'; return; }
+            if (normalizeUserRole(currentUserRole) !== 'admin') { card.style.display = 'none'; return; }
             card.style.display = '';
             if (_histEditorVer === _tabRenderVer) return; // no data change since last build
             _histEditorVer = _tabRenderVer;
@@ -28800,7 +29446,7 @@ body.header-offscreen .header-kicker::after {
         function initSnapshotRestore() {
             const card = document.getElementById('snapshotRestoreCard');
             if (!card) return;
-            if (currentUserRole !== 'admin') { card.style.display = 'none'; return; }
+            if (normalizeUserRole(currentUserRole) !== 'admin') { card.style.display = 'none'; return; }
             card.style.display = '';
         }
 
@@ -30780,7 +31426,7 @@ body.header-offscreen .header-kicker::after {
         }
 
         async function triggerRollChangeFromEdit() {
-            if (currentUserRole !== 'admin') {
+            if (normalizeUserRole(currentUserRole) !== 'admin') {
                 showAlert('Only admins can record roll changes.', 'warning');
                 return;
             }
@@ -36996,7 +37642,7 @@ body.header-offscreen .header-kicker::after {
         }
 
         async function undoTodayLeaderDirectAppointments() {
-            if (currentUserRole !== 'admin') {
+            if (normalizeUserRole(currentUserRole) !== 'admin') {
                 showAlert('Only Admin can undo Leader direct appointments.', 'warning');
                 return;
             }
@@ -37435,7 +38081,7 @@ body.header-offscreen .header-kicker::after {
         }
 
         function saveMonthlyRoleGrantOverride(studentId, monthKey = getCurrentMonthKey()) {
-            if (currentUserRole !== 'admin') {
+            if (normalizeUserRole(currentUserRole) !== 'admin') {
                 showAlert('Only Admin can change monthly role-grant VETOs.', 'warning');
                 return;
             }
@@ -37470,7 +38116,7 @@ body.header-offscreen .header-kicker::after {
         function renderRoleGrantSettingsPanel() {
             const tbody = document.getElementById('settingsRoleGrantBody');
             if (!tbody) return;
-            if (currentUserRole !== 'admin') {
+            if (normalizeUserRole(currentUserRole) !== 'admin') {
                 tbody.innerHTML = `<tr><td colspan="6" class="text-center" style="padding: 28px;">Settings are available to Admin only.</td></tr>`;
                 return;
             }
@@ -37527,7 +38173,7 @@ body.header-offscreen .header-kicker::after {
         }
 
         function saveGlobalVoteSettings() {
-            if (currentUserRole !== 'admin') {
+            if (normalizeUserRole(currentUserRole) !== 'admin') {
                 showAlert('Only Admin can change global vote settings.', 'warning');
                 return;
             }
@@ -37562,7 +38208,7 @@ body.header-offscreen .header-kicker::after {
         }
 
         function resetGlobalVoteSettings() {
-            if (currentUserRole !== 'admin') {
+            if (normalizeUserRole(currentUserRole) !== 'admin') {
                 showAlert('Only Admin can change global vote settings.', 'warning');
                 return;
             }
@@ -37954,7 +38600,7 @@ body.header-offscreen .header-kicker::after {
         // block fires, it checks this flag first and skips suspension.
         // Also clears any active 72h warning clocks when the waiver is granted.
         function toggleAutoSuspendWaiver(postId, table) {
-            if (currentUserRole !== 'admin') { showAlert('Only Admin can manage auto-suspend waivers.', 'warning'); return; }
+            if (normalizeUserRole(currentUserRole) !== 'admin') { showAlert('Only Admin can manage auto-suspend waivers.', 'warning'); return; }
             const data = db.getData();
             let entry = null;
             if (table === 'leadership') {
@@ -37986,7 +38632,7 @@ body.header-offscreen .header-kicker::after {
         // when the 72h enforcement triggers, _consumeAutoSuspendExemption clears the flag.
         // Admin can also deactivate the shield (no cost refunded).
         async function toggleVetoShield(postId, table, studentId) {
-            if (currentUserRole !== 'admin') { showAlert('Only Admin can manage VETO shields.', 'warning'); return; }
+            if (normalizeUserRole(currentUserRole) !== 'admin') { showAlert('Only Admin can manage VETO shields.', 'warning'); return; }
             const data = db.getData();
             let entry = null;
             if (table === 'leadership') {
@@ -38823,56 +39469,6 @@ body.header-offscreen .header-kicker::after {
             }
         }
 
-        let _activityLogRowsCache = [];
-
-        function getActivityLogRows() {
-            return Array.isArray(_activityLogRowsCache) ? _activityLogRowsCache : [];
-        }
-
-        function populateActivityLogUserFilter(rows) {
-            const select = document.getElementById('activityLogUserFilter');
-            if (!select) return;
-            const current = select.value || '';
-            const users = Array.from(new Set((rows || [])
-                .map(r => String(r && r.actor_login_id || '').trim())
-                .filter(Boolean))).sort((a, b) => a.localeCompare(b));
-            select.innerHTML = '<option value="">All Users</option>' + users.map(u => `<option value="${escapeHtml(u)}">${escapeHtml(u)}</option>`).join('');
-            if (users.includes(current)) select.value = current;
-        }
-
-        function populateActivityLogClassFilter(rows) {
-            const select = document.getElementById('activityLogClassFilter');
-            if (!select) return;
-            const current = select.value || '';
-            const classes = Array.from(new Set((rows || [])
-                .map(r => String(r && r.class || '').trim())
-                .filter(Boolean))).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
-            select.innerHTML = '<option value="">All Classes</option>' + classes.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
-            if (classes.includes(current)) select.value = current;
-        }
-
-        function resetActivityLogFilters() {
-            const ids = [
-                'activityLogUserFilter',
-                'activityLogClassFilter',
-                'activityLogStudentFilter',
-                'activityLogMonthFilter',
-                'activityLogFromDate',
-                'activityLogToDate'
-            ];
-            ids.forEach(id => {
-                const el = document.getElementById(id);
-                if (!el) return;
-                if (el.tagName === 'SELECT') el.value = '';
-                else el.value = '';
-            });
-            const userEl = document.getElementById('activityLogUserFilter');
-            const classEl = document.getElementById('activityLogClassFilter');
-            if (userEl && userEl.dataset) delete userEl.dataset.serverBound;
-            if (classEl && classEl.dataset) delete classEl.dataset.serverBound;
-            loadActivityLogTab();
-        }
-
         // ============================================================
         // REPORTS TAB
         // ============================================================
@@ -39404,100 +40000,6 @@ body.header-offscreen .header-kicker::after {
         // END REPORTS TAB
         // ============================================================
 
-        async function loadActivityLogTab() {
-            const tbody = document.getElementById('activityLogBody');
-            if (!tbody) return;
-            const userFilter = String(getElementValue('activityLogUserFilter') || '').trim().toLowerCase();
-            const classFilter = String(getElementValue('activityLogClassFilter') || '').trim();
-            const studentFilter = String(getElementValue('activityLogStudentFilter') || '').trim().toLowerCase();
-            const monthFilter = String(getElementValue('activityLogMonthFilter') || '').trim();
-            const fromDate = String(getElementValue('activityLogFromDate') || '').trim();
-            const toDate = String(getElementValue('activityLogToDate') || '').trim();
-            tbody.innerHTML = '<tr><td colspan="9" class="text-center" style="padding: 24px;">Loading activity log...</td></tr>';
-            let filtered = [];
-            try {
-                const qs = new URLSearchParams({
-                    limit: '3000',
-                    user: userFilter,
-                    class: classFilter,
-                    student: studentFilter,
-                    month: monthFilter,
-                    from: fromDate,
-                    to: toDate
-                });
-                const resp = await eaFetch(`/scoreboard/activity-log?${qs.toString()}`, { credentials: 'include', cache: 'no-store' });
-                const payload = await resp.json();
-                if (!resp.ok || !payload.success) throw new Error(payload.error || 'Failed to load activity log');
-                _activityLogRowsCache = Array.isArray(payload.rows) ? payload.rows : [];
-                const allUsers = Array.isArray(payload.users) ? payload.users.map(v => String(v || '')).filter(Boolean) : [];
-                const allClasses = Array.isArray(payload.classes) ? payload.classes.map(v => String(v || '')).filter(Boolean) : [];
-                const userSelect = document.getElementById('activityLogUserFilter');
-                if (userSelect && !userSelect.dataset.serverBound) {
-                    const current = userSelect.value || '';
-                    userSelect.innerHTML = '<option value="">All Users</option>' + allUsers.map(u => `<option value="${escapeHtml(u)}">${escapeHtml(u)}</option>`).join('');
-                    if (allUsers.map(u => u.toLowerCase()).includes(String(current || '').toLowerCase())) userSelect.value = current;
-                    userSelect.dataset.serverBound = '1';
-                }
-                const classSelect = document.getElementById('activityLogClassFilter');
-                if (classSelect && !classSelect.dataset.serverBound) {
-                    const current = classSelect.value || '';
-                    classSelect.innerHTML = '<option value="">All Classes</option>' + allClasses.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
-                    if (allClasses.includes(current)) classSelect.value = current;
-                    classSelect.dataset.serverBound = '1';
-                }
-                filtered = _activityLogRowsCache;
-            } catch (err) {
-                const rows = getActivityLogRows();
-                populateActivityLogUserFilter(rows);
-                populateActivityLogClassFilter(rows);
-                filtered = rows.filter(item => {
-                    if (!item || typeof item !== 'object') return false;
-                    const actor = String(item.actor_login_id || '').trim().toLowerCase();
-                    const cls = String(item.class || '').trim();
-                    const roll = String(item.student_roll || '').trim().toLowerCase();
-                    const name = String(item.student_name || '').trim().toLowerCase();
-                    const month = String(item.month || '').trim();
-                    const date = String(item.date || '').trim();
-                    if (userFilter && actor !== userFilter) return false;
-                    if (classFilter && cls !== classFilter) return false;
-                    if (studentFilter && !roll.includes(studentFilter) && !name.includes(studentFilter)) return false;
-                    if (monthFilter && month !== monthFilter) return false;
-                    if (fromDate && date && date < fromDate) return false;
-                    if (toDate && date && date > toDate) return false;
-                    return true;
-                }).slice(0, 3000);
-            }
-
-            if (!filtered.length) {
-                tbody.innerHTML = '<tr><td colspan="9" class="text-center" style="padding: 24px;">No activity log entries for selected filters.</td></tr>';
-                return;
-            }
-
-            const _actLogHtmlRows = filtered.map(item => {
-                const ts = item.logged_at ? formatDateLabel(item.logged_at) : '-';
-                const studentLabel = [String(item.student_roll || '').trim(), String(item.student_name || '').trim()].filter(Boolean).join(' - ');
-                return `<tr>
-                    <td>${escapeHtml(ts)}</td>
-                    <td>${escapeHtml(String(item.actor_login_id || '-'))}</td>
-                    <td>${escapeHtml(String(item.actor_role || '-'))}</td>
-                    <td>${escapeHtml(String(item.class || '-'))}</td>
-                    <td>${escapeHtml(studentLabel || '-')}</td>
-                    <td>${escapeHtml(String(item.entity || '-'))}</td>
-                    <td>${escapeHtml(String(item.action || '-'))}</td>
-                    <td>${escapeHtml(String(item.date || '-'))}</td>
-                    <td>${escapeHtml(String(item.detail || '-'))}</td>
-                </tr>`;
-            });
-
-            // Write activity log rows to DOM in chunks for smoother rendering.
-            eaChunkedInnerHtml(tbody, _actLogHtmlRows, {
-                chunkSize: 60,
-                onDone() {
-                    eaScheduleRender(() => animateTableRows(tbody));
-                }
-            });
-        }
-
         function getPostHistoryStatus(record) {
             if (!record) return 'Unknown';
             if (record.end_date) return 'Ended';
@@ -39974,7 +40476,7 @@ body.header-offscreen .header-kicker::after {
         function renderAdminVoteUndoList() {
             const listEl = document.getElementById('voteUndoList');
             if (!listEl) return;
-            if (currentUserRole !== 'admin') { listEl.innerHTML = ''; return; }
+            if (normalizeUserRole(currentUserRole) !== 'admin') { listEl.innerHTML = ''; return; }
             const post = String(getElementValue('voteUndoPost') || '').trim();
             if (!post) { listEl.innerHTML = '<p class="section-subtitle">Select a post to view teacher votes.</p>'; return; }
             const votes = db.getTeacherVotes().filter(v => String(v.post || '').trim() === post);
@@ -40019,7 +40521,7 @@ body.header-offscreen .header-kicker::after {
         }
 
         function adminDeleteTeacherVote(teacherId) {
-            if (currentUserRole !== 'admin') { showAlert('Admin only.', 'warning'); return; }
+            if (normalizeUserRole(currentUserRole) !== 'admin') { showAlert('Admin only.', 'warning'); return; }
             // Read the currently selected post from the undo selector
             const post = String(getElementValue('voteUndoPost') || '').trim();
             if (!post) { showAlert('No post selected.', 'warning'); return; }
@@ -40149,7 +40651,7 @@ body.header-offscreen .header-kicker::after {
             const emptyEl = document.getElementById('voteHistoryEmpty');
             const resultEl = document.getElementById('voteHistoryResult');
             if (!card || !emptyEl || !resultEl) return;
-            if (currentUserRole !== 'admin') {
+            if (normalizeUserRole(currentUserRole) !== 'admin') {
                 card.style.display = 'none';
                 return;
             }
@@ -40509,7 +41011,7 @@ body.header-offscreen .header-kicker::after {
             const card = document.getElementById('pendingElectionCard');
             const tbody = document.getElementById('pendingElectionBody');
             if (!card || !tbody) return;
-            if (currentUserRole !== 'admin') {
+            if (normalizeUserRole(currentUserRole) !== 'admin') {
                 card.classList.add('hidden');
                 return;
             }
@@ -41265,31 +41767,6 @@ body.header-offscreen .header-kicker::after {
                     auditCard.classList.add('hidden');
                 }
             }
-            removeActivityLogTabIfPresent();
-        }
-
-        function removeActivityLogTabIfPresent() {
-            // Safety kill-switch: fully remove Activity Log tab and linked panel to avoid known crash path.
-            const tabButtons = Array.from(document.querySelectorAll('[data-tab], .tab-btn, .nav-btn, button'));
-            tabButtons.forEach(btn => {
-                const label = String(btn.textContent || '').trim().toLowerCase();
-                if (!label.includes('activity log')) return;
-                const tabId = String(btn.getAttribute('data-tab') || '').trim();
-                if (tabId) {
-                    const panel = document.getElementById(tabId) || document.getElementById(`${tabId}-tab`);
-                    if (panel) panel.remove();
-                }
-                btn.remove();
-            });
-
-            // Extra fallback if panel exists without button.
-            Array.from(document.querySelectorAll('.tab-content, [id]')).forEach(el => {
-                const id = String(el.id || '').trim().toLowerCase();
-                if (!id) return;
-                if (id === 'activity-tab' || id === 'activitylog-tab' || id === 'activity-log-tab') {
-                    el.remove();
-                }
-            });
         }
 
         function scheduleUiWork(fn) {
@@ -41343,7 +41820,6 @@ body.header-offscreen .header-kicker::after {
         // This function can trigger saveData() which could write stale cache back to file.
         // Only run it when explicitly needed (user interactions).
         // Disabled:
-        // scheduleUiWork(removeActivityLogTabIfPresent);
         // scheduleUiWork(normalizeRoleVetoNow);
         // scheduleUiWork(patchCRTabVetoDisplay);
 
@@ -41378,6 +41854,11 @@ body.header-offscreen .header-kicker::after {
                 /* GPU composite layer hint — set just before entrance, cleared after */
                 .tab-content.tab-entering {
                     will-change: opacity, transform;
+                    animation: eaTabEnter 180ms var(--ui-ease) both;
+                }
+                @keyframes eaTabEnter {
+                    from { opacity: 0; transform: translate3d(0, 6px, 0); }
+                    to { opacity: 1; transform: translate3d(0, 0, 0); }
                 }
                 .tab-btn,
                 [data-tab],
@@ -41425,7 +41906,7 @@ body.header-offscreen .header-kicker::after {
             document.head.appendChild(style);
         }
 
-        scheduleUiWork(enableFastSmoothUI);
+        enableFastSmoothUI();
 
         let attendanceSectionActiveKey = '';
 
@@ -42027,7 +42508,7 @@ body.header-offscreen .header-kicker::after {
         }
 
         function approveAttendancePrizeCollection(studentId) {
-            if (currentUserRole !== 'admin') {
+            if (normalizeUserRole(currentUserRole) !== 'admin') {
                 showAlert('Only admin can approve prize collection.', 'warning');
                 return;
             }
@@ -43498,7 +43979,7 @@ body.header-offscreen .header-kicker::after {
         }
 
         function progressToTeacherVoting(postArg = '') {
-            if (currentUserRole !== 'admin') {
+            if (normalizeUserRole(currentUserRole) !== 'admin') {
                 showAlert('Only Admin can progress an election to teacher voting.', 'warning');
                 return;
             }
@@ -43540,7 +44021,7 @@ body.header-offscreen .header-kicker::after {
         }
 
         function reopenStudentVoting(postArg = '') {
-            if (currentUserRole !== 'admin') {
+            if (normalizeUserRole(currentUserRole) !== 'admin') {
                 showAlert('Only Admin can reopen student voting.', 'warning');
                 return;
             }
@@ -43800,7 +44281,7 @@ body.header-offscreen .header-kicker::after {
         }
 
         function _concludeTeacherAndReveal(post) {
-            if (currentUserRole !== 'admin') {
+            if (normalizeUserRole(currentUserRole) !== 'admin') {
                 showAlert('Only Admin can conclude and reveal the combined result.', 'warning');
                 return;
             }
@@ -45263,7 +45744,7 @@ body.header-offscreen .header-kicker::after {
                 showAlert('Bulk past attendance is Admin-only. Teachers can mark attendance day-wise for the current month.', 'warning');
                 return;
             }
-            if (currentUserRole !== 'admin') {
+            if (normalizeUserRole(currentUserRole) !== 'admin') {
                 showAlert('Only Admin can save bulk past attendance.', 'warning');
                 return;
             }
@@ -47517,7 +47998,7 @@ body.header-offscreen .header-kicker::after {
 
         // ── REPORTS HUB MODAL & LEDGER INTEGRITY ─────────────────────────────────
         function openFeesReportsHubModal() {
-            if (currentUserRole !== 'admin') {
+            if (normalizeUserRole(currentUserRole) !== 'admin') {
                 showAlert('Admin access required.', 'warning');
                 return;
             }
@@ -48371,7 +48852,7 @@ body.header-offscreen .header-kicker::after {
         // using the same free_quota_amount field that getStudentFreeQuotaUsed() sums,
         // so the counter updates immediately. Marks it manual=true for traceability.
         async function markStudentAvailedSubsidy(studentId, monthKey, triggerBtn) {
-            if (currentUserRole !== 'admin') { showAlert('Only admins can mark subsidy availed.', 'warning'); return; }
+            if (normalizeUserRole(currentUserRole) !== 'admin') { showAlert('Only admins can mark subsidy availed.', 'warning'); return; }
             const sid = parseInt(studentId, 10);
             if (!sid || !monthKey) return;
             const student = (db.getStudents() || []).find(s => parseInt(s.id, 10) === sid);
@@ -48891,7 +49372,7 @@ body.header-offscreen .header-kicker::after {
             /**
              * Reverse a specific advantage deduction by its ID
              */
-            if (currentUserRole !== 'admin') {
+            if (normalizeUserRole(currentUserRole) !== 'admin') {
                 showAlert('Admin access required', 'warning');
                 return;
             }
@@ -48924,7 +49405,7 @@ body.header-offscreen .header-kicker::after {
         }
 
         async function adminDiagnoseExcessPointsIssue() {
-            if (currentUserRole !== 'admin') {
+            if (normalizeUserRole(currentUserRole) !== 'admin') {
                 showAlert('Admin access required', 'warning');
                 return;
             }
@@ -49001,7 +49482,7 @@ body.header-offscreen .header-kicker::after {
         }
 
         function getResourceContextMonthKey() {
-            if (currentUserRole !== 'admin') {
+            if (normalizeUserRole(currentUserRole) !== 'admin') {
                 return getCurrentMonthKey();
             }
             const dateStr = getAdminResourceRequestDate();
@@ -49439,7 +49920,7 @@ body.header-offscreen .header-kicker::after {
         }
 
         async function saveResourceCabinetItem() {
-            if (currentUserRole !== 'admin') {
+            if (normalizeUserRole(currentUserRole) !== 'admin') {
                 showAlert('Only Admin can update the resource cabinet.', 'warning');
                 return;
             }
@@ -56093,7 +56574,7 @@ body.header-offscreen .header-kicker::after {
         }
 
         function saveGoodConductFormula() {
-            if (currentUserRole !== 'admin') {
+            if (normalizeUserRole(currentUserRole) !== 'admin') {
                 showAlert('Only Admin can edit Good Conduct formula.', 'warning');
                 return;
             }
@@ -56431,7 +56912,7 @@ body.header-offscreen .header-kicker::after {
         }
 
         async function toggleRestorePointLock(lockState) {
-            if (currentUserRole !== 'admin') {
+            if (normalizeUserRole(currentUserRole) !== 'admin') {
                 showAlert('Only Admin can lock restore points.', 'warning');
                 return;
             }
@@ -56463,7 +56944,7 @@ body.header-offscreen .header-kicker::after {
         }
 
         async function applyRestorePoint() {
-            if (currentUserRole !== 'admin') {
+            if (normalizeUserRole(currentUserRole) !== 'admin') {
                 showAlert('Only Admin can restore backups.', 'warning');
                 return;
             }
@@ -56987,32 +57468,6 @@ body.header-offscreen .header-kicker::after {
 
         /* VALIDATION MODAL FUNCTIONS */
         /* ── Score History Modal ── */
-        function _getScoreHistoryFromActivityLog(studentId, dateKey) {
-            const data = db.getData();
-            const logs = (data.activity_log || [])
-                .filter(l => l.entity === 'scoreboard' && l.action === 'upsert'
-                    && (l.student_id === studentId || _parseIntSafe(l.student_id) === studentId)
-                    && l.date === dateKey)
-                .sort((a, b) => (a.logged_at || '').localeCompare(b.logged_at || ''));
-            const entries = [];
-            let prevPoints = 0;
-            for (const log of logs) {
-                const match = (log.detail || '').match(/pts=(-?\d+)/);
-                const cumPts = match ? parseInt(match[1], 10) : 0;
-                const delta = cumPts - prevPoints;
-                entries.push({
-                    delta,
-                    total: cumPts,
-                    actor: log.actor_login_id || log.actor_role || 'unknown',
-                    role: log.actor_role || '',
-                    timestamp: log.logged_at || '',
-                    source: log.source || '',
-                    note: ''
-                });
-                prevPoints = cumPts;
-            }
-            return entries;
-        }
         function _parseIntSafe(v) { const n = parseInt(v, 10); return Number.isFinite(n) ? n : 0; }
 
         function _formatHistoryTime(iso) {
@@ -57044,21 +57499,9 @@ body.header-offscreen .header-kicker::after {
                 ? `${student.base_name || student.name || 'Student'} (${formatRollDisplay(student.roll)})`
                 : `Student #${studentId}`;
 
-            // Gather history: prefer inline history, fall back to activity_log reconstruction
             let entries = [];
             if (score && Array.isArray(score.history) && score.history.length > 0) {
                 entries = score.history.slice().sort((a, b) => (a.timestamp || '').localeCompare(b.timestamp || ''));
-            }
-            // Also try activity_log for older entries
-            const logEntries = _getScoreHistoryFromActivityLog(studentId, dateKey);
-            // If no inline history, use log entries. If both exist, merge (inline preferred for overlapping timestamps)
-            if (entries.length === 0 && logEntries.length > 0) {
-                entries = logEntries;
-            } else if (entries.length > 0 && logEntries.length > 0) {
-                // Add log entries that predate the earliest inline entry
-                const earliest = entries[0].timestamp || '';
-                const olderLogs = logEntries.filter(e => e.timestamp && e.timestamp < earliest);
-                if (olderLogs.length) entries = [...olderLogs, ...entries];
             }
 
             const totalPoints = score ? (parseInt(safeProp(score, 'points'), 10) || 0) : 0;
@@ -57539,9 +57982,33 @@ body.header-offscreen .header-kicker::after {
                 if (el) el.textContent = text;
             }
 
+            const _localFirstPaintReady = (() => {
+                try {
+                    const local = db.getData();
+                    const health = assessSnapshotHealth(local, null);
+                    return !!(
+                        health &&
+                        health.healthy &&
+                        health.studentCount > 0 &&
+                        !hasSuspiciousLockedHistoryLoss(local)
+                    );
+                } catch (_) {
+                    return false;
+                }
+            })();
+
             // Paint the last active tab immediately (behind the overlay if syncing)
             // so the DOM is ready when the overlay is removed.
             restoreLastActiveTab();
+            if (_localFirstPaintReady && _startupSyncOverlay) {
+                _startupSyncOverlay.classList.add('fade-out');
+                const _fastOverlay = _startupSyncOverlay;
+                setTimeout(() => {
+                    if (_fastOverlay && _fastOverlay.parentNode) _fastOverlay.parentNode.removeChild(_fastOverlay);
+                }, 180);
+                _startupSyncOverlay = null;
+                updateSyncStatus('syncing', 'Syncing in background');
+            }
             setInterval(() => {
                 if (document.hidden) return;
                 if (getActiveTabName() !== 'tools') return;
@@ -57837,6 +58304,8 @@ body.header-offscreen .header-kicker::after {
                     }
                 }
                 keysToRemove.forEach(key => localStorage.removeItem(key));
+                // Also clear sessionStorage active tab so a new login starts fresh
+                try { sessionStorage.removeItem(ACTIVE_TAB_KEY); } catch (e) {}
                 eaLog('localStorage cleared on logout (profile + data)');
             } catch (e) {
                 console.error('Failed to clear localStorage:', e);
@@ -57868,6 +58337,340 @@ body.header-offscreen .header-kicker::after {
         });
 
     </script>
+<script>
+(function() {
+    if (window.__eaSidebarController) return;
+    window.__eaSidebarController = true;
+
+    var body = document.body;
+    var sidebar = document.getElementById('appSidebar');
+    var main = document.getElementById('mainContentWrapper');
+    var toggle = document.getElementById('sidebarToggle');
+    var close = document.getElementById('sidebarCloseBtn');
+    var menu = document.getElementById('mobileMenuBtn');
+    var overlay = document.getElementById('sidebarOverlay');
+    var stateKey = 'ea_sidebar_collapsed';
+    var idleTimer = 0;
+    var hoverTimer = 0;
+    var navigationCloseTimer = 0;
+    var cleanupTimer = 0;
+    var edgeFrame = 0;
+    var edgeX = 0;
+    var raf = window.requestAnimationFrame || function(fn) { return window.setTimeout(fn, 16); };
+
+    if (!sidebar) return;
+
+    function isMobile() {
+        return window.innerWidth <= 768;
+    }
+
+    function readCollapsed() {
+        try { return window.localStorage.getItem(stateKey) === 'true'; } catch (e) { return false; }
+    }
+
+    function writeCollapsed(value) {
+        try { window.localStorage.setItem(stateKey, value ? 'true' : 'false'); } catch (e) {}
+    }
+
+    function setWillChange(active) {
+        if (sidebar) sidebar.style.willChange = active ? 'transform' : 'auto';
+        if (main) main.style.willChange = active ? 'margin-left' : 'auto';
+    }
+
+    function finishMotion(delay) {
+        window.clearTimeout(cleanupTimer);
+        cleanupTimer = window.setTimeout(function() {
+            body.classList.remove('sb-closing');
+            setWillChange(false);
+        }, delay || 280);
+    }
+
+    function updateAria() {
+        var collapsed = body.classList.contains('sidebar-collapsed');
+        var revealed = body.classList.contains('sidebar-hover-reveal');
+        var mobileOpen = sidebar.classList.contains('mobile-open');
+        if (toggle) {
+            toggle.setAttribute('aria-expanded', String(!collapsed || revealed));
+            toggle.setAttribute('aria-label', collapsed ? 'Expand sidebar' : 'Collapse sidebar');
+            toggle.title = collapsed ? 'Expand sidebar' : 'Collapse sidebar';
+        }
+        if (menu) menu.setAttribute('aria-expanded', String(mobileOpen));
+        if (overlay) overlay.setAttribute('aria-hidden', String(!mobileOpen));
+    }
+
+    function hideHoverReveal() {
+        if (!body.classList.contains('sidebar-hover-reveal')) return;
+        window.clearTimeout(hoverTimer);
+        setWillChange(true);
+        body.classList.add('sb-closing');
+        body.classList.remove('sidebar-hover-reveal');
+        updateAria();
+        finishMotion(260);
+    }
+
+    function scheduleHoverCollapse() {
+        if (!body.classList.contains('sidebar-hover-reveal')) return;
+        window.clearTimeout(hoverTimer);
+        hoverTimer = window.setTimeout(function() {
+            var active = document.activeElement;
+            if (sidebar.matches(':hover') || hoverZone.matches(':hover') || (active && sidebar.contains(active))) return;
+            hideHoverReveal();
+        }, 220);
+    }
+
+    function revealSidebar() {
+        if (isMobile() || !body.classList.contains('sidebar-collapsed')) return;
+        window.clearTimeout(hoverTimer);
+        if (body.classList.contains('sidebar-hover-reveal')) return;
+        setWillChange(true);
+        raf(function() {
+            if (!isMobile() && body.classList.contains('sidebar-collapsed')) {
+                body.classList.remove('sb-closing');
+                body.classList.add('sidebar-hover-reveal');
+                updateAria();
+            }
+        });
+        finishMotion(240);
+    }
+
+    function collapseSidebar(persist) {
+        if (isMobile()) return;
+        window.clearTimeout(hoverTimer);
+        if (body.classList.contains('sidebar-collapsed') && !body.classList.contains('sidebar-hover-reveal')) {
+            if (persist) writeCollapsed(true);
+            updateAria();
+            return;
+        }
+        setWillChange(true);
+        body.classList.add('sb-closing');
+        body.classList.remove('sidebar-hover-reveal');
+        body.classList.add('sidebar-collapsed');
+        updateAria();
+        if (persist) writeCollapsed(true);
+        finishMotion(260);
+    }
+
+    function expandSidebar() {
+        window.clearTimeout(hoverTimer);
+        window.clearTimeout(idleTimer);
+        setWillChange(true);
+        body.classList.remove('sb-closing', 'sidebar-hover-reveal', 'sidebar-collapsed');
+        writeCollapsed(false);
+        updateAria();
+        finishMotion(240);
+        resetIdleTimer();
+    }
+
+    function resetIdleTimer() {
+        window.clearTimeout(idleTimer);
+        if (isMobile() || body.classList.contains('sidebar-collapsed')) return;
+        idleTimer = window.setTimeout(function() { collapseSidebar(true); }, 3500);
+    }
+
+    function openMobileSidebar() {
+        if (!isMobile()) return;
+        window.clearTimeout(hoverTimer);
+        window.clearTimeout(idleTimer);
+        sidebar.classList.add('mobile-open');
+        if (overlay) {
+            overlay.classList.remove('closing');
+            overlay.classList.add('active');
+        }
+        updateAria();
+    }
+
+    function closeMobileSidebar() {
+        sidebar.classList.remove('mobile-open');
+        if (overlay) {
+            overlay.classList.add('closing');
+            overlay.classList.remove('active');
+            window.setTimeout(function() { overlay.classList.remove('closing'); }, 340);
+        }
+        updateAria();
+    }
+
+    if (readCollapsed()) body.classList.add('sidebar-collapsed');
+
+    var hoverZone = document.querySelector('.sidebar-hover-zone');
+    if (!hoverZone) {
+        hoverZone = document.createElement('div');
+        hoverZone.className = 'sidebar-hover-zone';
+        hoverZone.setAttribute('aria-hidden', 'true');
+        body.appendChild(hoverZone);
+    }
+
+    sidebar.addEventListener('transitionend', function(event) {
+        if (event.target === sidebar && (event.propertyName === 'transform' || event.propertyName === 'width')) {
+            body.classList.remove('sb-closing');
+            setWillChange(false);
+        }
+    });
+    sidebar.addEventListener('mouseenter', function() {
+        if (isMobile()) return;
+        window.clearTimeout(hoverTimer);
+        if (body.classList.contains('sidebar-collapsed')) revealSidebar();
+        resetIdleTimer();
+    });
+    sidebar.addEventListener('mouseleave', function() {
+        if (!isMobile()) scheduleHoverCollapse();
+    });
+    hoverZone.addEventListener('mouseenter', function() {
+        if (!isMobile()) revealSidebar();
+    });
+    hoverZone.addEventListener('mouseleave', function() {
+        if (!isMobile()) scheduleHoverCollapse();
+    });
+    sidebar.addEventListener('focusin', function() {
+        if (!isMobile() && body.classList.contains('sidebar-collapsed')) revealSidebar();
+    });
+    sidebar.addEventListener('focusout', scheduleHoverCollapse);
+    function requestSidebarCloseAfterTab() {
+        if (isMobile()) return;
+        window.clearTimeout(navigationCloseTimer);
+        // Collapse immediately — no debounce timer. A timer would get reset
+        // by rapid successive tab clicks and never fire, leaving the sidebar
+        // stuck open. The sb-instant class suppresses transitions so there is
+        // no margin-left reflow thrash while the tab content renders.
+        if (body.classList.contains('sidebar-collapsed') && !body.classList.contains('sidebar-hover-reveal')) return;
+        body.classList.add('sb-instant');
+        body.classList.remove('sidebar-hover-reveal');
+        body.classList.add('sidebar-collapsed');
+        writeCollapsed(true);
+        updateAria();
+        raf(function() {
+            raf(function() {
+                body.classList.remove('sb-instant');
+            });
+        });
+    }
+
+    window.__eaRequestSidebarClose = requestSidebarCloseAfterTab;
+
+    sidebar.addEventListener('click', function(event) {
+        resetIdleTimer();
+        var item = event.target && event.target.closest ? event.target.closest('.sidebar-nav-item') : null;
+        if (item && isMobile()) closeMobileSidebar();
+        if (item && !isMobile()) requestSidebarCloseAfterTab();
+    });
+    // Middle-click (button === 1) on a sidebar item opens that tab in a new
+    // browser tab via URL hash routing.  Ctrl/Cmd+click also opens a new tab.
+    sidebar.addEventListener('mousedown', function(event) {
+        if (event.button !== 1 && !(event.ctrlKey || event.metaKey)) return;
+        var item = event.target && event.target.closest ? event.target.closest('.sidebar-nav-item') : null;
+        if (!item) return;
+        var tabName = item.getAttribute('data-tab');
+        if (!tabName) return;
+        event.preventDefault();
+        var url = window.location.pathname + window.location.search + '#tab=' + tabName;
+        window.open(url, '_blank');
+    });
+    sidebar.addEventListener('auxclick', function(event) {
+        if (event.button !== 1) return;
+        event.preventDefault();
+    });
+
+    // Same middle-click / Ctrl+click support for the top tab-button bar.
+    var _tabBar = document.querySelector('.tabs');
+    if (_tabBar) {
+        _tabBar.addEventListener('mousedown', function(event) {
+            if (event.button !== 1 && !(event.ctrlKey || event.metaKey)) return;
+            var btn = event.target && event.target.closest ? event.target.closest('.tab-button') : null;
+            if (!btn) return;
+            var m = String(btn.getAttribute('onclick') || '').match(/switchTab\('([^']+)'\)/);
+            if (!m) return;
+            event.preventDefault();
+            var url = window.location.pathname + window.location.search + '#tab=' + m[1];
+            window.open(url, '_blank');
+        });
+        _tabBar.addEventListener('auxclick', function(event) {
+            if (event.button !== 1) return;
+            event.preventDefault();
+        });
+    }
+    sidebar.addEventListener('scroll', resetIdleTimer, { passive: true });
+
+    document.addEventListener('pointermove', function(event) {
+        if ((event.pointerType && event.pointerType !== 'mouse') || isMobile() || !body.classList.contains('sidebar-collapsed')) return;
+        edgeX = event.clientX;
+        if (edgeX > 24 || edgeFrame) return;
+        edgeFrame = raf(function() {
+            edgeFrame = 0;
+            if (!isMobile() && body.classList.contains('sidebar-collapsed') && edgeX <= 24) revealSidebar();
+        });
+    }, { passive: true });
+
+    if (toggle) {
+        toggle.addEventListener('click', function(event) {
+            event.preventDefault();
+            event.stopPropagation();
+            if (body.classList.contains('sidebar-collapsed')) expandSidebar();
+            else collapseSidebar(true);
+        });
+    }
+    if (menu) {
+        menu.addEventListener('click', function(event) {
+            event.preventDefault();
+            event.stopPropagation();
+            if (sidebar.classList.contains('mobile-open')) closeMobileSidebar();
+            else openMobileSidebar();
+        });
+    }
+    if (close) {
+        close.addEventListener('click', function(event) {
+            event.preventDefault();
+            event.stopPropagation();
+            closeMobileSidebar();
+        });
+    }
+    if (overlay) overlay.addEventListener('click', closeMobileSidebar);
+    document.addEventListener('keydown', function(event) {
+        if (event.key === 'Escape' && sidebar.classList.contains('mobile-open')) closeMobileSidebar();
+    });
+    window.addEventListener('resize', function() {
+        if (isMobile()) {
+            window.clearTimeout(hoverTimer);
+            window.clearTimeout(idleTimer);
+            body.classList.remove('sb-closing', 'sidebar-hover-reveal');
+        } else {
+            closeMobileSidebar();
+            resetIdleTimer();
+        }
+        updateAria();
+    }, { passive: true });
+    document.addEventListener('visibilitychange', function() {
+        if (document.hidden) {
+            window.clearTimeout(idleTimer);
+            window.clearTimeout(hoverTimer);
+        } else {
+            resetIdleTimer();
+        }
+    });
+
+    function syncSidebarTheme() {
+        var button = document.getElementById('sidebarThemeBtn');
+        if (!button) return;
+        var light = body.classList.contains('light-mode');
+        var icon = button.querySelector('i');
+        var text = button.querySelector('.sidebar-link-text');
+        if (icon) icon.className = light ? 'fas fa-moon' : 'fas fa-sun';
+        if (text) text.textContent = light ? 'Dark Mode' : 'Light Mode';
+    }
+
+    var baseToggleTheme = window.toggleTheme;
+    if (typeof baseToggleTheme === 'function' && !baseToggleTheme.__eaSidebarWrapped) {
+        var wrappedToggleTheme = function() {
+            baseToggleTheme.apply(this, arguments);
+            syncSidebarTheme();
+        };
+        wrappedToggleTheme.__eaSidebarWrapped = true;
+        window.toggleTheme = wrappedToggleTheme;
+    }
+
+    syncSidebarTheme();
+    updateAria();
+    resetIdleTimer();
+})();
+</script>
 
     <!-- Notification click popup modal -->
     <div id="notifPopupOverlay" class="notif-popup-overlay" style="display:none"
@@ -58051,488 +58854,4 @@ body.header-offscreen .header-kicker::after {
      */
     window.adminRecordRollChange = async function adminRecordRollChange(studentId, newRoll, effectiveMonth, reason) {
         if (typeof SERVER_SYNC === 'undefined' || !SERVER_SYNC.enabled) {
-            if (typeof showAlert === 'function') showAlert('Server connection required to record roll changes.', 'warning');
-            return false;
-        }
-        try {
-            var resp = await eaFetch('/scoreboard/record-roll-change', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify({
-                    student_id: studentId,
-                    new_roll: newRoll,
-                    effective_month: effectiveMonth,
-                    reason: reason || 'admin_update'
-                })
-            });
-            var text = '';
-            try { text = await resp.text(); } catch (_) {}
-            var json = null;
-            if (text) {
-                try { json = JSON.parse(text); } catch (_) { /* leave json null */ }
-            }
-            if (!resp.ok) {
-                var errMsg = (json && json.error) || text || 'Unauthorized or server error';
-                if (typeof showAlert === 'function') showAlert('Roll change failed (' + resp.status + '): ' + errMsg, 'danger');
-                if (typeof console !== 'undefined' && console.error) console.error('roll-change error', resp.status, errMsg);
-                alert('Roll change failed (' + resp.status + '): ' + errMsg);
-                return false;
-            }
-            if (!json || !json.success) {
-                var msg = (json && json.error) || text || 'Unknown error';
-                if (typeof showAlert === 'function') showAlert('Roll change failed: ' + msg, 'danger');
-                if (typeof console !== 'undefined' && console.error) console.error('roll-change error', msg);
-                alert('Roll change failed: ' + msg);
-                return false;
-            }
-            var msg = 'Roll changed: ' + json.old_roll + ' \u2192 ' + json.new_roll +
-                      ' from ' + json.effective_month + '. Updated ' +
-                      (json.profiles_updated || []).length + ' month profile(s).';
-            if (typeof showAlert === 'function') showAlert(msg, 'success');
-            // Pull fresh data from server so local state reflects the change.
-            if (typeof pullFromServer === 'function') {
-                try { await pullFromServer(); } catch (_) {}
-            }
-            return true;
-        } catch (e) {
-            if (typeof showAlert === 'function') showAlert('Failed to record roll change: ' + e.message, 'danger');
-            return false;
-        }
-    };
-
-    // ── Server-side pre-validation for star/VETO actions ─────────────
-    /**
-     * Ask the server whether a proposed star or VETO delta is valid.
-     * Returns the server's response object (or null when offline).
-     * The client should BLOCK the action if overall_valid === false.
-     */
-    window.serverValidateAction = async function serverValidateAction(studentId, month, deltaStars, deltaVetos) {
-        if (typeof SERVER_SYNC === 'undefined' || !SERVER_SYNC.enabled) return null;
-        try {
-            var resp = await eaFetch('/scoreboard/validate-action', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify({
-                    student_id: studentId,
-                    month: month,
-                    delta_stars: deltaStars || 0,
-                    delta_vetos: deltaVetos || 0
-                })
-            });
-            if (!resp.ok) return null;
-            return await resp.json();
-        } catch (_) {
-            return null;
-        }
-    };
-
-    // ── Auto-fetch on load ────────────────────────────────────────────
-    // Populate balance cache as soon as the page is ready.
-    window.addEventListener('load', function() {
-        var month = (typeof getCurrentMonthKey === 'function') ? getCurrentMonthKey() : '';
-        if (month && typeof SERVER_SYNC !== 'undefined' && SERVER_SYNC.enabled) {
-            window.fetchServerBalances(month).catch(function() {});
-        }
-    });
-
-})();
-</script>
-    <!-- Generic centered confirmation / notice modal (position-aware, viewport-centered) -->
-    <div id="eaConfirmModal" class="modal">
-        <div class="modal-content" style="max-width: 460px;">
-            <div class="modal-header">
-                <h2 id="eaConfirmTitle"><i class="fas fa-check-circle"></i> Confirm</h2>
-                <button class="close-btn" onclick="closeModal('eaConfirmModal')">&times;</button>
-            </div>
-            <div class="modal-body">
-                <p id="eaConfirmMessage" style="margin:0 0 6px;line-height:1.5;"></p>
-            </div>
-            <div class="modal-footer" style="padding:16px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:12px;">
-                <button class="secondary" id="eaConfirmCancel" onclick="closeModal('eaConfirmModal')">Cancel</button>
-                <button id="eaConfirmOk">OK</button>
-            </div>
-        </div>
-    </div>
-    <!-- Planner Designer Modal -->
-    <div id="plannerModal" class="modal">
-        <div class="modal-content planner-editor-modal">
-            <div class="modal-header">
-                <h2><i class="fas fa-calendar-check"></i> Planner Designer</h2>
-                <button class="close-btn" onclick="closeModal('plannerModal')">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div class="planner-type-toggle">
-                    <button id="btnTypeMonthly" class="planner-type-btn active" onclick="setPlannerType('monthly')">📆 Monthly Planner</button>
-                    <button id="btnTypeWeekly" class="planner-type-btn" onclick="setPlannerType('weekly')">🗓 Weekly Planner</button>
-                </div>
-                
-                <div class="planner-setup-grid">
-                    <div id="monthlySetup" class="control-group">
-                        <label>Select Month & Year</label>
-                        <div style="display:flex; gap:8px;">
-                            <select id="planMonth">
-                                <option value="0">January</option><option value="1">February</option>
-                                <option value="2">March</option><option value="3">April</option>
-                                <option value="4">May</option><option value="5">June</option>
-                                <option value="6">July</option><option value="7">August</option>
-                                <option value="8">September</option><option value="9">October</option>
-                                <option value="10">November</option><option value="11">December</option>
-                            </select>
-                            <select id="planYear"></select>
-                        </div>
-                    </div>
-                    <div id="weeklySetup" class="control-group" style="display:none;">
-                        <label>Start Date (Monday)</label>
-                        <input type="date" id="planWeekStart">
-                    </div>
-                    <div class="control-group">
-                        <label>Planner Title (Inherited from Information Title)</label>
-                        <input type="text" id="planDisplayTitle" readonly style="opacity:0.7;">
-                    </div>
-                </div>
-
-                <div id="weeklyMetaFields" class="planner-weekly-meta" style="display:none;">
-                    <div class="planner-meta-box">
-                        <div class="planner-meta-label">🎯 Week's Goals</div>
-                        <textarea id="planWeeklyGoals" class="planner-meta-textarea" rows="2" placeholder="Main goals for the week..."></textarea>
-                    </div>
-                    <div class="planner-meta-box">
-                        <div class="planner-meta-label">📌 Important Notes</div>
-                        <textarea id="planWeeklyNotes" class="planner-meta-textarea" rows="2" placeholder="Deadlines, events, reminders..."></textarea>
-                    </div>
-                </div>
-
-                <div class="planner-grid-container" id="plannerGridContainer">
-                    <!-- Dynamic Grid Injector -->
-                </div>
-            </div>
-            <div class="modal-footer" style="padding:16px; border-top:1px solid var(--border); display:flex; justify-content:flex-end; gap:12px;">
-                <button class="secondary" onclick="closeModal('plannerModal')">Cancel</button>
-                <button class="primary" onclick="applyPlannerDesign()"><i class="fas fa-check"></i> Apply to Information</button>
-            </div>
-        </div>
-    </div>
-</div><!-- end .main-content-wrapper -->
-
-<script>
-(function() {
-    var sb = document.getElementById('appSidebar');
-    var isMobile = function() { return window.innerWidth <= 768; };
-
-    // Restore collapsed state
-    if (localStorage.getItem('ea_sidebar_collapsed') === 'true') {
-        document.body.classList.add('sidebar-collapsed');
-    }
-
-    // ── Create hover zone element ──
-    var hoverZone = document.createElement('div');
-    hoverZone.className = 'sidebar-hover-zone';
-    hoverZone.setAttribute('aria-hidden', 'true');
-    document.body.appendChild(hoverZone);
-
-    // ── Auto-collapse & hover-to-reveal (desktop only) ──
-    var IDLE_TIMEOUT = 2000;   // ms before sidebar auto-collapses after last interaction
-    var HOVER_DELAY  = 200;    // ms before hover-reveal collapses after mouse leaves
-    var idleTimer    = null;
-    var hoverTimer   = null;
-    var hoverRevealed = false;
-
-    // ── will-change lifecycle: promote GPU layer just before animation,
-    //    release it after the transition ends to free compositor memory ──
-    var mcw = document.getElementById('mainContentWrapper');
-    function _setWillChange() {
-        if (sb)  sb.style.willChange  = 'width';
-        if (mcw) mcw.style.willChange = 'margin-left';
-    }
-    function _clearWillChange() {
-        if (sb)  sb.style.willChange  = 'auto';
-        if (mcw) mcw.style.willChange = 'auto';
-    }
-    // Listen for the width transition to finish on the sidebar, then clean up
-    if (sb) {
-        sb.addEventListener('transitionend', function(e) {
-            if (e.propertyName === 'width') {
-                document.body.classList.remove('sb-closing');
-                _clearWillChange();
-            }
-        });
-    }
-
-    // ── rAF-gated class mutations: every sidebar DOM change is scheduled on the
-    //    next animation frame so the GPU compositor picks it up in a single paint.
-    var _sbRafPending = false;
-    var _sbRafQueue = [];
-    function sbRaf(fn) {
-        _sbRafQueue.push(fn);
-        if (!_sbRafPending) {
-            _sbRafPending = true;
-            requestAnimationFrame(function() {
-                _sbRafPending = false;
-                var batch = _sbRafQueue;
-                _sbRafQueue = [];
-                for (var i = 0; i < batch.length; i++) {
-                    try { batch[i](); } catch(e) {}
-                }
-            });
-        }
-    }
-
-    function collapseSidebar() {
-        _setWillChange();
-        // Add sb-closing BEFORE the class change so the close curve applies
-        document.body.classList.add('sb-closing');
-        sbRaf(function() {
-            document.body.classList.add('sidebar-collapsed');
-            // Fallback cleanup in case transitionend doesn't fire (e.g. prefers-reduced-motion)
-            setTimeout(function() {
-                document.body.classList.remove('sb-closing');
-                _clearWillChange();
-            }, 150);
-        });
-        localStorage.setItem('ea_sidebar_collapsed', 'true');
-        clearHoverReveal();
-    }
-
-    function expandSidebar() {
-        _setWillChange();
-        hoverRevealed = false; // reset before any DOM change to prevent clearHoverReveal adding sb-closing
-        clearTimeout(hoverTimer);
-        // Remove all collapse/close classes at once so the spring open curve wins
-        document.body.classList.remove('sb-closing', 'sidebar-collapsed', 'sidebar-hover-reveal');
-        localStorage.setItem('ea_sidebar_collapsed', 'false');
-        resetIdleTimer();
-        // Fallback cleanup in case transitionend doesn't fire (e.g. prefers-reduced-motion)
-        setTimeout(function() { _clearWillChange(); }, 220);
-    }
-
-    function showHoverReveal() {
-        if (!document.body.classList.contains('sidebar-collapsed')) return;
-        if (isMobile()) return;
-        clearTimeout(hoverTimer);
-        if (hoverRevealed) return; // already revealing
-        hoverRevealed = true;
-        _setWillChange();
-        sbRaf(function() {
-            document.body.classList.add('sidebar-hover-reveal');
-            setTimeout(function() { _clearWillChange(); }, 220);
-        });
-    }
-
-    function clearHoverReveal() {
-        if (!hoverRevealed) return;
-        hoverRevealed = false;
-        _setWillChange();
-        document.body.classList.add('sb-closing');
-        sbRaf(function() {
-            document.body.classList.remove('sidebar-hover-reveal');
-            setTimeout(function() {
-                document.body.classList.remove('sb-closing');
-                _clearWillChange();
-            }, 150);
-        });
-    }
-
-    function scheduleHoverCollapse() {
-        if (!hoverRevealed) return;
-        clearTimeout(hoverTimer);
-        hoverTimer = setTimeout(function() {
-            clearHoverReveal();
-        }, HOVER_DELAY);
-    }
-
-    function resetIdleTimer() {
-        clearTimeout(idleTimer);
-        if (isMobile()) return;
-        if (document.body.classList.contains('sidebar-collapsed')) return;
-        idleTimer = setTimeout(collapseSidebar, IDLE_TIMEOUT);
-    }
-
-    // Start idle timer on load
-    resetIdleTimer();
-
-    // Mouse enters sidebar or hover zone → reveal
-    function onSidebarEnter() {
-        if (isMobile()) return;
-        clearTimeout(hoverTimer);
-        if (document.body.classList.contains('sidebar-collapsed')) {
-            showHoverReveal();
-        }
-        resetIdleTimer();
-    }
-
-    // Mouse leaves sidebar → schedule re-collapse
-    function onSidebarLeave() {
-        if (isMobile()) return;
-        if (hoverRevealed) {
-            scheduleHoverCollapse();
-        }
-    }
-
-    // Edge detection: mouse near left side triggers reveal
-    // Throttled to rAF to avoid per-pixel classList checks on every mousemove
-    var _edgeRafPending = false;
-    document.addEventListener('mousemove', function(e) {
-        if (isMobile()) return;
-        if (_edgeRafPending) return;
-        _edgeRafPending = true;
-        requestAnimationFrame(function() {
-            _edgeRafPending = false;
-            if (!document.body.classList.contains('sidebar-collapsed')) {
-                resetIdleTimer();
-                return;
-            }
-            if (e.clientX < 20) {
-                showHoverReveal();
-            }
-        });
-    });
-
-    if (sb) {
-        sb.addEventListener('mouseenter', onSidebarEnter);
-        sb.addEventListener('mouseleave', onSidebarLeave);
-    }
-    hoverZone.addEventListener('mouseenter', onSidebarEnter);
-    hoverZone.addEventListener('mouseleave', onSidebarLeave);
-
-    // Any interaction inside sidebar resets idle timer
-    if (sb) {
-        sb.addEventListener('click', function() { resetIdleTimer(); });
-        sb.addEventListener('scroll', function() { resetIdleTimer(); });
-    }
-
-    // Collapse toggle button
-    var toggleBtn = document.getElementById('sidebarToggle');
-    if (toggleBtn) {
-        toggleBtn.addEventListener('click', function(e) {
-            e.stopPropagation();
-            if (document.body.classList.contains('sidebar-collapsed')) {
-                expandSidebar();
-            } else {
-                collapseSidebar();
-            }
-        });
-    }
-
-    // When a nav item is clicked during hover-reveal, collapse after action
-    document.querySelectorAll('.sidebar-nav-item').forEach(function(btn) {
-        btn.addEventListener('click', function() {
-            if (hoverRevealed) {
-                setTimeout(function() {
-                    clearHoverReveal();
-                    collapseSidebar();
-                }, 80);
-            }
-        });
-    });
-
-    // ── Mobile menu ──
-    (function() {
-        function openSidebar() {
-            var sbEl = document.getElementById('appSidebar');
-            var ov = document.getElementById('sidebarOverlay');
-            if (sbEl) sbEl.classList.add('mobile-open');
-            if (ov) ov.classList.add('active');
-        }
-        function closeSidebar() {
-            var sbEl = document.getElementById('appSidebar');
-            var ov = document.getElementById('sidebarOverlay');
-            if (sbEl) sbEl.classList.remove('mobile-open');
-            if (ov) {
-                ov.classList.add('closing');
-                ov.classList.remove('active');
-                setTimeout(function() { ov.classList.remove('closing'); }, 300);
-            }
-        }
-        var menuBtn  = document.getElementById('mobileMenuBtn');
-        var closeBtn = document.getElementById('sidebarCloseBtn');
-        var overlay  = document.getElementById('sidebarOverlay');
-        if (menuBtn) {
-            menuBtn.addEventListener('click', function(e) {
-                e.stopPropagation();
-                var sbEl = document.getElementById('appSidebar');
-                if (sbEl && sbEl.classList.contains('mobile-open')) { closeSidebar(); }
-                else { openSidebar(); }
-            });
-        }
-        if (closeBtn) {
-            closeBtn.addEventListener('click', function(e) {
-                e.stopPropagation();
-                closeSidebar();
-            });
-        }
-        if (overlay) {
-            overlay.addEventListener('click', function() { closeSidebar(); });
-        }
-        // Close sidebar when any nav item is clicked (mobile)
-        document.querySelectorAll('.sidebar-nav-item').forEach(function(btn) {
-            btn.addEventListener('click', function() { closeSidebar(); });
-        });
-    })();
-
-    // ── Patch switchTab to mirror active state onto sidebar items ──
-    function patchSwitchTab() {
-        if (typeof window.switchTab !== 'function') return;
-        var _orig = window.switchTab;
-        window.switchTab = function(tabName) {
-            _orig.call(window, tabName);
-            document.querySelectorAll('.sidebar-nav-item[data-tab]').forEach(function(el) {
-                el.classList.toggle('active', el.dataset.tab === tabName);
-            });
-        };
-    }
-    patchSwitchTab();
-    if (typeof window.switchTab !== 'function') {
-        document.addEventListener('DOMContentLoaded', patchSwitchTab);
-    }
-
-    // ── Patch syncThemeButton to also update sidebar theme button ──
-    var _origSync = window.syncThemeButton;
-    window.syncThemeButton = function() {
-        if (_origSync) _origSync();
-        var btn = document.getElementById('sidebarThemeBtn');
-        if (!btn) return;
-        var isLight = document.body.classList.contains('light-mode');
-        var icon = btn.querySelector('i');
-        var text = btn.querySelector('.sidebar-link-text');
-        if (icon) icon.className = isLight ? 'fas fa-moon' : 'fas fa-sun';
-        if (text) text.textContent = isLight ? 'Dark Mode' : 'Light Mode';
-    };
-
-    // Sync sidebar theme button on load
-    document.addEventListener('DOMContentLoaded', function() {
-        var btn = document.getElementById('sidebarThemeBtn');
-        if (!btn) return;
-        var isLight = document.body.classList.contains('light-mode');
-        var icon = btn.querySelector('i');
-        var text = btn.querySelector('.sidebar-link-text');
-        if (icon) icon.className = isLight ? 'fas fa-moon' : 'fas fa-sun';
-        if (text) text.textContent = isLight ? 'Dark Mode' : 'Light Mode';
-    });
-
-    // ── Mirror visibility of special tab buttons in sidebar ──
-    document.addEventListener('DOMContentLoaded', function() {
-        var map = {
-            'appealsTabButton':      'sidebarAppealsBtn',
-            'notificationsTabButton':'sidebarNotificationsBtn',
-            'proposalsTabButton':    'sidebarProposalsBtn',
-            'activityLogTabButton':  'sidebarActivityBtn',
-            'profileTabButton':      'sidebarProfileBtn',
-            'myDashboardTabButton':  'sidebarDashboardBtn'
-        };
-        Object.keys(map).forEach(function(origId) {
-            var orig = document.getElementById(origId);
-            var mirror = document.getElementById(map[origId]);
-            if (!orig || !mirror) return;
-            var observer = new MutationObserver(function() {
-                mirror.style.display = orig.style.display;
-            });
-            observer.observe(orig, { attributes: true, attributeFilter: ['style'] });
-            mirror.style.display = orig.style.display;
-        });
-    });
-})();
-</script>
-</body>
-</html>
+            if (typeof showAlert === 'function') showAlert('Server connectio

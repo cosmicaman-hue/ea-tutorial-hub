@@ -1135,6 +1135,13 @@
         #chessPanel .public-chess-bracket-player.is-winner { color: #fde68a; }
         #chessPanel .public-chess-bracket-player b { color: #86efac; }
         #chessPanel .public-chess-bracket-status { margin-top: 6px; color: #71819c; font-size: .57rem; }
+        #chessPanel .public-chess-series-card { margin-top: 14px; }
+        #chessPanel .public-chess-series-list { padding: 12px; }
+        #chessPanel .public-chess-series-item { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px; border: 1px solid rgba(148,163,184,.12); border-radius: 12px; background: rgba(15,23,42,.62); }
+        #chessPanel .public-chess-series-item + .public-chess-series-item { margin-top: 8px; }
+        #chessPanel .public-chess-series-item strong { display: block; color: #f8fafc; font-size: .68rem; }
+        #chessPanel .public-chess-series-item small { display: block; margin-top: 3px; color: #71819c; font-size: .58rem; }
+        #chessPanel .public-chess-series-item > span { color: #fde68a; font-size: .64rem; font-weight: 800; text-align: right; }
         #chessPanel .public-chess-empty { padding: 42px 18px; color: #8494ae; font: 700 .76rem/1.5 "Poppins", sans-serif; text-align: center; }
         #chessPanel .public-chess-empty i { display: block; margin-bottom: 10px; color: #facc15; font-size: 1.8rem; }
         @keyframes publicChessFloat { 0%, 100% { transform: translateY(0) rotate(-5deg); } 50% { transform: translateY(-5px) rotate(5deg); } }
@@ -1392,6 +1399,10 @@
                     <section class="public-chess-card public-chess-bracket-card">
                         <div class="public-chess-card-heading"><span><small>From league to legacy</small><strong>Knockout bracket</strong></span><span>Elimination · Semifinals · Finale</span></div>
                         <div id="publicChessBracket"></div>
+                    </section>
+                    <section class="public-chess-card public-chess-series-card">
+                        <div class="public-chess-card-heading"><span><small>Tournament history</small><strong>Saved series</strong></span><span>Archived events</span></div>
+                        <div id="publicChessSeries"></div>
                     </section>
                 </div>
             </div>
@@ -1905,10 +1916,11 @@
             }
             target.innerHTML = `<div class="public-chess-matches">${visible.slice(0, 6).map((match, index) => {
                 const complete = match.status === 'completed' || ['white', 'black', 'draw', 'bye'].includes(match.result);
-                const resultLabel = match.result === 'draw' ? 'Draw' : (complete ? (match.result === 'bye' ? 'BYE' : 'Result recorded') : 'Scheduled');
+                const advancingSide = match.advancingSide || match.winnerSide || '';
+                const resultLabel = match.result === 'draw' ? (advancingSide ? `Draw · ${advancingSide === 'white' ? 'White' : 'Black'} advances` : 'Draw') : (complete ? (match.result === 'bye' ? 'BYE' : 'Result recorded') : 'Scheduled');
                 const duration = Number(match.durationSeconds || 0) > 0 ? `${Math.round(Number(match.durationSeconds) / 60)} min` : '';
                 const kills = Number(match.killPoints || 0) > 0 ? `${publicChessPoints(match.killPoints)} kill pts` : '';
-                return `<article class="public-chess-match" style="animation-delay:${index * .06}s"><div class="public-chess-match-top"><span>${escapeHtml(publicChessStageLabel(match))} · Board ${escapeHtml(match.board || '')}</span><b>${resultLabel}</b></div><div class="public-chess-versus"><div>${publicChessPlayerMarkup(match.white, match.winnerSide === 'white')}</div><span>VS</span><div>${publicChessPlayerMarkup(match.black, match.winnerSide === 'black')}</div></div>${duration || kills ? `<div class="public-chess-match-note">${escapeHtml([duration, kills].filter(Boolean).join(' · '))}</div>` : ''}</article>`;
+                return `<article class="public-chess-match" style="animation-delay:${index * .06}s"><div class="public-chess-match-top"><span>${escapeHtml(publicChessStageLabel(match))} · Board ${escapeHtml(match.board || '')}</span><b>${escapeHtml(resultLabel)}</b></div><div class="public-chess-versus"><div>${publicChessPlayerMarkup(match.white, advancingSide === 'white')}</div><span>VS</span><div>${publicChessPlayerMarkup(match.black, advancingSide === 'black')}</div></div>${duration || kills ? `<div class="public-chess-match-note">${escapeHtml([duration, kills].filter(Boolean).join(' · '))}</div>` : ''}</article>`;
             }).join('')}</div>`;
         }
         function renderPublicChessBracket(chess) {
@@ -1928,11 +1940,22 @@
             });
             const order = { elimination: 0, semifinal: 1, finale: 2 };
             groups.sort((a, b) => order[(a.matches[0] || {}).stage] - order[(b.matches[0] || {}).stage] || Number((a.matches[0] || {}).round) - Number((b.matches[0] || {}).round));
-            target.innerHTML = `<div class="public-chess-bracket">${groups.map((group, groupIndex) => `<div class="public-chess-bracket-column"><h4>${escapeHtml(group.label)}</h4>${group.matches.map((match, index) => `<article class="public-chess-bracket-match" style="animation-delay:${(groupIndex * .1 + index * .05).toFixed(2)}s"><small>Board ${escapeHtml(match.board || '')}</small><div class="public-chess-bracket-player ${match.winnerSide === 'white' ? 'is-winner' : ''}"><span>${publicChessName(match.white)}</span><b>${match.winnerSide === 'white' ? publicChessPoints(match.whitePoints) : '—'}</b></div><div class="public-chess-bracket-player ${match.winnerSide === 'black' ? 'is-winner' : ''}"><span>${publicChessName(match.black)}</span><b>${match.winnerSide === 'black' ? publicChessPoints(match.blackPoints) : '—'}</b></div><div class="public-chess-bracket-status">${escapeHtml(match.result ? (match.result === 'draw' ? 'Draw' : 'Result recorded') : 'Awaiting board')}</div></article>`).join('')}</div>`).join('<div style="display:grid;place-items:center;min-width:15px;color:rgba(250,204,21,.55);"><i class="fas fa-chevron-right"></i></div>')}</div>`;
+            target.innerHTML = `<div class="public-chess-bracket">${groups.map((group, groupIndex) => `<div class="public-chess-bracket-column"><h4>${escapeHtml(group.label)}</h4>${group.matches.map((match, index) => { const advancingSide = match.advancingSide || match.winnerSide || ''; const status = match.result === 'draw' ? (advancingSide ? `Draw · ${advancingSide === 'white' ? 'White' : 'Black'} advances` : 'Draw') : (match.result ? 'Result recorded' : 'Awaiting board'); return `<article class="public-chess-bracket-match" style="animation-delay:${(groupIndex * .1 + index * .05).toFixed(2)}s"><small>Board ${escapeHtml(match.board || '')}</small><div class="public-chess-bracket-player ${advancingSide === 'white' ? 'is-winner' : ''}"><span>${publicChessName(match.white)}</span><b>${advancingSide === 'white' ? publicChessPoints(match.whitePoints) : '—'}</b></div><div class="public-chess-bracket-player ${advancingSide === 'black' ? 'is-winner' : ''}"><span>${publicChessName(match.black)}</span><b>${advancingSide === 'black' ? publicChessPoints(match.blackPoints) : '—'}</b></div><div class="public-chess-bracket-status">${escapeHtml(status)}</div></article>`; }).join('')}</div>`).join('<div style="display:grid;place-items:center;min-width:15px;color:rgba(250,204,21,.55);"><i class="fas fa-chevron-right"></i></div>')}</div>`;
         }
+        function renderPublicChessSeries(chess) {
+            const target = document.getElementById('publicChessSeries');
+            if (!target) return;
+            const series = Array.isArray(chess && chess.series) ? chess.series : [];
+            if (!series.length) {
+                target.innerHTML = '<div class="public-chess-empty"><i class="fas fa-box-archive"></i>No archived tournament series yet.</div>';
+                return;
+            }
+            target.innerHTML = `<div class="public-chess-series-list">${series.map(item => `<article class="public-chess-series-item"><div><strong>${escapeHtml(item.eventName || 'Excel Chess Champion')}</strong><small>${escapeHtml(item.archivedAt || 'Archived')} · ${item.completedMatches || 0}/${item.matchCount || 0} matches · ${item.enrolledCount || 0} players</small></div><span>${escapeHtml(item.champion && item.champion.name ? item.champion.name : item.stageLabel || 'Series saved')}</span></article>`).join('')}</div>`;
+        }
+
         function renderChessChampion(data) {
             scoresData = data;
-            const chess = data && data.chess_champion ? data.chess_champion : { eventName: 'Excel Chess Champion', stage: 'registration', stageLabel: 'Registration', enrolledCount: 0, completedMatches: 0, qualificationCount: 8, basicRoundCount: 3, standings: [], matches: [] };
+            const chess = data && data.chess_champion ? data.chess_champion : { eventName: 'Excel Chess Champion', stage: 'registration', stageLabel: 'Registration', enrolledCount: 0, completedMatches: 0, qualificationCount: 8, basicRoundCount: 3, standings: [], matches: [], series: [] };
             const title = document.getElementById('publicChessTitle');
             const subtitle = document.getElementById('publicChessSubtitle');
             const stage = document.getElementById('publicChessStage');
@@ -1946,7 +1969,7 @@
                 const leader = Array.isArray(chess.standings) && chess.standings[0];
                 stats.innerHTML = [
                     { icon: 'fa-users', label: 'Registered players', value: chess.enrolledCount || 0, detail: 'Admin opt-in roster' },
-                    { icon: 'fa-ranking-star', label: 'Current leader', value: leader ? leader.name : '—', detail: leader ? `${publicChessPoints(leader.points)} pts · ${leader.wins || 0}W ${leader.draws || 0}D` : 'No results yet' },
+                    { icon: 'fa-ranking-star', label: chess.stage === 'complete' ? 'Champion' : 'Current leader', value: chess.stage === 'complete' && chess.champion ? chess.champion.name : (leader ? leader.name : '—'), detail: chess.stage === 'complete' && chess.champion ? 'Finale advancement winner' : (leader ? `${publicChessPoints(leader.points)} pts · ${leader.wins || 0}W ${leader.draws || 0}D` : 'No results yet') },
                     { icon: 'fa-chess-board', label: 'Matches played', value: chess.completedMatches || 0, detail: `${(chess.matches || []).length} boards in snapshot` },
                     { icon: 'fa-layer-group', label: 'Qualification', value: chess.qualificationCount || 8, detail: `Top ${chess.qualificationCount || 8} · ${chess.basicRoundCount || 3} basic rounds` }
                 ].map(item => `<article class="public-chess-stat"><i class="fas ${item.icon}"></i><small>${escapeHtml(item.label)}</small><strong>${escapeHtml(String(item.value))}</strong><span>${escapeHtml(item.detail)}</span></article>`).join('');
@@ -1958,6 +1981,7 @@
             }
             renderPublicChessMatches(chess);
             renderPublicChessBracket(chess);
+            renderPublicChessSeries(chess);
         }
 
         // ── Information rendering ──

@@ -8378,7 +8378,15 @@
         #excel-chess-champion-tab .chess-champion-admin-actions button,
         #excel-chess-champion-tab .chess-champion-roster-actions button { padding: 8px 11px; font-size: .7rem; }
         #excel-chess-champion-tab .chess-champion-admin-help { margin: 0 0 12px; color: #aebbd1; font-size: .74rem; line-height: 1.5; }
-        #excel-chess-champion-tab .chess-champion-roster { display: grid; max-height: 400px; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; overflow-y: auto; padding: 2px; }
+        #excel-chess-champion-tab .chess-champion-series-archive { max-height: 260px; margin-top: 16px; overflow-y: auto; }
+        #excel-chess-champion-tab .chess-champion-series-title { margin-bottom: 8px; color: #fde68a; font-size: .7rem; font-weight: 900; letter-spacing: .12em; text-transform: uppercase; }
+        #excel-chess-champion-tab .chess-champion-series-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 9px 10px; border: 1px solid rgba(148,163,184,.13); border-radius: 10px; background: rgba(2,6,23,.32); }
+        #excel-chess-champion-tab .chess-champion-series-row + .chess-champion-series-row { margin-top: 7px; }
+        #excel-chess-champion-tab .chess-champion-series-row strong,
+        #excel-chess-champion-tab .chess-champion-series-row span { color: #e2e8f0; font-size: .7rem; }
+        #excel-chess-champion-tab .chess-champion-series-row span { color: #fde68a; font-weight: 800; text-align: right; }
+        #excel-chess-champion-tab .chess-champion-series-row small { display: block; margin-top: 3px; color: #71819c; font-size: .59rem; }
+        #excel-chess-champion-tab .chess-champion-roster {  display: grid; max-height: 400px; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; overflow-y: auto; padding: 2px; }
         #excel-chess-champion-tab .chess-champion-roster-row { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 8px; border: 1px solid rgba(148,163,184,.13); border-radius: 10px; background: rgba(2,6,23,.4); cursor: pointer; transition: border-color .2s ease, background .2s ease, transform .2s ease; }
         #excel-chess-champion-tab .chess-champion-roster-row:hover { border-color: rgba(250,204,21,.36); transform: translateY(-1px); }
         #excel-chess-champion-tab .chess-champion-roster-row.is-enrolled { border-color: rgba(74,222,128,.3); background: rgba(20,83,45,.18); }
