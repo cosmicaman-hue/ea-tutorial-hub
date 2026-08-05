@@ -753,7 +753,7 @@
         @media (max-width: 450px) { #rankingPanel .public-ranking-cards { grid-template-columns: 1fr; } #rankingPanel .public-podium-name { max-width: 96px; font-size: .75rem; } }
 
         /* ════════════════════════════════════════════════════════════
-           PARTY STANDINGS — floating bubbles + green water-fill
+           PARTY STANDINGS — ranked 3D circles sized by vote power
            ════════════════════════════════════════════════════════════ */
         #partiesPanel .public-parties-wrap { padding: 16px; }
         #partiesPanel .public-parties-controls {
@@ -767,133 +767,130 @@
             margin: 0 0 14px; font-size: .76rem; color: var(--muted);
         }
         #partiesPanel .public-parties-legend .legend-swatch {
-            width: 12px; height: 12px; border-radius: 50%;
-            background: linear-gradient(180deg, #22c55e 0%, #15803d 100%);
-            box-shadow: 0 0 8px rgba(34,197,94,.5);
+            width: 14px; height: 14px; border-radius: 50%; flex: 0 0 auto;
+            background:
+                radial-gradient(circle at 32% 28%, rgba(255,255,255,.65), transparent 42%),
+                radial-gradient(circle at 50% 55%, #22c55e, #15803d);
+            box-shadow: 0 3px 8px rgba(0,0,0,.18), inset 0 -2px 4px rgba(0,0,0,.18);
         }
-        .parties-bubble-field {
+        .parties-circle-field {
             position: relative;
-            min-height: 460px;
-            padding: 10px 6px 30px;
+            min-height: 320px;
+            padding: 24px 12px 32px;
             display: flex; flex-wrap: wrap; justify-content: center; align-items: flex-end;
-            gap: 26px 30px;
+            gap: 20px 24px;
             overflow: hidden;
             border-radius: 18px;
+            perspective: 900px;
             background:
-                radial-gradient(ellipse at 50% 120%, rgba(34,197,94,.06), transparent 60%),
-                linear-gradient(180deg, rgba(124,58,237,.03) 0%, rgba(34,197,94,.04) 100%);
+                radial-gradient(ellipse at 50% 120%, rgba(124,58,237,.08), transparent 62%),
+                linear-gradient(180deg, rgba(124,58,237,.04) 0%, rgba(26,77,46,.05) 100%);
             border: 1px solid var(--line);
         }
-        body.dark .parties-bubble-field {
+        body.dark .parties-circle-field {
             background:
-                radial-gradient(ellipse at 50% 120%, rgba(34,197,94,.10), transparent 60%),
-                linear-gradient(180deg, rgba(124,58,237,.05) 0%, rgba(34,197,94,.06) 100%);
-            border-color: rgba(34,197,94,.14);
+                radial-gradient(ellipse at 50% 120%, rgba(124,58,237,.14), transparent 62%),
+                linear-gradient(180deg, rgba(124,58,237,.07) 0%, rgba(34,197,94,.05) 100%);
+            border-color: rgba(124,58,237,.16);
         }
-        .party-bubble {
-            position: relative;
+        .party-circle-slot {
             flex: 0 0 auto;
-            width: 132px; height: 132px;
-            border-radius: 50%;
-            cursor: pointer;
-            overflow: hidden;
-            isolation: isolate;
-            background: rgba(255,255,255,.06);
-            border: 2px solid var(--party-color, #64748b);
-            box-shadow:
-                0 10px 26px rgba(0,0,0,.18),
-                0 0 22px color-mix(in srgb, var(--party-color, #64748b) 40%, transparent),
-                inset 0 2px 14px rgba(255,255,255,.18);
-            transition: transform .25s cubic-bezier(.34,1.56,.64,1), box-shadow .25s;
             animation: partyFloat 7s ease-in-out infinite;
             animation-delay: var(--float-delay, 0s);
         }
-        .party-bubble:hover {
-            transform: scale(1.10) translateY(-6px);
-            box-shadow:
-                0 18px 40px rgba(0,0,0,.26),
-                0 0 38px color-mix(in srgb, var(--party-color, #64748b) 65%, transparent),
-                inset 0 2px 18px rgba(255,255,255,.22);
+        .party-circle {
+            position: relative;
+            width: var(--circle-size, 132px);
+            height: var(--circle-size, 132px);
+            padding: 0;
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+            background: transparent;
+            isolation: isolate;
+            transform-style: preserve-3d;
+            transition: transform .28s cubic-bezier(.34,1.56,.64,1), filter .28s;
+            animation: partyCircleIn .65s cubic-bezier(.34,1.56,.64,1) backwards;
+            animation-delay: var(--enter-delay, 0s);
+        }
+        .party-circle:hover,
+        .party-circle:focus-visible {
+            transform: translateY(-8px) scale(1.05) rotateX(10deg);
             z-index: 5;
+            filter: brightness(1.06);
         }
-        .party-bubble:focus-visible { outline: 3px solid var(--primary); outline-offset: 4px; }
-        body.dark .party-bubble {
-            background: rgba(8,8,8,.55);
+        .party-circle:focus-visible { outline: 3px solid var(--primary); outline-offset: 5px; }
+        .party-circle .party-sphere {
+            position: absolute; inset: 0; border-radius: 50%; z-index: 0;
+            background:
+                radial-gradient(circle at 32% 28%, rgba(255,255,255,.58) 0%, rgba(255,255,255,.14) 16%, transparent 42%),
+                radial-gradient(circle at 68% 78%, rgba(0,0,0,.38) 0%, transparent 54%),
+                radial-gradient(circle at 50% 58%,
+                    color-mix(in srgb, var(--party-color, #64748b) 82%, #fff 18%),
+                    color-mix(in srgb, var(--party-color, #64748b) 68%, #000 32%));
             box-shadow:
-                0 10px 26px rgba(0,0,0,.5),
-                0 0 26px color-mix(in srgb, var(--party-color, #64748b) 50%, transparent),
-                inset 0 2px 14px rgba(255,255,255,.06);
+                0 calc(var(--circle-size, 132px) * 0.08) calc(var(--circle-size, 132px) * 0.22) rgba(0,0,0,.28),
+                0 calc(var(--circle-size, 132px) * 0.02) calc(var(--circle-size, 132px) * 0.06) rgba(0,0,0,.16),
+                inset calc(var(--circle-size, 132px) * -0.06) calc(var(--circle-size, 132px) * -0.06) calc(var(--circle-size, 132px) * 0.14) rgba(0,0,0,.24),
+                inset calc(var(--circle-size, 132px) * 0.04) calc(var(--circle-size, 132px) * 0.04) calc(var(--circle-size, 132px) * 0.08) rgba(255,255,255,.22);
         }
-        /* Green water fill — rises from the bottom to the vote-power % height */
-        .party-bubble .water {
-            position: absolute; left: 0; right: 0; bottom: 0;
-            height: 0%;
-            background: linear-gradient(180deg,
-                rgba(34,197,94,.85) 0%,
-                rgba(22,163,74,.92) 40%,
-                rgba(5,150,105,.95) 100%);
-            z-index: 0;
-            transition: height 1.6s cubic-bezier(.22,1,.36,1);
+        body.dark .party-circle .party-sphere {
+            box-shadow:
+                0 calc(var(--circle-size, 132px) * 0.10) calc(var(--circle-size, 132px) * 0.26) rgba(0,0,0,.55),
+                0 0 calc(var(--circle-size, 132px) * 0.12) color-mix(in srgb, var(--party-color, #64748b) 35%, transparent),
+                inset calc(var(--circle-size, 132px) * -0.05) calc(var(--circle-size, 132px) * -0.05) calc(var(--circle-size, 132px) * 0.12) rgba(0,0,0,.35),
+                inset calc(var(--circle-size, 132px) * 0.03) calc(var(--circle-size, 132px) * 0.03) calc(var(--circle-size, 132px) * 0.06) rgba(255,255,255,.08);
         }
-        .party-bubble .water::before {
-            /* shimmering surface wave */
-            content: ''; position: absolute; top: -6px; left: -50%; right: -50%; height: 12px;
-            background: radial-gradient(ellipse at 50% 100%, rgba(255,255,255,.55), transparent 70%);
-            animation: partyWave 3.2s linear infinite;
-            opacity: .7;
-        }
-        .party-bubble .water::after {
-            /* second slower wave for depth */
-            content: ''; position: absolute; top: -3px; left: -50%; right: -50%; height: 8px;
-            background: radial-gradient(ellipse at 50% 100%, rgba(255,255,255,.30), transparent 70%);
-            animation: partyWave 4.8s linear infinite reverse;
-        }
-        .party-bubble .bubble-content {
+        .party-circle .circle-content {
             position: absolute; inset: 0; z-index: 2;
             display: flex; flex-direction: column; align-items: center; justify-content: center;
-            text-align: center; padding: 6px;
+            text-align: center; padding: 8%;
             pointer-events: none;
         }
-        .party-bubble .bubble-symbol { font-size: 1.7rem; line-height: 1; filter: drop-shadow(0 1px 3px rgba(0,0,0,.4)); }
-        .party-bubble .bubble-code {
-            font: 800 .82rem/1 "Poppins", sans-serif;
-            color: #fff; margin-top: 3px;
+        .party-circle .circle-symbol {
+            font-size: calc(var(--circle-size, 132px) * 0.22);
+            line-height: 1;
+            filter: drop-shadow(0 1px 3px rgba(0,0,0,.45));
+        }
+        .party-circle .circle-code {
+            font: 800 calc(var(--circle-size, 132px) * 0.105)/1 "Poppins", sans-serif;
+            color: #fff; margin-top: 4%;
             text-shadow: 0 1px 4px rgba(0,0,0,.55);
             letter-spacing: .5px;
         }
-        .party-bubble .bubble-vp {
-            font: 700 .68rem/1 "Poppins", sans-serif;
-            color: #d1fae5; margin-top: 2px;
+        .party-circle .circle-vp {
+            font: 700 calc(var(--circle-size, 132px) * 0.085)/1 "Poppins", sans-serif;
+            color: rgba(255,255,255,.92); margin-top: 3%;
             text-shadow: 0 1px 3px rgba(0,0,0,.6);
         }
-        .party-bubble .bubble-rank {
-            position: absolute; top: 6px; left: 8px; z-index: 3;
-            font: 800 .62rem/1 "Poppins", sans-serif;
-            color: #fff; background: rgba(0,0,0,.42);
-            border-radius: 999px; padding: 3px 7px;
+        .party-circle .circle-rank {
+            position: absolute; top: 7%; left: 8%; z-index: 3;
+            font: 800 calc(var(--circle-size, 132px) * 0.075)/1 "Poppins", sans-serif;
+            color: #fff; background: rgba(0,0,0,.44);
+            border-radius: 999px; padding: .22em .55em;
             backdrop-filter: blur(4px);
         }
-        .party-bubble.bubble-empty { opacity: .55; }
-        .party-bubble.bubble-empty .water { height: 8% !important; }
+        .party-circle.circle-empty {
+            filter: saturate(.35) brightness(.88);
+            opacity: .62;
+        }
+        .party-circle.circle-empty .party-sphere {
+            background:
+                radial-gradient(circle at 32% 28%, rgba(255,255,255,.35) 0%, transparent 42%),
+                radial-gradient(circle at 68% 78%, rgba(0,0,0,.28) 0%, transparent 54%),
+                radial-gradient(circle at 50% 58%, #94a3b8, #64748b);
+        }
 
         @keyframes partyFloat {
             0%, 100% { transform: translateY(0); }
-            50% { transform: translateY(-12px); }
+            50% { transform: translateY(-10px); }
         }
-        @keyframes partyWave {
-            0% { transform: translateX(-25%); }
-            100% { transform: translateX(25%); }
-        }
-        @keyframes partyBubbleIn {
-            from { opacity: 0; transform: translateY(30px) scale(.6); }
+        @keyframes partyCircleIn {
+            from { opacity: 0; transform: translateY(24px) scale(.55); }
             to { opacity: 1; transform: translateY(0) scale(1); }
         }
-        .party-bubble { animation: partyFloat 7s ease-in-out infinite, partyBubbleIn .6s cubic-bezier(.34,1.56,.64,1) backwards; }
         @media (max-width: 640px) {
-            .party-bubble { width: 108px; height: 108px; }
-            .party-bubble .bubble-symbol { font-size: 1.4rem; }
-            .party-bubble .bubble-code { font-size: .72rem; }
-            .parties-bubble-field { gap: 18px 20px; min-height: 380px; }
+            .parties-circle-field { gap: 12px 14px; min-height: 260px; padding: 16px 8px 24px; }
         }
 
         /* ── Party detail modal ── */
@@ -1337,10 +1334,10 @@
 
         <section id="partiesPanel" class="panel panel-shell">
             <div class="login-gate" id="partiesGate">
-                <div class="login-gate-icon">🫧</div>
+                <div class="login-gate-icon">⚖️</div>
                 <h2>Party Standings</h2>
                 <p>The live party standings and combined vote-power showcase is available to logged-in users.</p>
-                <p style="font-size:0.85rem;color:var(--muted);margin-bottom:18px;">Log in to view floating party bubbles with real-time vote-power charging.</p>
+                <p style="font-size:0.85rem;color:var(--muted);margin-bottom:18px;">Log in to view ranked 3D party circles sized by vote power.</p>
                 <button type="button" class="cta-button" id="partiesLoginLink">🔐 Login to View Parties</button>
             </div>
             <div id="partiesContent" hidden>
@@ -1357,9 +1354,9 @@
                     </div>
                     <div class="public-parties-legend">
                         <span class="legend-swatch"></span>
-                        <span>Green fill = combined vote power as % of the strongest party this month. Click a bubble for full details.</span>
+                        <span>Circle size reflects combined vote power (√ scale). Strongest party left. Click a circle for full details.</span>
                     </div>
-                    <div id="partiesBubbleField" class="parties-bubble-field"></div>
+                    <div id="partiesCircleField" class="parties-circle-field"></div>
                 </div>
             </div>
         </section>
@@ -2024,10 +2021,26 @@
         }
 
         // ════════════════════════════════════════════════════════════
-        // PARTY STANDINGS — floating bubbles + green water-fill
+        // PARTY STANDINGS — ranked 3D circles sized by vote power
         // ════════════════════════════════════════════════════════════
         let partiesMonthSelect = null;
         let partiesCurrentMonth = '';
+
+        function partyCircleSizeBounds() {
+            const w = window.innerWidth || 1200;
+            if (w <= 480) return { min: 64, max: 120, empty: 56 };
+            if (w <= 640) return { min: 76, max: 160, empty: 64 };
+            return { min: 90, max: 240, empty: 72 };
+        }
+
+        function partyCircleDiameter(vp, maxVp, empty) {
+            const bounds = partyCircleSizeBounds();
+            if (empty) return bounds.empty;
+            const safeVp = Math.max(0, vp || 0);
+            const safeMax = Math.max(1, maxVp || 1);
+            const ratio = Math.sqrt(safeVp / safeMax);
+            return Math.round(bounds.min + (bounds.max - bounds.min) * ratio);
+        }
 
         function renderParties(data) {
             scoresData = data;
@@ -2044,10 +2057,10 @@
             if (months.length) {
                 partiesCurrentMonth = months[0];
                 partiesMonthSelect.value = months[0];
-                partiesMonthSelect.onchange = () => { partiesCurrentMonth = partiesMonthSelect.value; renderPartyBubbles(); };
-                renderPartyBubbles();
+                partiesMonthSelect.onchange = () => { partiesCurrentMonth = partiesMonthSelect.value; renderPartyCircles(); };
+                renderPartyCircles();
             } else {
-                document.getElementById('partiesBubbleField').innerHTML = '<div class="party-modal-empty">No party standings data available.</div>';
+                document.getElementById('partiesCircleField').innerHTML = '<div class="party-modal-empty">No party standings data available.</div>';
             }
         }
 
@@ -2056,8 +2069,8 @@
             return isNaN(d) ? m : d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
         }
 
-        function renderPartyBubbles() {
-            const field = document.getElementById('partiesBubbleField');
+        function renderPartyCircles() {
+            const field = document.getElementById('partiesCircleField');
             if (!field || !scoresData) return;
             const allParties = (scoresData.parties && scoresData.parties[partiesCurrentMonth]) || [];
             if (!allParties.length) {
@@ -2065,51 +2078,31 @@
                 return;
             }
             const maxVp = Math.max(1, ...allParties.map(p => p.votePower || 0));
-            // Sort by vote power desc so the strongest bubble appears first (left).
             const sorted = allParties.slice().sort((a, b) => (b.votePower || 0) - (a.votePower || 0));
             field.innerHTML = sorted.map((p, i) => {
-                const fillPct = Math.max(8, Math.round(((p.votePower || 0) / maxVp) * 100));
                 const empty = !(p.memberCount > 0);
-                const delay = (i * 0.18).toFixed(2) + 's';
+                const size = partyCircleDiameter(p.votePower || 0, maxVp, empty);
                 const floatDelay = (i * 0.9).toFixed(2) + 's';
-                return '<button type="button" class="party-bubble' + (empty ? ' bubble-empty' : '') + '" '
-                    + 'style="--party-color:' + escapeHtml(p.color || '#64748b') + ';--float-delay:' + floatDelay + ';animation-delay:' + delay + ';" '
+                const enterDelay = (i * 0.12).toFixed(2) + 's';
+                return '<div class="party-circle-slot" style="--float-delay:' + floatDelay + ';">'
+                    + '<button type="button" class="party-circle' + (empty ? ' circle-empty' : '') + '" '
+                    + 'style="--party-color:' + escapeHtml(p.color || '#64748b') + ';--circle-size:' + size + 'px;--enter-delay:' + enterDelay + ';" '
                     + 'data-party-code="' + escapeHtml(p.code) + '" '
-                    + 'aria-label="' + escapeHtml(p.fullName || p.code) + ' — vote power ' + (p.votePower || 0) + '" '
-                    + 'data-fill="' + fillPct + '">'
-                    + '<span class="bubble-rank">#' + (p.rank || (i + 1)) + '</span>'
-                    + '<span class="water"></span>'
-                    + '<span class="bubble-content">'
-                    + '<span class="bubble-symbol">' + escapeHtml(p.symbol || '🫧') + '</span>'
-                    + '<span class="bubble-code">' + escapeHtml(p.code) + '</span>'
-                    + '<span class="bubble-vp">VP ' + (p.votePower || 0) + '</span>'
-                    + '</span></button>';
+                    + 'aria-label="' + escapeHtml(p.fullName || p.code) + ' — vote power ' + (p.votePower || 0) + '">'
+                    + '<span class="party-sphere" aria-hidden="true"></span>'
+                    + '<span class="circle-rank">#' + (p.rank || (i + 1)) + '</span>'
+                    + '<span class="circle-content">'
+                    + '<span class="circle-symbol">' + escapeHtml(p.symbol || '⚖️') + '</span>'
+                    + '<span class="circle-code">' + escapeHtml(p.code) + '</span>'
+                    + '<span class="circle-vp">VP ' + (p.votePower || 0) + '</span>'
+                    + '</span></button></div>';
             }).join('');
-            // Bind click → open detail modal
-            field.querySelectorAll('.party-bubble').forEach(btn => {
+            field.querySelectorAll('.party-circle').forEach(btn => {
                 btn.addEventListener('click', () => {
                     const code = btn.getAttribute('data-party-code');
                     const party = allParties.find(p => p.code === code);
                     if (party) openPartyModal(party, maxVp);
                 });
-            });
-            animatePartyBubbles();
-        }
-
-        // Trigger the water-fill rise after the bubbles are in the DOM.
-        function animatePartyBubbles() {
-            if (activeTab !== 'parties') return;
-            const field = document.getElementById('partiesBubbleField');
-            if (!field) return;
-            const bubbles = field.querySelectorAll('.party-bubble');
-            bubbles.forEach((b, i) => {
-                const water = b.querySelector('.water');
-                if (!water) return;
-                water.style.height = '0%';
-                setTimeout(() => {
-                    const fill = parseInt(b.getAttribute('data-fill'), 10) || 0;
-                    water.style.height = fill + '%';
-                }, 120 + i * 90);
             });
         }
 
@@ -2214,12 +2207,13 @@
             }
             if (isRanking) startPublicRankingAnimationLoop();
             else stopPublicRankingAnimationLoop();
-            if (isParties) animatePartyBubbles();
         }
         document.addEventListener('visibilitychange', () => {
             if (document.hidden) stopPublicRankingAnimationLoop();
             else if (activeTab === 'ranking') startPublicRankingAnimationLoop();
-            else if (activeTab === 'parties') animatePartyBubbles();
+        });
+        window.addEventListener('resize', () => {
+            if (activeTab === 'parties' && scoresData) renderPartyCircles();
         });
         tabHome.addEventListener('click', () => setActiveTab('home'));
         tabScoreboard.addEventListener('click', () => {
