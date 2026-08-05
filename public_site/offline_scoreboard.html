@@ -13350,20 +13350,39 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             return CHESS_CHAMPION_STAGE_LABELS[stage] || 'Tournament';
         }
 
+        function chessChampionIsAdminOrigin(match) {
+            const origin = String(match && match.origin || '').trim().toLowerCase();
+            return origin === 'manual' || origin === 'historical';
+        }
+
         function chessChampionCurrentMatches(state = getChessChampionState()) {
             if (!['basic', 'elimination', 'semifinal', 'finale'].includes(state.stage)) return [];
             const currentRound = parseInt(state.round, 10) || 0;
+            return state.matches
+                .filter(match => match.stage === state.stage && parseInt(match.round, 10) === currentRound)
+                .sort((a, b) => (parseInt(a.board, 10) || 0) - (parseInt(b.board, 10) || 0));
+        }
+
+        function chessChampionMatchRoomMatches(state = getChessChampionState()) {
+            if (!['basic', 'elimination', 'semifinal', 'finale'].includes(state.stage)) return [];
+            const currentRound = parseInt(state.round, 10) || 0;
             const stageMatches = state.matches.filter(match => match.stage === state.stage);
-            // League phases: show the live round plus any incomplete Admin-added boards
-            // from later rounds so a Round-2 add for players who finished Round 1 is visible.
-            if (chessChampionIsLeagueStage(state.stage)) {
-                return stageMatches.filter(match => {
-                    const round = parseInt(match.round, 10) || 0;
-                    if (round === currentRound) return true;
-                    return round > currentRound && !chessChampionMatchComplete(match);
-                }).sort((a, b) => (parseInt(a.round, 10) || 0) - (parseInt(b.round, 10) || 0) || (parseInt(a.board, 10) || 0) - (parseInt(b.board, 10) || 0));
-            }
-            return stageMatches.filter(match => parseInt(match.round, 10) === currentRound);
+            const byId = new Map();
+            stageMatches.forEach(match => {
+                const round = parseInt(match.round, 10) || 0;
+                const include = round === currentRound
+                    || chessChampionIsAdminOrigin(match)
+                    || (round > currentRound && !chessChampionMatchComplete(match));
+                if (include) byId.set(String(match.id), match);
+            });
+            return Array.from(byId.values()).sort((a, b) => {
+                const aDone = chessChampionMatchComplete(a) ? 1 : 0;
+                const bDone = chessChampionMatchComplete(b) ? 1 : 0;
+                // Pending boards first, then recorded Admin boards, ordered by round/board.
+                return aDone - bDone
+                    || (parseInt(a.round, 10) || 0) - (parseInt(b.round, 10) || 0)
+                    || (parseInt(a.board, 10) || 0) - (parseInt(b.board, 10) || 0);
+            });
         }
 
         function chessChampionExpectedBoards(playerCount) {
@@ -13652,18 +13671,24 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             const winnerSide = match.result === 'white' || match.result === 'black' ? match.result : '';
             const breakdown = match.breakdown && winnerSide && match.breakdown[winnerSide] ? match.breakdown[winnerSide] : null;
             const kills = chessChampionNormalizeKillPointsBySide(match, match.killPointsBySide);
+            const adminOrigin = chessChampionIsAdminOrigin(match);
+            const roundLabel = `Round ${match.round || 1}`;
+            const statusLabel = match.result
+                ? (adminOrigin ? 'ADMIN RECORDED' : 'COMPLETED')
+                : (adminOrigin ? 'ADMIN ADDED' : (admin ? 'ADMIN ENTRY' : 'SCHEDULED'));
             const summary = match.result ? `<div class="chess-champion-match-summary"><strong>${escapeHtml(chessChampionMatchResultLabel(match, studentMap))}</strong><span>${match.durationSeconds ? `${Math.round(match.durationSeconds / 60)} min` : 'Time not entered'} · White ${chessChampionFormatPoints(kills.white)} kill pts · Black ${chessChampionFormatPoints(kills.black)} kill pts</span>${breakdown ? `<small>IPL ${chessChampionFormatPoints(breakdown.iplTotal)} + kill bonus ${chessChampionFormatPoints(breakdown.killBonus)} · ${match.result === 'draw' ? 'Equal kill/class tie' : 'Higher kill total or class-level tie-break'}</small>` : ''}</div>` : '';
+            const top = `<div class="chess-champion-match-top"><span>Board ${match.board} · ${escapeHtml(roundLabel)}${adminOrigin ? ' · Admin' : ''}</span><b class="${adminOrigin ? 'is-admin-origin' : ''}">${escapeHtml(statusLabel)}</b></div>`;
             if (!admin) {
-                return `<div class="chess-champion-match-card ${match.result ? 'is-complete' : ''}"><div class="chess-champion-match-top"><span>Board ${match.board}</span><b>${escapeHtml(match.result ? 'COMPLETED' : 'SCHEDULED')}</b></div><div class="chess-champion-match-versus"><div>${chessChampionPlayerMarkup(white, winnerSide === 'white' ? 'is-winner' : '')}</div><span>VS</span><div>${chessChampionPlayerMarkup(black, winnerSide === 'black' ? 'is-winner' : '')}</div></div>${summary}</div>`;
+                return `<div class="chess-champion-match-card ${match.result ? 'is-complete' : ''} ${adminOrigin ? 'is-admin-origin' : ''}">${top}<div class="chess-champion-match-versus"><div>${chessChampionPlayerMarkup(white, winnerSide === 'white' ? 'is-winner' : '')}</div><span>VS</span><div>${chessChampionPlayerMarkup(black, winnerSide === 'black' ? 'is-winner' : '')}</div></div>${summary}</div>`;
             }
-            return `<div class="chess-champion-match-card ${match.result ? 'is-complete' : ''}"><div class="chess-champion-match-top"><span>Board ${match.board}</span><b>${escapeHtml(match.result ? 'COMPLETED' : 'ADMIN ENTRY')}</b></div><div class="chess-champion-match-versus"><div>${chessChampionPlayerMarkup(white, winnerSide === 'white' ? 'is-winner' : '')}</div><span>VS</span><div>${chessChampionPlayerMarkup(black, winnerSide === 'black' ? 'is-winner' : '')}</div></div>${match.result ? summary : ''}<div class="chess-champion-match-form"><button class="secondary" type="button" onclick="openChessChampionEndMatch('${escapeHtml(match.id)}', false)"><i class="fas fa-crosshairs"></i> ${match.result ? 'Revise kill points' : 'Enter kill points'}</button><button class="secondary" type="button" onclick="openChessChampionEndMatch('${escapeHtml(match.id)}', true)"><i class="fas fa-flag-checkered"></i> ${match.result ? 'Recalculate result' : 'End match'}</button></div></div>`;
+            return `<div class="chess-champion-match-card ${match.result ? 'is-complete' : ''} ${adminOrigin ? 'is-admin-origin' : ''}">${top}<div class="chess-champion-match-versus"><div>${chessChampionPlayerMarkup(white, winnerSide === 'white' ? 'is-winner' : '')}</div><span>VS</span><div>${chessChampionPlayerMarkup(black, winnerSide === 'black' ? 'is-winner' : '')}</div></div>${match.result ? summary : ''}<div class="chess-champion-match-form"><button class="secondary" type="button" onclick="openChessChampionEndMatch('${escapeHtml(match.id)}', false)"><i class="fas fa-crosshairs"></i> ${match.result ? 'Revise kill points' : 'Enter kill points'}</button><button class="secondary" type="button" onclick="openChessChampionEndMatch('${escapeHtml(match.id)}', true)"><i class="fas fa-flag-checkered"></i> ${match.result ? 'Recalculate result' : 'End match'}</button></div></div>`;
         }
 
         function renderChessChampionMatchRoom(state) {
             const room = document.getElementById('chessChampionMatchRoom');
             if (!room) return;
             const studentMap = chessChampionStudentMap();
-            const current = chessChampionCurrentMatches(state);
+            const current = chessChampionMatchRoomMatches(state);
             if (state.stage === 'registration') {
                 room.innerHTML = '<div class="chess-champion-empty chess-champion-empty-compact"><i class="fas fa-hourglass-start"></i><strong>Registration is open</strong><span>Admin registers players, then generates the first balanced round.</span></div>';
                 return;
@@ -13679,7 +13704,11 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                 room.innerHTML = `<div class="chess-champion-empty chess-champion-empty-compact"><i class="fas fa-forward-step"></i><strong>${escapeHtml(chessChampionStageLabel(state.stage, state.round))} is ready to advance</strong><span>All boards are complete. Admin can generate the next round.</span></div>`;
                 return;
             }
-            room.innerHTML = `<div class="chess-champion-room-label">${escapeHtml(chessChampionStageLabel(state.stage, state.round))}</div>${current.map(match => chessChampionMatchFormMarkup(match, state, studentMap)).join('')}`;
+            const adminCount = current.filter(chessChampionIsAdminOrigin).length;
+            const roomLabel = adminCount
+                ? `${chessChampionStageLabel(state.stage, state.round)} · ${adminCount} Admin board${adminCount === 1 ? '' : 's'} shown`
+                : chessChampionStageLabel(state.stage, state.round);
+            room.innerHTML = `<div class="chess-champion-room-label">${escapeHtml(roomLabel)}</div>${current.map(match => chessChampionMatchFormMarkup(match, state, studentMap)).join('')}`;
         }
 
         function renderChessChampionBracket(state) {
@@ -14574,6 +14603,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                 board: match.board,
                 status: match.status,
                 result: match.result,
+                origin: chessChampionIsAdminOrigin(match) ? String(match.origin || 'manual') : 'system',
                 winnerSide: match.result === 'white' || match.result === 'black' ? match.result : '',
                 advancingSide: match.advancingId === match.whiteId ? 'white' : (match.advancingId === match.blackId ? 'black' : ''),
                 white: publicStudent(match.whiteId),
@@ -14582,6 +14612,8 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                 killPoints: match.killPoints,
                 whiteSeed: match.whiteSeed || 0,
                 blackSeed: match.blackSeed || 0,
+                whitePoints: chessChampionNumber(match.awards && (match.awards[String(match.whiteId)] ?? match.awards[match.whiteId]), 0),
+                blackPoints: chessChampionNumber(match.awards && (match.awards[String(match.blackId)] ?? match.awards[match.blackId]), 0),
                 awards: match.awards || {},
                 updatedAt: match.updatedAt || match.createdAt || ''
             })).filter(match => match.white || match.black);

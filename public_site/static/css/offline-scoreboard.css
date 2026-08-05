@@ -8320,6 +8320,8 @@
         #excel-chess-champion-tab .chess-champion-room-label { margin: 0 4px 10px; color: #facc15; font-size: .66rem; font-weight: 900; letter-spacing: .14em; text-transform: uppercase; }
         #excel-chess-champion-tab .chess-champion-match-card { position: relative; margin-bottom: 11px; padding: 13px; border: 1px solid rgba(129,140,248,.21); border-radius: 16px; background: linear-gradient(145deg, rgba(30,41,59,.68), rgba(15,23,42,.48)); animation: chessChampionMatchIn .5s cubic-bezier(.16,1,.3,1) both; }
         #excel-chess-champion-tab .chess-champion-match-card.is-complete { border-color: rgba(74,222,128,.25); background: linear-gradient(145deg, rgba(20,83,45,.26), rgba(15,23,42,.48)); }
+        #excel-chess-champion-tab .chess-champion-match-card.is-admin-origin { border-color: rgba(250,204,21,.42); box-shadow: inset 0 0 0 1px rgba(250,204,21,.12); }
+        #excel-chess-champion-tab .chess-champion-match-top b.is-admin-origin { color: #facc15; }
         #excel-chess-champion-tab .chess-champion-match-top { display: flex; justify-content: space-between; margin-bottom: 10px; color: #71819c; font-size: .62rem; font-weight: 900; letter-spacing: .12em; text-transform: uppercase; }
         #excel-chess-champion-tab .chess-champion-match-top b { color: #a5b4fc; }
         #excel-chess-champion-tab .chess-champion-match-card.is-complete .chess-champion-match-top b { color: #86efac; }

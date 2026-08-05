@@ -1109,6 +1109,8 @@
         #chessPanel .public-chess-sub { display: block; margin-top: 3px; color: #71819c; font-size: .6rem; }
         #chessPanel .public-chess-points { color: #fde68a; font-size: .98rem; font-weight: 950; }
         #chessPanel .public-chess-matches { padding: 12px; }
+        #chessPanel .public-chess-match.is-admin-origin { border-color: rgba(250,204,21,.42); }
+        #chessPanel .public-chess-match.is-admin-origin .public-chess-match-top b { color: #facc15; }
         #chessPanel .public-chess-match { margin-bottom: 9px; padding: 11px; border: 1px solid rgba(129,140,248,.2); border-radius: 13px; background: rgba(15,23,42,.62); animation: publicChessMatchIn .48s cubic-bezier(.16,1,.3,1) both; }
         #chessPanel .public-chess-match:last-child { margin-bottom: 0; }
         #chessPanel .public-chess-match-top { display: flex; justify-content: space-between; color: #74829d; font: 800 .58rem/1.2 "Poppins", sans-serif; letter-spacing: .1em; text-transform: uppercase; }
@@ -1899,25 +1901,43 @@
             if (!player) return '<span class="public-chess-player"><span>TBD</span></span>';
             return `<span class="public-chess-player ${isWinner ? 'is-winner' : ''}"><span>${publicChessName(player)}</span><small>${escapeHtml(player.roll || '—')} · ${publicChessClass(player)}</small></span>`;
         }
+        function publicChessIsAdminOrigin(match) {
+            const origin = String(match && match.origin || '').trim().toLowerCase();
+            return origin === 'manual' || origin === 'historical';
+        }
         function renderPublicChessMatches(chess) {
             const target = document.getElementById('publicChessMatches');
             if (!target) return;
             const matches = Array.isArray(chess && chess.matches) ? chess.matches : [];
             const currentStage = chess && chess.stage;
             const currentRound = Number(chess && chess.round) || 0;
-            let visible = matches.filter(match => match.stage === currentStage && (!currentRound || Number(match.round) === currentRound));
-            if (!visible.length) visible = matches.slice(-4).reverse();
+            const stageMatches = matches.filter(match => match.stage === currentStage);
+            const byId = new Map();
+            stageMatches.forEach(match => {
+                const round = Number(match.round) || 0;
+                const include = !currentRound || round === currentRound || publicChessIsAdminOrigin(match);
+                if (include) byId.set(String(match.id || `${match.stage}-${match.round}-${match.board}`), match);
+            });
+            let visible = Array.from(byId.values()).sort((a, b) => {
+                const aDone = (a.status === 'completed' || ['white', 'black', 'draw', 'bye'].includes(a.result)) ? 1 : 0;
+                const bDone = (b.status === 'completed' || ['white', 'black', 'draw', 'bye'].includes(b.result)) ? 1 : 0;
+                return aDone - bDone || Number(a.round || 0) - Number(b.round || 0) || Number(a.board || 0) - Number(b.board || 0);
+            });
+            if (!visible.length) visible = matches.slice(-6).reverse();
             if (!visible.length) {
                 target.innerHTML = '<div class="public-chess-empty"><i class="fas fa-chess-board"></i>No boards have been scheduled yet.</div>';
                 return;
             }
-            target.innerHTML = `<div class="public-chess-matches">${visible.slice(0, 6).map((match, index) => {
+            target.innerHTML = `<div class="public-chess-matches">${visible.slice(0, 8).map((match, index) => {
                 const complete = match.status === 'completed' || ['white', 'black', 'draw', 'bye'].includes(match.result);
+                const adminOrigin = publicChessIsAdminOrigin(match);
                 const advancingSide = match.advancingSide || match.winnerSide || '';
-                const resultLabel = match.result === 'draw' ? (advancingSide ? `Draw · ${advancingSide === 'white' ? 'White' : 'Black'} advances` : 'Draw') : (complete ? (match.result === 'bye' ? 'BYE' : 'Result recorded') : 'Scheduled');
+                const resultLabel = match.result === 'draw'
+                    ? (advancingSide ? `Draw · ${advancingSide === 'white' ? 'White' : 'Black'} advances` : 'Draw')
+                    : (complete ? (match.result === 'bye' ? 'BYE' : (adminOrigin ? 'Admin recorded' : 'Result recorded')) : (adminOrigin ? 'Admin added' : 'Scheduled'));
                 const duration = Number(match.durationSeconds || 0) > 0 ? `${Math.round(Number(match.durationSeconds) / 60)} min` : '';
                 const kills = Number(match.killPoints || 0) > 0 ? `${publicChessPoints(match.killPoints)} kill pts` : '';
-                return `<article class="public-chess-match" style="animation-delay:${index * .06}s"><div class="public-chess-match-top"><span>${escapeHtml(publicChessStageLabel(match))} · Board ${escapeHtml(match.board || '')}</span><b>${escapeHtml(resultLabel)}</b></div><div class="public-chess-versus"><div>${publicChessPlayerMarkup(match.white, advancingSide === 'white')}</div><span>VS</span><div>${publicChessPlayerMarkup(match.black, advancingSide === 'black')}</div></div>${duration || kills ? `<div class="public-chess-match-note">${escapeHtml([duration, kills].filter(Boolean).join(' · '))}</div>` : ''}</article>`;
+                return `<article class="public-chess-match ${adminOrigin ? 'is-admin-origin' : ''}" style="animation-delay:${index * .06}s"><div class="public-chess-match-top"><span>${escapeHtml(publicChessStageLabel(match))} · Board ${escapeHtml(match.board || '')}${adminOrigin ? ' · Admin' : ''}</span><b>${escapeHtml(resultLabel)}</b></div><div class="public-chess-versus"><div>${publicChessPlayerMarkup(match.white, advancingSide === 'white')}</div><span>VS</span><div>${publicChessPlayerMarkup(match.black, advancingSide === 'black')}</div></div>${duration || kills ? `<div class="public-chess-match-note">${escapeHtml([duration, kills].filter(Boolean).join(' · '))}</div>` : ''}</article>`;
             }).join('')}</div>`;
         }
         function renderPublicChessBracket(chess) {
