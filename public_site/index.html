@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
+    <meta name="ea-public-chess-matchroom" content="all-boards-v2">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Excel Academy</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -1108,9 +1109,12 @@
         #chessPanel .public-chess-name { display: block; color: #f8fafc; font-weight: 800; }
         #chessPanel .public-chess-sub { display: block; margin-top: 3px; color: #71819c; font-size: .6rem; }
         #chessPanel .public-chess-points { color: #fde68a; font-size: .98rem; font-weight: 950; }
-        #chessPanel .public-chess-matches { padding: 12px; }
+        #chessPanel .public-chess-matches { max-height: 560px; overflow-y: auto; padding: 12px; }
+        #chessPanel .public-chess-round-group + .public-chess-round-group { margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(148,163,184,.12); }
+        #chessPanel .public-chess-round-title { margin: 0 0 9px; color: #fde68a; font: 900 .62rem/1.2 "Poppins", sans-serif; letter-spacing: .12em; text-transform: uppercase; }
         #chessPanel .public-chess-match.is-admin-origin { border-color: rgba(250,204,21,.42); }
         #chessPanel .public-chess-match.is-admin-origin .public-chess-match-top b { color: #facc15; }
+        #chessPanel .public-chess-match.is-complete { border-color: rgba(74,222,128,.28); }
         #chessPanel .public-chess-match { margin-bottom: 9px; padding: 11px; border: 1px solid rgba(129,140,248,.2); border-radius: 13px; background: rgba(15,23,42,.62); animation: publicChessMatchIn .48s cubic-bezier(.16,1,.3,1) both; }
         #chessPanel .public-chess-match:last-child { margin-bottom: 0; }
         #chessPanel .public-chess-match-top { display: flex; justify-content: space-between; color: #74829d; font: 800 .58rem/1.2 "Poppins", sans-serif; letter-spacing: .1em; text-transform: uppercase; }
@@ -1905,39 +1909,71 @@
             const origin = String(match && match.origin || '').trim().toLowerCase();
             return origin === 'manual' || origin === 'historical';
         }
+        function publicChessMatchComplete(match) {
+            return !!(match && (match.status === 'completed' || ['white', 'black', 'draw', 'bye'].includes(String(match.result || '').trim())));
+        }
+        function publicChessResultLabel(match) {
+            const complete = publicChessMatchComplete(match);
+            const adminOrigin = publicChessIsAdminOrigin(match);
+            const advancingSide = match.advancingSide || match.winnerSide || '';
+            const winner = advancingSide === 'white' ? match.white : (advancingSide === 'black' ? match.black : null);
+            if (match.result === 'draw') {
+                return advancingSide
+                    ? `Draw · ${(winner && winner.name) ? winner.name : (advancingSide === 'white' ? 'White' : 'Black')} advances`
+                    : 'Draw';
+            }
+            if (match.result === 'bye') return 'BYE';
+            if (complete && winner && winner.name) {
+                return `${winner.name} wins${adminOrigin ? ' · Admin' : ''}`;
+            }
+            if (complete) return adminOrigin ? 'Admin recorded' : 'Result recorded';
+            return adminOrigin ? 'Admin added' : 'Scheduled';
+        }
         function renderPublicChessMatches(chess) {
             const target = document.getElementById('publicChessMatches');
             if (!target) return;
             const matches = Array.isArray(chess && chess.matches) ? chess.matches : [];
-            const currentStage = chess && chess.stage;
-            const currentRound = Number(chess && chess.round) || 0;
-            const stageMatches = matches.filter(match => match.stage === currentStage);
+            // Always show every published board. Admin-held matches must remain visible
+            // even when stage.round still points at an earlier round.
             const byId = new Map();
-            stageMatches.forEach(match => {
-                const round = Number(match.round) || 0;
-                const include = !currentRound || round === currentRound || publicChessIsAdminOrigin(match);
-                if (include) byId.set(String(match.id || `${match.stage}-${match.round}-${match.board}`), match);
+            matches.forEach(match => {
+                if (!match || !(match.white || match.black)) return;
+                const key = String(match.id || [match.stage, match.round, match.board, match.white && match.white.roll, match.black && match.black.roll].join('|'));
+                byId.set(key, match);
             });
-            let visible = Array.from(byId.values()).sort((a, b) => {
-                const aDone = (a.status === 'completed' || ['white', 'black', 'draw', 'bye'].includes(a.result)) ? 1 : 0;
-                const bDone = (b.status === 'completed' || ['white', 'black', 'draw', 'bye'].includes(b.result)) ? 1 : 0;
-                return aDone - bDone || Number(a.round || 0) - Number(b.round || 0) || Number(a.board || 0) - Number(b.board || 0);
-            });
-            if (!visible.length) visible = matches.slice(-6).reverse();
+            const stageOrder = { basic: 0, elimination: 1, semifinal: 2, finale: 3 };
+            const visible = Array.from(byId.values()).sort((a, b) =>
+                (stageOrder[a.stage] ?? 9) - (stageOrder[b.stage] ?? 9)
+                || Number(a.round || 0) - Number(b.round || 0)
+                || Number(publicChessMatchComplete(a)) - Number(publicChessMatchComplete(b))
+                || Number(a.board || 0) - Number(b.board || 0)
+            );
             if (!visible.length) {
                 target.innerHTML = '<div class="public-chess-empty"><i class="fas fa-chess-board"></i>No boards have been scheduled yet.</div>';
                 return;
             }
-            target.innerHTML = `<div class="public-chess-matches">${visible.slice(0, 8).map((match, index) => {
-                const complete = match.status === 'completed' || ['white', 'black', 'draw', 'bye'].includes(match.result);
-                const adminOrigin = publicChessIsAdminOrigin(match);
-                const advancingSide = match.advancingSide || match.winnerSide || '';
-                const resultLabel = match.result === 'draw'
-                    ? (advancingSide ? `Draw · ${advancingSide === 'white' ? 'White' : 'Black'} advances` : 'Draw')
-                    : (complete ? (match.result === 'bye' ? 'BYE' : (adminOrigin ? 'Admin recorded' : 'Result recorded')) : (adminOrigin ? 'Admin added' : 'Scheduled'));
-                const duration = Number(match.durationSeconds || 0) > 0 ? `${Math.round(Number(match.durationSeconds) / 60)} min` : '';
-                const kills = Number(match.killPoints || 0) > 0 ? `${publicChessPoints(match.killPoints)} kill pts` : '';
-                return `<article class="public-chess-match ${adminOrigin ? 'is-admin-origin' : ''}" style="animation-delay:${index * .06}s"><div class="public-chess-match-top"><span>${escapeHtml(publicChessStageLabel(match))} · Board ${escapeHtml(match.board || '')}${adminOrigin ? ' · Admin' : ''}</span><b>${escapeHtml(resultLabel)}</b></div><div class="public-chess-versus"><div>${publicChessPlayerMarkup(match.white, advancingSide === 'white')}</div><span>VS</span><div>${publicChessPlayerMarkup(match.black, advancingSide === 'black')}</div></div>${duration || kills ? `<div class="public-chess-match-note">${escapeHtml([duration, kills].filter(Boolean).join(' · '))}</div>` : ''}</article>`;
+            const groups = [];
+            visible.forEach(match => {
+                const key = `${match.stage || 'basic'}-${Number(match.round) || 1}`;
+                let group = groups.find(item => item.key === key);
+                if (!group) {
+                    group = { key, label: publicChessStageLabel(match), matches: [] };
+                    groups.push(group);
+                }
+                group.matches.push(match);
+            });
+            const pending = visible.filter(match => !publicChessMatchComplete(match)).length;
+            const completed = visible.length - pending;
+            const adminCount = visible.filter(publicChessIsAdminOrigin).length;
+            target.innerHTML = `<div class="public-chess-matches" data-match-count="${visible.length}"><div class="public-chess-round-title" style="margin-bottom:12px;color:#94a3b8;letter-spacing:.08em;">${visible.length} board${visible.length === 1 ? '' : 's'} · ${pending} live · ${completed} recorded${adminCount ? ` · ${adminCount} Admin` : ''}</div>${groups.map((group, groupIndex) => {
+                return `<div class="public-chess-round-group"><h4 class="public-chess-round-title">${escapeHtml(group.label)}</h4>${group.matches.map((match, index) => {
+                    const complete = publicChessMatchComplete(match);
+                    const adminOrigin = publicChessIsAdminOrigin(match);
+                    const advancingSide = match.advancingSide || match.winnerSide || '';
+                    const duration = Number(match.durationSeconds || 0) > 0 ? `${Math.round(Number(match.durationSeconds) / 60)} min` : '';
+                    const kills = Number(match.killPoints || 0) > 0 ? `${publicChessPoints(match.killPoints)} kill pts` : '';
+                    return `<article class="public-chess-match ${complete ? 'is-complete' : ''} ${adminOrigin ? 'is-admin-origin' : ''}" style="animation-delay:${(groupIndex * .08 + index * .05).toFixed(2)}s"><div class="public-chess-match-top"><span>Board ${escapeHtml(match.board || '')}${adminOrigin ? ' · Admin' : ''}</span><b>${escapeHtml(publicChessResultLabel(match))}</b></div><div class="public-chess-versus"><div>${publicChessPlayerMarkup(match.white, advancingSide === 'white')}</div><span>VS</span><div>${publicChessPlayerMarkup(match.black, advancingSide === 'black')}</div></div>${duration || kills ? `<div class="public-chess-match-note">${escapeHtml([duration, kills].filter(Boolean).join(' · '))}</div>` : ''}</article>`;
+                }).join('')}</div>`;
             }).join('')}</div>`;
         }
         function renderPublicChessBracket(chess) {

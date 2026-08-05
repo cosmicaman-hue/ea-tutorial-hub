@@ -13365,20 +13365,17 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
 
         function chessChampionMatchRoomMatches(state = getChessChampionState()) {
             if (!['basic', 'elimination', 'semifinal', 'finale'].includes(state.stage)) return [];
-            const currentRound = parseInt(state.round, 10) || 0;
-            const stageMatches = state.matches.filter(match => match.stage === state.stage);
+            // Show every board for the live stage. Admin-held matches often land in a later
+            // round while stage.round still points at an earlier one, and older snapshots
+            // may lack origin — so do not gate visibility on origin/round alone.
             const byId = new Map();
-            stageMatches.forEach(match => {
-                const round = parseInt(match.round, 10) || 0;
-                const include = round === currentRound
-                    || chessChampionIsAdminOrigin(match)
-                    || (round > currentRound && !chessChampionMatchComplete(match));
-                if (include) byId.set(String(match.id), match);
+            state.matches.forEach(match => {
+                if (!match || match.stage !== state.stage) return;
+                byId.set(String(match.id), match);
             });
             return Array.from(byId.values()).sort((a, b) => {
                 const aDone = chessChampionMatchComplete(a) ? 1 : 0;
                 const bDone = chessChampionMatchComplete(b) ? 1 : 0;
-                // Pending boards first, then recorded Admin boards, ordered by round/board.
                 return aDone - bDone
                     || (parseInt(a.round, 10) || 0) - (parseInt(b.round, 10) || 0)
                     || (parseInt(a.board, 10) || 0) - (parseInt(b.board, 10) || 0);
