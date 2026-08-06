@@ -8559,8 +8559,12 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             backendUrl: EA_CROSS_ORIGIN || ''
         };
         const SERVER_URLS_KEY = 'ea_server_sync_urls';
-        const DEFAULT_PRIMARY_SERVER_URL = 'http://192.168.0.183:5000';
-        const DEFAULT_BACKUP_SERVER_URL = 'http://192.168.0.163:5000';
+        const DEFAULT_PRIMARY_SERVER_URL = 'http://127.0.0.1:5000';
+        const DEFAULT_BACKUP_SERVER_URL = 'http://192.168.0.183:5000';
+        const DEFAULT_LAN_SERVER_URLS = [
+            'http://192.168.0.163:5000',
+            'http://10.128.140.221:5000'
+        ];
         // Guardrail: if a snapshot ever drops below this roster size, treat it as corrupt/stale.
         // This prevents the known "20 students" stale snapshot from being applied anywhere.
         const MIN_SAFE_STUDENT_ROSTER = 25;
@@ -8570,20 +8574,17 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             'CR - Group D & H'
         ];
         const LOCAL_BACKUP_KEY = 'ea_scoreboard_backups';
-        // TEMP_DISABLE_AUTO_SYNC_LOOPS: permanently true. Realtime SSE sync and
-        // minimal polling are started directly from DOMContentLoaded when the
-        // flag is false, but they caused duplicate-pull storms on multi-tab and
-        // WAN reconnect. Sync is now driven by: (1) admin push after local
-        // edits, (2) pull on focus/online events, (3) SSE when available.
-        // Keeping the flag as a constant (vs deleting) preserves the gate
-        // structure so it can be flipped back on for testing if needed.
-        const TEMP_DISABLE_AUTO_SYNC_LOOPS = true;
+        // Keep the real-time SSE loop enabled for LAN clients. Minimal polling
+        // remains the fallback when streaming is unavailable or reconnecting.
+        // The pull path coalesces concurrent requests so multiple tabs do not
+        // create duplicate full pulls.
+        const TEMP_DISABLE_AUTO_SYNC_LOOPS = false;
         const LOCAL_BACKUP_LIMIT = 1;
         const LOCAL_BACKUP_MAX_BYTES = 900000;
         const LOCAL_BACKUP_INTERVAL = 5 * 60 * 1000;
         const LOCAL_NOTIFICATION_HISTORY_MAX = 400;
         // Minimal fallback poll when SSE/event-driven sync is unavailable.
-        const MINIMAL_SYNC_POLL_INTERVAL_MS = 2 * 60 * 1000;
+        const MINIMAL_SYNC_POLL_INTERVAL_MS = 2 * 1000;
 
         // Verbose diagnostics only when ?ea_debug=1 or localStorage ea_debug=1 (no data changes).
         function eaDebugEnabled() {
@@ -8847,7 +8848,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
         let adminAutoPublishAttempted = false;
         let pendingPushTimer = null;
         let allowedMonthsFromServer = null;
-        const AUTO_PUSH_DELAY_MS = 800;
+        const AUTO_PUSH_DELAY_MS = 100;
         let rosterRecoveryInProgress = false;
         let rosterRecoveryQueuedTab = null;
         let rosterRecoveryLastAttemptAt = 0;
@@ -10190,7 +10191,8 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
         function getDefaultServerUrls() {
             return Array.from(new Set([
                 normalizeServerBaseUrl(DEFAULT_PRIMARY_SERVER_URL),
-                normalizeServerBaseUrl(DEFAULT_BACKUP_SERVER_URL)
+                normalizeServerBaseUrl(DEFAULT_BACKUP_SERVER_URL),
+                ...DEFAULT_LAN_SERVER_URLS.map(normalizeServerBaseUrl)
             ].filter(Boolean)));
         }
 
@@ -10273,6 +10275,30 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             return headers;
         }
 
+        let eaFailoverRedirectInProgress = false;
+
+        async function redirectToHealthyServer() {
+            if (eaFailoverRedirectInProgress) return;
+            const currentBase = normalizeServerBaseUrl(window.location.origin);
+            const candidates = getSyncBaseUrls().filter(base => base && base !== currentBase);
+            for (const base of candidates) {
+                try {
+                    const response = await fetch(`${base}/healthz`, {
+                        method: 'GET',
+                        cache: 'no-store',
+                        mode: 'no-cors'
+                    });
+                    if (response.ok || response.type === 'opaque') {
+                        eaFailoverRedirectInProgress = true;
+                        const target = `${base}${window.location.pathname}${window.location.search}${window.location.hash}`;
+                        window.location.replace(target);
+                        return;
+                    }
+                } catch (err) {
+                }
+            }
+        }
+
         async function eaFetch(url, options = {}, timeoutMs = 0) {
             const finalUrl = eaBuildUrl(url);
             const authHeaders = eaAuthHeaders();
@@ -10292,7 +10318,9 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                 }
                 return resp;
             } catch (err) {
-                if (SERVER_SYNC.crossOrigin || !isLANHost()) {
+                if (isLANHost()) {
+                    void redirectToHealthyServer();
+                } else {
                     showCrossOriginOfflineBanner();
                 }
                 throw err;
