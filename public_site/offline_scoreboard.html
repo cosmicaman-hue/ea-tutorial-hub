@@ -4797,6 +4797,29 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             </div>
         </div>
 
+        <div id="chessChampionReviseMatchModal" class="chess-champion-modal hidden" role="dialog" aria-modal="true" aria-labelledby="chessChampionReviseMatchTitle">
+            <div class="chess-champion-modal-backdrop" onclick="closeChessChampionReviseMatch()" aria-hidden="true"></div>
+            <div class="chess-champion-modal-card chess-champion-revise-card" role="document">
+                <div class="chess-champion-modal-header">
+                    <div class="chess-champion-modal-heading">
+                        <span class="chess-champion-eyebrow">Admin board editor</span>
+                        <h2 id="chessChampionReviseMatchTitle">Revise pending board</h2>
+                        <p id="chessChampionReviseMatchStage" class="chess-champion-desk-stage-label"></p>
+                    </div>
+                    <button class="chess-champion-modal-close" type="button" onclick="closeChessChampionReviseMatch()" aria-label="Close"><i class="fas fa-xmark"></i></button>
+                </div>
+                <p class="chess-champion-admin-help chess-champion-desk-help">Change the white/black pairing for this pending board. Kill points and partial entries are cleared when you save a new pairing.</p>
+                <div class="chess-champion-form-grid">
+                    <label>White player<select id="chessChampionReviseWhite"></select></label>
+                    <label>Black player<select id="chessChampionReviseBlack"></select></label>
+                </div>
+                <div class="chess-champion-modal-actions">
+                    <button class="secondary" type="button" onclick="closeChessChampionReviseMatch()">Cancel</button>
+                    <button class="secondary chess-champion-desk-primary" type="button" onclick="saveChessChampionReviseMatch()"><i class="fas fa-save"></i> Save pairing</button>
+                </div>
+            </div>
+        </div>
+
         <!-- TAB: CLASS REPRESENTATIVES -->
         <div id="gr-tab" class="tab-content hidden">
             <div class="form-card">
@@ -13290,6 +13313,52 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             return !!match && ['white', 'black', 'draw', 'bye'].includes(String(match.result || '').trim()) && (match.status === 'completed' || match.result === 'bye');
         }
 
+        function chessChampionMatchPending(match) {
+            return !!match
+                && parseInt(match.whiteId, 10) > 0
+                && parseInt(match.blackId, 10) > 0
+                && !chessChampionMatchComplete(match);
+        }
+
+        let activeChessChampionReviseMatchId = '';
+
+        function chessChampionEligiblePlayerIdsForStage(state, stage) {
+            const ids = stage === 'basic'
+                ? chessChampionActiveEnrolledIds(state)
+                : chessChampionPhasePlayerIds(state);
+            return new Set(ids.map(id => parseInt(id, 10)).filter(id => id > 0));
+        }
+
+        function chessChampionStageMatchCountExcluding(state, studentId, stage, excludeMatchId = '') {
+            const id = parseInt(studentId, 10) || 0;
+            if (!id) return 0;
+            return state.matches.filter(match =>
+                match.stage === stage
+                && String(match.id) !== String(excludeMatchId)
+                && chessChampionMatchPlayedBy(match, id)
+            ).length;
+        }
+
+        function chessChampionClearMatchBoard(match) {
+            match.result = '';
+            match.status = 'scheduled';
+            match.winnerId = 0;
+            match.advancingId = 0;
+            match.durationSeconds = 0;
+            match.killPoints = 0;
+            match.killPointsBySide = { white: 0, black: 0 };
+            match.awards = {};
+            match.breakdown = {};
+            match.endedAt = '';
+            match.updatedAt = new Date().toISOString();
+        }
+
+        function chessChampionPendingMatchActionsMarkup(match) {
+            if (!chessChampionMatchPending(match)) return '';
+            const id = escapeHtml(match.id);
+            return `<div class="chess-champion-match-pending-actions"><button class="secondary" type="button" onclick="openChessChampionReviseMatch('${id}')"><i class="fas fa-user-pen"></i> Revise pairing</button><button class="secondary" type="button" onclick="resetChessChampionPendingMatch('${id}')"><i class="fas fa-rotate-left"></i> Reset board</button><button class="danger" type="button" onclick="deleteChessChampionPendingMatch('${id}')"><i class="fas fa-trash"></i> Delete board</button></div>`;
+        }
+
         function chessChampionMatchPlayedBy(match, studentId) {
             const id = parseInt(studentId, 10) || 0;
             return !!match && id > 0 && (parseInt(match.whiteId, 10) === id || parseInt(match.blackId, 10) === id);
@@ -13397,6 +13466,17 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
         }
 
         function chessChampionMatchRoomMatches(state = getChessChampionState()) {
+            const admin = normalizeUserRole(currentUserRole) === 'admin';
+            const revisable = match => match && match.whiteId && match.blackId && match.result !== 'bye';
+            if (admin) {
+                const stageOrder = { basic: 0, elimination: 1, semifinal: 2, finale: 3 };
+                return state.matches.filter(revisable).sort((a, b) =>
+                    (stageOrder[a.stage] ?? 9) - (stageOrder[b.stage] ?? 9)
+                    || (parseInt(a.round, 10) || 0) - (parseInt(b.round, 10) || 0)
+                    || (chessChampionMatchComplete(a) ? 1 : 0) - (chessChampionMatchComplete(b) ? 1 : 0)
+                    || (parseInt(a.board, 10) || 0) - (parseInt(b.board, 10) || 0)
+                );
+            }
             if (!['basic', 'elimination', 'semifinal', 'finale'].includes(state.stage)) return [];
             // Show every board for the live stage. Admin-held matches often land in a later
             // round while stage.round still points at an earlier one, and older snapshots
@@ -13702,7 +13782,9 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             const breakdown = match.breakdown && winnerSide && match.breakdown[winnerSide] ? match.breakdown[winnerSide] : null;
             const kills = chessChampionNormalizeKillPointsBySide(match, match.killPointsBySide);
             const adminOrigin = chessChampionIsAdminOrigin(match);
-            const roundLabel = `Round ${match.round || 1}`;
+            const roundLabel = admin
+                ? chessChampionStageLabel(match.stage, match.round)
+                : `Round ${match.round || 1}`;
             const statusLabel = match.result
                 ? (adminOrigin ? 'ADMIN RECORDED' : 'COMPLETED')
                 : (adminOrigin ? 'ADMIN ADDED' : (admin ? 'ADMIN ENTRY' : 'SCHEDULED'));
@@ -13711,33 +13793,40 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             if (!admin) {
                 return `<div class="chess-champion-match-card ${match.result ? 'is-complete' : ''} ${adminOrigin ? 'is-admin-origin' : ''}">${top}<div class="chess-champion-match-versus"><div>${chessChampionPlayerMarkup(white, winnerSide === 'white' ? 'is-winner' : '')}</div><span>VS</span><div>${chessChampionPlayerMarkup(black, winnerSide === 'black' ? 'is-winner' : '')}</div></div>${summary}</div>`;
             }
-            return `<div class="chess-champion-match-card ${match.result ? 'is-complete' : ''} ${adminOrigin ? 'is-admin-origin' : ''}">${top}<div class="chess-champion-match-versus"><div>${chessChampionPlayerMarkup(white, winnerSide === 'white' ? 'is-winner' : '')}</div><span>VS</span><div>${chessChampionPlayerMarkup(black, winnerSide === 'black' ? 'is-winner' : '')}</div></div>${match.result ? summary : ''}<div class="chess-champion-match-form"><button class="secondary" type="button" onclick="openChessChampionEndMatch('${escapeHtml(match.id)}', false)"><i class="fas fa-crosshairs"></i> ${match.result ? 'Revise kill points' : 'Enter kill points'}</button><button class="secondary" type="button" onclick="openChessChampionEndMatch('${escapeHtml(match.id)}', true)"><i class="fas fa-flag-checkered"></i> ${match.result ? 'Recalculate result' : 'End match'}</button></div></div>`;
+            return `<div class="chess-champion-match-card ${match.result ? 'is-complete' : ''} ${adminOrigin ? 'is-admin-origin' : ''}">${top}<div class="chess-champion-match-versus"><div>${chessChampionPlayerMarkup(white, winnerSide === 'white' ? 'is-winner' : '')}</div><span>VS</span><div>${chessChampionPlayerMarkup(black, winnerSide === 'black' ? 'is-winner' : '')}</div></div>${match.result ? summary : ''}${chessChampionMatchPending(match) ? chessChampionPendingMatchActionsMarkup(match) : ''}<div class="chess-champion-match-form"><button class="secondary" type="button" onclick="openChessChampionEndMatch('${escapeHtml(match.id)}', false)"><i class="fas fa-crosshairs"></i> ${match.result ? 'Revise kill points' : 'Enter kill points'}</button><button class="secondary" type="button" onclick="openChessChampionEndMatch('${escapeHtml(match.id)}', true)"><i class="fas fa-flag-checkered"></i> ${match.result ? 'Recalculate result' : 'End match'}</button></div></div>`;
         }
 
         function renderChessChampionMatchRoom(state) {
             const room = document.getElementById('chessChampionMatchRoom');
             if (!room) return;
+            const admin = normalizeUserRole(currentUserRole) === 'admin';
             const studentMap = chessChampionStudentMap();
             const current = chessChampionMatchRoomMatches(state);
             if (state.stage === 'registration') {
-                room.innerHTML = '<div class="chess-champion-empty chess-champion-empty-compact"><i class="fas fa-hourglass-start"></i><strong>Registration is open</strong><span>Admin registers players, then generates the first balanced round.</span></div>';
-                return;
+                if (!admin || !current.length) {
+                    room.innerHTML = '<div class="chess-champion-empty chess-champion-empty-compact"><i class="fas fa-hourglass-start"></i><strong>Registration is open</strong><span>Admin registers players, then generates the first balanced round.</span></div>';
+                    return;
+                }
             }
             if (state.stage === 'complete') {
-                const standings = getChessChampionStandings(state);
-                const championId = parseInt(state.championStudentId, 10) || 0;
-                const champion = standings.find(row => row.id === championId) || standings[0];
-                room.innerHTML = champion ? `<div class="chess-champion-champion-card"><i class="fas fa-crown"></i><span>Excel Chess Champion</span><strong>${escapeHtml(chessChampionStudentName(champion.student))}</strong><small>${chessChampionFormatPoints(champion.points)} tournament points</small></div>` : '<div class="chess-champion-empty chess-champion-empty-compact">The event is complete.</div>';
-                return;
+                if (!admin) {
+                    const standings = getChessChampionStandings(state);
+                    const championId = parseInt(state.championStudentId, 10) || 0;
+                    const champion = standings.find(row => row.id === championId) || standings[0];
+                    room.innerHTML = champion ? `<div class="chess-champion-champion-card"><i class="fas fa-crown"></i><span>Excel Chess Champion</span><strong>${escapeHtml(chessChampionStudentName(champion.student))}</strong><small>${chessChampionFormatPoints(champion.points)} tournament points</small></div>` : '<div class="chess-champion-empty chess-champion-empty-compact">The event is complete.</div>';
+                    return;
+                }
             }
             if (!current.length) {
                 room.innerHTML = `<div class="chess-champion-empty chess-champion-empty-compact"><i class="fas fa-forward-step"></i><strong>${escapeHtml(chessChampionStageLabel(state.stage, state.round))} is ready to advance</strong><span>All boards are complete. Admin can generate the next round.</span></div>`;
                 return;
             }
             const adminCount = current.filter(chessChampionIsAdminOrigin).length;
-            const roomLabel = adminCount
-                ? `${chessChampionStageLabel(state.stage, state.round)} · ${adminCount} Admin board${adminCount === 1 ? '' : 's'} shown`
-                : chessChampionStageLabel(state.stage, state.round);
+            const roomLabel = admin
+                ? `All boards · ${current.length} match${current.length === 1 ? '' : 'es'}${adminCount ? ` · ${adminCount} Admin` : ''}`
+                : (adminCount
+                    ? `${chessChampionStageLabel(state.stage, state.round)} · ${adminCount} Admin board${adminCount === 1 ? '' : 's'} shown`
+                    : chessChampionStageLabel(state.stage, state.round));
             room.innerHTML = `<div class="chess-champion-room-label">${escapeHtml(roomLabel)}</div>${current.map(match => chessChampionMatchFormMarkup(match, state, studentMap)).join('')}`;
         }
 
@@ -13767,7 +13856,13 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                 const advancingId = chessChampionMatchAdvancingId(match);
                 const advancingName = advancingId === parseInt(match.whiteId, 10) ? chessChampionStudentName(white) : (advancingId === parseInt(match.blackId, 10) ? chessChampionStudentName(black) : '');
                 const status = match.result === 'draw' && advancingName ? `Draw · ${advancingName} advances on higher seed` : (match.result ? 'Result recorded' : 'Awaiting board');
-                return `<article class="chess-champion-bracket-match ${chessChampionMatchComplete(match) ? 'is-complete' : ''}"><span class="chess-champion-bracket-board">Board ${match.board}</span><div class="chess-champion-bracket-player ${advancingId === parseInt(match.whiteId, 10) ? 'is-winner' : ''}"><span>${escapeHtml(chessChampionStudentName(white))}</span><b>${match.result === 'white' || (match.result === 'draw' && advancingId === parseInt(match.whiteId, 10)) ? chessChampionFormatPoints(match.awards && match.awards[String(match.whiteId)]) : '—'}</b></div><div class="chess-champion-bracket-player ${advancingId === parseInt(match.blackId, 10) ? 'is-winner' : ''}"><span>${escapeHtml(chessChampionStudentName(black))}</span><b>${match.result === 'black' || (match.result === 'draw' && advancingId === parseInt(match.blackId, 10)) ? chessChampionFormatPoints(match.awards && match.awards[String(match.blackId)]) : '—'}</b></div><div class="chess-champion-bracket-status">${escapeHtml(status)}</div></article>`;
+                const admin = normalizeUserRole(currentUserRole) === 'admin';
+                const pending = chessChampionMatchPending(match);
+                const pendingActions = pending
+                    ? `<button class="secondary" type="button" onclick="openChessChampionReviseMatch('${escapeHtml(match.id)}')"><i class="fas fa-user-pen"></i> Revise</button><button class="secondary" type="button" onclick="resetChessChampionPendingMatch('${escapeHtml(match.id)}')"><i class="fas fa-rotate-left"></i> Reset</button><button class="danger" type="button" onclick="deleteChessChampionPendingMatch('${escapeHtml(match.id)}')"><i class="fas fa-trash"></i> Delete</button>`
+                    : '';
+                const adminActions = admin && match.whiteId && match.blackId ? `<div class="chess-champion-bracket-actions"><button class="secondary" type="button" onclick="openChessChampionEndMatch('${escapeHtml(match.id)}')"><i class="fas fa-crosshairs"></i> ${match.result ? 'Revise kills' : 'Enter kills'}</button>${pendingActions}</div>` : '';
+                return `<article class="chess-champion-bracket-match ${chessChampionMatchComplete(match) ? 'is-complete' : ''}"><span class="chess-champion-bracket-board">Board ${match.board}</span><div class="chess-champion-bracket-player ${advancingId === parseInt(match.whiteId, 10) ? 'is-winner' : ''}"><span>${escapeHtml(chessChampionStudentName(white))}</span><b>${match.result === 'white' || (match.result === 'draw' && advancingId === parseInt(match.whiteId, 10)) ? chessChampionFormatPoints(match.awards && match.awards[String(match.whiteId)]) : '—'}</b></div><div class="chess-champion-bracket-player ${advancingId === parseInt(match.blackId, 10) ? 'is-winner' : ''}"><span>${escapeHtml(chessChampionStudentName(black))}</span><b>${match.result === 'black' || (match.result === 'draw' && advancingId === parseInt(match.blackId, 10)) ? chessChampionFormatPoints(match.awards && match.awards[String(match.blackId)]) : '—'}</b></div><div class="chess-champion-bracket-status">${escapeHtml(status)}</div>${adminActions}</article>`;
             }).join('')}</div>`).join('<div class="chess-champion-bracket-connector" aria-hidden="true"><i class="fas fa-chevron-right"></i></div>');
         }
 
@@ -14144,6 +14239,51 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             return true;
         }
 
+        function ensureChessChampionModalPortal(modal) {
+            if (!modal) return;
+            // Reparent to <body> so position:fixed is viewport-relative, not page-relative.
+            // .main-content-wrapper uses transform:translateZ(0) for GPU layers, which
+            // creates a containing block and breaks fixed positioning for descendants.
+            if (modal.parentElement !== document.body) {
+                document.body.appendChild(modal);
+            }
+        }
+
+        function chessChampionLockViewportForModal() {
+            if (document.body.classList.contains('chess-champion-modal-open')) return;
+            const scrollY = window.scrollY || window.pageYOffset || 0;
+            document.body.dataset.chessChampionScrollY = String(scrollY);
+            document.body.style.position = 'fixed';
+            document.body.style.top = `-${scrollY}px`;
+            document.body.style.left = '0';
+            document.body.style.right = '0';
+            document.body.style.width = '100%';
+            document.body.classList.add('chess-champion-modal-open');
+        }
+
+        function chessChampionUnlockViewportForModal() {
+            const scrollY = parseInt(document.body.dataset.chessChampionScrollY || '0', 10) || 0;
+            document.body.classList.remove('chess-champion-modal-open');
+            document.body.style.position = '';
+            document.body.style.top = '';
+            document.body.style.left = '';
+            document.body.style.right = '';
+            document.body.style.width = '';
+            delete document.body.dataset.chessChampionScrollY;
+            window.scrollTo(0, scrollY);
+        }
+
+        function initChessChampionModalPortals() {
+            ensureChessChampionModalPortal(document.getElementById('chessChampionEndMatchModal'));
+            ensureChessChampionModalPortal(document.getElementById('chessChampionReviseMatchModal'));
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initChessChampionModalPortals);
+        } else {
+            initChessChampionModalPortals();
+        }
+
         function toggleChessChampionParticipant(studentId, checked) {
             if (!chessChampionAdminGuard()) return;
             const state = getChessChampionState();
@@ -14390,12 +14530,149 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
         }
 
         function chessChampionCanReviseMatch(state, match) {
-            if (!match || !match.result) return true;
-            if (match.stage !== state.stage || parseInt(match.round, 10) !== parseInt(state.round, 10)) {
-                showAlert('Past-round results are locked after the bracket advances.', 'warning');
-                return false;
-            }
+            if (!match || match.result === 'bye') return false;
+            if (!match.whiteId || !match.blackId) return false;
             return true;
+        }
+
+        function deleteChessChampionPendingMatch(matchId) {
+            if (!chessChampionAdminGuard()) return;
+            const { state, match } = getChessChampionMatch(matchId);
+            if (!chessChampionMatchPending(match)) {
+                showAlert('Only pending boards can be deleted. Use kill-point revision for completed results.', 'warning');
+                return;
+            }
+            const studentMap = chessChampionStudentMap();
+            const whiteName = chessChampionStudentName(studentMap.get(parseInt(match.whiteId, 10)));
+            const blackName = chessChampionStudentName(studentMap.get(parseInt(match.blackId, 10)));
+            const label = `${chessChampionStageLabel(match.stage, match.round)} · Board ${match.board || 1}`;
+            if (!confirm(`Delete pending board ${label}?\n${whiteName} vs ${blackName}`)) return;
+            state.matches = state.matches.filter(item => String(item.id) !== String(match.id));
+            saveChessChampionState(state);
+            renderChessChampionTab();
+            showAlert('Pending board removed from the match room.', 'success');
+        }
+
+        function resetChessChampionPendingMatch(matchId) {
+            if (!chessChampionAdminGuard()) return;
+            const { state, match } = getChessChampionMatch(matchId);
+            if (!chessChampionMatchPending(match)) {
+                showAlert('Only pending boards can be reset. Use kill-point revision for completed results.', 'warning');
+                return;
+            }
+            const label = `${chessChampionStageLabel(match.stage, match.round)} · Board ${match.board || 1}`;
+            if (!confirm(`Reset ${label} to a clean pending board? Kill points and partial entries will be cleared.`)) return;
+            chessChampionClearMatchBoard(match);
+            saveChessChampionState(state);
+            if (String(activeChessChampionMatchId) === String(match.id)) closeChessChampionEndMatch();
+            if (String(activeChessChampionReviseMatchId) === String(match.id)) closeChessChampionReviseMatch();
+            renderChessChampionTab();
+            showAlert('Board reset. Enter kill points when ready.', 'success');
+        }
+
+        function populateChessChampionRevisePlayers(state, match) {
+            const whiteSelect = document.getElementById('chessChampionReviseWhite');
+            const blackSelect = document.getElementById('chessChampionReviseBlack');
+            if (!whiteSelect || !blackSelect || !match) return;
+            const eligibleIds = chessChampionEligiblePlayerIdsForStage(state, match.stage);
+            const students = getChessChampionStudents()
+                .filter(student => eligibleIds.has(parseInt(student.id, 10)))
+                .sort((a, b) => chessChampionStudentName(a).localeCompare(chessChampionStudentName(b)));
+            const options = students.map(student => `<option value="${parseInt(student.id, 10)}">${escapeHtml(chessChampionStudentName(student))} · ${escapeHtml(chessChampionRoll(student))} · Class ${escapeHtml(chessChampionStudentClass(student))}</option>`).join('');
+            whiteSelect.innerHTML = `<option value="">Select white player</option>${options}`;
+            blackSelect.innerHTML = `<option value="">Select black player</option>${options}`;
+            whiteSelect.value = String(parseInt(match.whiteId, 10) || '');
+            blackSelect.value = String(parseInt(match.blackId, 10) || '');
+        }
+
+        function openChessChampionReviseMatch(matchId) {
+            if (!chessChampionAdminGuard()) return;
+            const { state, match } = getChessChampionMatch(matchId);
+            if (!chessChampionMatchPending(match)) {
+                showAlert('Only pending boards can be revised here. Use kill-point revision for completed results.', 'warning');
+                return;
+            }
+            activeChessChampionReviseMatchId = String(match.id);
+            const modal = document.getElementById('chessChampionReviseMatchModal');
+            if (!modal) return;
+            ensureChessChampionModalPortal(modal);
+            document.getElementById('chessChampionReviseMatchTitle').textContent = 'Revise pending board';
+            const stageEl = document.getElementById('chessChampionReviseMatchStage');
+            if (stageEl) stageEl.textContent = `${chessChampionStageLabel(match.stage, match.round)} · Board ${match.board || 1}`;
+            populateChessChampionRevisePlayers(state, match);
+            modal.classList.remove('hidden');
+            modal.setAttribute('aria-hidden', 'false');
+            chessChampionLockViewportForModal();
+            requestAnimationFrame(() => modal.scrollTop = 0);
+        }
+
+        function closeChessChampionReviseMatch() {
+            const modal = document.getElementById('chessChampionReviseMatchModal');
+            if (modal) {
+                modal.classList.add('hidden');
+                modal.setAttribute('aria-hidden', 'true');
+            }
+            if (!document.getElementById('chessChampionEndMatchModal') || document.getElementById('chessChampionEndMatchModal').classList.contains('hidden')) {
+                chessChampionUnlockViewportForModal();
+            }
+            activeChessChampionReviseMatchId = '';
+        }
+
+        function saveChessChampionReviseMatch() {
+            if (!chessChampionAdminGuard()) return;
+            const { state, match } = getChessChampionMatch(activeChessChampionReviseMatchId);
+            if (!chessChampionMatchPending(match)) {
+                showAlert('This board is no longer pending.', 'warning');
+                closeChessChampionReviseMatch();
+                return;
+            }
+            const whiteId = parseInt(document.getElementById('chessChampionReviseWhite')?.value, 10) || 0;
+            const blackId = parseInt(document.getElementById('chessChampionReviseBlack')?.value, 10) || 0;
+            if (!whiteId || !blackId || whiteId === blackId) {
+                showAlert('Choose two different eligible players for the board.', 'warning');
+                return;
+            }
+            const eligibleIds = chessChampionEligiblePlayerIdsForStage(state, match.stage);
+            if (!eligibleIds.has(whiteId) || !eligibleIds.has(blackId)) {
+                showAlert('Both players must be eligible for this stage.', 'warning');
+                return;
+            }
+            const matchLimit = chessChampionStageMatchLimit(match.stage);
+            const whitePlayed = chessChampionStageMatchCountExcluding(state, whiteId, match.stage, match.id);
+            const blackPlayed = chessChampionStageMatchCountExcluding(state, blackId, match.stage, match.id);
+            if (matchLimit > 0 && whitePlayed >= matchLimit) {
+                showAlert(`${chessChampionStudentName(chessChampionStudentMap().get(whiteId))} already has ${whitePlayed}/${matchLimit} ${match.stage} matches.`, 'warning');
+                return;
+            }
+            if (matchLimit > 0 && blackPlayed >= matchLimit) {
+                showAlert(`${chessChampionStudentName(chessChampionStudentMap().get(blackId))} already has ${blackPlayed}/${matchLimit} ${match.stage} matches.`, 'warning');
+                return;
+            }
+            const duplicate = state.matches.find(item =>
+                String(item.id) !== String(match.id)
+                && item.stage === match.stage
+                && parseInt(item.round, 10) === parseInt(match.round, 10)
+                && ((parseInt(item.whiteId, 10) === whiteId && parseInt(item.blackId, 10) === blackId)
+                    || (parseInt(item.whiteId, 10) === blackId && parseInt(item.blackId, 10) === whiteId))
+            );
+            if (duplicate) {
+                showAlert('That pairing already exists in this round. Delete or revise the other board first.', 'warning');
+                return;
+            }
+            const changed = parseInt(match.whiteId, 10) !== whiteId || parseInt(match.blackId, 10) !== blackId;
+            if (changed) chessChampionClearMatchBoard(match);
+            match.whiteId = whiteId;
+            match.blackId = blackId;
+            if (chessChampionIsKnockoutStage(match.stage)) {
+                const seeds = chessChampionSeedLookup(state);
+                match.whiteSeed = seeds.get(whiteId) || 0;
+                match.blackSeed = seeds.get(blackId) || 0;
+            }
+            match.updatedAt = new Date().toISOString();
+            saveChessChampionState(state);
+            closeChessChampionReviseMatch();
+            renderChessChampionTab();
+            showAlert(changed ? 'Pending board pairing updated.' : 'Pairing unchanged.', changed ? 'success' : 'info');
         }
 
         function openChessChampionEndMatch(matchId) {
@@ -14415,7 +14692,8 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             const kills = chessChampionNormalizeKillPointsBySide(match, match.killPointsBySide);
             const modal = document.getElementById('chessChampionEndMatchModal');
             if (!modal) return;
-            document.getElementById('chessChampionEndMatchTitle').textContent = match.result ? 'Revise / end match' : 'End match';
+            ensureChessChampionModalPortal(modal);
+            document.getElementById('chessChampionEndMatchTitle').textContent = match.result ? 'Revise kill points / result' : 'End match';
             const stageEl = document.getElementById('chessChampionEndMatchStage');
             if (stageEl) stageEl.textContent = `${chessChampionStageLabel(match.stage, match.round)} · Board ${match.board || 1}`;
             const whiteNameEl = document.getElementById('chessChampionWhiteName');

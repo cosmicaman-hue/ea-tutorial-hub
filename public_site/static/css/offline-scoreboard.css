@@ -8316,7 +8316,7 @@
         #excel-chess-champion-tab .chess-champion-record small { display: block; margin-top: 4px; color: #71819c; font-size: .66rem; font-weight: 600; }
         #excel-chess-champion-tab .chess-champion-points { color: #fde68a !important; font-size: 1.05rem !important; font-weight: 950; }
         #excel-chess-champion-tab .chess-champion-bonus-trail { color: #86efac; font-weight: 850; }
-        #excel-chess-champion-tab .chess-champion-match-room { padding: 14px; }
+        #excel-chess-champion-tab .chess-champion-match-room { padding: 14px; max-height: 720px; overflow-y: auto; }
         #excel-chess-champion-tab .chess-champion-room-label { margin: 0 4px 10px; color: #facc15; font-size: .66rem; font-weight: 900; letter-spacing: .14em; text-transform: uppercase; }
         #excel-chess-champion-tab .chess-champion-match-card { position: relative; margin-bottom: 11px; padding: 13px; border: 1px solid rgba(129,140,248,.21); border-radius: 16px; background: linear-gradient(145deg, rgba(30,41,59,.68), rgba(15,23,42,.48)); animation: chessChampionMatchIn .5s cubic-bezier(.16,1,.3,1) both; }
         #excel-chess-champion-tab .chess-champion-match-card.is-complete { border-color: rgba(74,222,128,.25); background: linear-gradient(145deg, rgba(20,83,45,.26), rgba(15,23,42,.48)); }
@@ -8332,6 +8332,9 @@
         #excel-chess-champion-tab .chess-champion-player.is-winner .chess-champion-player-name { color: #fde68a; }
         #excel-chess-champion-tab .chess-champion-player.is-winner::before { content: 'WINNER'; display: block; color: #86efac; font-size: .54rem; font-weight: 900; letter-spacing: .12em; }
         #excel-chess-champion-tab .chess-champion-match-form { display: grid; grid-template-columns: 1.2fr .8fr .8fr; gap: 7px; margin-top: 13px; padding-top: 11px; border-top: 1px solid rgba(148,163,184,.12); }
+        #excel-chess-champion-tab .chess-champion-match-pending-actions { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 12px; padding-top: 11px; border-top: 1px dashed rgba(148,163,184,.16); }
+        #excel-chess-champion-tab .chess-champion-match-pending-actions button { padding: 7px 10px; font-size: .68rem; }
+        #excel-chess-champion-tab .chess-champion-revise-card .chess-champion-form-grid { padding: 0 18px 6px; }
         #excel-chess-champion-tab .chess-champion-match-form label,
         #excel-chess-champion-tab .chess-champion-form-grid label { display: flex; flex-direction: column; gap: 5px; color: #8494ae; font-size: .61rem; font-weight: 850; letter-spacing: .08em; text-transform: uppercase; }
         #excel-chess-champion-tab .chess-champion-match-form select,
@@ -8366,6 +8369,8 @@
         #excel-chess-champion-tab .chess-champion-bracket-player.is-winner { color: #fde68a; font-weight: 900; }
         #excel-chess-champion-tab .chess-champion-bracket-player b { color: #86efac; font-size: .72rem; }
         #excel-chess-champion-tab .chess-champion-bracket-status { margin-top: 7px; color: #71819c; font-size: .61rem; }
+        #excel-chess-champion-tab .chess-champion-bracket-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
+        #excel-chess-champion-tab .chess-champion-bracket-actions button { padding: 6px 9px; font-size: .62rem; }
         #excel-chess-champion-tab .chess-champion-bracket-connector { display: grid; min-width: 18px; place-items: center; color: rgba(250,204,21,.55); }
         #excel-chess-champion-tab .chess-champion-admin-panel { z-index: 1; margin-top: 16px; }
         #excel-chess-champion-tab .chess-champion-admin-grid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(280px, .85fr); gap: 16px; padding: 16px; }
@@ -8442,28 +8447,47 @@
         }
 
         /* Admin result desk lives outside the tab, so keep these styles global. */
-        body.chess-champion-modal-open { overflow: hidden; }
+        body.chess-champion-modal-open { overflow: hidden; touch-action: none; }
         .chess-champion-modal {
             position: fixed;
-            inset: 0;
+            top: 0;
+            right: 0;
+            bottom: 0;
+            left: 0;
             z-index: 12000;
-            display: grid;
-            place-items: center;
-            padding: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100vw;
+            height: 100dvh;
+            max-height: 100dvh;
+            padding:
+                max(12px, env(safe-area-inset-top, 0px))
+                max(12px, env(safe-area-inset-right, 0px))
+                max(12px, env(safe-area-inset-bottom, 0px))
+                max(12px, env(safe-area-inset-left, 0px));
+            overflow-y: auto;
+            overscroll-behavior: contain;
+            box-sizing: border-box;
         }
         .chess-champion-modal.hidden { display: none !important; }
         .chess-champion-modal-backdrop {
-            position: absolute;
-            inset: 0;
+            position: fixed;
+            top: 0;
+            right: 0;
+            bottom: 0;
+            left: 0;
             background: rgba(2, 6, 23, .72);
             backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
         }
         .chess-champion-modal-card {
             position: relative;
             z-index: 1;
-            width: min(720px, 100%);
-            max-height: min(92vh, 900px);
+            width: min(720px, calc(100vw - 24px));
+            max-height: min(calc(100dvh - 24px), 900px);
             overflow: auto;
+            margin: auto;
             padding: 22px;
             border: 1px solid rgba(148,163,184,.22);
             border-radius: 24px;
