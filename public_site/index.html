@@ -3,7 +3,10 @@
 <head>
     <meta charset="utf-8">
     <meta name="ea-public-chess-matchroom" content="all-boards-v2">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="theme-color" content="#1a4d2e">
     <title>Excel Academy</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Arvo:wght@400;700&display=swap" rel="stylesheet">
@@ -21,9 +24,11 @@
             --gold: #d4af37;
             --line: rgba(36,52,71,.12);
             --shadow: 0 14px 34px rgba(26, 77, 46, .10);
+            --gradient-hero: linear-gradient(135deg, var(--primary) 0%, #0d2818 55%, #163d24 100%);
+            --gradient-accent: linear-gradient(90deg, var(--primary), var(--gold), var(--secondary));
         }
         * { box-sizing: border-box; }
-        html { scroll-behavior: smooth; }
+        html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
         body {
             margin: 0;
             font-family: "Lora", Georgia, serif;
@@ -41,6 +46,7 @@
             backdrop-filter: blur(10px);
             background: rgba(250,248,243,.88);
             border-bottom: 1px solid var(--line);
+            padding-top: env(safe-area-inset-top, 0px);
         }
         .topbar {
             max-width: 1200px;
@@ -76,10 +82,16 @@
             border-top: 1px solid var(--line);
             background: rgba(244,240,232,.72);
             display: flex;
-            justify-content: center;
+            justify-content: flex-start;
+            flex-wrap: nowrap;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
         }
+        .tabs::-webkit-scrollbar { display: none; }
         .tab-btn {
-            flex: 1;
+            flex: 1 0 auto;
+            min-width: 88px;
             max-width: 180px;
             border: none;
             border-bottom: 3px solid transparent;
@@ -101,18 +113,20 @@
         .tab-btn.active {
             color: var(--primary);
             font-weight: 700;
-            border-bottom: 3px solid var(--primary);
-            background: rgba(26,77,46,.04);
+            border-bottom: 3px solid transparent;
+            border-image: var(--gradient-accent) 1;
+            background: linear-gradient(180deg, rgba(26,77,46,.07) 0%, rgba(247,147,30,.04) 100%);
         }
         .page {
             max-width: 1200px;
             margin: 0 auto;
-            padding: 22px 16px 40px;
+            padding: 22px 16px calc(40px + env(safe-area-inset-bottom, 0px));
+            transform-origin: top center;
         }
         .panel { display: none; }
         .panel.active { display: block; }
         .hero {
-            background: linear-gradient(135deg, var(--primary) 0%, #0d2818 100%);
+            background: var(--gradient-hero);
             color: white;
             padding: 76px 22px;
             text-align: center;
@@ -126,9 +140,15 @@
             position: absolute;
             inset: -20%;
             background:
-                radial-gradient(circle at 20% 50%, rgba(247,147,30,.12) 0%, transparent 40%),
-                radial-gradient(circle at 80% 80%, rgba(212,175,55,.12) 0%, transparent 40%);
+                radial-gradient(circle at 20% 50%, rgba(247,147,30,.18) 0%, transparent 40%),
+                radial-gradient(circle at 80% 80%, rgba(212,175,55,.16) 0%, transparent 40%),
+                radial-gradient(circle at 50% 0%, rgba(255,255,255,.08) 0%, transparent 55%);
             pointer-events: none;
+            animation: heroShimmer 8s ease-in-out infinite alternate;
+        }
+        @keyframes heroShimmer {
+            from { transform: translateX(-2%) scale(1); opacity: .85; }
+            to { transform: translateX(2%) scale(1.02); opacity: 1; }
         }
         .hero-content { position: relative; z-index: 1; }
         .logo {
@@ -145,11 +165,13 @@
         }
         .section {
             margin-top: 26px;
-            background: rgba(255,255,255,.82);
+            background: rgba(255,255,255,.88);
             border: 1px solid var(--line);
             border-radius: 24px;
             padding: 28px;
             box-shadow: var(--shadow);
+            backdrop-filter: blur(8px);
+            border-top: 3px solid rgba(26,77,46,.18);
         }
         .intro { text-align: center; }
         .intro h2 {
@@ -171,11 +193,13 @@
             gap: 18px;
         }
         .card {
-            background: white;
+            background: rgba(255,255,255,.95);
             border-radius: 18px;
             padding: 22px;
             border: 1px solid var(--line);
+            border-top: 3px solid rgba(247,147,30,.35);
             box-shadow: 0 8px 24px rgba(36,52,71,.06);
+            backdrop-filter: blur(6px);
             transition: transform .3s ease, box-shadow .3s ease, border-color .3s ease;
         }
         .card:hover {
@@ -221,11 +245,13 @@
             box-shadow: 0 14px 28px rgba(212,175,55,.35);
         }
         .panel-shell {
-            background: rgba(255,255,255,.80);
+            background: rgba(255,255,255,.88);
             border: 1px solid var(--line);
             border-radius: 24px;
             box-shadow: var(--shadow);
             overflow: hidden;
+            backdrop-filter: blur(8px);
+            border-top: 3px solid rgba(26,77,46,.2);
         }
         .login-gate {
             text-align: center;
@@ -421,7 +447,12 @@
             border-radius: 14px;
             padding: 14px;
             background: white;
+            border-left: 4px solid var(--primary);
         }
+        .info-item[data-category="schedule_class"],
+        .info-item[data-category="schedule_group"] { border-left-color: var(--secondary); }
+        .info-item[data-category="general"] { border-left-color: var(--primary); }
+        .info-item[data-category="announcement"] { border-left-color: var(--accent); }
         .info-head {
             display: flex;
             justify-content: space-between;
@@ -460,7 +491,13 @@
         footer {
             text-align: center;
             color: var(--muted);
-            padding: 18px 16px 28px;
+            padding: 18px 16px calc(28px + env(safe-area-inset-bottom, 0px));
+        }
+        @media (max-width: 640px) {
+            .tab-btn, .ctrl-btn { min-height: 44px; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .hero::before { animation: none; }
         }
         .panel {
             opacity: 0;
@@ -1074,85 +1111,137 @@
             .party-modal-stats { grid-template-columns: repeat(2, 1fr); }
             .party-modal-member .m-role { display: none; }
         }
-        #chessPanel .public-chess-shell { position: relative; overflow: hidden; padding: 18px; background: radial-gradient(circle at 10% 0%, rgba(245,158,11,.12), transparent 38%), linear-gradient(145deg, #07101c, #111a35 52%, #050812); color: #e2e8f0; }
-        #chessPanel .public-chess-hero { position: relative; overflow: hidden; padding: 44px 22px 34px; border: 1px solid rgba(250,204,21,.25); border-radius: 22px; text-align: center; background: radial-gradient(circle at 82% 15%, rgba(99,102,241,.24), transparent 40%), linear-gradient(145deg, rgba(15,23,42,.95), rgba(2,6,23,.95)); box-shadow: 0 18px 48px rgba(0,0,0,.25); }
-        #chessPanel .public-chess-hero::after { content: ''; position: absolute; inset: 0; pointer-events: none; background-image: linear-gradient(rgba(250,204,21,.04) 1px, transparent 1px), linear-gradient(90deg, rgba(250,204,21,.04) 1px, transparent 1px); background-size: 34px 34px; mask-image: linear-gradient(130deg, #000, transparent 80%); }
-        #chessPanel .public-chess-kicker { position: relative; z-index: 1; color: #facc15; font: 900 .66rem/1.2 "Poppins", sans-serif; letter-spacing: .18em; text-transform: uppercase; }
+        /* Chess Champion — light theme default */
+        #chessPanel .public-chess-shell { position: relative; overflow: hidden; padding: 18px; background: radial-gradient(circle at 10% 0%, rgba(212,175,55,.14), transparent 38%), radial-gradient(circle at 90% 100%, rgba(26,77,46,.10), transparent 40%), linear-gradient(145deg, var(--surface-2), var(--bg) 52%, #fff); color: var(--text); }
+        #chessPanel .public-chess-hero { position: relative; overflow: hidden; padding: 44px 22px 34px; border: 1px solid rgba(26,77,46,.18); border-radius: 22px; text-align: center; background: radial-gradient(circle at 82% 15%, rgba(247,147,30,.12), transparent 40%), linear-gradient(145deg, #fff, var(--surface-2)); box-shadow: 0 18px 48px rgba(26,77,46,.12); }
+        #chessPanel .public-chess-hero::after { content: ''; position: absolute; inset: 0; pointer-events: none; background-image: linear-gradient(rgba(26,77,46,.04) 1px, transparent 1px), linear-gradient(90deg, rgba(26,77,46,.04) 1px, transparent 1px); background-size: 34px 34px; mask-image: linear-gradient(130deg, #000, transparent 80%); }
+        #chessPanel .public-chess-kicker { position: relative; z-index: 1; color: var(--gold); font: 900 .66rem/1.2 "Poppins", sans-serif; letter-spacing: .18em; text-transform: uppercase; }
         #chessPanel .public-chess-kicker i { margin-right: 6px; animation: publicChessFloat 3s ease-in-out infinite; }
-        #chessPanel .public-chess-hero h2 { position: relative; z-index: 1; margin: 12px 0 8px; color: #fff7d6; font: 900 clamp(2rem, 5vw, 4.3rem)/.98 "Poppins", sans-serif; letter-spacing: .02em; }
-        #chessPanel .public-chess-hero p { position: relative; z-index: 1; max-width: 650px; margin: 0 auto; color: #b8c5dc; font-size: .96rem; line-height: 1.6; }
+        #chessPanel .public-chess-hero h2 { position: relative; z-index: 1; margin: 12px 0 8px; color: var(--primary); font: 900 clamp(2rem, 5vw, 4.3rem)/.98 "Poppins", sans-serif; letter-spacing: .02em; }
+        #chessPanel .public-chess-hero p { position: relative; z-index: 1; max-width: 650px; margin: 0 auto; color: var(--muted); font-size: .96rem; line-height: 1.6; }
         #chessPanel .public-chess-stage { position: relative; z-index: 1; display: flex; justify-content: center; flex-wrap: wrap; gap: 7px; margin-top: 22px; }
-        #chessPanel .public-chess-stage span { padding: 7px 10px; border: 1px solid rgba(148,163,184,.21); border-radius: 999px; color: #72809a; background: rgba(15,23,42,.55); font: 800 .62rem/1 "Poppins", sans-serif; letter-spacing: .08em; text-transform: uppercase; }
-        #chessPanel .public-chess-stage span.is-active { border-color: rgba(250,204,21,.65); color: #fff7d6; background: rgba(161,98,7,.28); box-shadow: 0 0 18px rgba(250,204,21,.16); }
-        #chessPanel .public-chess-stage span.is-passed { border-color: rgba(74,222,128,.28); color: #86efac; }
+        #chessPanel .public-chess-stage span { padding: 7px 10px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); background: rgba(255,255,255,.85); font: 800 .62rem/1 "Poppins", sans-serif; letter-spacing: .08em; text-transform: uppercase; }
+        #chessPanel .public-chess-stage span.is-active { border-color: rgba(212,175,55,.65); color: var(--primary); background: rgba(212,175,55,.15); box-shadow: 0 0 18px rgba(212,175,55,.12); }
+        #chessPanel .public-chess-stage span.is-passed { border-color: rgba(26,77,46,.35); color: var(--primary); background: rgba(26,77,46,.08); }
         #chessPanel .public-chess-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin: 14px 0; }
-        #chessPanel .public-chess-stat { min-height: 95px; padding: 13px; border: 1px solid rgba(148,163,184,.16); border-radius: 15px; background: rgba(15,23,42,.75); animation: publicChessCardIn .5s cubic-bezier(.16,1,.3,1) both; }
-        #chessPanel .public-chess-stat i { display: block; margin-bottom: 9px; color: #facc15; }
-        #chessPanel .public-chess-stat small { display: block; color: #8290aa; font: 700 .62rem/1.2 "Poppins", sans-serif; letter-spacing: .08em; text-transform: uppercase; }
-        #chessPanel .public-chess-stat strong { display: block; overflow: hidden; margin-top: 5px; color: #f8fafc; font: 900 1.1rem/1.15 "Poppins", sans-serif; text-overflow: ellipsis; white-space: nowrap; }
-        #chessPanel .public-chess-stat span { display: block; margin-top: 5px; color: #aebbd1; font-size: .69rem; }
+        #chessPanel .public-chess-stat { min-height: 95px; padding: 13px; border: 1px solid var(--line); border-radius: 15px; background: var(--surface); border-left: 4px solid var(--primary); animation: publicChessCardIn .5s cubic-bezier(.16,1,.3,1) both; }
+        #chessPanel .public-chess-stat:nth-child(2) { border-left-color: var(--secondary); }
+        #chessPanel .public-chess-stat:nth-child(3) { border-left-color: var(--gold); }
+        #chessPanel .public-chess-stat:nth-child(4) { border-left-color: var(--accent); }
+        #chessPanel .public-chess-stat i { display: block; margin-bottom: 9px; color: var(--gold); }
+        #chessPanel .public-chess-stat small { display: block; color: var(--muted); font: 700 .62rem/1.2 "Poppins", sans-serif; letter-spacing: .08em; text-transform: uppercase; }
+        #chessPanel .public-chess-stat strong { display: block; overflow: hidden; margin-top: 5px; color: var(--text); font: 900 1.1rem/1.15 "Poppins", sans-serif; text-overflow: ellipsis; white-space: nowrap; }
+        #chessPanel .public-chess-stat span { display: block; margin-top: 5px; color: var(--muted); font-size: .69rem; }
         #chessPanel .public-chess-grid { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(300px, .9fr); gap: 14px; }
-        #chessPanel .public-chess-card { overflow: hidden; border: 1px solid rgba(148,163,184,.16); border-radius: 18px; background: rgba(5,9,20,.72); box-shadow: 0 12px 32px rgba(0,0,0,.18); }
-        #chessPanel .public-chess-card-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; padding: 15px 16px 12px; border-bottom: 1px solid rgba(148,163,184,.11); }
-        #chessPanel .public-chess-card-heading small { display: block; color: #facc15; font: 900 .6rem/1.2 "Poppins", sans-serif; letter-spacing: .14em; text-transform: uppercase; }
-        #chessPanel .public-chess-card-heading strong { display: block; margin-top: 4px; color: #f8fafc; font: 900 1rem/1.2 "Poppins", sans-serif; }
+        #chessPanel .public-chess-card { overflow: hidden; border: 1px solid var(--line); border-radius: 18px; background: var(--surface); box-shadow: 0 12px 32px rgba(26,77,46,.08); }
+        #chessPanel .public-chess-card-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; padding: 15px 16px 12px; border-bottom: 1px solid var(--line); background: rgba(244,240,232,.5); }
+        #chessPanel .public-chess-card-heading small { display: block; color: var(--gold); font: 900 .6rem/1.2 "Poppins", sans-serif; letter-spacing: .14em; text-transform: uppercase; }
+        #chessPanel .public-chess-card-heading strong { display: block; margin-top: 4px; color: var(--text); font: 900 1rem/1.2 "Poppins", sans-serif; }
         #chessPanel .public-chess-card-heading > span:last-child,
-        #chessPanel .public-chess-card-heading > i { color: #7886a2; font-size: .68rem; }
-        #chessPanel .public-chess-card-heading > i { color: #facc15; font-size: 1rem; }
+        #chessPanel .public-chess-card-heading > i { color: var(--muted); font-size: .68rem; }
+        #chessPanel .public-chess-card-heading > i { color: var(--gold); font-size: 1rem; }
         #chessPanel .public-chess-table-wrap { overflow-x: auto; }
         #chessPanel .public-chess-table { width: 100%; min-width: 560px; border-collapse: collapse; font-family: "Poppins", "Segoe UI", sans-serif; }
-        #chessPanel .public-chess-table th { padding: 9px 10px; color: #7785a0; background: rgba(15,23,42,.75); font-size: .59rem; letter-spacing: .1em; text-align: left; text-transform: uppercase; }
-        #chessPanel .public-chess-table td { padding: 10px; border-top: 1px solid rgba(148,163,184,.08); color: #cbd5e1; font-size: .72rem; }
+        #chessPanel .public-chess-table th { padding: 9px 10px; color: var(--muted); background: var(--surface-2); font-size: .59rem; letter-spacing: .1em; text-align: left; text-transform: uppercase; }
+        #chessPanel .public-chess-table td { padding: 10px; border-top: 1px solid var(--line); color: var(--text); font-size: .72rem; }
         #chessPanel .public-chess-table tbody tr { animation: publicChessRowIn .45s cubic-bezier(.16,1,.3,1) both; }
-        #chessPanel .public-chess-table tbody tr:hover { background: rgba(250,204,21,.055); }
-        #chessPanel .public-chess-rank { display: grid; width: 25px; height: 25px; place-items: center; border: 1px solid rgba(148,163,184,.25); border-radius: 50%; color: #aebbd1; font-weight: 900; }
-        #chessPanel .public-chess-name { display: block; color: #f8fafc; font-weight: 800; }
-        #chessPanel .public-chess-sub { display: block; margin-top: 3px; color: #71819c; font-size: .6rem; }
-        #chessPanel .public-chess-points { color: #fde68a; font-size: .98rem; font-weight: 950; }
+        #chessPanel .public-chess-table tbody tr:hover { background: rgba(26,77,46,.04); }
+        #chessPanel .public-chess-table tbody tr:nth-child(1) { background: linear-gradient(105deg, rgba(212,175,55,.18) 0%, transparent 70%); }
+        #chessPanel .public-chess-table tbody tr:nth-child(2) { background: linear-gradient(105deg, rgba(148,163,184,.14) 0%, transparent 70%); }
+        #chessPanel .public-chess-table tbody tr:nth-child(3) { background: linear-gradient(105deg, rgba(247,147,30,.14) 0%, transparent 70%); }
+        #chessPanel .public-chess-rank { display: grid; width: 25px; height: 25px; place-items: center; border: 1px solid var(--line); border-radius: 50%; color: var(--muted); font-weight: 900; }
+        #chessPanel .public-chess-table tbody tr:nth-child(1) .public-chess-rank { border-color: var(--gold); color: var(--gold); }
+        #chessPanel .public-chess-table tbody tr:nth-child(2) .public-chess-rank { border-color: #94a3b8; color: #64748b; }
+        #chessPanel .public-chess-table tbody tr:nth-child(3) .public-chess-rank { border-color: var(--secondary); color: var(--secondary); }
+        #chessPanel .public-chess-name { display: block; color: var(--text); font-weight: 800; }
+        #chessPanel .public-chess-sub { display: block; margin-top: 3px; color: var(--muted); font-size: .6rem; }
+        #chessPanel .public-chess-points { color: var(--gold); font-size: .98rem; font-weight: 950; }
         #chessPanel .public-chess-matches { max-height: 560px; overflow-y: auto; padding: 12px; }
-        #chessPanel .public-chess-round-group + .public-chess-round-group { margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(148,163,184,.12); }
-        #chessPanel .public-chess-round-title { margin: 0 0 9px; color: #fde68a; font: 900 .62rem/1.2 "Poppins", sans-serif; letter-spacing: .12em; text-transform: uppercase; }
-        #chessPanel .public-chess-match.is-admin-origin { border-color: rgba(250,204,21,.42); }
-        #chessPanel .public-chess-match.is-admin-origin .public-chess-match-top b { color: #facc15; }
-        #chessPanel .public-chess-match.is-complete { border-color: rgba(74,222,128,.28); }
-        #chessPanel .public-chess-match { margin-bottom: 9px; padding: 11px; border: 1px solid rgba(129,140,248,.2); border-radius: 13px; background: rgba(15,23,42,.62); animation: publicChessMatchIn .48s cubic-bezier(.16,1,.3,1) both; }
+        #chessPanel .public-chess-round-group + .public-chess-round-group { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
+        #chessPanel .public-chess-round-title { margin: 0 0 9px; color: var(--primary); font: 900 .62rem/1.2 "Poppins", sans-serif; letter-spacing: .12em; text-transform: uppercase; }
+        #chessPanel .public-chess-match.is-admin-origin { border-color: rgba(212,175,55,.45); }
+        #chessPanel .public-chess-match.is-admin-origin .public-chess-match-top b { color: var(--gold); }
+        #chessPanel .public-chess-match.is-complete { border-color: rgba(26,77,46,.35); }
+        #chessPanel .public-chess-match { margin-bottom: 9px; padding: 11px; border: 1px solid rgba(99,102,241,.18); border-radius: 13px; background: var(--surface-2); animation: publicChessMatchIn .48s cubic-bezier(.16,1,.3,1) both; }
         #chessPanel .public-chess-match:last-child { margin-bottom: 0; }
-        #chessPanel .public-chess-match-top { display: flex; justify-content: space-between; color: #74829d; font: 800 .58rem/1.2 "Poppins", sans-serif; letter-spacing: .1em; text-transform: uppercase; }
-        #chessPanel .public-chess-match-top b { color: #86efac; }
+        #chessPanel .public-chess-match-top { display: flex; justify-content: space-between; color: var(--muted); font: 800 .58rem/1.2 "Poppins", sans-serif; letter-spacing: .1em; text-transform: uppercase; }
+        #chessPanel .public-chess-match-top b { color: var(--primary); }
         #chessPanel .public-chess-versus { display: grid; grid-template-columns: minmax(0, 1fr) 25px minmax(0, 1fr); align-items: center; gap: 5px; margin-top: 10px; }
-        #chessPanel .public-chess-versus > span { color: #facc15; font-size: .58rem; font-weight: 900; text-align: center; }
+        #chessPanel .public-chess-versus > span { color: var(--gold); font-size: .58rem; font-weight: 900; text-align: center; }
         #chessPanel .public-chess-versus > div:last-child { text-align: right; }
         #chessPanel .public-chess-versus > div:last-child .public-chess-player { align-items: flex-end; }
-        #chessPanel .public-chess-player { display: inline-flex; align-items: flex-start; flex-direction: column; gap: 3px; color: #e2e8f0; font-size: .68rem; font-weight: 800; }
-        #chessPanel .public-chess-player.is-winner { color: #fde68a; }
-        #chessPanel .public-chess-player small { color: #71819c; font-size: .58rem; font-weight: 600; }
-        #chessPanel .public-chess-match-note { margin-top: 9px; color: #aebbd1; font-size: .62rem; }
+        #chessPanel .public-chess-player { display: inline-flex; align-items: flex-start; flex-direction: column; gap: 3px; color: var(--text); font-size: .68rem; font-weight: 800; }
+        #chessPanel .public-chess-player.is-winner { color: var(--primary); }
+        #chessPanel .public-chess-player small { color: var(--muted); font-size: .58rem; font-weight: 600; }
+        #chessPanel .public-chess-match-note { margin-top: 9px; color: var(--muted); font-size: .62rem; }
         #chessPanel .public-chess-bracket-card { margin-top: 14px; }
         #chessPanel .public-chess-bracket { display: flex; gap: 11px; overflow-x: auto; padding: 14px; }
         #chessPanel .public-chess-bracket-column { min-width: 205px; flex: 1 0 205px; }
-        #chessPanel .public-chess-bracket-column h4 { margin: 0 0 9px; color: #facc15; font: 900 .62rem/1.2 "Poppins", sans-serif; letter-spacing: .13em; text-transform: uppercase; }
-        #chessPanel .public-chess-bracket-match { margin-bottom: 9px; padding: 9px; border: 1px solid rgba(129,140,248,.2); border-radius: 12px; background: rgba(15,23,42,.62); animation: publicChessBracketIn .5s cubic-bezier(.16,1,.3,1) both; }
-        #chessPanel .public-chess-bracket-match > small { display: block; margin-bottom: 5px; color: #71819c; font-size: .56rem; }
-        #chessPanel .public-chess-bracket-player { display: flex; justify-content: space-between; gap: 6px; padding: 7px 5px; color: #cbd5e1; font: 700 .65rem/1.2 "Poppins", sans-serif; }
-        #chessPanel .public-chess-bracket-player + .public-chess-bracket-player { border-top: 1px solid rgba(148,163,184,.1); }
-        #chessPanel .public-chess-bracket-player.is-winner { color: #fde68a; }
-        #chessPanel .public-chess-bracket-player b { color: #86efac; }
-        #chessPanel .public-chess-bracket-status { margin-top: 6px; color: #71819c; font-size: .57rem; }
+        #chessPanel .public-chess-bracket-column h4 { margin: 0 0 9px; color: var(--gold); font: 900 .62rem/1.2 "Poppins", sans-serif; letter-spacing: .13em; text-transform: uppercase; }
+        #chessPanel .public-chess-bracket-match { margin-bottom: 9px; padding: 9px; border: 1px solid rgba(99,102,241,.18); border-radius: 12px; background: var(--surface-2); animation: publicChessBracketIn .5s cubic-bezier(.16,1,.3,1) both; }
+        #chessPanel .public-chess-bracket-match > small { display: block; margin-bottom: 5px; color: var(--muted); font-size: .56rem; }
+        #chessPanel .public-chess-bracket-player { display: flex; justify-content: space-between; gap: 6px; padding: 7px 5px; color: var(--text); font: 700 .65rem/1.2 "Poppins", sans-serif; }
+        #chessPanel .public-chess-bracket-player + .public-chess-bracket-player { border-top: 1px solid var(--line); }
+        #chessPanel .public-chess-bracket-player.is-winner { color: var(--primary); }
+        #chessPanel .public-chess-bracket-player b { color: var(--primary); }
+        #chessPanel .public-chess-bracket-status { margin-top: 6px; color: var(--muted); font-size: .57rem; }
         #chessPanel .public-chess-series-card { margin-top: 14px; }
         #chessPanel .public-chess-series-list { padding: 12px; }
-        #chessPanel .public-chess-series-item { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px; border: 1px solid rgba(148,163,184,.12); border-radius: 12px; background: rgba(15,23,42,.62); }
+        #chessPanel .public-chess-series-item { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-2); }
         #chessPanel .public-chess-series-item + .public-chess-series-item { margin-top: 8px; }
-        #chessPanel .public-chess-series-item strong { display: block; color: #f8fafc; font-size: .68rem; }
-        #chessPanel .public-chess-series-item small { display: block; margin-top: 3px; color: #71819c; font-size: .58rem; }
-        #chessPanel .public-chess-series-item > span { color: #fde68a; font-size: .64rem; font-weight: 800; text-align: right; }
-        #chessPanel .public-chess-empty { padding: 42px 18px; color: #8494ae; font: 700 .76rem/1.5 "Poppins", sans-serif; text-align: center; }
-        #chessPanel .public-chess-empty i { display: block; margin-bottom: 10px; color: #facc15; font-size: 1.8rem; }
+        #chessPanel .public-chess-series-item strong { display: block; color: var(--text); font-size: .68rem; }
+        #chessPanel .public-chess-series-item small { display: block; margin-top: 3px; color: var(--muted); font-size: .58rem; }
+        #chessPanel .public-chess-series-item > span { color: var(--gold); font-size: .64rem; font-weight: 800; text-align: right; }
+        #chessPanel .public-chess-empty { padding: 42px 18px; color: var(--muted); font: 700 .76rem/1.5 "Poppins", sans-serif; text-align: center; }
+        #chessPanel .public-chess-empty i { display: block; margin-bottom: 10px; color: var(--gold); font-size: 1.8rem; }
         @keyframes publicChessFloat { 0%, 100% { transform: translateY(0) rotate(-5deg); } 50% { transform: translateY(-5px) rotate(5deg); } }
         @keyframes publicChessCardIn { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes publicChessRowIn { from { opacity: 0; transform: translateX(-8px); } to { opacity: 1; transform: translateX(0); } }
         @keyframes publicChessMatchIn { from { opacity: 0; transform: translateX(10px); } to { opacity: 1; transform: translateX(0); } }
         @keyframes publicChessBracketIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        body.dark #chessPanel .public-chess-shell { background: radial-gradient(circle at 10% 0%, rgba(245,158,11,.12), transparent 38%), linear-gradient(145deg, #020604, #07140c 52%, #000); }
+        /* Chess Champion — dark mode overrides */
+        body.dark #chessPanel .public-chess-shell { background: radial-gradient(circle at 10% 0%, rgba(245,158,11,.12), transparent 38%), linear-gradient(145deg, #020604, #07140c 52%, #000); color: #e2e8f0; }
+        body.dark #chessPanel .public-chess-hero { border-color: rgba(250,204,21,.25); background: radial-gradient(circle at 82% 15%, rgba(99,102,241,.24), transparent 40%), linear-gradient(145deg, rgba(15,23,42,.95), rgba(2,6,23,.95)); box-shadow: 0 18px 48px rgba(0,0,0,.25); }
+        body.dark #chessPanel .public-chess-hero::after { background-image: linear-gradient(rgba(250,204,21,.04) 1px, transparent 1px), linear-gradient(90deg, rgba(250,204,21,.04) 1px, transparent 1px); }
+        body.dark #chessPanel .public-chess-kicker { color: #facc15; }
+        body.dark #chessPanel .public-chess-hero h2 { color: #fff7d6; }
+        body.dark #chessPanel .public-chess-hero p { color: #b8c5dc; }
+        body.dark #chessPanel .public-chess-stage span { border-color: rgba(148,163,184,.21); color: #72809a; background: rgba(15,23,42,.55); }
+        body.dark #chessPanel .public-chess-stage span.is-active { border-color: rgba(250,204,21,.65); color: #fff7d6; background: rgba(161,98,7,.28); }
+        body.dark #chessPanel .public-chess-stage span.is-passed { border-color: rgba(74,222,128,.28); color: #86efac; }
+        body.dark #chessPanel .public-chess-stat { border-color: rgba(148,163,184,.16); background: rgba(15,23,42,.75); border-left-color: #facc15; }
+        body.dark #chessPanel .public-chess-stat i { color: #facc15; }
+        body.dark #chessPanel .public-chess-stat small { color: #8290aa; }
+        body.dark #chessPanel .public-chess-stat strong { color: #f8fafc; }
+        body.dark #chessPanel .public-chess-stat span { color: #aebbd1; }
+        body.dark #chessPanel .public-chess-card { border-color: rgba(148,163,184,.16); background: rgba(5,9,20,.72); box-shadow: 0 12px 32px rgba(0,0,0,.18); }
+        body.dark #chessPanel .public-chess-card-heading { border-bottom-color: rgba(148,163,184,.11); background: transparent; }
+        body.dark #chessPanel .public-chess-card-heading small { color: #facc15; }
+        body.dark #chessPanel .public-chess-card-heading strong { color: #f8fafc; }
+        body.dark #chessPanel .public-chess-card-heading > span:last-child,
+        body.dark #chessPanel .public-chess-card-heading > i { color: #7886a2; }
+        body.dark #chessPanel .public-chess-table th { color: #7785a0; background: rgba(15,23,42,.75); }
+        body.dark #chessPanel .public-chess-table td { border-top-color: rgba(148,163,184,.08); color: #cbd5e1; }
+        body.dark #chessPanel .public-chess-table tbody tr:hover { background: rgba(250,204,21,.055); }
+        body.dark #chessPanel .public-chess-table tbody tr:nth-child(1),
+        body.dark #chessPanel .public-chess-table tbody tr:nth-child(2),
+        body.dark #chessPanel .public-chess-table tbody tr:nth-child(3) { background: transparent; }
+        body.dark #chessPanel .public-chess-rank { border-color: rgba(148,163,184,.25); color: #aebbd1; }
+        body.dark #chessPanel .public-chess-name { color: #f8fafc; }
+        body.dark #chessPanel .public-chess-sub { color: #71819c; }
+        body.dark #chessPanel .public-chess-points { color: #fde68a; }
+        body.dark #chessPanel .public-chess-round-title { color: #fde68a; }
+        body.dark #chessPanel .public-chess-match { border-color: rgba(129,140,248,.2); background: rgba(15,23,42,.62); }
+        body.dark #chessPanel .public-chess-match-top { color: #74829d; }
+        body.dark #chessPanel .public-chess-match-top b { color: #86efac; }
+        body.dark #chessPanel .public-chess-player { color: #e2e8f0; }
+        body.dark #chessPanel .public-chess-player.is-winner { color: #fde68a; }
+        body.dark #chessPanel .public-chess-bracket-match { border-color: rgba(129,140,248,.2); background: rgba(15,23,42,.62); }
+        body.dark #chessPanel .public-chess-bracket-player { color: #cbd5e1; }
+        body.dark #chessPanel .public-chess-bracket-player.is-winner { color: #fde68a; }
+        body.dark #chessPanel .public-chess-series-item { border-color: rgba(148,163,184,.12); background: rgba(15,23,42,.62); }
+        body.dark #chessPanel .public-chess-series-item strong { color: #f8fafc; }
+        body.dark #chessPanel .public-chess-empty { color: #8494ae; }
         @media (max-width: 900px) { #chessPanel .public-chess-grid { grid-template-columns: 1fr; } }
         @media (max-width: 680px) { #chessPanel .public-chess-shell { padding: 10px; } #chessPanel .public-chess-hero { padding: 34px 14px 26px; } #chessPanel .public-chess-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } #chessPanel .public-chess-card-heading { padding-left: 12px; padding-right: 12px; } }
         @media (prefers-reduced-motion: reduce) { #chessPanel .public-chess-kicker i, #chessPanel .public-chess-stat, #chessPanel .public-chess-table tbody tr, #chessPanel .public-chess-match, #chessPanel .public-chess-bracket-match { animation: none !important; } }
@@ -2038,6 +2127,58 @@
         }
 
         // ── Information rendering ──
+        function renderPublicPlannerHtml(planner) {
+            if (!planner || typeof planner !== 'object') return '';
+            const type = String(planner.type || 'monthly').toLowerCase();
+            const data = planner.data && typeof planner.data === 'object' ? planner.data : {};
+            if (type === 'weekly') {
+                const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+                const startDate = planner.weekStart ? new Date(planner.weekStart) : new Date();
+                let rows = '';
+                for (let i = 0; i < 7; i++) {
+                    const d = new Date(startDate);
+                    d.setDate(startDate.getDate() + i);
+                    const dateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                    const key = 'w' + i;
+                    const val = data[key];
+                    const times = ['Morning', 'Mid-Day', 'Evening'];
+                    let blocks = '';
+                    times.forEach(t => {
+                        const text = (val && typeof val === 'object') ? String(val[t] || '') : (t === 'Morning' ? String(val || '') : '');
+                        if (!text) return;
+                        blocks += '<div class="planner-time-block"><span class="planner-time-tag">' + escapeHtml(t) + '</span><div class="planner-time-text">' + escapeHtml(text).replace(/\n/g, '<br>') + '</div></div>';
+                    });
+                    rows += '<div class="planner-weekly-row"><div class="planner-weekly-label"><span class="planner-weekly-day">' + escapeHtml(days[i].slice(0, 3)) + '</span><span class="planner-weekly-date">' + escapeHtml(dateStr) + '</span></div><div class="planner-weekly-content">' + (blocks || '<div class="planner-time-text" style="color:var(--muted);">—</div>') + '</div></div>';
+                }
+                let meta = '';
+                if (planner.goals || planner.notes) {
+                    meta = '<div class="planner-meta">';
+                    if (planner.goals) meta += '<div class="planner-meta-card"><div class="planner-meta-hdr">Goals</div><div class="planner-meta-txt">' + escapeHtml(String(planner.goals)).replace(/\n/g, '<br>') + '</div></div>';
+                    if (planner.notes) meta += '<div class="planner-meta-card"><div class="planner-meta-hdr">Notes</div><div class="planner-meta-txt">' + escapeHtml(String(planner.notes)).replace(/\n/g, '<br>') + '</div></div>';
+                    meta += '</div>';
+                }
+                return '<div class="planner-container">' + meta + rows + '</div>';
+            }
+            const m = parseInt(planner.month, 10) || 0;
+            const y = parseInt(planner.year, 10) || new Date().getFullYear();
+            const firstDay = new Date(y, m, 1).getDay();
+            const daysInMonth = new Date(y, m + 1, 0).getDate();
+            let startOffset = firstDay === 0 ? 6 : firstDay - 1;
+            let cells = '';
+            for (let i = 0; i < startOffset; i++) cells += '<td></td>';
+            for (let d = 1; d <= daysInMonth; d++) {
+                if ((startOffset + d - 1) % 7 === 0 && d > 1) cells += '</tr><tr>';
+                const key = 'd' + d;
+                const val = String(data[key] || '');
+                cells += '<td><span class="planner-day-num">' + d + '</span><div class="planner-day-text">' + (val ? escapeHtml(val).replace(/\n/g, '<br>') : '') + '</div></td>';
+            }
+            const totalCells = startOffset + daysInMonth;
+            const remaining = (7 - (totalCells % 7)) % 7;
+            for (let i = 0; i < remaining; i++) cells += '<td></td>';
+            const monthLabel = new Date(y, m, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+            return '<div class="planner-container"><div style="padding:10px 12px;font-weight:700;color:var(--primary);font-family:Poppins,sans-serif;">' + escapeHtml(monthLabel) + '</div><table class="planner-grid"><thead><tr><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th><th>Sun</th></tr></thead><tbody><tr>' + cells + '</tr></tbody></table></div>';
+        }
+
         function renderInfo(data) {
             scoresData = data;
             const wrap = document.getElementById('infoBody');
@@ -2058,8 +2199,13 @@
                         '<tr>' + row.map(cell => '<td>' + escapeHtml(cell) + '</td>').join('') + '</tr>'
                     ).join('');
                     body = '<div class="info-boxes"><div class="info-box"><table class="info-table"><thead>' + head + '</thead><tbody>' + rows + '</tbody></table></div></div>';
+                } else if (item.layout === 'planner' && item.planner_data) {
+                    body = '<div class="info-boxes">' + renderPublicPlannerHtml(item.planner_data) + '</div>';
                 } else if (item.content) {
-                    body = '<div class="info-boxes"><div class="info-box">' + escapeHtml(item.content).replace(/\n/g, '<br>') + '</div></div>';
+                    const boxes = String(item.content).split('\n').filter(line => line.trim()).map(line =>
+                        '<div class="info-box">' + escapeHtml(line) + '</div>'
+                    ).join('');
+                    body = '<div class="info-boxes">' + (boxes || '<div class="info-box">' + escapeHtml(item.content).replace(/\n/g, '<br>') + '</div>') + '</div>';
                 }
                 let attach = '';
                 if (item.attachment && item.attachment.data_url) {
@@ -2070,7 +2216,8 @@
                         attach = '<div class="info-attachment"><a href="' + a.data_url + '" target="_blank" rel="noopener">📄 ' + escapeHtml(a.name || 'View attachment') + '</a></div>';
                     }
                 }
-                return '<div class="info-item">'
+                const cat = String(item.category || 'general').trim().toLowerCase();
+                return '<div class="info-item" data-category="' + escapeHtml(cat) + '">'
                     + '<div class="info-head"><h4>' + escapeHtml(item.title || 'Information') + '</h4>' + (chips.length ? '<div>' + chips.join('') + '</div>' : '') + '</div>'
                     + body + attach + '</div>';
             }).join('');
@@ -2319,9 +2466,23 @@
         }
 
         // ── ZOOM ──
-        let zoomLevel = parseFloat(localStorage.getItem('ea_zoom') || '1');
+        const pageEl = document.querySelector('.page');
+        let zoomLevel = parseFloat(localStorage.getItem('ea_zoom') || '');
+        if (!Number.isFinite(zoomLevel)) {
+            zoomLevel = (window.innerWidth || 1200) <= 480 ? 0.92 : 1;
+        }
         function applyZoom() {
-            document.querySelector('.page').style.zoom = zoomLevel;
+            if (!pageEl) return;
+            const useTransform = (window.innerWidth || 1200) <= 480;
+            if (useTransform) {
+                pageEl.style.zoom = '';
+                pageEl.style.transform = 'scale(' + zoomLevel + ')';
+                pageEl.style.width = zoomLevel < 1 ? (100 / zoomLevel) + '%' : '';
+            } else {
+                pageEl.style.transform = '';
+                pageEl.style.width = '';
+                pageEl.style.zoom = zoomLevel;
+            }
             localStorage.setItem('ea_zoom', String(zoomLevel));
         }
         document.getElementById('zoomIn').addEventListener('click', () => {
@@ -2331,6 +2492,7 @@
             if (zoomLevel > 0.6) { zoomLevel = Math.round((zoomLevel - 0.1) * 10) / 10; applyZoom(); }
         });
         applyZoom();
+        window.addEventListener('resize', applyZoom);
 
         // ── DARK / LIGHT THEME ──
         let isDark = localStorage.getItem('ea_theme') === 'dark';

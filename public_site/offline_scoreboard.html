@@ -4343,6 +4343,11 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                 </div>
             </div>
             <div class="form-card" style="margin-top:12px;">
+                <h3 style="margin:0 0 8px;"><i class="fas fa-eye"></i> Published View</h3>
+                <p class="section-subtitle" style="margin-bottom:12px;">Preview of how information appears on the public site.</p>
+                <div id="infoPublicView" class="info-wrap"></div>
+            </div>
+            <div class="form-card" style="margin-top:12px;" id="infoAdminListCard">
                 <h3 style="margin:0 0 8px;"><i class="fas fa-list"></i> Current Information Items</h3>
                 <div id="infoItemsList"></div>
             </div>
@@ -15153,22 +15158,31 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                             data_url: String(item.attachment.data_url || '').trim()
                         }
                         : null;
+                    const rawLayout = String(item && item.layout || 'cards').trim().toLowerCase();
+                    const layout = ['table', 'planner'].includes(rawLayout) ? rawLayout : 'cards';
+                    const rawId = item && item.id;
+                    const id = (rawId !== undefined && rawId !== null && String(rawId).trim() !== '')
+                        ? rawId
+                        : generateUniqueId();
                     return {
-                        id: parseInt(item && item.id, 10) || generateUniqueId(),
+                        id,
                         title: String(item && item.title || '').trim(),
                         category: String(item && item.category || 'general').trim().toLowerCase(),
                         audience: String(item && item.audience || '').trim(),
                         period_type: String(item && item.period_type || '').trim().toLowerCase(),
                         period_label: String(item && item.period_label || '').trim(),
-                        layout: String(item && item.layout || 'cards').trim().toLowerCase() === 'table' ? 'table' : 'cards',
+                        layout,
                         content: String(item && item.content || '').trim(),
                         table_columns: Array.isArray(item && item.table_columns) ? item.table_columns.map(v => String(v || '').trim()).filter(Boolean) : [],
                         table_rows: Array.isArray(item && item.table_rows) ? item.table_rows.filter(Array.isArray).map(r => r.map(v => String(v || '').trim())) : [],
+                        planner_data: layout === 'planner' && item && item.planner_data && typeof item.planner_data === 'object'
+                            ? item.planner_data
+                            : null,
                         attachment: attachment,
                         created_at: String(item && item.created_at || '').trim(),
                         updated_at: String(item && item.updated_at || '').trim()
                     };
-                }).filter(item => item.title || item.content || (item.table_rows && item.table_rows.length > 0));
+                }).filter(item => item.title || item.content || (item.table_rows && item.table_rows.length > 0) || (item.planner_data && typeof item.planner_data === 'object'));
                 data.syllabus_catalog = normalizeSyllabusCatalogShape(data.syllabus_catalog || {});
                 data.syllabus_tracking = normalizeSyllabusTrackingRows(data.syllabus_tracking || []);
                 if (!data.syllabus_seed_version) {
@@ -22226,10 +22240,16 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                         };
                     }
                 }
-                return {
-                    id: parseInt(item.id, 10) || generateUniqueId(),
+                const rawLayout = String(item.layout || 'cards').trim().toLowerCase();
+                const layout = ['table', 'planner'].includes(rawLayout) ? rawLayout : 'cards';
+                const rawId = item.id;
+                const id = (rawId !== undefined && rawId !== null && String(rawId).trim() !== '')
+                    ? rawId
+                    : generateUniqueId();
+                const entry = {
+                    id,
                     title: String(item.title || '').trim(),
-                    layout: String(item.layout || 'cards').trim().toLowerCase() === 'table' ? 'table' : 'cards',
+                    layout,
                     content: String(item.content || '').trim(),
                     table_columns: Array.isArray(item.table_columns) ? item.table_columns.map(v => String(v || '').trim()).filter(Boolean) : [],
                     table_rows: Array.isArray(item.table_rows) ? item.table_rows.filter(Array.isArray).map(r => r.map(v => String(v || '').trim())) : [],
@@ -22241,6 +22261,10 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                     created_at: String(item.created_at || '').trim(),
                     updated_at: String(item.updated_at || '').trim()
                 };
+                if (layout === 'planner' && item.planner_data && typeof item.planner_data === 'object') {
+                    entry.planner_data = JSON.parse(JSON.stringify(item.planner_data));
+                }
+                return entry;
             }).filter(Boolean);
         }
 
@@ -55537,6 +55561,10 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             closeModal('plannerModal');
         }
 
+        function informationIdEquals(a, b) {
+            return String(a ?? '') === String(b ?? '');
+        }
+
         function getPublicInformationStore() {
             const data = db.getData();
             if (!Array.isArray(data.public_information)) data.public_information = [];
@@ -55603,7 +55631,8 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             const audience = String(getElementValue('infoAudienceInput') || '').trim();
             const periodType = String(getElementValue('infoPeriodTypeSelect') || '').trim().toLowerCase();
             const periodLabel = String(getElementValue('infoPeriodLabelInput') || '').trim();
-            const layout = String(getElementValue('infoLayoutSelect') || 'cards').trim().toLowerCase() === 'table' ? 'table' : 'cards';
+            const rawLayout = String(getElementValue('infoLayoutSelect') || 'cards').trim().toLowerCase();
+            const layout = ['table', 'planner'].includes(rawLayout) ? rawLayout : 'cards';
             const content = String(getElementValue('infoContentInput') || '').trim();
             const fileEl = document.getElementById('infoAttachmentInput');
             let attachment = informationEditorState.attachment;
@@ -55656,10 +55685,10 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                 table_rows: table.rows,
                 planner_data: layout === 'planner' ? informationEditorState.planner_data : null,
                 attachment: attachment || null,
-                created_at: informationEditorState.editingId ? (rows.find(r => parseInt(r.id, 10) === parseInt(id, 10))?.created_at || nowIso) : nowIso,
+                created_at: informationEditorState.editingId ? (rows.find(r => informationIdEquals(r.id, id))?.created_at || nowIso) : nowIso,
                 updated_at: nowIso
             };
-            const idx = rows.findIndex(item => parseInt(item && item.id, 10) === parseInt(id, 10));
+            const idx = rows.findIndex(item => informationIdEquals(item && item.id, id));
             if (idx >= 0) rows[idx] = nextItem;
             else rows.push(nextItem);
             data.public_information = rows;
@@ -55668,13 +55697,14 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             showAlert('Information item saved.', 'success');
             clearInformationEditor();
             renderInformationItems();
+            renderInformationPublicView();
         }
 
         function editInformationItem(itemId) {
             const rows = getPublicInformationStore();
-            const item = rows.find(row => parseInt(row && row.id, 10) === parseInt(itemId, 10));
+            const item = rows.find(row => informationIdEquals(row && row.id, itemId));
             if (!item) return;
-            informationEditorState.editingId = parseInt(item.id, 10);
+            informationEditorState.editingId = item.id;
             informationEditorState.attachment = item.attachment || null;
             const titleEl = document.getElementById('infoTitleInput');
             const categoryEl = document.getElementById('infoCategorySelect');
@@ -55720,12 +55750,109 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             }
             if (!confirm('Delete this information item?')) return;
             const data = db.getData();
-            data.public_information = getPublicInformationStore().filter(row => parseInt(row && row.id, 10) !== parseInt(itemId, 10));
+            data.public_information = getPublicInformationStore().filter(row => !informationIdEquals(row && row.id, itemId));
             db.saveData(data);
             if (SERVER_SYNC.enabled) pushToServer(db.getData(), { silent: true }).catch(() => {});
-            if (parseInt(informationEditorState.editingId, 10) === parseInt(itemId, 10)) clearInformationEditor();
+            if (informationIdEquals(informationEditorState.editingId, itemId)) clearInformationEditor();
             renderInformationItems();
+            renderInformationPublicView();
             showAlert('Information item deleted.', 'success');
+        }
+
+        function renderPublicPlannerHtml(planner) {
+            if (!planner || typeof planner !== 'object') return '';
+            const type = String(planner.type || 'monthly').toLowerCase();
+            const data = planner.data && typeof planner.data === 'object' ? planner.data : {};
+            if (type === 'weekly') {
+                const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+                const startDate = planner.weekStart ? new Date(planner.weekStart) : new Date();
+                let rows = '';
+                for (let i = 0; i < 7; i++) {
+                    const d = new Date(startDate);
+                    d.setDate(startDate.getDate() + i);
+                    const dateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                    const key = 'w' + i;
+                    const val = data[key];
+                    const times = ['Morning', 'Mid-Day', 'Evening'];
+                    let blocks = '';
+                    times.forEach(t => {
+                        const text = (val && typeof val === 'object') ? String(val[t] || '') : (t === 'Morning' ? String(val || '') : '');
+                        if (!text) return;
+                        blocks += '<div class="planner-time-block"><span class="planner-time-tag">' + escapeHtml(t) + '</span><div class="planner-time-text">' + escapeHtml(text).replace(/\n/g, '<br>') + '</div></div>';
+                    });
+                    rows += '<div class="planner-weekly-row"><div class="planner-weekly-label"><span class="planner-weekly-day">' + escapeHtml(days[i].slice(0, 3)) + '</span><span class="planner-weekly-date">' + escapeHtml(dateStr) + '</span></div><div class="planner-weekly-content">' + (blocks || '<div class="planner-time-text" style="color:var(--muted);">—</div>') + '</div></div>';
+                }
+                let meta = '';
+                if (planner.goals || planner.notes) {
+                    meta = '<div class="planner-meta">';
+                    if (planner.goals) meta += '<div class="planner-meta-card"><div class="planner-meta-hdr">Goals</div><div class="planner-meta-txt">' + escapeHtml(String(planner.goals)).replace(/\n/g, '<br>') + '</div></div>';
+                    if (planner.notes) meta += '<div class="planner-meta-card"><div class="planner-meta-hdr">Notes</div><div class="planner-meta-txt">' + escapeHtml(String(planner.notes)).replace(/\n/g, '<br>') + '</div></div>';
+                    meta += '</div>';
+                }
+                return '<div class="planner-container">' + meta + rows + '</div>';
+            }
+            const m = parseInt(planner.month, 10) || 0;
+            const y = parseInt(planner.year, 10) || new Date().getFullYear();
+            const firstDay = new Date(y, m, 1).getDay();
+            const daysInMonth = new Date(y, m + 1, 0).getDate();
+            let startOffset = firstDay === 0 ? 6 : firstDay - 1;
+            let cells = '';
+            for (let i = 0; i < startOffset; i++) cells += '<td></td>';
+            for (let d = 1; d <= daysInMonth; d++) {
+                if ((startOffset + d - 1) % 7 === 0 && d > 1) cells += '</tr><tr>';
+                const key = 'd' + d;
+                const val = String(data[key] || '');
+                cells += '<td><span class="planner-day-num">' + d + '</span><div class="planner-day-text">' + (val ? escapeHtml(val).replace(/\n/g, '<br>') : '') + '</div></td>';
+            }
+            const totalCells = startOffset + daysInMonth;
+            const remaining = (7 - (totalCells % 7)) % 7;
+            for (let i = 0; i < remaining; i++) cells += '<td></td>';
+            const monthLabel = new Date(y, m, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+            return '<div class="planner-container"><div style="padding:10px 12px;font-weight:700;color:var(--primary,#1a4d2e);">' + escapeHtml(monthLabel) + '</div><table class="planner-grid"><thead><tr><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th><th>Sun</th></tr></thead><tbody><tr>' + cells + '</tr></tbody></table></div>';
+        }
+
+        function renderInformationPublicView() {
+            const host = document.getElementById('infoPublicView');
+            if (!host) return;
+            const rows = [...getPublicInformationStore()].sort((a, b) => parseSyncStamp(b.updated_at || '') - parseSyncStamp(a.updated_at || ''));
+            if (!rows.length) {
+                host.innerHTML = '<div class="sync-meta">No information published yet.</div>';
+                return;
+            }
+            host.innerHTML = rows.map(item => {
+                const chips = [];
+                if (item.category && item.category !== 'general') chips.push('<span class="chip">' + escapeHtml(item.category) + '</span>');
+                if (item.audience) chips.push('<span class="chip">' + escapeHtml(item.audience) + '</span>');
+                if (item.period_label) chips.push('<span class="chip">' + escapeHtml(item.period_label) + '</span>');
+                let body = '';
+                if (item.layout === 'table' && item.table_columns && item.table_columns.length) {
+                    const head = '<tr>' + item.table_columns.map(c => '<th>' + escapeHtml(c) + '</th>').join('') + '</tr>';
+                    const tableRows = (item.table_rows || []).map(row =>
+                        '<tr>' + row.map(cell => '<td>' + escapeHtml(cell) + '</td>').join('') + '</tr>'
+                    ).join('');
+                    body = '<div class="info-boxes"><div class="info-box"><table class="info-table"><thead>' + head + '</thead><tbody>' + tableRows + '</tbody></table></div></div>';
+                } else if (item.layout === 'planner' && item.planner_data) {
+                    body = '<div class="info-boxes">' + renderPublicPlannerHtml(item.planner_data) + '</div>';
+                } else if (item.content) {
+                    const boxes = String(item.content).split('\n').filter(line => line.trim()).map(line =>
+                        '<div class="info-box">' + escapeHtml(line) + '</div>'
+                    ).join('');
+                    body = '<div class="info-boxes">' + (boxes || '<div class="info-box">' + escapeHtml(item.content).replace(/\n/g, '<br>') + '</div>') + '</div>';
+                }
+                let attach = '';
+                if (item.attachment && item.attachment.data_url) {
+                    const a = item.attachment;
+                    if (a.mime && a.mime.indexOf('image/') === 0) {
+                        attach = '<div class="info-attachment"><img src="' + a.data_url + '" alt="' + escapeHtml(a.name || '') + '" style="max-width:100%;height:auto;"></div>';
+                    } else if (a.mime === 'application/pdf') {
+                        attach = '<div class="info-attachment"><a href="' + a.data_url + '" target="_blank" rel="noopener">📄 ' + escapeHtml(a.name || 'View attachment') + '</a></div>';
+                    }
+                }
+                const cat = String(item.category || 'general').trim().toLowerCase();
+                return '<div class="info-item" data-category="' + escapeHtml(cat) + '" style="border:1px solid rgba(148,163,184,.2);border-radius:14px;padding:14px;margin-bottom:10px;border-left:4px solid var(--primary,#1a4d2e);">'
+                    + '<div style="display:flex;justify-content:space-between;gap:10px;align-items:center;margin-bottom:8px;"><strong>' + escapeHtml(item.title || 'Information') + '</strong>' + (chips.length ? '<div>' + chips.join('') + '</div>' : '') + '</div>'
+                    + body + attach + '</div>';
+            }).join('');
         }
 
         function renderInformationItems() {
@@ -55777,8 +55904,12 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             const canEdit = currentUserRole === 'admin' || currentUserRole === 'teacher';
             const editorRow = document.getElementById('infoEditorRow');
             const editorActions = document.getElementById('infoEditorActions');
+            const adminListCard = document.getElementById('infoAdminListCard');
+            const editorCard = editorRow ? editorRow.closest('.form-card') : null;
             if (editorRow) editorRow.style.display = canEdit ? '' : 'none';
             if (editorActions) editorActions.style.display = canEdit ? '' : 'none';
+            if (adminListCard) adminListCard.style.display = canEdit ? '' : 'none';
+            if (editorCard) editorCard.style.display = canEdit ? '' : 'none';
             const titleEl = document.getElementById('infoTitleInput');
             const categoryEl = document.getElementById('infoCategorySelect');
             const audienceEl = document.getElementById('infoAudienceInput');
@@ -55804,6 +55935,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
 
             if (contentEl) contentEl.disabled = !canEdit;
             if (fileEl) fileEl.disabled = !canEdit;
+            renderInformationPublicView();
             renderInformationItems();
         }
 
