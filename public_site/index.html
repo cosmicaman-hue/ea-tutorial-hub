@@ -2226,6 +2226,47 @@
         // ════════════════════════════════════════════════════════════
         // PARTY STANDINGS — ranked 3D circles sized by vote power
         // ════════════════════════════════════════════════════════════
+        // Readable accents aligned with LAN SPA (neon/near-white ledger colors fail contrast).
+        const PUBLIC_PARTY_COLORS = {
+            MAP: '#7c3aed',
+            BWP: '#d97706',
+            ESP: '#1d4ed8',
+            MRP: '#047857',
+            SSP: '#be185d',
+            NJP: '#c2410c',
+            EYP: '#0e7490'
+        };
+
+        function relativeLuminance(hex) {
+            const text = String(hex || '').replace('#', '').trim();
+            const full = text.length === 3 ? text.split('').map(c => c + c).join('') : text;
+            if (!/^[0-9a-fA-F]{6}$/.test(full)) return 0.5;
+            const rgb = [0, 2, 4].map(i => parseInt(full.slice(i, i + 2), 16) / 255);
+            const lin = rgb.map(c => c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4));
+            return 0.2126 * lin[0] + 0.7152 * lin[1] + 0.0722 * lin[2];
+        }
+
+        function darkenHex(hex, factor) {
+            const text = String(hex || '').replace('#', '').trim();
+            const full = text.length === 3 ? text.split('').map(c => c + c).join('') : text;
+            if (!/^[0-9a-fA-F]{6}$/.test(full)) return '#64748b';
+            const f = Math.max(0.15, Math.min(1, Number(factor) || 0.5));
+            const rgb = [0, 2, 4].map(i => Math.max(0, Math.min(255, Math.round(parseInt(full.slice(i, i + 2), 16) * f))));
+            return '#' + rgb.map(v => v.toString(16).padStart(2, '0')).join('');
+        }
+
+        function resolvePublicPartyColor(code, rawColor) {
+            const key = String(code || '').trim().toUpperCase();
+            if (PUBLIC_PARTY_COLORS[key]) return PUBLIC_PARTY_COLORS[key];
+            const color = String(rawColor || '').trim();
+            if (!/^#[0-9A-Fa-f]{3}([0-9A-Fa-f]{3})?$/.test(color)) return '#64748b';
+            const normalized = color.length === 4
+                ? '#' + color.slice(1).split('').map(c => c + c).join('')
+                : color;
+            if (relativeLuminance(normalized) > 0.42) return darkenHex(normalized, 0.48);
+            return normalized.toLowerCase();
+        }
+
         let partiesMonthSelect = null;
         let partiesCurrentMonth = '';
 
@@ -2287,9 +2328,10 @@
                 const size = partyCircleDiameter(p.votePower || 0, maxVp, empty);
                 const floatDelay = (i * 0.9).toFixed(2) + 's';
                 const enterDelay = (i * 0.12).toFixed(2) + 's';
+                const partyColor = resolvePublicPartyColor(p.code, p.color);
                 return '<div class="party-circle-slot" style="--float-delay:' + floatDelay + ';">'
                     + '<button type="button" class="party-circle' + (empty ? ' circle-empty' : '') + '" '
-                    + 'style="--party-color:' + escapeHtml(p.color || '#64748b') + ';--circle-size:' + size + 'px;--enter-delay:' + enterDelay + ';" '
+                    + 'style="--party-color:' + escapeHtml(partyColor) + ';--circle-size:' + size + 'px;--enter-delay:' + enterDelay + ';" '
                     + 'data-party-code="' + escapeHtml(p.code) + '" '
                     + 'aria-label="' + escapeHtml(p.fullName || p.code) + ' — vote power ' + (p.votePower || 0) + '">'
                     + '<span class="party-sphere" aria-hidden="true"></span>'
@@ -2342,7 +2384,7 @@
                 }).join('')
                 : '<li class="party-modal-empty">No active members for this month.</li>';
 
-            partyModalCard.style.setProperty('--party-color', party.color || '#64748b');
+            partyModalCard.style.setProperty('--party-color', resolvePublicPartyColor(party.code, party.color));
             partyModalBody.innerHTML =
                 '<div class="party-modal-header">'
                 + '<div class="party-modal-symbol">' + escapeHtml(party.symbol || '🫧') + '</div>'
