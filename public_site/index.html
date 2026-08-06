@@ -988,7 +988,7 @@
             font: 700 .72rem/1 "Poppins", sans-serif;
             padding: 5px 14px; border-radius: 999px;
             background: color-mix(in srgb, var(--party-color, #1a4d2e) 16%, transparent);
-            color: var(--party-color, var(--primary));
+            color: var(--party-label, var(--party-color, var(--primary)));
             border: 1px solid color-mix(in srgb, var(--party-color, #1a4d2e) 35%, transparent);
         }
         .party-modal-stats {
@@ -1001,7 +1001,7 @@
         }
         body.dark .party-modal-stat { background: #111; border-color: rgba(255,255,255,.07); }
         .party-modal-stat .stat-val {
-            font: 800 1.25rem/1 "Poppins", sans-serif; color: var(--party-color, var(--primary));
+            font: 800 1.25rem/1 "Poppins", sans-serif; color: var(--party-label, var(--party-color, var(--primary)));
         }
         .party-modal-stat .stat-label {
             font: 600 .62rem/1 "Poppins", sans-serif; color: var(--muted);
@@ -1079,7 +1079,7 @@
             flex: 0 0 auto; font: 700 .62rem/1 "Poppins", sans-serif;
             padding: 4px 9px; border-radius: 999px; text-transform: uppercase; letter-spacing: .4px;
             background: color-mix(in srgb, var(--party-color, #1a4d2e) 14%, transparent);
-            color: var(--party-color, var(--primary));
+            color: var(--party-label, var(--party-color, var(--primary)));
             border: 1px solid color-mix(in srgb, var(--party-color, #1a4d2e) 28%, transparent);
         }
         .party-modal-member .m-score {
@@ -1088,7 +1088,7 @@
         }
         .party-modal-member .m-score .m-score-val {
             display: block;
-            font: 800 1rem/1 "Poppins", sans-serif; color: var(--party-color, var(--primary));
+            font: 800 1rem/1 "Poppins", sans-serif; color: var(--party-label, var(--party-color, var(--primary)));
             white-space: nowrap;
         }
         .party-modal-member .m-score .m-vp {
