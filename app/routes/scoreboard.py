@@ -539,16 +539,16 @@ def _sanitize_client_public_snapshot(snapshot, payload):
     }
 
 
-# Readable public-site party accents aligned with LAN SPA defaults.
-# Neon / near-white ledger colors fail contrast on cream backgrounds and white circle text.
+# Vibrant public-site party accents matched to LAN Party Standings ledger hues.
+# Neon/near-white values are clamped for contrast while keeping each party distinct.
 _PUBLIC_PARTY_COLORS = {
-    'MAP': '#7c3aed',  # violet
-    'BWP': '#d97706',  # amber
-    'ESP': '#1d4ed8',  # blue
-    'MRP': '#047857',  # emerald
-    'SSP': '#be185d',  # rose
-    'NJP': '#c2410c',  # orange
-    'EYP': '#0e7490',  # teal — distinct from ESP blue
+    'MAP': '#f0a400',  # gold
+    'BWP': '#ef4444',  # vivid red
+    'ESP': '#3b82f6',  # blue (LAN near-white has no usable hue)
+    'MRP': '#22c55e',  # lime green
+    'SSP': '#06b6d4',  # cyan (LAN #14ffef)
+    'NJP': '#f97316',  # orange
+    'EYP': '#d946ef',  # magenta (LAN #f500ed)
 }
 
 
@@ -586,20 +586,42 @@ def _darken_hex(hex_color, factor=0.55):
     return '#{:02x}{:02x}{:02x}'.format(*darkened)
 
 
-def _public_party_color(code, raw_color=None):
-    """Return a readable party accent for the Cloudflare public site."""
-    key = str(code or '').strip().upper()
-    if key in _PUBLIC_PARTY_COLORS:
-        return _PUBLIC_PARTY_COLORS[key]
-    color = str(raw_color or '').strip()
+def _normalize_hex_color(value):
+    color = str(value or '').strip()
     if not re.match(r'^#[0-9A-Fa-f]{3}([0-9A-Fa-f]{3})?$', color):
-        return '#64748b'
+        return ''
     if len(color) == 4:
         color = '#' + ''.join(ch * 2 for ch in color[1:])
-    # Too light for white label text / cream modal labels — darken in place.
-    if _relative_luminance(color) > 0.42:
-        return _darken_hex(color, 0.48)
     return color.lower()
+
+
+def _hex_chroma(hex_color):
+    rgb = _hex_to_rgb(hex_color)
+    if not rgb:
+        return 0
+    return max(rgb) - min(rgb)
+
+
+def _clamp_public_party_color(hex_color, target_max_luminance=0.48):
+    """Darken while preserving hue until white-on-color text stays readable."""
+    out = _normalize_hex_color(hex_color) or '#64748b'
+    for _ in range(10):
+        if _relative_luminance(out) <= target_max_luminance:
+            return out
+        out = _darken_hex(out, 0.84)
+    return out
+
+
+def _public_party_color(code, raw_color=None):
+    """Prefer LAN Party Standings colors; clamp only when contrast would fail."""
+    key = str(code or '').strip().upper()
+    raw = _normalize_hex_color(raw_color)
+    # Near-white / washed colors (e.g. ESP #f0f4ff) have no usable hue — fall back.
+    if raw and not (_relative_luminance(raw) > 0.82 and _hex_chroma(raw) < 40):
+        return _clamp_public_party_color(raw)
+    if key in _PUBLIC_PARTY_COLORS:
+        return _clamp_public_party_color(_PUBLIC_PARTY_COLORS[key])
+    return '#64748b'
 
 
 def _sanitize_client_public_parties(raw_parties, allowed_months):

@@ -892,19 +892,19 @@
         }
         .party-circle .circle-code {
             font: 800 calc(var(--circle-size, 132px) * 0.105)/1 "Poppins", sans-serif;
-            color: #fff; margin-top: 4%;
+            color: var(--party-ink, #fff); margin-top: 4%;
             text-shadow: 0 1px 4px rgba(0,0,0,.55);
             letter-spacing: .5px;
         }
         .party-circle .circle-vp {
             font: 700 calc(var(--circle-size, 132px) * 0.085)/1 "Poppins", sans-serif;
-            color: rgba(255,255,255,.92); margin-top: 3%;
+            color: color-mix(in srgb, var(--party-ink, #fff) 92%, transparent); margin-top: 3%;
             text-shadow: 0 1px 3px rgba(0,0,0,.6);
         }
         .party-circle .circle-rank {
             position: absolute; top: 7%; left: 8%; z-index: 3;
             font: 800 calc(var(--circle-size, 132px) * 0.075)/1 "Poppins", sans-serif;
-            color: #fff; background: rgba(0,0,0,.44);
+            color: var(--party-ink, #fff); background: rgba(0,0,0,.44);
             border-radius: 999px; padding: .22em .55em;
             backdrop-filter: blur(4px);
         }
@@ -976,7 +976,7 @@
         }
         .party-modal-symbol { font-size: 2.6rem; line-height: 1; position: relative; }
         .party-modal-code {
-            font: 800 1.5rem/1.1 "Poppins", sans-serif; color: var(--party-color, var(--primary));
+            font: 800 1.5rem/1.1 "Poppins", sans-serif; color: var(--party-label, var(--party-color, var(--primary)));
             margin: 6px 0 2px; position: relative;
         }
         .party-modal-fullname {
@@ -2226,15 +2226,15 @@
         // ════════════════════════════════════════════════════════════
         // PARTY STANDINGS — ranked 3D circles sized by vote power
         // ════════════════════════════════════════════════════════════
-        // Readable accents aligned with LAN SPA (neon/near-white ledger colors fail contrast).
+        // Vibrant accents matched to LAN Party Standings ledger hues (not dark catalog shades).
         const PUBLIC_PARTY_COLORS = {
-            MAP: '#7c3aed',
-            BWP: '#d97706',
-            ESP: '#1d4ed8',
-            MRP: '#047857',
-            SSP: '#be185d',
-            NJP: '#c2410c',
-            EYP: '#0e7490'
+            MAP: '#f0a400', // gold
+            BWP: '#ef4444', // vivid red
+            ESP: '#3b82f6', // blue (LAN near-white has no usable hue)
+            MRP: '#22c55e', // lime green
+            SSP: '#06b6d4', // cyan (LAN #14ffef)
+            NJP: '#f97316', // orange
+            EYP: '#d946ef'  // magenta (LAN #f500ed)
         };
 
         function relativeLuminance(hex) {
@@ -2246,6 +2246,14 @@
             return 0.2126 * lin[0] + 0.7152 * lin[1] + 0.0722 * lin[2];
         }
 
+        function hexChroma(hex) {
+            const text = String(hex || '').replace('#', '').trim();
+            const full = text.length === 3 ? text.split('').map(c => c + c).join('') : text;
+            if (!/^[0-9a-fA-F]{6}$/.test(full)) return 0;
+            const rgb = [0, 2, 4].map(i => parseInt(full.slice(i, i + 2), 16));
+            return Math.max.apply(null, rgb) - Math.min.apply(null, rgb);
+        }
+
         function darkenHex(hex, factor) {
             const text = String(hex || '').replace('#', '').trim();
             const full = text.length === 3 ? text.split('').map(c => c + c).join('') : text;
@@ -2255,16 +2263,40 @@
             return '#' + rgb.map(v => v.toString(16).padStart(2, '0')).join('');
         }
 
+        function normalizeHexColor(raw) {
+            const color = String(raw || '').trim();
+            if (!/^#[0-9A-Fa-f]{3}([0-9A-Fa-f]{3})?$/.test(color)) return '';
+            if (color.length === 4) return '#' + color.slice(1).split('').map(c => c + c).join('').toLowerCase();
+            return color.toLowerCase();
+        }
+
+        function clampPublicPartyColor(hex, targetMax) {
+            let out = normalizeHexColor(hex) || '#64748b';
+            const maxL = typeof targetMax === 'number' ? targetMax : 0.48;
+            for (let i = 0; i < 10; i++) {
+                if (relativeLuminance(out) <= maxL) return out;
+                out = darkenHex(out, 0.84);
+            }
+            return out;
+        }
+
         function resolvePublicPartyColor(code, rawColor) {
             const key = String(code || '').trim().toUpperCase();
-            if (PUBLIC_PARTY_COLORS[key]) return PUBLIC_PARTY_COLORS[key];
-            const color = String(rawColor || '').trim();
-            if (!/^#[0-9A-Fa-f]{3}([0-9A-Fa-f]{3})?$/.test(color)) return '#64748b';
-            const normalized = color.length === 4
-                ? '#' + color.slice(1).split('').map(c => c + c).join('')
-                : color;
-            if (relativeLuminance(normalized) > 0.42) return darkenHex(normalized, 0.48);
-            return normalized.toLowerCase();
+            const raw = normalizeHexColor(rawColor);
+            // Prefer LAN Party Standings color; only replace washed near-white.
+            if (raw && !(relativeLuminance(raw) > 0.82 && hexChroma(raw) < 40)) {
+                return clampPublicPartyColor(raw);
+            }
+            if (PUBLIC_PARTY_COLORS[key]) return clampPublicPartyColor(PUBLIC_PARTY_COLORS[key]);
+            return '#64748b';
+        }
+
+        function resolvePublicPartyPalette(code, rawColor) {
+            const accent = resolvePublicPartyColor(code, rawColor);
+            const ink = relativeLuminance(accent) > 0.55 ? '#0f172a' : '#ffffff';
+            // Modal labels sit on cream — keep hue but ensure dark enough text.
+            const label = relativeLuminance(accent) > 0.42 ? darkenHex(accent, 0.72) : accent;
+            return { accent: accent, ink: ink, label: label };
         }
 
         let partiesMonthSelect = null;
@@ -2329,9 +2361,10 @@
                 const floatDelay = (i * 0.9).toFixed(2) + 's';
                 const enterDelay = (i * 0.12).toFixed(2) + 's';
                 const partyColor = resolvePublicPartyColor(p.code, p.color);
+                const palette = resolvePublicPartyPalette(p.code, p.color);
                 return '<div class="party-circle-slot" style="--float-delay:' + floatDelay + ';">'
                     + '<button type="button" class="party-circle' + (empty ? ' circle-empty' : '') + '" '
-                    + 'style="--party-color:' + escapeHtml(partyColor) + ';--circle-size:' + size + 'px;--enter-delay:' + enterDelay + ';" '
+                    + 'style="--party-color:' + escapeHtml(palette.accent) + ';--party-ink:' + escapeHtml(palette.ink) + ';--circle-size:' + size + 'px;--enter-delay:' + enterDelay + ';" '
                     + 'data-party-code="' + escapeHtml(p.code) + '" '
                     + 'aria-label="' + escapeHtml(p.fullName || p.code) + ' — vote power ' + (p.votePower || 0) + '">'
                     + '<span class="party-sphere" aria-hidden="true"></span>'
@@ -2384,7 +2417,10 @@
                 }).join('')
                 : '<li class="party-modal-empty">No active members for this month.</li>';
 
-            partyModalCard.style.setProperty('--party-color', resolvePublicPartyColor(party.code, party.color));
+            const palette = resolvePublicPartyPalette(party.code, party.color);
+            partyModalCard.style.setProperty('--party-color', palette.accent);
+            partyModalCard.style.setProperty('--party-label', palette.label);
+            partyModalCard.style.setProperty('--party-ink', palette.ink);
             partyModalBody.innerHTML =
                 '<div class="party-modal-header">'
                 + '<div class="party-modal-symbol">' + escapeHtml(party.symbol || '🫧') + '</div>'
