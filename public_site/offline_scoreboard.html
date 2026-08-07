@@ -14707,7 +14707,8 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             document.getElementById('chessChampionEndMatchDuration').value = match.durationSeconds ? Math.round(match.durationSeconds / 60) : '';
             modal.classList.remove('hidden');
             modal.setAttribute('aria-hidden', 'false');
-            document.body.classList.add('chess-champion-modal-open');
+            chessChampionLockViewportForModal();
+            requestAnimationFrame(() => modal.scrollTop = 0);
             previewChessChampionEndMatch();
             const firstInput = document.getElementById('chessChampionWhiteKillPoints');
             if (firstInput) setTimeout(() => firstInput.focus(), 30);
@@ -14719,7 +14720,9 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                 modal.classList.add('hidden');
                 modal.setAttribute('aria-hidden', 'true');
             }
-            document.body.classList.remove('chess-champion-modal-open');
+            if (!document.getElementById('chessChampionReviseMatchModal') || document.getElementById('chessChampionReviseMatchModal').classList.contains('hidden')) {
+                chessChampionUnlockViewportForModal();
+            }
             activeChessChampionMatchId = '';
         }
 
@@ -29222,6 +29225,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             const penalties = [
                 { label: '👑 Leader',    key: 'leader',     pts: -50 },
                 { label: '🥈 Co-Leader', key: 'co_leader',  pts: -40 },
+                { label: '⚖️ DWI',       key: 'dwi',        pts: -30 },
                 { label: '🎓 CR',        key: 'cr',         pts: -30 },
                 { label: '📚 Teacher',   key: 'teacher',    pts: -60 },
                 { label: '🔐 Admin',     key: 'admin',      pts: -100 }
