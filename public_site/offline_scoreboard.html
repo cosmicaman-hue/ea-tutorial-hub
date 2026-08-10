@@ -782,7 +782,8 @@ body.sb-closing .sidebar-nav-item { transition: color .2s var(--ease-out), backg
     .validation-modal-header h3 {
         font-size: 0.95rem;
     }
-    #lastSyncTime { min-width: 0 !important; }
+    #lastSyncTime { flex: 1 1 100% !important; min-width: 0 !important; order: 10; white-space: normal; }
+    #globalSyncBar { row-gap: 8px; }
 }
 
 #ranking-tab.tab-content {
@@ -1204,6 +1205,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
         <div class="sidebar-section-label">Records</div>
         <button class="sidebar-nav-item" data-tab="notebooks" onclick="switchTab('notebooks')" title="Notebooks Check"><i class="fas fa-clipboard-check" style="color:#a78bfa"></i><span class="sidebar-link-text">Notebooks Check</span></button>
         <button class="sidebar-nav-item" data-tab="attendance" onclick="switchTab('attendance')" title="Attendance"><i class="fas fa-user-check" style="color:#10b981"></i><span class="sidebar-link-text">Attendance</span></button>
+        <button class="sidebar-nav-item" data-tab="daily-summary" onclick="switchTab('daily-summary')" title="Daily Summary"><i class="fas fa-clipboard-list" style="color:#38bdf8"></i><span class="sidebar-link-text">Daily Summary</span></button>
         <button class="sidebar-nav-item" data-tab="reports" onclick="switchTab('reports')" title="Reports"><i class="fas fa-file-alt" style="color:#f59e0b"></i><span class="sidebar-link-text">Reports</span></button>
         <button class="sidebar-nav-item" id="sidebarProfileBtn" data-tab="profile" onclick="switchTab('profile')" title="Student Profiles"><i class="fas fa-id-card" style="color:#0f766e"></i><span class="sidebar-link-text">Student Profiles</span></button>
         <button class="sidebar-nav-item" data-tab="good-conduct" onclick="switchTab('good-conduct')" title="Good Conduct Badge"><i class="fas fa-award" style="color:#10b981"></i><span class="sidebar-link-text">Good Conduct</span></button>
@@ -1865,6 +1867,9 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             </button>
             <button class="tab-button" onclick="switchTab('attendance')" style="--tab-icon: #10b981;">
                 <i class="fas fa-user-check"></i> Attendance
+            </button>
+            <button class="tab-button" onclick="switchTab('daily-summary')" style="--tab-icon: #38bdf8;">
+                <i class="fas fa-clipboard-list"></i> Daily Summary
             </button>
             <button class="tab-button" onclick="switchTab('reports')" style="--tab-icon: #f59e0b;">
                 <i class="fas fa-file-alt"></i> Reports
@@ -6915,6 +6920,201 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                             </thead>
                             <tbody id="goodConductBody">
                                 <tr><td colspan="11" class="text-center loading">Loading...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB: DAILY SUMMARY -->
+        <div id="daily-summary-tab" class="tab-content hidden">
+            <style>
+                .tds-status { display:inline-block; padding:3px 10px; border-radius:999px; font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; }
+                .tds-status.draft { background:rgba(148,163,184,.18); color:#cbd5e1; }
+                .tds-status.submitted { background:rgba(56,189,248,.18); color:#7dd3fc; }
+                .tds-status.acknowledged { background:rgba(34,197,94,.18); color:#86efac; }
+                .tds-status.needs_revision { background:rgba(245,158,11,.18); color:#fbbf24; }
+                .tds-section { margin-top:14px; padding-top:12px; border-top:1px solid var(--border-color); }
+                .tds-row { display:grid; grid-template-columns:1.1fr 1.4fr 0.8fr 1.4fr auto; gap:8px; margin-bottom:8px; align-items:start; }
+                .tds-row input, .tds-row textarea, .tds-row select { width:100%; }
+                .tds-images { display:flex; flex-wrap:wrap; gap:10px; }
+                .tds-image-card { width:140px; border:1px solid var(--border-color); border-radius:8px; overflow:hidden; background:var(--bg-card); }
+                .tds-image-card img { width:100%; height:90px; object-fit:cover; display:block; background:#0f172a; }
+                .tds-image-card .cap { padding:6px; font-size:11px; }
+                .tds-filter-chip { cursor:pointer; border:1px solid var(--border-color); background:transparent; color:var(--text-primary); border-radius:999px; padding:4px 12px; font-size:12px; }
+                .tds-filter-chip.active { border-color:#38bdf8; background:rgba(56,189,248,.15); color:#7dd3fc; }
+                @media (max-width: 900px) {
+                    .tds-row { grid-template-columns:1fr; }
+                }
+            </style>
+
+            <div class="form-card" id="tdsAdminInboxCard" style="display:none;">
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+                    <h3 style="margin:0;"><i class="fas fa-inbox"></i> Review Inbox</h3>
+                    <div id="tdsInboxFilters" style="display:flex;gap:8px;flex-wrap:wrap;">
+                        <button type="button" class="tds-filter-chip active" data-filter="pending" onclick="tdsSetInboxFilter('pending')">Pending</button>
+                        <button type="button" class="tds-filter-chip" data-filter="needs_revision" onclick="tdsSetInboxFilter('needs_revision')">Needs revision</button>
+                        <button type="button" class="tds-filter-chip" data-filter="all" onclick="tdsSetInboxFilter('all')">All</button>
+                    </div>
+                </div>
+                <div class="scoreboard-wrapper" style="margin-top:12px;">
+                    <div class="scoreboard-scroll">
+                        <table class="scoreboard">
+                            <thead>
+                                <tr>
+                                    <th style="width:110px;">Date</th>
+                                    <th style="width:100px;">Class</th>
+                                    <th style="width:140px;">Taught by</th>
+                                    <th style="width:130px;">Status</th>
+                                    <th>Day note</th>
+                                    <th style="width:120px;">Open</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tdsInboxBody">
+                                <tr><td colspan="6" class="text-center loading">Loading...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-card">
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:12px;">
+                    <div>
+                        <h3 style="margin:0;"><i class="fas fa-clipboard-list"></i> Teacher Daily Summary</h3>
+                        <p class="section-subtitle" style="margin:6px 0 0;">Endorse today’s teaching work for Admin review.</p>
+                    </div>
+                    <span id="tdsStatusBadge" class="tds-status draft">draft</span>
+                </div>
+
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>Date</label>
+                        <input type="date" id="tdsDate" onchange="tdsOnDateOrClassChange()">
+                    </div>
+                    <div class="form-group">
+                        <label>Class / Group</label>
+                        <select id="tdsClassScope" onchange="tdsOnDateOrClassChange()">
+                            <option value="A">Group A</option>
+                            <option value="B">Group B</option>
+                            <option value="C">Group C</option>
+                            <option value="D">Group D</option>
+                            <option value="E">Group E</option>
+                            <option value="F">Group F</option>
+                            <option value="G">Group G</option>
+                            <option value="H">Group H</option>
+                            <option value="All">All / Mixed</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Taught by</label>
+                        <input type="text" id="tdsTaughtBy" list="tdsTeacherNames" placeholder="Teacher name">
+                        <datalist id="tdsTeacherNames"></datalist>
+                    </div>
+                </div>
+
+                <div class="tds-section">
+                    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
+                        <h4 style="margin:0;"><i class="fas fa-chalkboard"></i> Lessons conducted today</h4>
+                        <div style="display:flex;gap:8px;">
+                            <button type="button" class="secondary" onclick="tdsImportSyllabusLessons()"><i class="fas fa-download"></i> Import from Syllabus</button>
+                            <button type="button" class="secondary" onclick="tdsAddLessonRow()"><i class="fas fa-plus"></i> Add</button>
+                        </div>
+                    </div>
+                    <div id="tdsLessonsList" style="margin-top:10px;"></div>
+                </div>
+
+                <div class="tds-section">
+                    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
+                        <h4 style="margin:0;"><i class="fas fa-calendar-day"></i> Lesson plan for tomorrow</h4>
+                        <button type="button" class="secondary" onclick="tdsAddPlanRow()"><i class="fas fa-plus"></i> Add</button>
+                    </div>
+                    <div id="tdsPlanList" style="margin-top:10px;"></div>
+                </div>
+
+                <div class="tds-section">
+                    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
+                        <h4 style="margin:0;"><i class="fas fa-book"></i> Homework assigned</h4>
+                        <button type="button" class="secondary" onclick="tdsAddHomeworkRow()"><i class="fas fa-plus"></i> Add</button>
+                    </div>
+                    <div id="tdsHomeworkList" style="margin-top:10px;"></div>
+                </div>
+
+                <div class="tds-section">
+                    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
+                        <h4 style="margin:0;"><i class="fas fa-file-circle-check"></i> Tests conducted</h4>
+                        <button type="button" class="secondary" onclick="tdsAddTestRow()"><i class="fas fa-plus"></i> Add</button>
+                    </div>
+                    <div id="tdsTestsList" style="margin-top:10px;"></div>
+                </div>
+
+                <div class="tds-section">
+                    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
+                        <h4 style="margin:0;"><i class="fas fa-pen-to-square"></i> Gradings done</h4>
+                        <button type="button" class="secondary" onclick="tdsAddGradingRow()"><i class="fas fa-plus"></i> Add</button>
+                    </div>
+                    <div id="tdsGradingsList" style="margin-top:10px;"></div>
+                </div>
+
+                <div class="tds-section">
+                    <h4 style="margin:0 0 8px;"><i class="fas fa-note-sticky"></i> Day note</h4>
+                    <textarea id="tdsDayNote" rows="12" style="width:100%; min-height:220px; font-size:15px; line-height:1.45;" placeholder="What went well, blockers, follow-ups..."></textarea>
+                </div>
+
+                <div class="tds-section">
+                    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
+                        <h4 style="margin:0;"><i class="fas fa-image"></i> Evidence images</h4>
+                        <label class="secondary" style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;padding:6px 12px;border-radius:6px;border:1px solid var(--border-color);">
+                            <i class="fas fa-upload"></i> Upload
+                            <input type="file" id="tdsImageInput" accept="image/jpeg,image/png,image/webp" style="display:none;" onchange="tdsHandleImageSelect(event)">
+                        </label>
+                    </div>
+                    <div id="tdsImagesList" class="tds-images" style="margin-top:10px;"></div>
+                    <p style="font-size:12px;color:var(--text-muted);margin:8px 0 0;">Up to 6 images (JPG/PNG/WebP, max 5 MB each).</p>
+                </div>
+
+                <div class="tds-section" id="tdsRemarksSection" style="display:none;">
+                    <h4 style="margin:0 0 8px;"><i class="fas fa-comments"></i> Admin remarks</h4>
+                    <div id="tdsRemarksHistory"></div>
+                </div>
+
+                <div class="tds-section" id="tdsAdminReviewPanel" style="display:none;">
+                    <h4 style="margin:0 0 8px;"><i class="fas fa-user-shield"></i> Admin review</h4>
+                    <textarea id="tdsAdminRemarkInput" rows="3" placeholder="Remark for the teacher..."></textarea>
+                    <div class="form-buttons" style="margin-top:10px;">
+                        <button type="button" class="secondary" onclick="tdsAdminSetStatus('needs_revision')"><i class="fas fa-rotate-left"></i> Request revision</button>
+                        <button type="button" onclick="tdsAdminSetStatus('acknowledged')"><i class="fas fa-check"></i> Acknowledge</button>
+                    </div>
+                </div>
+
+                <div class="form-buttons" id="tdsTeacherActions">
+                    <button type="button" class="secondary" onclick="tdsNewSummary()"><i class="fas fa-file"></i> New</button>
+                    <button type="button" class="secondary" onclick="tdsSaveSummary('draft')"><i class="fas fa-save"></i> Save draft</button>
+                    <button type="button" onclick="tdsSaveSummary('submitted')"><i class="fas fa-paper-plane"></i> Submit for review</button>
+                </div>
+            </div>
+
+            <div class="form-card">
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+                    <h3 style="margin:0;"><i class="fas fa-history"></i> History</h3>
+                    <select id="tdsHistoryMonth" onchange="tdsRenderHistory()"></select>
+                </div>
+                <div class="scoreboard-wrapper">
+                    <div class="scoreboard-scroll">
+                        <table class="scoreboard">
+                            <thead>
+                                <tr>
+                                    <th style="width:110px;">Date</th>
+                                    <th style="width:100px;">Class</th>
+                                    <th style="width:140px;">Taught by</th>
+                                    <th style="width:130px;">Status</th>
+                                    <th>Updated</th>
+                                    <th style="width:100px;">Open</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tdsHistoryBody">
+                                <tr><td colspan="6" class="text-center loading">Loading...</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -15213,6 +15413,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                     syllabus_catalog: {},
                     syllabus_tracking: [],
                     syllabus_seed_version: '',
+                    teacher_daily_summaries: [],
                     post_holder_history: [],
                     notification_history: [],
                     proposals: [],
@@ -15309,6 +15510,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                 if (!data.syllabus_catalog || typeof data.syllabus_catalog !== 'object') data.syllabus_catalog = {};
                 if (!data.syllabus_tracking) data.syllabus_tracking = [];
                 if (!data.syllabus_seed_version) data.syllabus_seed_version = '';
+                if (!Array.isArray(data.teacher_daily_summaries)) data.teacher_daily_summaries = [];
                 if (!data.post_holder_history) data.post_holder_history = [];
                 if (!data.notification_history) data.notification_history = [];
                 if (!data.proposals) data.proposals = [];
@@ -16059,6 +16261,10 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                 }
                 if (!data.syllabus_tracking) {
                     data.syllabus_tracking = [];
+                    updated = true;
+                }
+                if (!Array.isArray(data.teacher_daily_summaries)) {
+                    data.teacher_daily_summaries = [];
                     updated = true;
                 }
                 if (!data.syllabus_seed_version) {
@@ -17908,6 +18114,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                     'rules':                 loadRulesTab,
                     'information':           loadInformationTab,
                     'attendance':            loadAttendanceTab,
+                    'daily-summary':         loadDailySummaryTab,
                     'gr':                    loadCRTab,
                     'leadership':            loadLeadership,
                     'leadership-selection':  loadLeadershipSelectionTab,
@@ -19747,6 +19954,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
         }
 
         function canEditData(options = {}) {
+            if (SERVER_SYNC.enabled && !hasServerSession) return false;
             const role = normalizeUserRole(currentUserRole);
             if (role === 'admin') return true;
             if (role === 'teacher') return options.allowTeacher === true;
@@ -19764,9 +19972,10 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
         }
 
         function isTabAccessibleForCurrentRole(tabName) {
-            const isAdmin = currentUserRole === 'admin';
-            const isTeacher = currentUserRole === 'teacher';
-            const isStudent = !isAdmin && !isTeacher;
+            const roleIsTrusted = !SERVER_SYNC.enabled || hasServerSession;
+            const isAdmin = roleIsTrusted && currentUserRole === 'admin';
+            const isTeacher = roleIsTrusted && currentUserRole === 'teacher';
+            const isStudent = roleIsTrusted && !isAdmin && !isTeacher;
             // Tabs visible to everyone (students, teachers, admins)
             if (['scoreboard', 'group-scoreboard', 'information', 'rules', 'syllabus',
                  'resources', 'excel-mela', 'team-competition', 'excel-chess-champion', 'awf', 'good-conduct',
@@ -19775,7 +19984,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             if (tabName === 'my-dashboard') return isStudent;
             // Teacher + Admin tabs
             if (['profile', 'attendance', 'add-score', 'students', 'gr', 'notebooks',
-                 'reports', 'office', 'voting', 'leadership-selection', 'notifications']
+                 'reports', 'office', 'voting', 'leadership-selection', 'notifications', 'daily-summary']
                 .includes(tabName)) return isAdmin || isTeacher;
             // Admin-only tabs
             if (['teachers', 'party', 'leadership', 'ranking', 'tools', 'settings']
@@ -19794,9 +20003,10 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
         }
 
         function applyRolePermissions() {
-            const isAdmin = currentUserRole === 'admin';
-            const isTeacher = currentUserRole === 'teacher';
-            const isStudent = !isAdmin && !isTeacher;
+            const roleIsTrusted = !SERVER_SYNC.enabled || hasServerSession;
+            const isAdmin = roleIsTrusted && currentUserRole === 'admin';
+            const isTeacher = roleIsTrusted && currentUserRole === 'teacher';
+            const isStudent = roleIsTrusted && !isAdmin && !isTeacher;
 
             // Tabs visible to everyone
             setTabVisibility('scoreboard', true);
@@ -19820,6 +20030,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             // Teacher + Admin tabs
             setTabVisibility('profile', isAdmin || isTeacher);
             setTabVisibility('attendance', isAdmin || isTeacher);
+            setTabVisibility('daily-summary', isAdmin || isTeacher);
             setTabVisibility('add-score', isAdmin || isTeacher);
             setTabVisibility('students', isAdmin || isTeacher);
             setTabVisibility('gr', isAdmin || isTeacher);
@@ -19888,7 +20099,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                 });
             }
 
-            if (!isAdmin && !isTeacher) {
+            if (isStudent) {
                 // Students: limited edit mode (own profile + appeals + scoreboard filters)
                 document.querySelectorAll('input, select, textarea, button').forEach(el => {
                     if (el.dataset.allow === 'true') return;
@@ -19936,6 +20147,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                         el.closest('#appeals-tab') ||
                         el.closest('#proposals-tab') ||
                         el.closest('#attendance-tab') ||
+                        el.closest('#daily-summary-tab') ||
                         el.closest('#profile-tab') ||
                         el.closest('#students-tab') ||
                         el.closest('#notebooks-tab') ||
@@ -19969,6 +20181,49 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
         const EA_PROFILE_LOGIN_KEY = 'ea_profile_login_id';
         const EA_PROFILE_ROLL_KEY = 'ea_profile_student_roll';
         const EA_PROFILE_TIMESTAMP_KEY = 'ea_profile_saved_at';
+
+        function clearBrowserDataCacheForIdentityChange() {
+            try {
+                [
+                    'ea_scoreboard_data',
+                    LOCAL_BACKUP_KEY,
+                    'ea_offline_data_v2',
+                    'ea_offline_data_v2_backup',
+                    WAL_KEY,
+                    'ea_last_server_etag',
+                    ACTIVE_TAB_KEY,
+                    ACTIVE_SCOREBOARD_MONTH_KEY
+                ].forEach(key => localStorage.removeItem(key));
+            } catch (e) {}
+            try {
+                if (typeof db === 'undefined' || !db) return;
+                if (db._pendingLocalWriteTimer) clearTimeout(db._pendingLocalWriteTimer);
+                db._pendingLocalWriteTimer = null;
+                db._pendingLocalWriteSnapshot = null;
+                db._pendingLocalWriteDataRef = null;
+                db._pendingLocalWriteOptions = null;
+                db._cacheData = typeof db.getDefaultData === 'function' ? db.getDefaultData() : null;
+                if (db._monthScoresCache) db._monthScoresCache.clear();
+                if (db._scoreboardCache) db._scoreboardCache.clear();
+                if (db._idb) {
+                    const tx = db._idb.transaction('snapshots', 'readwrite');
+                    tx.objectStore('snapshots').delete('main');
+                }
+            } catch (e) {}
+        }
+
+        function resetUnauthenticatedContext(clearData = false) {
+            if (clearData) clearBrowserDataCacheForIdentityChange();
+            clearProfileFromLocal();
+            currentUserRole = 'student';
+            currentLoginId = '';
+            currentStudentRoll = '';
+            allowedMonthsFromServer = null;
+            hasServerSession = false;
+            updateAuthButtons();
+            updateRoleBadge();
+            applyRolePermissions();
+        }
 
         function saveProfileToLocal(role, loginId, studentRoll) {
             try {
@@ -20004,11 +20259,17 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
         }
 
         async function loadSessionContext(maxAttempts = 3) {
+            const hadServerSession = hasServerSession;
+            const previousLoginId = String(currentLoginId || '').trim();
+            const previousRole = normalizeUserRole(currentUserRole);
+            let authenticationRejected = false;
             if (!SERVER_SYNC.enabled) {
                 // Offline: try to restore last known profile from this browser
                 restoreProfileFromLocal();
                 hasServerSession = false;
                 updateAuthButtons();
+                updateRoleBadge();
+                applyRolePermissions();
                 return false;
             }
             const attempts = Math.max(1, parseInt(maxAttempts, 10) || 1);
@@ -20018,7 +20279,8 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                     const sessionResp = await eaFetch('/scoreboard/session', { cache: 'no-store', credentials: 'include' }, timeoutMs);
                     if (!sessionResp.ok) {
                         // Cross-origin: clear stale tokens on 401 (expired/invalid)
-                        if ((SERVER_SYNC.crossOrigin || !isLANHost()) && sessionResp.status === 401) {
+                        if (sessionResp.status === 401) {
+                            authenticationRejected = true;
                             try {
                                 localStorage.removeItem('ea_login_id');
                                 localStorage.removeItem('login_code');
@@ -20027,13 +20289,22 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                         continue;
                     }
                     const session = await sessionResp.json();
-                    currentUserRole = normalizeUserRole(session.role || currentUserRole || 'student');
-                    currentLoginId = session.login_id || currentLoginId || '';
+                    const nextRole = normalizeUserRole(session.role || 'student');
+                    const nextLoginId = String(session.login_id || '').trim();
+                    let storedLoginId = '';
+                    try { storedLoginId = String(localStorage.getItem(EA_PROFILE_LOGIN_KEY) || '').trim(); } catch (e) { /* ignore */ }
+                    if ((previousLoginId && previousLoginId !== nextLoginId) || (previousLoginId && previousRole !== nextRole) || (storedLoginId && storedLoginId !== nextLoginId)) {
+                        clearBrowserDataCacheForIdentityChange();
+                    }
+                    currentUserRole = nextRole;
+                    currentLoginId = nextLoginId;
                     currentStudentRoll = session.student_roll || '';
                     serverTimezone = session.server_timezone || serverTimezone;
                     feesModuleEnabled = session.fees_enabled !== false;
                     hasServerSession = true;
                     updateAuthButtons();
+                    updateRoleBadge();
+                    applyRolePermissions();
                     hideCrossOriginOfflineBanner();
                     // Remember this profile for future visits from this browser
                     saveProfileToLocal(currentUserRole, currentLoginId, currentStudentRoll);
@@ -20045,13 +20316,16 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                     await new Promise(resolve => setTimeout(resolve, 250));
                 }
             }
-            // Server session unavailable — restore last known profile from this browser
-            const restored = restoreProfileFromLocal();
-            if (restored) {
-                eaLog(`Session unavailable. Restored profile: ${currentUserRole} (${currentLoginId})`);
+            let cachedProfileLogin = '';
+            try { cachedProfileLogin = String(localStorage.getItem(EA_PROFILE_LOGIN_KEY) || '').trim(); } catch (e) { /* ignore */ }
+            if (!hadServerSession || authenticationRejected) {
+                resetUnauthenticatedContext(authenticationRejected || !!cachedProfileLogin);
+            } else {
+                hasServerSession = true;
+                updateAuthButtons();
+                updateRoleBadge();
+                applyRolePermissions();
             }
-            hasServerSession = false;
-            updateAuthButtons();
             if (SERVER_SYNC.crossOrigin || !isLANHost()) {
                 showCrossOriginOfflineBanner();
             }
@@ -20128,6 +20402,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                 currentStudentRoll = '';
                 updateAuthButtons();
                 updateRoleBadge();
+                applyRolePermissions();
                 loadSessionContext(1);
                 return;
             }
@@ -20227,7 +20502,12 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                     closeCrossOriginLoginModal();
                     updateAuthButtons();
                     updateRoleBadge();
-                    loadSessionContext(1);
+                    const sessionReady = await loadSessionContext(1);
+                    if (sessionReady) {
+                        await refreshAllowedMonthsFromServer();
+                        applyRolePermissions();
+                        await pullFromServer(false, true).catch(() => {});
+                    }
                 } else {
                     if (errEl) { errEl.textContent = (data && data.error) || 'Login failed. Please try again.'; errEl.style.display = 'block'; }
                 }
@@ -20282,7 +20562,9 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
         function updateRoleBadge() {
             const badge = document.getElementById('roleBadge');
             if (!badge) return;
-            badge.textContent = `Role: ${currentUserRole}${currentLoginId ? ` (${currentLoginId})` : ''}`;
+            const guest = SERVER_SYNC.enabled && !hasServerSession;
+            const role = guest ? 'guest' : currentUserRole;
+            badge.textContent = `Role: ${role}${!guest && currentLoginId ? ` (${currentLoginId})` : ''}`;
         }
 
         function maybeLocalBackup(data) {
@@ -20787,6 +21069,36 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             };
             (Array.isArray(existingRows) ? existingRows : []).forEach(add);
             (Array.isArray(incomingRows) ? incomingRows : []).forEach(add);
+            return Array.from(merged.values());
+        }
+
+        function mergeTeacherDailySummariesForSync(localRows, remoteRows) {
+            const merged = new Map();
+            const stamp = (row) => parseSyncStamp((row && (row.updated_at || row.created_at)) || '');
+            const add = (row) => {
+                if (!row || typeof row !== 'object') return;
+                const id = String(row.id || '').trim();
+                if (!id) return;
+                const prev = merged.get(id);
+                if (!prev) {
+                    merged.set(id, { ...row, admin_remarks: Array.isArray(row.admin_remarks) ? row.admin_remarks.slice() : [] });
+                    return;
+                }
+                const preferRemote = stamp(row) >= stamp(prev);
+                const next = preferRemote ? { ...row } : { ...prev };
+                const prevRemarks = Array.isArray(prev.admin_remarks) ? prev.admin_remarks : [];
+                const rowRemarks = Array.isArray(row.admin_remarks) ? row.admin_remarks : [];
+                // Never lose admin remark history during client merge.
+                next.admin_remarks = rowRemarks.length >= prevRemarks.length ? rowRemarks.slice() : prevRemarks.slice();
+                if (!preferRemote) {
+                    // Keep newer content but preserve richer remarks already chosen above.
+                    Object.assign(next, prev);
+                    next.admin_remarks = rowRemarks.length >= prevRemarks.length ? rowRemarks.slice() : prevRemarks.slice();
+                }
+                merged.set(id, next);
+            };
+            (Array.isArray(localRows) ? localRows : []).forEach(add);
+            (Array.isArray(remoteRows) ? remoteRows : []).forEach(add);
             return Array.from(merged.values());
         }
 
@@ -21770,6 +22082,22 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             return normalizeChessChampionState(base);
         }
 
+        function applyAllowedMonthScope(data) {
+            if (!data || typeof data !== 'object' || !Array.isArray(data.allowed_months) || data.allowed_months.length === 0) return data;
+            const allowed = new Set(data.allowed_months.map(month => String(month || '').trim()).filter(month => /^\d{4}-\d{2}$/.test(month)));
+            if (!allowed.size || currentUserRole === 'admin') return data;
+            const monthFor = row => String(row && (row.month || row.date || row.score_month || row.request_date || row.created_at) || '').slice(0, 7);
+            ['scores', 'attendance', 'appeals', 'resource_requests', 'resource_transactions', 'teacher_daily_summaries'].forEach(key => {
+                if (Array.isArray(data[key])) data[key] = data[key].filter(row => allowed.has(monthFor(row)));
+            });
+            ['month_students', 'month_roster_profiles', 'month_extra_columns', 'month_student_extras', 'role_veto_monthly'].forEach(key => {
+                if (!data[key] || typeof data[key] !== 'object') return;
+                data[key] = Object.fromEntries(Object.entries(data[key]).filter(([month]) => allowed.has(String(month || '').trim())));
+            });
+            data.allowed_months = Array.from(allowed).sort();
+            return data;
+        }
+
         function applyRemoteSnapshot(serverData, serverUpdatedAt, showToast = false, options = {}) {
             if (!serverData) return false;
             if (isLikelyCorruptRoster(serverData)) {
@@ -21848,6 +22176,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                     resource_transactions: mergeResourceTransactionsSuperset(localData.resource_transactions || [], serverData.resource_transactions || []),
                     syllabus_catalog: mergeSyllabusCatalogForSync(localData.syllabus_catalog || {}, serverData.syllabus_catalog || {}),
                     syllabus_tracking: mergeSyllabusTrackingForSync(localData.syllabus_tracking || [], serverData.syllabus_tracking || []),
+                    teacher_daily_summaries: mergeTeacherDailySummariesForSync(localData.teacher_daily_summaries || [], serverData.teacher_daily_summaries || []),
                     rule_sections: mergeRuleRowsSuperset(localData.rule_sections || [], serverData.rule_sections || [], 'key'),
                     rule_feedback: mergeRuleRowsSuperset(localData.rule_feedback || [], serverData.rule_feedback || [], 'id'),
                     rule_votes: mergeRuleRowsSuperset(localData.rule_votes || [], serverData.rule_votes || [], 'id'),
@@ -21872,6 +22201,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                         : (serverData.public_information || [])
                 };
             }
+            applyAllowedMonthScope(mergedData);
             db.saveData(mergedData, { system: true, skipSync: true, preserveTimestamp: true, skipBackup: true, allowHistoricalWrite: true });
             if (currentUserRole === 'admin' || currentUserRole === 'teacher') {
                 // Safety: pull should not trigger a write-back loop.
@@ -24406,6 +24736,8 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
 
         function loadMonthScoreboard(month, filterOnly) {
             try {
+            const scoreboardScroll = document.getElementById('scoreboardBottomScroll');
+            const scrollToDate = !filterOnly && !(scoreboardScroll && scoreboardScroll.dataset.eaScoreboardReady === '1');
             if (month) {
                 localStorage.setItem(ACTIVE_SCOREBOARD_MONTH_KEY, month);
             }
@@ -24772,7 +25104,8 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                         syncScoreboardStickyOffsets();
                         applyColumnVisibility();
                         if (!filterOnly) _animateTableRows('scoreboardTable');
-                        eaNextPaint(() => stabilizeScoreboardLayout({ month, scrollToDate: !filterOnly }));
+                        if (scoreboardScroll) scoreboardScroll.dataset.eaScoreboardReady = '1';
+                        eaNextPaint(() => stabilizeScoreboardLayout({ month, scrollToDate }));
                     }, true);
                 }
             });
@@ -46856,6 +47189,658 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             loadAttendanceTab();
         }
 
+        // ── Teacher Daily Summary ───────────────────────────────────────────
+        let _tdsCurrentId = '';
+        let _tdsInboxFilter = 'pending';
+        let _tdsImages = [];
+        let _tdsReadOnly = false;
+
+        function tdsTodayKey() {
+            try {
+                return formatDateKey(new Date());
+            } catch (_) {
+                return new Date().toISOString().slice(0, 10);
+            }
+        }
+
+        function tdsNewId() {
+            return `tds_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+        }
+
+        function tdsGetSummaries() {
+            const data = db.getData() || {};
+            if (!Array.isArray(data.teacher_daily_summaries)) data.teacher_daily_summaries = [];
+            return data.teacher_daily_summaries;
+        }
+
+        function tdsNormalizeRow(row) {
+            const src = row && typeof row === 'object' ? row : {};
+            return {
+                id: String(src.id || '').trim() || tdsNewId(),
+                date: String(src.date || tdsTodayKey()).slice(0, 10),
+                class_scope: String(src.class_scope || 'A').trim() || 'A',
+                taught_by: String(src.taught_by || '').trim(),
+                created_by: String(src.created_by || currentLoginId || currentUserRole || 'Teacher').trim(),
+                updated_by: String(src.updated_by || currentLoginId || currentUserRole || 'Teacher').trim(),
+                created_at: String(src.created_at || ''),
+                updated_at: String(src.updated_at || ''),
+                status: ['draft', 'submitted', 'acknowledged', 'needs_revision'].includes(String(src.status || '').toLowerCase())
+                    ? String(src.status).toLowerCase()
+                    : 'draft',
+                lessons_today: Array.isArray(src.lessons_today) ? src.lessons_today.map(r => ({ ...r })) : [],
+                plan_tomorrow: Array.isArray(src.plan_tomorrow) ? src.plan_tomorrow.map(r => ({ ...r })) : [],
+                homework: Array.isArray(src.homework) ? src.homework.map(r => ({ ...r })) : [],
+                tests: Array.isArray(src.tests) ? src.tests.map(r => ({ ...r })) : [],
+                gradings_done: Array.isArray(src.gradings_done) ? src.gradings_done.map(r => ({ ...r })) : [],
+                day_note: String(src.day_note || ''),
+                images: Array.isArray(src.images) ? src.images.map(r => ({ ...r })) : [],
+                behaviour_notes: Array.isArray(src.behaviour_notes) ? src.behaviour_notes.map(r => ({ ...r })) : [],
+                progress_notes: Array.isArray(src.progress_notes) ? src.progress_notes.map(r => ({ ...r })) : [],
+                attendance_digest: src.attendance_digest && typeof src.attendance_digest === 'object' ? { ...src.attendance_digest } : null,
+                admin_remarks: Array.isArray(src.admin_remarks) ? src.admin_remarks.map(r => ({ ...r })) : []
+            };
+        }
+
+        function tdsFindExisting(dateKey, classScope, createdBy) {
+            const login = String(createdBy || currentLoginId || 'Teacher').trim().toLowerCase();
+            return tdsGetSummaries().find(row =>
+                String(row.date || '') === dateKey &&
+                String(row.class_scope || '') === classScope &&
+                String(row.created_by || '').trim().toLowerCase() === login
+            ) || null;
+        }
+
+        function tdsSetStatusBadge(status) {
+            const el = document.getElementById('tdsStatusBadge');
+            if (!el) return;
+            const s = String(status || 'draft').toLowerCase();
+            el.className = `tds-status ${s}`;
+            el.textContent = s.replace('_', ' ');
+        }
+
+        function tdsCanEditContent(row) {
+            if (currentUserRole === 'admin') return false; // Admin reviews only; does not rewrite teacher content
+            if (currentUserRole !== 'teacher') return false;
+            const status = String((row && row.status) || 'draft').toLowerCase();
+            return status === 'draft' || status === 'submitted' || status === 'needs_revision';
+        }
+
+        function tdsEsc(value) {
+            return String(value == null ? '' : value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+        }
+
+        function tdsRenderDynamicRows(containerId, rows, kind) {
+            const el = document.getElementById(containerId);
+            if (!el) return;
+            const list = Array.isArray(rows) ? rows : [];
+            if (!list.length) {
+                el.innerHTML = `<p style="color:var(--text-muted);font-size:13px;margin:0;">No entries yet.</p>`;
+                return;
+            }
+            const disabled = _tdsReadOnly ? 'disabled' : '';
+            el.innerHTML = list.map((row, idx) => {
+                if (kind === 'lesson') {
+                    return `<div class="tds-row" data-idx="${idx}">
+                        <input ${disabled} placeholder="Subject" value="${tdsEsc(row.subject)}" oninput="tdsUpdateRow('lesson',${idx},'subject',this.value)">
+                        <input ${disabled} placeholder="Topic / chapter" value="${tdsEsc(row.topic)}" oninput="tdsUpdateRow('lesson',${idx},'topic',this.value)">
+                        <input ${disabled} placeholder="Period" value="${tdsEsc(row.period)}" oninput="tdsUpdateRow('lesson',${idx},'period',this.value)">
+                        <input ${disabled} placeholder="Notes" value="${tdsEsc(row.notes)}" oninput="tdsUpdateRow('lesson',${idx},'notes',this.value)">
+                        <button type="button" class="secondary" ${disabled} onclick="tdsRemoveRow('lesson',${idx})"><i class="fas fa-trash"></i></button>
+                    </div>`;
+                }
+                if (kind === 'plan') {
+                    return `<div class="tds-row" data-idx="${idx}">
+                        <input ${disabled} placeholder="Subject" value="${tdsEsc(row.subject)}" oninput="tdsUpdateRow('plan',${idx},'subject',this.value)">
+                        <input ${disabled} placeholder="Topic" value="${tdsEsc(row.topic)}" oninput="tdsUpdateRow('plan',${idx},'topic',this.value)">
+                        <input ${disabled} placeholder="Materials" value="${tdsEsc(row.materials)}" oninput="tdsUpdateRow('plan',${idx},'materials',this.value)">
+                        <input ${disabled} placeholder="Notes" value="${tdsEsc(row.notes)}" oninput="tdsUpdateRow('plan',${idx},'notes',this.value)">
+                        <button type="button" class="secondary" ${disabled} onclick="tdsRemoveRow('plan',${idx})"><i class="fas fa-trash"></i></button>
+                    </div>`;
+                }
+                if (kind === 'homework') {
+                    return `<div class="tds-row" data-idx="${idx}">
+                        <input ${disabled} placeholder="Subject" value="${tdsEsc(row.subject)}" oninput="tdsUpdateRow('homework',${idx},'subject',this.value)">
+                        <input ${disabled} placeholder="Description" value="${tdsEsc(row.description)}" oninput="tdsUpdateRow('homework',${idx},'description',this.value)">
+                        <input ${disabled} type="date" value="${tdsEsc(row.due_date)}" oninput="tdsUpdateRow('homework',${idx},'due_date',this.value)">
+                        <input ${disabled} placeholder="Notes" value="${tdsEsc(row.notes || '')}" oninput="tdsUpdateRow('homework',${idx},'notes',this.value)">
+                        <button type="button" class="secondary" ${disabled} onclick="tdsRemoveRow('homework',${idx})"><i class="fas fa-trash"></i></button>
+                    </div>`;
+                }
+                if (kind === 'test') {
+                    return `<div class="tds-row" data-idx="${idx}">
+                        <input ${disabled} placeholder="Test name" value="${tdsEsc(row.name)}" oninput="tdsUpdateRow('test',${idx},'name',this.value)">
+                        <input ${disabled} placeholder="Subject" value="${tdsEsc(row.subject)}" oninput="tdsUpdateRow('test',${idx},'subject',this.value)">
+                        <input ${disabled} type="number" placeholder="Max marks" value="${tdsEsc(row.max_marks)}" oninput="tdsUpdateRow('test',${idx},'max_marks',this.value)">
+                        <input ${disabled} placeholder="Notes" value="${tdsEsc(row.notes)}" oninput="tdsUpdateRow('test',${idx},'notes',this.value)">
+                        <button type="button" class="secondary" ${disabled} onclick="tdsRemoveRow('test',${idx})"><i class="fas fa-trash"></i></button>
+                    </div>`;
+                }
+                // grading
+                return `<div class="tds-row" data-idx="${idx}">
+                    <select ${disabled} onchange="tdsUpdateRow('grading',${idx},'kind',this.value)">
+                        <option value="notebook" ${row.kind === 'notebook' ? 'selected' : ''}>Notebook</option>
+                        <option value="scores" ${row.kind === 'scores' ? 'selected' : ''}>Scores</option>
+                        <option value="other" ${row.kind === 'other' ? 'selected' : ''}>Other</option>
+                    </select>
+                    <input ${disabled} placeholder="Label" value="${tdsEsc(row.label)}" oninput="tdsUpdateRow('grading',${idx},'label',this.value)">
+                    <input ${disabled} type="number" placeholder="Count" value="${tdsEsc(row.count)}" oninput="tdsUpdateRow('grading',${idx},'count',this.value)">
+                    <input ${disabled} placeholder="Notes" value="${tdsEsc(row.notes)}" oninput="tdsUpdateRow('grading',${idx},'notes',this.value)">
+                    <button type="button" class="secondary" ${disabled} onclick="tdsRemoveRow('grading',${idx})"><i class="fas fa-trash"></i></button>
+                </div>`;
+            }).join('');
+        }
+
+        function tdsGetWorkingLists() {
+            return {
+                lessons: window._tdsLessons || [],
+                plan: window._tdsPlan || [],
+                homework: window._tdsHomework || [],
+                tests: window._tdsTests || [],
+                gradings: window._tdsGradings || []
+            };
+        }
+
+        function tdsSetWorkingLists(row) {
+            window._tdsLessons = Array.isArray(row.lessons_today) ? row.lessons_today.map(r => ({ ...r })) : [];
+            window._tdsPlan = Array.isArray(row.plan_tomorrow) ? row.plan_tomorrow.map(r => ({ ...r })) : [];
+            window._tdsHomework = Array.isArray(row.homework) ? row.homework.map(r => ({ ...r })) : [];
+            window._tdsTests = Array.isArray(row.tests) ? row.tests.map(r => ({ ...r })) : [];
+            window._tdsGradings = Array.isArray(row.gradings_done) ? row.gradings_done.map(r => ({ ...r })) : [];
+            _tdsImages = Array.isArray(row.images) ? row.images.map(r => ({ ...r })) : [];
+        }
+
+        function tdsUpdateRow(kind, idx, field, value) {
+            const map = {
+                lesson: '_tdsLessons',
+                plan: '_tdsPlan',
+                homework: '_tdsHomework',
+                test: '_tdsTests',
+                grading: '_tdsGradings'
+            };
+            const key = map[kind];
+            if (!key || !Array.isArray(window[key]) || !window[key][idx]) return;
+            window[key][idx][field] = value;
+        }
+
+        function tdsRemoveRow(kind, idx) {
+            if (_tdsReadOnly) return;
+            const map = {
+                lesson: ['_tdsLessons', 'tdsLessonsList', 'lesson'],
+                plan: ['_tdsPlan', 'tdsPlanList', 'plan'],
+                homework: ['_tdsHomework', 'tdsHomeworkList', 'homework'],
+                test: ['_tdsTests', 'tdsTestsList', 'test'],
+                grading: ['_tdsGradings', 'tdsGradingsList', 'grading']
+            };
+            const conf = map[kind];
+            if (!conf) return;
+            window[conf[0]].splice(idx, 1);
+            tdsRenderDynamicRows(conf[1], window[conf[0]], conf[2]);
+        }
+
+        function tdsAddLessonRow() {
+            if (_tdsReadOnly) return;
+            window._tdsLessons = window._tdsLessons || [];
+            window._tdsLessons.push({ subject: '', topic: '', period: '', notes: '' });
+            tdsRenderDynamicRows('tdsLessonsList', window._tdsLessons, 'lesson');
+        }
+        function tdsAddPlanRow() {
+            if (_tdsReadOnly) return;
+            window._tdsPlan = window._tdsPlan || [];
+            window._tdsPlan.push({ subject: '', topic: '', materials: '', notes: '' });
+            tdsRenderDynamicRows('tdsPlanList', window._tdsPlan, 'plan');
+        }
+        function tdsAddHomeworkRow() {
+            if (_tdsReadOnly) return;
+            window._tdsHomework = window._tdsHomework || [];
+            window._tdsHomework.push({ subject: '', description: '', due_date: '', notes: '' });
+            tdsRenderDynamicRows('tdsHomeworkList', window._tdsHomework, 'homework');
+        }
+        function tdsAddTestRow() {
+            if (_tdsReadOnly) return;
+            window._tdsTests = window._tdsTests || [];
+            window._tdsTests.push({ name: '', subject: '', max_marks: '', notes: '' });
+            tdsRenderDynamicRows('tdsTestsList', window._tdsTests, 'test');
+        }
+        function tdsAddGradingRow() {
+            if (_tdsReadOnly) return;
+            window._tdsGradings = window._tdsGradings || [];
+            window._tdsGradings.push({ kind: 'notebook', label: '', count: '', notes: '' });
+            tdsRenderDynamicRows('tdsGradingsList', window._tdsGradings, 'grading');
+        }
+
+        function tdsRenderImages() {
+            const el = document.getElementById('tdsImagesList');
+            if (!el) return;
+            if (!_tdsImages.length) {
+                el.innerHTML = `<p style="color:var(--text-muted);font-size:13px;margin:0;">No images attached.</p>`;
+                return;
+            }
+            el.innerHTML = _tdsImages.map((img, idx) => {
+                const src = (typeof eaBuildUrl === 'function') ? eaBuildUrl(img.path) : img.path;
+                return `<div class="tds-image-card">
+                    <img src="${tdsEsc(src)}" alt="evidence">
+                    <div class="cap">
+                        <input ${_tdsReadOnly ? 'disabled' : ''} style="width:100%;font-size:11px;" placeholder="Caption" value="${tdsEsc(img.caption || '')}" oninput="_tdsImages[${idx}].caption=this.value">
+                        ${_tdsReadOnly ? '' : `<button type="button" class="secondary" style="width:100%;margin-top:4px;padding:2px 6px;font-size:11px;" onclick="tdsRemoveImage(${idx})">Remove</button>`}
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        function tdsRemoveImage(idx) {
+            if (_tdsReadOnly) return;
+            _tdsImages.splice(idx, 1);
+            tdsRenderImages();
+        }
+
+        async function tdsHandleImageSelect(event) {
+            if (_tdsReadOnly) return;
+            const file = event && event.target && event.target.files && event.target.files[0];
+            if (event && event.target) event.target.value = '';
+            if (!file) return;
+            if (_tdsImages.length >= 6) {
+                showAlert('Maximum 6 images allowed.', 'warning');
+                return;
+            }
+            if (!['image/jpeg', 'image/jpg', 'image/png', 'image/webp'].includes(file.type)) {
+                showAlert('Only JPG, PNG, and WebP images are allowed.', 'danger');
+                return;
+            }
+            if (file.size > 5 * 1024 * 1024) {
+                showAlert('Image too large (max 5 MB).', 'danger');
+                return;
+            }
+            const summaryId = _tdsCurrentId || tdsNewId();
+            if (!_tdsCurrentId) _tdsCurrentId = summaryId;
+            try {
+                const formData = new FormData();
+                formData.append('file', file);
+                formData.append('summary_id', summaryId);
+                const resp = await eaFetch('/scoreboard/upload-daily-summary-image', { method: 'POST', body: formData }, 20000);
+                const payload = await resp.json();
+                if (!resp.ok || !payload.success) {
+                    throw new Error((payload && payload.error) || 'Upload failed');
+                }
+                _tdsImages.push({
+                    path: payload.path,
+                    caption: '',
+                    uploaded_at: payload.uploaded_at || new Date().toISOString()
+                });
+                tdsRenderImages();
+                showAlert('Image uploaded.', 'success');
+            } catch (err) {
+                showAlert(err && err.message ? err.message : 'Image upload failed.', 'danger');
+            }
+        }
+
+        function tdsRenderRemarks(row) {
+            const section = document.getElementById('tdsRemarksSection');
+            const history = document.getElementById('tdsRemarksHistory');
+            if (!section || !history) return;
+            const remarks = Array.isArray(row.admin_remarks) ? row.admin_remarks : [];
+            if (!remarks.length) {
+                section.style.display = 'none';
+                history.innerHTML = '';
+                return;
+            }
+            section.style.display = '';
+            history.innerHTML = remarks.slice().reverse().map(r => `
+                <div style="padding:8px 10px;border:1px solid var(--border-color);border-radius:8px;margin-bottom:8px;background:rgba(255,255,255,.02);">
+                    <div style="font-size:12px;color:var(--text-muted);">${tdsEsc(r.by || 'Admin')} · ${tdsEsc(r.at || '')} · ${tdsEsc(r.status_set || '')}</div>
+                    <div style="margin-top:4px;">${tdsEsc(r.text || '')}</div>
+                </div>
+            `).join('');
+        }
+
+        function tdsPopulateTeacherNames() {
+            const list = document.getElementById('tdsTeacherNames');
+            if (!list) return;
+            const teachers = (db.getData().teachers || []).filter(t => t && (t.active !== false && t.active !== 'false'));
+            list.innerHTML = teachers.map(t => `<option value="${tdsEsc(t.name || '')}"></option>`).join('');
+        }
+
+        function tdsPopulateHistoryMonth() {
+            const sel = document.getElementById('tdsHistoryMonth');
+            if (!sel) return;
+            const months = new Set();
+            tdsGetSummaries().forEach(row => {
+                const mk = String(row.date || '').slice(0, 7);
+                if (/^\d{4}-\d{2}$/.test(mk)) months.add(mk);
+            });
+            const current = getCurrentMonthKey();
+            months.add(current);
+            const sorted = Array.from(months).sort().reverse();
+            const prev = sel.value || current;
+            sel.innerHTML = sorted.map(m => `<option value="${m}">${m}</option>`).join('');
+            sel.value = sorted.includes(prev) ? prev : current;
+        }
+
+        function tdsRenderHistory() {
+            const body = document.getElementById('tdsHistoryBody');
+            const month = String(getElementValue('tdsHistoryMonth') || getCurrentMonthKey());
+            if (!body) return;
+            let rows = tdsGetSummaries().filter(r => String(r.date || '').slice(0, 7) === month);
+            if (currentUserRole === 'teacher') {
+                const login = String(currentLoginId || 'Teacher').trim().toLowerCase();
+                rows = rows.filter(r => String(r.created_by || '').trim().toLowerCase() === login || !r.created_by);
+            }
+            rows.sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')) || String(b.updated_at || '').localeCompare(String(a.updated_at || '')));
+            if (!rows.length) {
+                body.innerHTML = `<tr><td colspan="6" class="text-center" style="padding:16px;color:var(--text-muted);">No summaries for ${tdsEsc(month)}</td></tr>`;
+                return;
+            }
+            body.innerHTML = rows.map(r => `
+                <tr>
+                    <td>${tdsEsc(r.date)}</td>
+                    <td>${tdsEsc(r.class_scope)}</td>
+                    <td>${tdsEsc(r.taught_by || r.created_by || '')}</td>
+                    <td><span class="tds-status ${tdsEsc(r.status)}">${tdsEsc(String(r.status || '').replace('_', ' '))}</span></td>
+                    <td>${tdsEsc(String(r.updated_at || '').replace('T', ' ').slice(0, 16))}</td>
+                    <td><button type="button" class="secondary" onclick="tdsOpenSummary('${tdsEsc(r.id)}')">Open</button></td>
+                </tr>
+            `).join('');
+        }
+
+        function tdsSetInboxFilter(filter) {
+            _tdsInboxFilter = filter || 'pending';
+            document.querySelectorAll('#tdsInboxFilters .tds-filter-chip').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.filter === _tdsInboxFilter);
+            });
+            tdsRenderInbox();
+        }
+
+        function tdsRenderInbox() {
+            const card = document.getElementById('tdsAdminInboxCard');
+            const body = document.getElementById('tdsInboxBody');
+            if (!card || !body) return;
+            if (currentUserRole !== 'admin') {
+                card.style.display = 'none';
+                return;
+            }
+            card.style.display = '';
+            let rows = tdsGetSummaries().slice();
+            if (_tdsInboxFilter === 'pending') {
+                rows = rows.filter(r => String(r.status || '') === 'submitted');
+            } else if (_tdsInboxFilter === 'needs_revision') {
+                rows = rows.filter(r => String(r.status || '') === 'needs_revision');
+            }
+            rows.sort((a, b) => String(b.updated_at || '').localeCompare(String(a.updated_at || '')));
+            if (!rows.length) {
+                body.innerHTML = `<tr><td colspan="6" class="text-center" style="padding:16px;color:var(--text-muted);">No matching summaries</td></tr>`;
+                return;
+            }
+            body.innerHTML = rows.map(r => `
+                <tr>
+                    <td>${tdsEsc(r.date)}</td>
+                    <td>${tdsEsc(r.class_scope)}</td>
+                    <td>${tdsEsc(r.taught_by || r.created_by || '')}</td>
+                    <td><span class="tds-status ${tdsEsc(r.status)}">${tdsEsc(String(r.status || '').replace('_', ' '))}</span></td>
+                    <td>${tdsEsc(String(r.day_note || '').slice(0, 80))}</td>
+                    <td><button type="button" class="secondary" onclick="tdsOpenSummary('${tdsEsc(r.id)}')">Open</button></td>
+                </tr>
+            `).join('');
+        }
+
+        function tdsFillForm(row) {
+            const normalized = tdsNormalizeRow(row);
+            _tdsCurrentId = normalized.id;
+            _tdsReadOnly = !tdsCanEditContent(normalized);
+            setElementValue('tdsDate', normalized.date);
+            setElementValue('tdsClassScope', normalized.class_scope || 'A');
+            setElementValue('tdsTaughtBy', normalized.taught_by || '');
+            setElementValue('tdsDayNote', normalized.day_note || '');
+            tdsSetWorkingLists(normalized);
+            tdsSetStatusBadge(normalized.status);
+            tdsRenderDynamicRows('tdsLessonsList', window._tdsLessons, 'lesson');
+            tdsRenderDynamicRows('tdsPlanList', window._tdsPlan, 'plan');
+            tdsRenderDynamicRows('tdsHomeworkList', window._tdsHomework, 'homework');
+            tdsRenderDynamicRows('tdsTestsList', window._tdsTests, 'test');
+            tdsRenderDynamicRows('tdsGradingsList', window._tdsGradings, 'grading');
+            tdsRenderImages();
+            tdsRenderRemarks(normalized);
+
+            const teacherActions = document.getElementById('tdsTeacherActions');
+            const adminPanel = document.getElementById('tdsAdminReviewPanel');
+            const dayNote = document.getElementById('tdsDayNote');
+            const taughtBy = document.getElementById('tdsTaughtBy');
+            const dateEl = document.getElementById('tdsDate');
+            const classEl = document.getElementById('tdsClassScope');
+            const imageInput = document.getElementById('tdsImageInput');
+
+            if (dayNote) dayNote.disabled = _tdsReadOnly;
+            if (taughtBy) taughtBy.disabled = _tdsReadOnly;
+            if (dateEl) dateEl.disabled = currentUserRole === 'admin';
+            if (classEl) classEl.disabled = currentUserRole === 'admin';
+            if (imageInput) imageInput.disabled = _tdsReadOnly;
+            if (teacherActions) teacherActions.style.display = currentUserRole === 'teacher' ? '' : 'none';
+            if (adminPanel) {
+                adminPanel.style.display = (currentUserRole === 'admin' && ['submitted', 'needs_revision', 'acknowledged'].includes(normalized.status)) ? '' : 'none';
+                const remarkInput = document.getElementById('tdsAdminRemarkInput');
+                if (remarkInput) remarkInput.value = '';
+            }
+        }
+
+        function tdsCollectForm() {
+            const nowIso = new Date().toISOString();
+            const existing = tdsGetSummaries().find(r => String(r.id) === String(_tdsCurrentId)) || null;
+            const lists = tdsGetWorkingLists();
+            return tdsNormalizeRow({
+                id: _tdsCurrentId || tdsNewId(),
+                date: getElementValue('tdsDate') || tdsTodayKey(),
+                class_scope: getElementValue('tdsClassScope') || 'A',
+                taught_by: getElementValue('tdsTaughtBy') || '',
+                created_by: (existing && existing.created_by) || currentLoginId || 'Teacher',
+                updated_by: currentLoginId || currentUserRole || 'Teacher',
+                created_at: (existing && existing.created_at) || nowIso,
+                updated_at: nowIso,
+                status: (existing && existing.status) || 'draft',
+                lessons_today: lists.lessons,
+                plan_tomorrow: lists.plan,
+                homework: lists.homework,
+                tests: lists.tests,
+                gradings_done: lists.gradings,
+                day_note: getElementValue('tdsDayNote') || '',
+                images: _tdsImages.slice(0, 6),
+                behaviour_notes: (existing && existing.behaviour_notes) || [],
+                progress_notes: (existing && existing.progress_notes) || [],
+                attendance_digest: (existing && existing.attendance_digest) || null,
+                admin_remarks: (existing && existing.admin_remarks) || []
+            });
+        }
+
+        function tdsPersistRow(row) {
+            const data = db.getData();
+            if (!Array.isArray(data.teacher_daily_summaries)) data.teacher_daily_summaries = [];
+            const idx = data.teacher_daily_summaries.findIndex(r => String(r.id) === String(row.id));
+            if (idx >= 0) data.teacher_daily_summaries[idx] = row;
+            else data.teacher_daily_summaries.push(row);
+            db.saveData(data, { allowTeacher: true });
+            _tdsCurrentId = row.id;
+        }
+
+        function tdsSaveSummary(status) {
+            if (currentUserRole !== 'teacher' && currentUserRole !== 'admin') {
+                showAlert('Only teacher/admin can save daily summaries.', 'warning');
+                return;
+            }
+            if (currentUserRole === 'admin') {
+                showAlert('Admin reviews summaries; use Acknowledge / Request revision.', 'info');
+                return;
+            }
+            const nextStatus = status === 'submitted' ? 'submitted' : 'draft';
+            const row = tdsCollectForm();
+            if (row.status === 'acknowledged') {
+                showAlert('This summary was acknowledged. Ask Admin to reopen via needs revision if changes are required.', 'warning');
+                return;
+            }
+            row.status = nextStatus;
+            row.updated_by = currentLoginId || 'Teacher';
+            row.updated_at = new Date().toISOString();
+            tdsPersistRow(row);
+            tdsFillForm(row);
+            tdsPopulateHistoryMonth();
+            tdsRenderHistory();
+            tdsRenderInbox();
+            showAlert(nextStatus === 'submitted' ? 'Daily summary submitted for Admin review.' : 'Draft saved.', 'success');
+        }
+
+        function tdsAdminSetStatus(status) {
+            if (currentUserRole !== 'admin') return;
+            if (!['acknowledged', 'needs_revision'].includes(status)) return;
+            const existing = tdsGetSummaries().find(r => String(r.id) === String(_tdsCurrentId));
+            if (!existing) {
+                showAlert('Open a submitted summary first.', 'warning');
+                return;
+            }
+            const remarkText = String(getElementValue('tdsAdminRemarkInput') || '').trim();
+            if (!remarkText) {
+                showAlert('Please enter a remark.', 'warning');
+                return;
+            }
+            const row = tdsNormalizeRow(existing);
+            row.status = status;
+            row.updated_by = currentLoginId || 'Admin';
+            row.updated_at = new Date().toISOString();
+            row.admin_remarks = Array.isArray(row.admin_remarks) ? row.admin_remarks.slice() : [];
+            row.admin_remarks.push({
+                by: currentLoginId || 'Admin',
+                at: row.updated_at,
+                text: remarkText,
+                status_set: status
+            });
+            tdsPersistRow(row);
+            tdsFillForm(row);
+            tdsRenderHistory();
+            tdsRenderInbox();
+            showAlert(status === 'acknowledged' ? 'Summary acknowledged.' : 'Revision requested.', 'success');
+        }
+
+        function tdsOpenSummary(id) {
+            const row = tdsGetSummaries().find(r => String(r.id) === String(id));
+            if (!row) {
+                showAlert('Summary not found.', 'warning');
+                return;
+            }
+            tdsFillForm(row);
+        }
+
+        function tdsNewSummary() {
+            if (currentUserRole !== 'teacher') {
+                showAlert('Teachers create new daily summaries.', 'info');
+                return;
+            }
+            const dateKey = getElementValue('tdsDate') || tdsTodayKey();
+            const classScope = getElementValue('tdsClassScope') || 'A';
+            const existing = tdsFindExisting(dateKey, classScope, currentLoginId || 'Teacher');
+            if (existing) {
+                tdsFillForm(existing);
+                showAlert('Opened existing summary for this date and class.', 'info');
+                return;
+            }
+            tdsFillForm({
+                id: tdsNewId(),
+                date: dateKey,
+                class_scope: classScope,
+                taught_by: getElementValue('tdsTaughtBy') || '',
+                status: 'draft',
+                created_by: currentLoginId || 'Teacher',
+                lessons_today: [],
+                plan_tomorrow: [],
+                homework: [],
+                tests: [],
+                gradings_done: [],
+                images: [],
+                admin_remarks: []
+            });
+        }
+
+        function tdsOnDateOrClassChange() {
+            if (currentUserRole !== 'teacher') return;
+            const dateKey = getElementValue('tdsDate') || tdsTodayKey();
+            const classScope = getElementValue('tdsClassScope') || 'A';
+            const existing = tdsFindExisting(dateKey, classScope, currentLoginId || 'Teacher');
+            if (existing) tdsFillForm(existing);
+            else tdsNewSummary();
+        }
+
+        function tdsImportSyllabusLessons() {
+            if (_tdsReadOnly) return;
+            const dateKey = getElementValue('tdsDate') || tdsTodayKey();
+            const tracking = (db.getData().syllabus_tracking || []).filter(row => {
+                const dates = Array.isArray(row.conducted_dates) ? row.conducted_dates : [];
+                return dates.includes(dateKey) || (Array.isArray(row.sessions) && row.sessions.some(s => String(s.date || '') === dateKey));
+            });
+            if (!tracking.length) {
+                showAlert('No syllabus lectures found for this date.', 'info');
+                return;
+            }
+            window._tdsLessons = window._tdsLessons || [];
+            tracking.forEach(row => {
+                window._tdsLessons.push({
+                    subject: String(row.subject || ''),
+                    topic: String(row.topic || row.chapter || ''),
+                    period: '',
+                    notes: `Imported from syllabus (${row.board || ''}/${row.class_level || ''})`
+                });
+            });
+            tdsRenderDynamicRows('tdsLessonsList', window._tdsLessons, 'lesson');
+            showAlert(`Imported ${tracking.length} syllabus lecture(s).`, 'success');
+        }
+
+        function loadDailySummaryTab() {
+            if (!(currentUserRole === 'admin' || currentUserRole === 'teacher')) return;
+            const dateEl = document.getElementById('tdsDate');
+            if (dateEl && !dateEl.value) dateEl.value = tdsTodayKey();
+            tdsPopulateTeacherNames();
+            tdsPopulateHistoryMonth();
+            tdsRenderInbox();
+            tdsRenderHistory();
+
+            const dateKey = getElementValue('tdsDate') || tdsTodayKey();
+            const classScope = getElementValue('tdsClassScope') || 'A';
+            if (_tdsCurrentId) {
+                const open = tdsGetSummaries().find(r => String(r.id) === String(_tdsCurrentId));
+                if (open) {
+                    tdsFillForm(open);
+                    return;
+                }
+            }
+            if (currentUserRole === 'teacher') {
+                const existing = tdsFindExisting(dateKey, classScope, currentLoginId || 'Teacher');
+                if (existing) tdsFillForm(existing);
+                else tdsNewSummary();
+            } else {
+                // Admin: show empty form until a history/inbox item is opened
+                _tdsCurrentId = '';
+                _tdsReadOnly = true;
+                setElementValue('tdsDate', dateKey);
+                setElementValue('tdsClassScope', classScope);
+                setElementValue('tdsTaughtBy', '');
+                setElementValue('tdsDayNote', '');
+                tdsSetWorkingLists({ lessons_today: [], plan_tomorrow: [], homework: [], tests: [], gradings_done: [], images: [] });
+                tdsSetStatusBadge('draft');
+                tdsRenderDynamicRows('tdsLessonsList', [], 'lesson');
+                tdsRenderDynamicRows('tdsPlanList', [], 'plan');
+                tdsRenderDynamicRows('tdsHomeworkList', [], 'homework');
+                tdsRenderDynamicRows('tdsTestsList', [], 'test');
+                tdsRenderDynamicRows('tdsGradingsList', [], 'grading');
+                tdsRenderImages();
+                tdsRenderRemarks({ admin_remarks: [] });
+                const teacherActions = document.getElementById('tdsTeacherActions');
+                const adminPanel = document.getElementById('tdsAdminReviewPanel');
+                if (teacherActions) teacherActions.style.display = 'none';
+                if (adminPanel) adminPanel.style.display = 'none';
+                ['tdsDayNote', 'tdsTaughtBy', 'tdsDate', 'tdsClassScope', 'tdsImageInput'].forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) el.disabled = true;
+                });
+            }
+        }
+
         function loadAttendanceTab() {
             ensureActiveStudentTabDefaultsForCurrentUser();
             if (currentUserRole === 'student') {
@@ -59219,6 +60204,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             try {
                 // Clear remembered profile for this browser
                 clearProfileFromLocal();
+                clearBrowserDataCacheForIdentityChange();
                 // Clear scoreboard-specific data
                 const keysToRemove = [];
                 for (let i = 0; i < localStorage.length; i++) {
