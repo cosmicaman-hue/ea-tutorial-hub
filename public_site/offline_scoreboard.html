@@ -7071,7 +7071,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                         </label>
                     </div>
                     <div id="tdsImagesList" class="tds-images" style="margin-top:10px;"></div>
-                    <p style="font-size:12px;color:var(--text-muted);margin:8px 0 0;">Up to 6 images (JPG/PNG/WebP, max 5 MB each).</p>
+                    <p style="font-size:12px;color:var(--text-muted);margin:8px 0 0;">JPG / PNG / WebP — no count or size limit for LAN classroom evidence.</p>
                 </div>
 
                 <div class="tds-section" id="tdsRemarksSection" style="display:none;">
@@ -10289,23 +10289,71 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
         }
 
         function ensureLeadershipCatalogData(data) {
+            // Preserve the full leadership record (studentId/status/updated_at/tenure/…).
+            // Older versions rebuilt catalog rows with only id/post/holder/roll/elected_on,
+            // which stripped assignment timestamps and let stale peer sync revive previous holders.
+            const pickPreferredLeadership = (current, candidate) => {
+                if (!current) return candidate;
+                const curStatus = normalizePostHolderStatus(current.status || 'active');
+                const nextStatus = normalizePostHolderStatus(candidate.status || 'active');
+                const curActive = curStatus === 'active';
+                const nextActive = nextStatus === 'active';
+                if (nextActive && !curActive) return candidate;
+                if (curActive && !nextActive) return current;
+                const curStamp = parseSyncStamp(current.updated_at || current.created_at || current.elected_on || '');
+                const nextStamp = parseSyncStamp(candidate.updated_at || candidate.created_at || candidate.elected_on || '');
+                if (nextStamp > curStamp) return candidate;
+                if (curStamp > nextStamp) return current;
+                const curPopulated = !!(String(current.holder || '').trim() || String(current.roll || '').trim() || current.studentId);
+                const nextPopulated = !!(String(candidate.holder || '').trim() || String(candidate.roll || '').trim() || candidate.studentId);
+                if (nextPopulated && !curPopulated) return candidate;
+                return current;
+            };
+
             const existingByPost = new Map();
+            const extras = [];
             (data.leadership || []).forEach(post => {
-                const key = String(post && post.post ? post.post : '').trim().toUpperCase();
-                if (key && !existingByPost.has(key)) {
-                    existingByPost.set(key, post);
+                if (!post || typeof post !== 'object') return;
+                const key = String(post.post || '').trim().toUpperCase();
+                if (!key) return;
+                if (ACTIVE_LEADERSHIP_POSTS.some(title => title.toUpperCase() === key)) {
+                    existingByPost.set(key, pickPreferredLeadership(existingByPost.get(key), post));
+                    return;
                 }
+                extras.push(post);
             });
-            data.leadership = ACTIVE_LEADERSHIP_POSTS.map((postTitle, idx) => {
+
+            const catalogRows = ACTIVE_LEADERSHIP_POSTS.map((postTitle, idx) => {
                 const existing = existingByPost.get(postTitle.toUpperCase());
+                if (existing) {
+                    // Keep every field; only fill blanks / ensure canonical post title.
+                    return {
+                        ...existing,
+                        id: existing.id || (idx + 1),
+                        post: postTitle,
+                        roll: existing.roll ? normalizeRoll(existing.roll) : '',
+                        status: normalizePostHolderStatus(existing.status || 'active')
+                    };
+                }
                 return {
-                    id: existing && existing.id ? existing.id : idx + 1,
+                    id: idx + 1,
                     post: postTitle,
-                    holder: existing && existing.holder ? existing.holder : '',
-                    roll: existing && existing.roll ? normalizeRoll(existing.roll) : '',
-                    elected_on: existing && existing.elected_on ? existing.elected_on : ''
+                    holder: '',
+                    roll: '',
+                    elected_on: '',
+                    studentId: null,
+                    status: 'active',
+                    created_at: '',
+                    updated_at: ''
                 };
             });
+
+            // Preserve any custom/non-catalog leadership posts (do not silently drop them).
+            data.leadership = catalogRows.concat(extras.map(post => ({
+                ...post,
+                roll: post.roll ? normalizeRoll(post.roll) : '',
+                status: normalizePostHolderStatus(post.status || 'active')
+            })));
         }
 
         function deriveGroupFromRoll(roll) {
@@ -17110,13 +17158,52 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                 }
 
                 const leadershipPost = (data.leadership || []).find(l => String(l.post || '').toLowerCase() === postLower);
+                const _leaderNow = new Date().toISOString();
                 if (leadershipPost) {
+                    // Close prior open history when the holder changes (same pattern as group CR).
+                    const prevSid = parseInt(leadershipPost.studentId, 10) || 0;
+                    const nextSid = parseInt(student.id, 10) || 0;
+                    if (prevSid && nextSid && prevSid !== nextSid) {
+                        const _oldKey = `leadership:${postLower}`;
+                        data.post_holder_history = data.post_holder_history || [];
+                        const _oldRecord = data.post_holder_history.find(r =>
+                            r.assignment_key === _oldKey && !r.end_date
+                        );
+                        if (_oldRecord && (parseInt(_oldRecord.studentId, 10) || 0) === prevSid) {
+                            _oldRecord.end_date = electedOn;
+                            _oldRecord.status = 'ended';
+                            _oldRecord.updated_at = _leaderNow;
+                        }
+                    }
                     leadershipPost.holder = student.base_name || student.name || leadershipPost.holder;
                     leadershipPost.roll = normalizeRoll(student.roll || leadershipPost.roll || '');
+                    leadershipPost.studentId = student.id;
                     leadershipPost.elected_on = electedOn;
                     leadershipPost.status = 'active';
+                    leadershipPost.ended_on = '';
+                    leadershipPost.source = 'election';
                     leadershipPost.tenure_extension_months = 0;
                     leadershipPost.tenure_extensions = [];
+                    leadershipPost.updated_at = _leaderNow;
+                    if (!leadershipPost.created_at) leadershipPost.created_at = _leaderNow;
+                } else if (!targetGroups.length) {
+                    // Non-CR election posts must still land in leadership when no catalog row exists yet.
+                    data.leadership = data.leadership || [];
+                    data.leadership.push({
+                        id: generateUniqueId(),
+                        post: normalizedPost,
+                        holder: student.base_name || student.name || '',
+                        roll: normalizeRoll(student.roll || ''),
+                        studentId: student.id,
+                        elected_on: electedOn,
+                        status: 'active',
+                        ended_on: '',
+                        source: 'election',
+                        tenure_extension_months: 0,
+                        tenure_extensions: [],
+                        created_at: _leaderNow,
+                        updated_at: _leaderNow
+                    });
                 }
                 // Use the safe post-holder save pipeline so suffixes + role VETOs reflect everywhere immediately.
                 if (typeof savePostHolderData === 'function') {
@@ -21703,36 +21790,60 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
         }
 
         // Merge leadership: prefer the version that has a holder assigned (non-empty holder/roll).
-        // Match by post id first, then by post name. Never overwrite a populated entry with an empty one.
+        // Match by post id first. Never overwrite a populated entry with an empty one.
+        // When both are populated, newer updated_at/created_at/elected_on wins so stale peers
+        // cannot revive a previous holder after a manual override, edit, or election install.
         function mergeLeadershipSuperset(localPosts, remotePosts) {
             const merged = new Map();
             const normalize = (p) => ({ ...p, id: parseInt(p.id, 10) || 0 });
-            const isPopulated = (p) => !!(String(p.holder || '').trim() || String(p.roll || '').trim());
-            (Array.isArray(localPosts) ? localPosts : []).forEach(p => {
-                const n = normalize(p);
-                if (n.id) merged.set(n.id, n);
-            });
-            (Array.isArray(remotePosts) ? remotePosts : []).forEach(p => {
-                const n = normalize(p);
-                if (!n.id) return;
-                const existing = merged.get(n.id);
-                if (!existing) { merged.set(n.id, n); return; }
-                // Never overwrite a populated holder with an empty one
-                if (isPopulated(existing) && !isPopulated(n)) return;
-                // Prefer whichever has a holder; if both have one, use newer timestamp
-                if (isPopulated(n) && isPopulated(existing)) {
-                    const existingStamp = parseSyncStamp(existing.updated_at || existing.created_at || '');
-                    const newStamp = parseSyncStamp(n.updated_at || n.created_at || '');
-                    if (existingStamp > newStamp) {
-                        // Local/existing is newer, keep it (but merge any non-overlapping fields from n)
-                        merged.set(n.id, { ...n, ...existing, id: n.id });
-                        return;
+            const isPopulated = (p) => !!(String(p.holder || '').trim() || String(p.roll || '').trim() || p.studentId);
+            const stampOf = (p) => parseSyncStamp(p.updated_at || p.created_at || p.elected_on || '');
+            const add = (arr) => {
+                (Array.isArray(arr) ? arr : []).forEach(p => {
+                    const n = normalize(p);
+                    if (!n.id) return;
+                    const existing = merged.get(n.id);
+                    if (!existing) { merged.set(n.id, n); return; }
+                    // Never overwrite a populated holder with an empty one
+                    if (isPopulated(existing) && !isPopulated(n)) return;
+                    if (isPopulated(n) && isPopulated(existing)) {
+                        const existingStamp = stampOf(existing);
+                        const newStamp = stampOf(n);
+                        if (existingStamp >= newStamp) {
+                            merged.set(n.id, { ...n, ...existing, id: n.id });
+                            return;
+                        }
+                        if (newStamp > existingStamp) {
+                            const next = { ...existing, ...n, id: n.id };
+                            // Preserve 'ended' against stale clients that still carry 'active' for the same holder.
+                            const prevStatus = String(existing.status || '').trim().toLowerCase();
+                            const newStatus = String(n.status || '').trim().toLowerCase();
+                            const sameHolder = String(existing.holder || '').trim().toLowerCase() === String(n.holder || '').trim().toLowerCase()
+                                && String(existing.roll || '').trim().toUpperCase() === String(n.roll || '').trim().toUpperCase()
+                                && String(existing.studentId || '') === String(n.studentId || '');
+                            if (prevStatus === 'ended' && newStatus !== 'ended' && sameHolder) {
+                                next.status = 'ended';
+                            }
+                            merged.set(n.id, next);
+                            return;
+                        }
                     }
-                }
-                if (isPopulated(n) || !isPopulated(existing)) {
-                    merged.set(n.id, { ...existing, ...n });
-                }
-            });
+                    if (isPopulated(n) || !isPopulated(existing)) {
+                        const next = { ...existing, ...n, id: n.id };
+                        const prevStatus = String(existing.status || '').trim().toLowerCase();
+                        const newStatus = String(n.status || '').trim().toLowerCase();
+                        const sameHolder = String(existing.holder || '').trim().toLowerCase() === String(n.holder || '').trim().toLowerCase()
+                            && String(existing.roll || '').trim().toUpperCase() === String(n.roll || '').trim().toUpperCase()
+                            && String(existing.studentId || '') === String(n.studentId || '');
+                        if (prevStatus === 'ended' && newStatus !== 'ended' && sameHolder) {
+                            next.status = 'ended';
+                        }
+                        merged.set(n.id, next);
+                    }
+                });
+            };
+            add(localPosts);
+            add(remotePosts);
             return Array.from(merged.values());
         }
 
@@ -21776,8 +21887,8 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                     if (newHas && existingHas) {
                         const existingStamp = parseSyncStamp(existing.updated_at || existing.elected_on || '');
                         const newStamp = parseSyncStamp(cr.updated_at || cr.elected_on || '');
-                        if (existingStamp > newStamp) {
-                            // Existing is newer (e.g. just approved locally) — keep it, ignore stale incoming
+                        if (existingStamp >= newStamp) {
+                            // Existing is newer or equal (e.g. just approved locally) — keep it
                             merged.set(id, { ...cr, ...existing, id });
                             return;
                         }
@@ -21790,11 +21901,45 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             return Array.from(merged.values());
         }
 
-        // Merge parties: match by code or id, preserve members (never overwrite populated with empty)
+        // Merge parties: match by code or id, union members by id (never lose a member to a
+        // stale snapshot). On conflicting member ids, newer updated_at/elected_on wins.
+        function mergePartyMembersSuperset(localMembers, remoteMembers) {
+            const merged = new Map();
+            const stampOf = (m) => parseSyncStamp(m && (m.updated_at || m.elected_on || m.created_at) || '');
+            const richness = (m) => Object.values(m || {}).filter(v => v !== null && v !== undefined && v !== '' && v !== 0).length;
+            const add = (arr) => {
+                (Array.isArray(arr) ? arr : []).forEach(member => {
+                    if (!member || typeof member !== 'object') return;
+                    let key = member.id != null && member.id !== '' ? String(member.id) : '';
+                    if (!key) {
+                        const sid = member.studentId;
+                        if (sid == null || sid === '') return;
+                        key = `sid-${sid}`;
+                    }
+                    const existing = merged.get(key);
+                    if (!existing) { merged.set(key, { ...member }); return; }
+                    const existingStamp = stampOf(existing);
+                    const nextStamp = stampOf(member);
+                    if (nextStamp > existingStamp) {
+                        merged.set(key, { ...existing, ...member });
+                    } else if (existingStamp > nextStamp) {
+                        merged.set(key, { ...member, ...existing });
+                    } else {
+                        merged.set(key, richness(member) >= richness(existing)
+                            ? { ...existing, ...member }
+                            : { ...member, ...existing });
+                    }
+                });
+            };
+            add(localMembers);
+            add(remoteMembers);
+            return Array.from(merged.values());
+        }
+
         function mergePartiesSuperset(localParties, remoteParties) {
             const merged = new Map();
             const keyOf = (p) => String(p.code || '').trim().toUpperCase() || String(p.id || '');
-            const add = (arr, overwrite) => {
+            const add = (arr) => {
                 (Array.isArray(arr) ? arr : []).forEach(p => {
                     const key = keyOf(p);
                     if (!key) return;
@@ -21802,21 +21947,24 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                     if (!existing) { merged.set(key, { ...p }); return; }
                     const existingMembers = Array.isArray(existing.members) ? existing.members : [];
                     const newMembers = Array.isArray(p.members) ? p.members : [];
-                    // Never overwrite non-empty members with empty
+                    // Never overwrite non-empty members with empty; otherwise union by member id.
                     if (existingMembers.length > 0 && newMembers.length === 0) {
-                        // Keep existing members, merge other fields
                         merged.set(key, { ...existing, ...p, members: existingMembers });
                     } else {
-                        merged.set(key, { ...existing, ...p });
+                        merged.set(key, {
+                            ...existing,
+                            ...p,
+                            members: mergePartyMembersSuperset(existingMembers, newMembers)
+                        });
                     }
                 });
             };
-            add(localParties, false);
-            add(remoteParties, true);
+            add(localParties);
+            add(remoteParties);
             return Array.from(merged.values());
         }
 
-        // Merge class_reps: same pattern as group_crs
+        // Merge class_reps: same pattern as group_crs — newer assignment wins; equal stamps keep first-seen.
         function mergeClassRepsSuperset(localReps, remoteReps) {
             const merged = new Map();
             const add = (arr) => {
@@ -21827,9 +21975,31 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                     if (!existing) { merged.set(id, { ...rep, id }); return; }
                     const existingHas = !!(existing.studentId);
                     const newHas = !!(rep.studentId);
-                    if (newHas || !existingHas) {
-                        merged.set(id, { ...existing, ...rep, id });
+                    if (!newHas && existingHas) return;
+                    if (newHas && existingHas) {
+                        const existingStamp = parseSyncStamp(existing.updated_at || existing.elected_on || '');
+                        const newStamp = parseSyncStamp(rep.updated_at || rep.elected_on || '');
+                        if (existingStamp >= newStamp) {
+                            const next = { ...rep, ...existing, id };
+                            const prevStatus = String(existing.status || '').trim().toLowerCase();
+                            const newStatus = String(rep.status || '').trim().toLowerCase();
+                            if (prevStatus === 'ended' && newStatus !== 'ended'
+                                && String(existing.studentId) === String(rep.studentId)) {
+                                next.status = 'ended';
+                            }
+                            merged.set(id, next);
+                            return;
+                        }
                     }
+                    const next = { ...existing, ...rep, id };
+                    const prevStatus = String(existing.status || '').trim().toLowerCase();
+                    const newStatus = String(rep.status || '').trim().toLowerCase();
+                    if (prevStatus === 'ended' && newStatus !== 'ended'
+                        && existing.studentId && rep.studentId
+                        && String(existing.studentId) === String(rep.studentId)) {
+                        next.status = 'ended';
+                    }
+                    merged.set(id, next);
                 });
             };
             add(localReps);
@@ -38403,18 +38573,22 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                 member.designation = designation;
                 member.elected_on = electedOn;
                 member.status = normalizePostHolderStatus(member.status || 'active');
+                member.updated_at = new Date().toISOString();
                 _pendingNotice = { msg: 'Party member updated', type: 'success' };
             } else {
                 if (existingMember) {
                     showAlert('This student is already in the party', 'danger');
                     return;
                 }
+                const _memberNow = new Date().toISOString();
                 members.push({
                     id: generateUniqueId(),
                     studentId,
                     designation,
                     elected_on: electedOn,
-                    status: 'active'
+                    status: 'active',
+                    created_at: _memberNow,
+                    updated_at: _memberNow
                 });
                 const studentName = (() => {
                     const s = (db.getStudents() || []).find(x => parseInt(x.id, 10) === studentId);
@@ -47442,16 +47616,8 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             const file = event && event.target && event.target.files && event.target.files[0];
             if (event && event.target) event.target.value = '';
             if (!file) return;
-            if (_tdsImages.length >= 6) {
-                showAlert('Maximum 6 images allowed.', 'warning');
-                return;
-            }
             if (!['image/jpeg', 'image/jpg', 'image/png', 'image/webp'].includes(file.type)) {
                 showAlert('Only JPG, PNG, and WebP images are allowed.', 'danger');
-                return;
-            }
-            if (file.size > 5 * 1024 * 1024) {
-                showAlert('Image too large (max 5 MB).', 'danger');
                 return;
             }
             const summaryId = _tdsCurrentId || tdsNewId();
@@ -47460,7 +47626,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                 const formData = new FormData();
                 formData.append('file', file);
                 formData.append('summary_id', summaryId);
-                const resp = await eaFetch('/scoreboard/upload-daily-summary-image', { method: 'POST', body: formData }, 20000);
+                const resp = await eaFetch('/scoreboard/upload-daily-summary-image', { method: 'POST', body: formData }, 120000);
                 const payload = await resp.json();
                 if (!resp.ok || !payload.success) {
                     throw new Error((payload && payload.error) || 'Upload failed');
@@ -47644,7 +47810,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                 tests: lists.tests,
                 gradings_done: lists.gradings,
                 day_note: getElementValue('tdsDayNote') || '',
-                images: _tdsImages.slice(0, 6),
+                images: _tdsImages.slice(),
                 behaviour_notes: (existing && existing.behaviour_notes) || [],
                 progress_notes: (existing && existing.progress_notes) || [],
                 attendance_digest: (existing && existing.attendance_digest) || null,
