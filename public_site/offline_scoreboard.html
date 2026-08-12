@@ -42277,42 +42277,76 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             });
             let changed = false;
             const nowIso = new Date().toISOString();
+
+            const findActiveAssignmentMeta = (postName) => {
+                const data = db.getData();
+                const groups = getCRGroupsFromPost(postName);
+                let best = null;
+                if (groups.length) {
+                    groups.forEach(group => {
+                        const existing = getPreferredGroupCREntry
+                            ? getPreferredGroupCREntry(data.group_crs || [], group)
+                            : (data.group_crs || []).find(x =>
+                                String(x.group || '').toUpperCase() === group
+                                && normalizePostHolderStatus(x.status) === 'active'
+                            );
+                        if (!existing || normalizePostHolderStatus(existing.status) !== 'active') return;
+                        const stamp = parseSyncStamp(existing.updated_at || '');
+                        if (!best || stamp >= best.stamp) {
+                            best = {
+                                studentId: parseInt(existing.studentId, 10) || 0,
+                                stamp,
+                                source: String(existing.source || '')
+                            };
+                        }
+                    });
+                    return best;
+                }
+                const leadershipPost = (data.leadership || []).find(x =>
+                    String(x.post || '').trim().toLowerCase() === String(postName || '').trim().toLowerCase()
+                    && normalizePostHolderStatus(x.status) === 'active'
+                );
+                if (!leadershipPost) return null;
+                const resolved = typeof resolveLeadershipStudent === 'function'
+                    ? resolveLeadershipStudent(leadershipPost)
+                    : null;
+                return {
+                    studentId: parseInt(leadershipPost.studentId || (resolved && resolved.id) || 0, 10) || 0,
+                    stamp: parseSyncStamp(leadershipPost.updated_at || ''),
+                    source: String(leadershipPost.source || '')
+                };
+            };
+
             approvedByPost.forEach((item, postKey) => {
                 const candidate = (db.getCandidates() || []).find(c => parseInt(c.id, 10) === parseInt(item.candidateId, 10));
                 if (!candidate) return;
                 if (!isElectionOutcomeApplied(item.post, candidate.studentId)) {
-                    // Check if there is an active manual assignment for this post that is newer than this election's approval
+                    // Never silently revive a previous election winner over a live different
+                    // postholder. Only re-apply when the election is STRICTLY newer than a
+                    // stamped assignment. Missing assignment timestamps mean "protect current".
                     const electionStamp = parseSyncStamp(item.decided_at || item.updated_at || item.created_at || '');
-                    let activeUpdatedAtStamp = 0;
-                    const data = db.getData();
-                    const groups = getCRGroupsFromPost(item.post);
-                    if (groups.length) {
-                        groups.forEach(group => {
-                            const existing = (data.group_crs || []).find(x => String(x.group || '').toUpperCase() === group && normalizePostHolderStatus(x.status) === 'active');
-                            if (existing) {
-                                const stamp = parseSyncStamp(existing.updated_at || existing.elected_on || '');
-                                if (stamp > activeUpdatedAtStamp) {
-                                    activeUpdatedAtStamp = stamp;
-                                }
-                            }
-                        });
-                    } else {
-                        const leadershipPost = (data.leadership || []).find(x =>
-                            String(x.post || '').trim().toLowerCase() === String(item.post || '').trim().toLowerCase() && normalizePostHolderStatus(x.status) === 'active'
-                        );
-                        if (leadershipPost) {
-                            activeUpdatedAtStamp = parseSyncStamp(leadershipPost.updated_at || leadershipPost.elected_on || '');
-                        }
-                    }
+                    const activeMeta = findActiveAssignmentMeta(item.post);
+                    const activeSid = activeMeta ? (parseInt(activeMeta.studentId, 10) || 0) : 0;
+                    const winnerSid = parseInt(candidate.studentId, 10) || 0;
+                    const hasConflictingActive = !!(activeSid && winnerSid && activeSid !== winnerSid);
 
-                    if (activeUpdatedAtStamp > electionStamp) {
-                        // The manual active assignment is newer. Mark the election outcome as superseded.
-                        item.status = 'superseded';
-                        item.decided_at = item.decided_at || nowIso;
-                        item.updated_at = nowIso;
-                        changed = true;
+                    if (hasConflictingActive) {
+                        const activeStamp = activeMeta ? (activeMeta.stamp || 0) : 0;
+                        if (electionStamp > activeStamp && activeStamp > 0) {
+                            const ok = db.applyElectionOutcome(item.post, item.candidateId, (item.decided_at || nowIso).split('T')[0]);
+                            if (ok) {
+                                changed = true;
+                                grantPostHolderTickets(candidate.studentId, 'election', item.post);
+                            }
+                        } else {
+                            item.status = 'superseded';
+                            item.decided_at = item.decided_at || nowIso;
+                            item.updated_at = nowIso;
+                            item.supersede_reason = 'newer_or_unstamped_active_assignment';
+                            changed = true;
+                        }
                     } else {
-                        // Apply the election outcome as the election is newer (or no active manual post exists)
+                        // Vacant / same holder not yet fully linked — safe to install.
                         const ok = db.applyElectionOutcome(item.post, item.candidateId, (item.decided_at || nowIso).split('T')[0]);
                         if (ok) {
                             changed = true;
@@ -46000,20 +46034,29 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
 
         function isElectionOutcomeApplied(post, winnerStudentId) {
             const data = db.getData();
+            const winnerSid = parseInt(winnerStudentId, 10) || 0;
+            if (!winnerSid) return false;
             const groups = getCRGroupsFromPost(post);
             if (groups.length) {
                 return groups.every(group => {
-                    const existing = (data.group_crs || []).find(item => String(item.group || '').toUpperCase() === group);
+                    const existing = getPreferredGroupCREntry
+                        ? getPreferredGroupCREntry(data.group_crs || [], group)
+                        : (data.group_crs || []).find(item => String(item.group || '').toUpperCase() === group);
                     if (!existing) return false;
-                    return parseInt(existing.studentId, 10) === parseInt(winnerStudentId, 10)
+                    return parseInt(existing.studentId, 10) === winnerSid
                         && normalizePostHolderStatus(existing.status) === 'active';
                 });
             }
             const leadershipPost = (data.leadership || []).find(item =>
                 String(item.post || '').trim().toLowerCase() === String(post || '').trim().toLowerCase()
             );
-            if (!leadershipPost) return false;
-            const winner = db.getStudents().find(student => student.id === winnerStudentId);
+            if (!leadershipPost || normalizePostHolderStatus(leadershipPost.status) !== 'active') return false;
+            if (parseInt(leadershipPost.studentId, 10) === winnerSid) return true;
+            const resolved = typeof resolveLeadershipStudent === 'function'
+                ? resolveLeadershipStudent(leadershipPost)
+                : null;
+            if (resolved && parseInt(resolved.id, 10) === winnerSid) return true;
+            const winner = (data.students || []).find(student => parseInt(student.id, 10) === winnerSid);
             if (!winner) return false;
             return normalizeRoll(leadershipPost.roll || '') === normalizeRoll(winner.roll || '');
         }
