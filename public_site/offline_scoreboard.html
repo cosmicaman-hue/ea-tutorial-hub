@@ -1313,6 +1313,22 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             </div>
         </div>
 
+        <!-- DAILY SUMMARY: Admin remarks popup for Teacher -->
+        <div id="tdsRemarksModal" class="validation-modal hidden">
+            <div class="validation-modal-content" style="max-width:640px;">
+                <div class="validation-modal-header">
+                    <h3><i class="fas fa-envelope-open-text"></i> Admin remarks for your attention</h3>
+                </div>
+                <div class="validation-modal-body">
+                    <p style="margin-top:0;color:var(--text-muted);">Please read these coloured remarks carefully. They will keep appearing until you confirm you have noted them.</p>
+                    <div id="tdsRemarksModalBody"></div>
+                </div>
+                <div class="validation-modal-footer">
+                    <button type="button" class="btn-primary" onclick="tdsAckPendingRemarks()"><i class="fas fa-check"></i> Noted — I will implement</button>
+                </div>
+            </div>
+        </div>
+
         <!-- PIP CONFIRM PANEL — floats bottom-right, no full-screen backdrop -->
         <div id="pipConfirmPanel" style="display:none;">
             <div class="pip-confirm-header">
@@ -6933,7 +6949,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                 .tds-status { display:inline-block; padding:3px 10px; border-radius:999px; font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; }
                 .tds-status.draft { background:rgba(148,163,184,.18); color:#cbd5e1; }
                 .tds-status.submitted { background:rgba(56,189,248,.18); color:#7dd3fc; }
-                .tds-status.acknowledged { background:rgba(34,197,94,.18); color:#86efac; }
+                .tds-status.acknowledged, .tds-status.perused { background:rgba(34,197,94,.18); color:#86efac; }
                 .tds-status.needs_revision { background:rgba(245,158,11,.18); color:#fbbf24; }
                 .tds-section { margin-top:14px; padding-top:12px; border-top:1px solid var(--border-color); }
                 .tds-row { display:grid; grid-template-columns:1.1fr 1.4fr 0.8fr 1.4fr auto; gap:8px; margin-bottom:8px; align-items:start; }
@@ -6944,6 +6960,18 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                 .tds-image-card .cap { padding:6px; font-size:11px; }
                 .tds-filter-chip { cursor:pointer; border:1px solid var(--border-color); background:transparent; color:var(--text-primary); border-radius:999px; padding:4px 12px; font-size:12px; }
                 .tds-filter-chip.active { border-color:#38bdf8; background:rgba(56,189,248,.15); color:#7dd3fc; }
+                .tds-tone-chip { cursor:pointer; border:1px solid transparent; border-radius:999px; padding:5px 12px; font-size:12px; font-weight:700; }
+                .tds-tone-chip.guidance { background:rgba(56,189,248,.14); color:#7dd3fc; border-color:rgba(56,189,248,.35); }
+                .tds-tone-chip.appreciation { background:rgba(34,197,94,.14); color:#86efac; border-color:rgba(34,197,94,.35); }
+                .tds-tone-chip.caution { background:rgba(245,158,11,.14); color:#fbbf24; border-color:rgba(245,158,11,.35); }
+                .tds-tone-chip.action { background:rgba(239,68,68,.14); color:#fca5a5; border-color:rgba(239,68,68,.35); }
+                .tds-tone-chip.active { outline:2px solid currentColor; outline-offset:1px; }
+                .tds-remark-card { padding:10px 12px; border-radius:10px; margin-bottom:10px; border:1px solid transparent; }
+                .tds-remark-card.guidance { background:rgba(56,189,248,.10); border-color:rgba(56,189,248,.35); }
+                .tds-remark-card.appreciation { background:rgba(34,197,94,.10); border-color:rgba(34,197,94,.35); }
+                .tds-remark-card.caution { background:rgba(245,158,11,.12); border-color:rgba(245,158,11,.4); }
+                .tds-remark-card.action { background:rgba(239,68,68,.12); border-color:rgba(239,68,68,.4); }
+                .tds-remark-tone-label { display:inline-block; font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.05em; margin-bottom:4px; }
                 @media (max-width: 900px) {
                     .tds-row { grid-template-columns:1fr; }
                 }
@@ -7081,10 +7109,19 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
 
                 <div class="tds-section" id="tdsAdminReviewPanel" style="display:none;">
                     <h4 style="margin:0 0 8px;"><i class="fas fa-user-shield"></i> Admin review</h4>
-                    <textarea id="tdsAdminRemarkInput" rows="3" placeholder="Remark for the teacher..."></textarea>
+                    <div style="margin-bottom:8px;">
+                        <div style="font-size:12px;color:var(--text-muted);margin-bottom:6px;">Remark tone (shown in colour to the teacher)</div>
+                        <div id="tdsTonePicker" style="display:flex;flex-wrap:wrap;gap:8px;">
+                            <button type="button" class="tds-tone-chip guidance active" data-tone="guidance" onclick="tdsSetRemarkTone('guidance')">Guidance</button>
+                            <button type="button" class="tds-tone-chip appreciation" data-tone="appreciation" onclick="tdsSetRemarkTone('appreciation')">Appreciation</button>
+                            <button type="button" class="tds-tone-chip caution" data-tone="caution" onclick="tdsSetRemarkTone('caution')">Caution</button>
+                            <button type="button" class="tds-tone-chip action" data-tone="action" onclick="tdsSetRemarkTone('action')">Action required</button>
+                        </div>
+                    </div>
+                    <textarea id="tdsAdminRemarkInput" rows="10" style="width:100%; min-height:180px; font-size:15px; line-height:1.45;" placeholder="Write guidance, appreciation, caution, or action points for the teacher..."></textarea>
                     <div class="form-buttons" style="margin-top:10px;">
                         <button type="button" class="secondary" onclick="tdsAdminSetStatus('needs_revision')"><i class="fas fa-rotate-left"></i> Request revision</button>
-                        <button type="button" onclick="tdsAdminSetStatus('acknowledged')"><i class="fas fa-check"></i> Acknowledge</button>
+                        <button type="button" onclick="tdsAdminSetStatus('acknowledged')"><i class="fas fa-book-open"></i> For Perusal</button>
                     </div>
                 </div>
 
@@ -47411,6 +47448,8 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
         let _tdsInboxFilter = 'pending';
         let _tdsImages = [];
         let _tdsReadOnly = false;
+        let _tdsRemarkTone = 'guidance';
+        let _tdsPendingRemarkIds = [];
 
         function tdsTodayKey() {
             try {
@@ -47422,6 +47461,43 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
 
         function tdsNewId() {
             return `tds_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+        }
+
+        function tdsNewRemarkId() {
+            return `tdr_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+        }
+
+        function tdsStatusLabel(status) {
+            const s = String(status || 'draft').toLowerCase();
+            if (s === 'acknowledged') return 'perused';
+            return s.replace(/_/g, ' ');
+        }
+
+        function tdsToneLabel(tone) {
+            const map = {
+                guidance: 'Guidance',
+                appreciation: 'Appreciation',
+                caution: 'Caution',
+                action: 'Action required'
+            };
+            const key = String(tone || 'guidance').toLowerCase();
+            return map[key] || 'Guidance';
+        }
+
+        function tdsNormalizeTone(tone, statusSet) {
+            const t = String(tone || '').toLowerCase();
+            if (['guidance', 'appreciation', 'caution', 'action'].includes(t)) return t;
+            const s = String(statusSet || '').toLowerCase();
+            if (s === 'needs_revision') return 'action';
+            if (s === 'acknowledged') return 'appreciation';
+            return 'guidance';
+        }
+
+        function tdsSetRemarkTone(tone) {
+            _tdsRemarkTone = tdsNormalizeTone(tone);
+            document.querySelectorAll('#tdsTonePicker .tds-tone-chip').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.tone === _tdsRemarkTone);
+            });
         }
 
         function tdsGetSummaries() {
@@ -47454,7 +47530,12 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                 behaviour_notes: Array.isArray(src.behaviour_notes) ? src.behaviour_notes.map(r => ({ ...r })) : [],
                 progress_notes: Array.isArray(src.progress_notes) ? src.progress_notes.map(r => ({ ...r })) : [],
                 attendance_digest: src.attendance_digest && typeof src.attendance_digest === 'object' ? { ...src.attendance_digest } : null,
-                admin_remarks: Array.isArray(src.admin_remarks) ? src.admin_remarks.map(r => ({ ...r })) : []
+                admin_remarks: Array.isArray(src.admin_remarks) ? src.admin_remarks.map(r => ({
+                    ...r,
+                    id: String(r.id || '').trim() || tdsNewRemarkId(),
+                    tone: tdsNormalizeTone(r.tone, r.status_set),
+                    teacher_ack_at: String(r.teacher_ack_at || '')
+                })) : []
             };
         }
 
@@ -47471,8 +47552,8 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             const el = document.getElementById('tdsStatusBadge');
             if (!el) return;
             const s = String(status || 'draft').toLowerCase();
-            el.className = `tds-status ${s}`;
-            el.textContent = s.replace('_', ' ');
+            el.className = `tds-status ${s === 'acknowledged' ? 'perused' : s}`;
+            el.textContent = tdsStatusLabel(s);
         }
 
         function tdsCanEditContent(row) {
@@ -47686,6 +47767,18 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             }
         }
 
+        function tdsRenderRemarkCard(r) {
+            const tone = tdsNormalizeTone(r.tone, r.status_set);
+            const noted = r.teacher_ack_at
+                ? `<span style="margin-left:8px;font-size:11px;opacity:.85;">Noted ${tdsEsc(String(r.teacher_ack_at).replace('T', ' ').slice(0, 16))}</span>`
+                : `<span style="margin-left:8px;font-size:11px;opacity:.85;">Awaiting teacher note</span>`;
+            return `<div class="tds-remark-card ${tone}">
+                <div class="tds-remark-tone-label">${tdsEsc(tdsToneLabel(tone))}</div>
+                <div style="font-size:12px;opacity:.85;">${tdsEsc(r.by || 'Admin')} · ${tdsEsc(String(r.at || '').replace('T', ' ').slice(0, 16))} · ${tdsEsc(tdsStatusLabel(r.status_set || ''))}${noted}</div>
+                <div style="margin-top:6px;font-size:14px;line-height:1.45;white-space:pre-wrap;">${tdsEsc(r.text || '')}</div>
+            </div>`;
+        }
+
         function tdsRenderRemarks(row) {
             const section = document.getElementById('tdsRemarksSection');
             const history = document.getElementById('tdsRemarksHistory');
@@ -47697,12 +47790,97 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                 return;
             }
             section.style.display = '';
-            history.innerHTML = remarks.slice().reverse().map(r => `
-                <div style="padding:8px 10px;border:1px solid var(--border-color);border-radius:8px;margin-bottom:8px;background:rgba(255,255,255,.02);">
-                    <div style="font-size:12px;color:var(--text-muted);">${tdsEsc(r.by || 'Admin')} · ${tdsEsc(r.at || '')} · ${tdsEsc(r.status_set || '')}</div>
-                    <div style="margin-top:4px;">${tdsEsc(r.text || '')}</div>
+            history.innerHTML = remarks.slice().reverse().map(tdsRenderRemarkCard).join('');
+        }
+
+        function tdsCollectPendingRemarks() {
+            const login = String(currentLoginId || 'Teacher').trim().toLowerCase();
+            const pending = [];
+            tdsGetSummaries().forEach(row => {
+                if (currentUserRole === 'teacher') {
+                    const created = String(row.created_by || '').trim().toLowerCase();
+                    if (created && created !== login && created !== 'teacher') return;
+                }
+                (Array.isArray(row.admin_remarks) ? row.admin_remarks : []).forEach(r => {
+                    if (!r || !String(r.text || '').trim()) return;
+                    if (String(r.teacher_ack_at || '').trim()) return;
+                    pending.push({
+                        summary_id: row.id,
+                        summary_date: row.date,
+                        class_scope: row.class_scope,
+                        remark: {
+                            ...r,
+                            id: String(r.id || '').trim() || tdsNewRemarkId(),
+                            tone: tdsNormalizeTone(r.tone, r.status_set)
+                        }
+                    });
+                });
+            });
+            pending.sort((a, b) => String(b.remark.at || '').localeCompare(String(a.remark.at || '')));
+            return pending;
+        }
+
+        function tdsShowPendingRemarksPopup() {
+            if (currentUserRole !== 'teacher') return;
+            const pending = tdsCollectPendingRemarks();
+            const modal = document.getElementById('tdsRemarksModal');
+            const body = document.getElementById('tdsRemarksModalBody');
+            if (!modal || !body) return;
+            if (!pending.length) {
+                modal.classList.add('hidden');
+                _tdsPendingRemarkIds = [];
+                return;
+            }
+            _tdsPendingRemarkIds = pending.map(p => `${p.summary_id}::${p.remark.id}`);
+            body.innerHTML = pending.map(p => `
+                <div style="margin-bottom:14px;">
+                    <div style="font-size:12px;color:var(--text-muted);margin-bottom:4px;">
+                        Summary ${tdsEsc(p.summary_date || '')} · Class ${tdsEsc(p.class_scope || '')}
+                    </div>
+                    ${tdsRenderRemarkCard(p.remark)}
                 </div>
             `).join('');
+            modal.classList.remove('hidden');
+        }
+
+        function tdsAckPendingRemarks() {
+            if (currentUserRole !== 'teacher') return;
+            const nowIso = new Date().toISOString();
+            const pending = tdsCollectPendingRemarks();
+            if (!pending.length) {
+                const modal = document.getElementById('tdsRemarksModal');
+                if (modal) modal.classList.add('hidden');
+                return;
+            }
+            const bySummary = new Map();
+            pending.forEach(p => {
+                if (!bySummary.has(p.summary_id)) bySummary.set(p.summary_id, new Set());
+                bySummary.get(p.summary_id).add(String(p.remark.id));
+            });
+            const data = db.getData();
+            if (!Array.isArray(data.teacher_daily_summaries)) data.teacher_daily_summaries = [];
+            data.teacher_daily_summaries = data.teacher_daily_summaries.map(row => {
+                const ids = bySummary.get(row.id);
+                if (!ids) return row;
+                const next = tdsNormalizeRow(row);
+                next.admin_remarks = next.admin_remarks.map(r => {
+                    if (!ids.has(String(r.id)) || r.teacher_ack_at) return r;
+                    return { ...r, teacher_ack_at: nowIso };
+                });
+                next.updated_by = currentLoginId || 'Teacher';
+                next.updated_at = nowIso;
+                return next;
+            });
+            db.saveData(data, { allowTeacher: true });
+            const modal = document.getElementById('tdsRemarksModal');
+            if (modal) modal.classList.add('hidden');
+            _tdsPendingRemarkIds = [];
+            if (_tdsCurrentId) {
+                const open = tdsGetSummaries().find(r => String(r.id) === String(_tdsCurrentId));
+                if (open) tdsFillForm(open);
+            }
+            tdsRenderHistory();
+            showAlert('Admin remarks noted. Thank you.', 'success');
         }
 
         function tdsPopulateTeacherNames() {
@@ -47747,7 +47925,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                     <td>${tdsEsc(r.date)}</td>
                     <td>${tdsEsc(r.class_scope)}</td>
                     <td>${tdsEsc(r.taught_by || r.created_by || '')}</td>
-                    <td><span class="tds-status ${tdsEsc(r.status)}">${tdsEsc(String(r.status || '').replace('_', ' '))}</span></td>
+                    <td><span class="tds-status ${tdsEsc(r.status === 'acknowledged' ? 'perused' : r.status)}">${tdsEsc(tdsStatusLabel(r.status))}</span></td>
                     <td>${tdsEsc(String(r.updated_at || '').replace('T', ' ').slice(0, 16))}</td>
                     <td><button type="button" class="secondary" onclick="tdsOpenSummary('${tdsEsc(r.id)}')">Open</button></td>
                 </tr>
@@ -47787,7 +47965,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                     <td>${tdsEsc(r.date)}</td>
                     <td>${tdsEsc(r.class_scope)}</td>
                     <td>${tdsEsc(r.taught_by || r.created_by || '')}</td>
-                    <td><span class="tds-status ${tdsEsc(r.status)}">${tdsEsc(String(r.status || '').replace('_', ' '))}</span></td>
+                    <td><span class="tds-status ${tdsEsc(r.status === 'acknowledged' ? 'perused' : r.status)}">${tdsEsc(tdsStatusLabel(r.status))}</span></td>
                     <td>${tdsEsc(String(r.day_note || '').slice(0, 80))}</td>
                     <td><button type="button" class="secondary" onclick="tdsOpenSummary('${tdsEsc(r.id)}')">Open</button></td>
                 </tr>
@@ -47877,13 +48055,13 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                 return;
             }
             if (currentUserRole === 'admin') {
-                showAlert('Admin reviews summaries; use Acknowledge / Request revision.', 'info');
+                showAlert('Admin reviews summaries; use For Perusal / Request revision.', 'info');
                 return;
             }
             const nextStatus = status === 'submitted' ? 'submitted' : 'draft';
             const row = tdsCollectForm();
             if (row.status === 'acknowledged') {
-                showAlert('This summary was acknowledged. Ask Admin to reopen via needs revision if changes are required.', 'warning');
+                showAlert('This summary was marked For Perusal. Ask Admin to reopen via needs revision if changes are required.', 'warning');
                 return;
             }
             row.status = nextStatus;
@@ -47910,22 +48088,27 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                 showAlert('Please enter a remark.', 'warning');
                 return;
             }
+            const tone = tdsNormalizeTone(_tdsRemarkTone, status);
             const row = tdsNormalizeRow(existing);
             row.status = status;
             row.updated_by = currentLoginId || 'Admin';
             row.updated_at = new Date().toISOString();
             row.admin_remarks = Array.isArray(row.admin_remarks) ? row.admin_remarks.slice() : [];
             row.admin_remarks.push({
+                id: tdsNewRemarkId(),
                 by: currentLoginId || 'Admin',
                 at: row.updated_at,
                 text: remarkText,
-                status_set: status
+                status_set: status,
+                tone,
+                teacher_ack_at: ''
             });
             tdsPersistRow(row);
             tdsFillForm(row);
             tdsRenderHistory();
             tdsRenderInbox();
-            showAlert(status === 'acknowledged' ? 'Summary acknowledged.' : 'Revision requested.', 'success');
+            setElementValue('tdsAdminRemarkInput', '');
+            showAlert(status === 'acknowledged' ? 'Marked For Perusal.' : 'Revision requested.', 'success');
         }
 
         function tdsOpenSummary(id) {
@@ -48008,6 +48191,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             tdsPopulateHistoryMonth();
             tdsRenderInbox();
             tdsRenderHistory();
+            if (currentUserRole === 'admin') tdsSetRemarkTone(_tdsRemarkTone || 'guidance');
 
             const dateKey = getElementValue('tdsDate') || tdsTodayKey();
             const classScope = getElementValue('tdsClassScope') || 'A';
@@ -48015,6 +48199,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                 const open = tdsGetSummaries().find(r => String(r.id) === String(_tdsCurrentId));
                 if (open) {
                     tdsFillForm(open);
+                    if (currentUserRole === 'teacher') setTimeout(tdsShowPendingRemarksPopup, 80);
                     return;
                 }
             }
@@ -48022,6 +48207,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                 const existing = tdsFindExisting(dateKey, classScope, currentLoginId || 'Teacher');
                 if (existing) tdsFillForm(existing);
                 else tdsNewSummary();
+                setTimeout(tdsShowPendingRemarksPopup, 80);
             } else {
                 // Admin: show empty form until a history/inbox item is opened
                 _tdsCurrentId = '';
