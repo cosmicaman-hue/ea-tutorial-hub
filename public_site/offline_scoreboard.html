@@ -1314,8 +1314,8 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
         </div>
 
         <!-- DAILY SUMMARY: Admin remarks popup for Teacher -->
-        <div id="tdsRemarksModal" class="validation-modal hidden">
-            <div class="validation-modal-content" style="max-width:640px;">
+        <div id="tdsRemarksModal" class="validation-modal hidden" style="z-index:14000; pointer-events:auto;">
+            <div class="validation-modal-content" style="max-width:640px; pointer-events:auto;">
                 <div class="validation-modal-header">
                     <h3><i class="fas fa-envelope-open-text"></i> Admin remarks for your attention</h3>
                 </div>
@@ -1324,7 +1324,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                     <div id="tdsRemarksModalBody"></div>
                 </div>
                 <div class="validation-modal-footer">
-                    <button type="button" class="btn-primary" onclick="tdsAckPendingRemarks()"><i class="fas fa-check"></i> Noted — I will implement</button>
+                    <button type="button" id="tdsAckRemarksBtn" class="btn-primary" data-allow="true" onclick="tdsAckPendingRemarks(event)"><i class="fas fa-check"></i> Noted — I will implement</button>
                 </div>
             </div>
         </div>
@@ -12776,11 +12776,13 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             const data = db.getData();
             let updated = false;
             let holderName = '';
+            const nowIso = new Date().toISOString();
 
             if (source === 'leadership') {
                 const post = (data.leadership || []).find(p => p.id === postId);
                 if (post) {
                     post.status = 'suspended';
+                    post.updated_at = nowIso;
                     holderName = post.holder || post.roll || 'Post holder';
                     updated = true;
                 }
@@ -12788,6 +12790,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                 const rep = (data.class_reps || []).find(r => r.id === postId);
                 if (rep) {
                     rep.status = 'suspended';
+                    rep.updated_at = nowIso;
                     const student = (data.students || []).find(s => s.id === rep.studentId);
                     holderName = student ? (student.base_name || student.name) : 'CR';
                     updated = true;
@@ -12796,6 +12799,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                 const rep = (data.group_crs || []).find(r => r.id === postId);
                 if (rep) {
                     rep.status = 'suspended';
+                    rep.updated_at = nowIso;
                     const student = (data.students || []).find(s => s.id === rep.studentId);
                     holderName = student ? (student.base_name || student.name) : 'Group CR';
                     updated = true;
@@ -12822,11 +12826,13 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             const data = db.getData();
             let updated = false;
             let holderName = '';
+            const nowIso = new Date().toISOString();
 
             if (source === 'leadership') {
                 const post = (data.leadership || []).find(p => p.id === postId);
                 if (post) {
                     post.status = 'active';
+                    post.updated_at = nowIso;
                     holderName = post.holder || post.roll || 'Post holder';
                     updated = true;
                 }
@@ -12834,6 +12840,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                 const rep = (data.class_reps || []).find(r => r.id === postId);
                 if (rep) {
                     rep.status = 'active';
+                    rep.updated_at = nowIso;
                     const student = (data.students || []).find(s => s.id === rep.studentId);
                     holderName = student ? (student.base_name || student.name) : 'CR';
                     updated = true;
@@ -12842,6 +12849,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                 const rep = (data.group_crs || []).find(r => r.id === postId);
                 if (rep) {
                     rep.status = 'active';
+                    rep.updated_at = nowIso;
                     const student = (data.students || []).find(s => s.id === rep.studentId);
                     holderName = student ? (student.base_name || student.name) : 'Group CR';
                     updated = true;
@@ -12868,20 +12876,74 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             const data = db.getData();
             let updated = false;
             let holderName = '';
+            let postTitle = '';
+            const nowIso = new Date().toISOString();
+            const today = nowIso.split('T')[0];
 
             if (source === 'leadership') {
                 const post = (data.leadership || []).find(p => p.id === postId);
                 if (post) {
                     holderName = post.holder || post.roll || 'Post holder';
+                    postTitle = post.post || '';
                     post.status = 'vacant';
                     post.holder = '';
                     post.roll = '';
                     post.studentId = null;
+                    post.ended_on = today;
+                    post.updated_at = nowIso;
                     updated = true;
+                }
+            } else if (source === 'group_cr') {
+                const rep = (data.group_crs || []).find(r => r.id === postId);
+                if (rep) {
+                    const student = (data.students || []).find(s => s.id === rep.studentId);
+                    holderName = student ? (student.base_name || student.name) : 'Group CR';
+                    postTitle = rep.post || `Group CR (Group ${rep.group})`;
+                    rep.status = 'vacant';
+                    rep.studentId = null;
+                    rep.ended_on = today;
+                    rep.updated_at = nowIso;
+                    updated = true;
+                }
+            } else if (source === 'class_rep') {
+                const rep = (data.class_reps || []).find(r => r.id === postId);
+                if (rep) {
+                    const student = (data.students || []).find(s => s.id === rep.studentId);
+                    holderName = student ? (student.base_name || student.name) : 'Class Rep';
+                    postTitle = rep.post || `Class Representative (Class ${rep.class})`;
+                    rep.status = 'vacant';
+                    rep.studentId = null;
+                    rep.ended_on = today;
+                    rep.updated_at = nowIso;
+                    updated = true;
+                }
+            } else if (source === 'party_president') {
+                const party = (data.parties || []).find(p => p.id === postId);
+                if (party) {
+                    const member = (party.members || []).find(m => isPartyPresidentDesignation(m.designation) && normalizePostHolderStatus(m.status) !== 'ended');
+                    if (member) {
+                        const student = (data.students || []).find(s => s.id === member.studentId);
+                        holderName = student ? (student.base_name || student.name) : 'Party President';
+                        postTitle = `Party President (${party.code})`;
+                        member.status = 'ended';
+                        member.ended_on = today;
+                        member.updated_at = nowIso;
+                        updated = true;
+                    }
                 }
             }
 
             if (updated) {
+                if (postTitle && Array.isArray(data.pending_election_results)) {
+                    data.pending_election_results.forEach(res => {
+                        if (samePostKey(res.post, postTitle)) {
+                            res.status = 'superseded';
+                            res.updated_at = nowIso;
+                            res.decided_at = res.decided_at || nowIso;
+                            res.supersede_reason = 'deappointed_by_admin';
+                        }
+                    });
+                }
                 savePostHolderData(data);
                 showAlert(`${holderName} de-appointed. Post is now vacant.`, 'info');
             } else {
@@ -16673,7 +16735,24 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
 
             deleteLeadership(postId) {
                 const data = this.getData();
-                data.leadership = data.leadership.filter(p => p.id !== postId);
+                const nowIso = new Date().toISOString();
+                const post = (data.leadership || []).find(p => p.id === postId);
+                const postTitle = post ? post.post : '';
+                data.leadership = (data.leadership || []).filter(p => p.id !== postId);
+                data.deleted_leadership = data.deleted_leadership || [];
+                if (!data.deleted_leadership.some(d => d.id === postId)) {
+                    data.deleted_leadership.push({ id: postId, deleted_at: nowIso });
+                }
+                if (postTitle && Array.isArray(data.pending_election_results)) {
+                    data.pending_election_results.forEach(res => {
+                        if (samePostKey(res.post, postTitle)) {
+                            res.status = 'superseded';
+                            res.updated_at = nowIso;
+                            res.decided_at = res.decided_at || nowIso;
+                            res.supersede_reason = 'deleted_by_admin';
+                        }
+                    });
+                }
                 this.saveData(data);
             }
 
@@ -20251,9 +20330,16 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                 // Teachers: full operational access on teacher-visible tabs.
                 // Keep admin-only tabs hidden via setTabVisibility above.
                 document.querySelectorAll('input, select, textarea, button').forEach(el => {
-                    if (el.dataset.allow === 'true') return;
+                    if (el.dataset.allow === 'true' || el.closest('#tdsRemarksModal') || el.id === 'tdsAckRemarksBtn') {
+                        el.disabled = false;
+                        return;
+                    }
                     if (el.classList && el.classList.contains('tab-button')) return;
                     if (el.closest('.app-sidebar') || el.closest('.mobile-topbar') || el.closest('.sidebar-overlay')) return;
+                    if (el.closest('#tdsRemarksModal') || el.id === 'tdsAckRemarksBtn') {
+                        el.disabled = false;
+                        return;
+                    }
                     if (
                         el.closest('#add-score-tab') ||
                         el.closest('#scoreboard-tab') ||
@@ -20288,8 +20374,15 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                 });
                 // Honor explicit admin-only markers in mixed tabs.
                 document.querySelectorAll('[data-teacher-allow="false"]').forEach(el => {
+                    if (el.closest('#tdsRemarksModal') || el.id === 'tdsAckRemarksBtn') return;
                     el.disabled = true;
                 });
+                // Always keep Daily Summary remark popup actionable for teachers.
+                const tdsAckBtn = document.getElementById('tdsAckRemarksBtn');
+                if (tdsAckBtn) {
+                    tdsAckBtn.disabled = false;
+                    tdsAckBtn.removeAttribute('disabled');
+                }
             }
 
             document.querySelectorAll('[data-role-only="admin"]').forEach(el => {
@@ -21826,56 +21919,85 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             return hardDrop && largeRemovedSet;
         }
 
-        // Merge leadership: prefer the version that has a holder assigned (non-empty holder/roll).
-        // Match by post id first. Never overwrite a populated entry with an empty one.
-        // When both are populated, newer updated_at/created_at/elected_on wins so stale peers
-        // cannot revive a previous holder after a manual override, edit, or election install.
-        function mergeLeadershipSuperset(localPosts, remotePosts) {
+        function mergeDeletedLeadershipSuperset(existingDeleted, incomingDeleted) {
             const merged = new Map();
+            const add = (entry) => {
+                if (!entry || typeof entry !== 'object') return;
+                const id = parseInt(entry.id, 10) || 0;
+                if (!id) return;
+                const existing = merged.get(id);
+                if (!existing) {
+                    merged.set(id, { ...entry, id });
+                    return;
+                }
+                const prevStamp = parseSyncStamp(existing.deleted_at || existing.updated_at || '');
+                const nextStamp = parseSyncStamp(entry.deleted_at || entry.updated_at || '');
+                merged.set(id, nextStamp >= prevStamp ? { ...existing, ...entry, id } : { ...entry, ...existing, id });
+            };
+            (Array.isArray(existingDeleted) ? existingDeleted : []).forEach(add);
+            (Array.isArray(incomingDeleted) ? incomingDeleted : []).forEach(add);
+            return Array.from(merged.values());
+        }
+
+        // Merge leadership: prefer newer timestamp (updated_at/ended_on/created_at/elected_on).
+        // If an incoming record vacates or ends a post with a newer or equal timestamp, that status
+        // is preserved rather than resurrecting the old holder.
+        function mergeLeadershipSuperset(localPosts, remotePosts, deletedEntries = []) {
+            const merged = new Map();
+            const deletedIds = new Set((Array.isArray(deletedEntries) ? deletedEntries : []).map(d => parseInt(d && d.id, 10)).filter(Boolean));
             const normalize = (p) => ({ ...p, id: parseInt(p.id, 10) || 0 });
             const isPopulated = (p) => !!(String(p.holder || '').trim() || String(p.roll || '').trim() || p.studentId);
-            const stampOf = (p) => parseSyncStamp(p.updated_at || p.created_at || p.elected_on || '');
+            const stampOf = (p) => parseSyncStamp(p.updated_at || p.ended_on || p.created_at || p.elected_on || '');
             const add = (arr) => {
                 (Array.isArray(arr) ? arr : []).forEach(p => {
                     const n = normalize(p);
-                    if (!n.id) return;
+                    if (!n.id || deletedIds.has(n.id)) return;
                     const existing = merged.get(n.id);
                     if (!existing) { merged.set(n.id, n); return; }
-                    // Never overwrite a populated holder with an empty one
-                    if (isPopulated(existing) && !isPopulated(n)) return;
-                    if (isPopulated(n) && isPopulated(existing)) {
-                        const existingStamp = stampOf(existing);
-                        const newStamp = stampOf(n);
-                        if (existingStamp >= newStamp) {
-                            merged.set(n.id, { ...n, ...existing, id: n.id });
-                            return;
-                        }
-                        if (newStamp > existingStamp) {
-                            const next = { ...existing, ...n, id: n.id };
-                            // Preserve 'ended' against stale clients that still carry 'active' for the same holder.
-                            const prevStatus = String(existing.status || '').trim().toLowerCase();
-                            const newStatus = String(n.status || '').trim().toLowerCase();
-                            const sameHolder = String(existing.holder || '').trim().toLowerCase() === String(n.holder || '').trim().toLowerCase()
-                                && String(existing.roll || '').trim().toUpperCase() === String(n.roll || '').trim().toUpperCase()
-                                && String(existing.studentId || '') === String(n.studentId || '');
-                            if (prevStatus === 'ended' && newStatus !== 'ended' && sameHolder) {
-                                next.status = 'ended';
-                            }
-                            merged.set(n.id, next);
-                            return;
-                        }
-                    }
-                    if (isPopulated(n) || !isPopulated(existing)) {
+
+                    const existingStamp = stampOf(existing);
+                    const newStamp = stampOf(n);
+
+                    if (newStamp > existingStamp) {
                         const next = { ...existing, ...n, id: n.id };
-                        const prevStatus = String(existing.status || '').trim().toLowerCase();
-                        const newStatus = String(n.status || '').trim().toLowerCase();
-                        const sameHolder = String(existing.holder || '').trim().toLowerCase() === String(n.holder || '').trim().toLowerCase()
-                            && String(existing.roll || '').trim().toUpperCase() === String(n.roll || '').trim().toUpperCase()
-                            && String(existing.studentId || '') === String(n.studentId || '');
-                        if (prevStatus === 'ended' && newStatus !== 'ended' && sameHolder) {
-                            next.status = 'ended';
+                        if (!isPopulated(n) || String(n.status || '').toLowerCase() === 'vacant') {
+                            next.holder = n.holder || '';
+                            next.roll = n.roll || '';
+                            next.studentId = n.studentId || null;
+                            next.status = n.status || 'vacant';
                         }
                         merged.set(n.id, next);
+                        return;
+                    }
+                    if (existingStamp > newStamp) {
+                        const next = { ...n, ...existing, id: n.id };
+                        if (!isPopulated(existing) || String(existing.status || '').toLowerCase() === 'vacant') {
+                            next.holder = existing.holder || '';
+                            next.roll = existing.roll || '';
+                            next.studentId = existing.studentId || null;
+                            next.status = existing.status || 'vacant';
+                        }
+                        merged.set(n.id, next);
+                        return;
+                    }
+
+                    // Equal stamps:
+                    const prevStatus = String(existing.status || '').trim().toLowerCase();
+                    const newStatus = String(n.status || '').trim().toLowerCase();
+                    const sameHolder = String(existing.holder || '').trim().toLowerCase() === String(n.holder || '').trim().toLowerCase()
+                        && String(existing.roll || '').trim().toUpperCase() === String(n.roll || '').trim().toUpperCase()
+                        && String(existing.studentId || '') === String(n.studentId || '');
+
+                    if ((prevStatus === 'ended' || prevStatus === 'suspended' || prevStatus === 'vacant') && newStatus === 'active' && sameHolder) {
+                        merged.set(n.id, { ...n, ...existing, id: n.id, status: prevStatus });
+                    } else if ((newStatus === 'ended' || newStatus === 'suspended' || newStatus === 'vacant') && prevStatus === 'active' && sameHolder) {
+                        merged.set(n.id, { ...existing, ...n, id: n.id, status: newStatus });
+                    } else if (isPopulated(existing) && !isPopulated(n) && newStatus !== 'vacant') {
+                        merged.set(n.id, { ...n, ...existing, id: n.id });
+                    } else if (!isPopulated(existing) && isPopulated(n) && prevStatus !== 'vacant') {
+                        merged.set(n.id, { ...existing, ...n, id: n.id });
+                    } else {
+                        merged.set(n.id, { ...existing, ...n, id: n.id });
                     }
                 });
             };
@@ -21907,30 +22029,52 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             return Array.from(merged.values());
         }
 
-        // Merge group_crs: match by id, never drop entries, prefer newer entry by timestamp
+        // Merge group_crs: match by id, prefer newer timestamp (updated_at/ended_on/created_at/elected_on)
         function mergeGroupCRsSuperset(localCRs, remoteCRs) {
             const merged = new Map();
+            const stampOf = (cr) => parseSyncStamp(cr && (cr.updated_at || cr.ended_on || cr.created_at || cr.elected_on) || '');
             const add = (arr) => {
                 (Array.isArray(arr) ? arr : []).forEach(cr => {
                     const id = parseInt(cr.id, 10) || 0;
                     if (!id) return;
                     const existing = merged.get(id);
                     if (!existing) { merged.set(id, { ...cr, id }); return; }
-                    // Never overwrite a populated entry with an empty one
-                    const existingHas = !!(existing.studentId);
-                    const newHas = !!(cr.studentId);
-                    if (!newHas && existingHas) return;
-                    // When both have a student, prefer the entry with the newer updated_at / elected_on
-                    if (newHas && existingHas) {
-                        const existingStamp = parseSyncStamp(existing.updated_at || existing.elected_on || '');
-                        const newStamp = parseSyncStamp(cr.updated_at || cr.elected_on || '');
-                        if (existingStamp >= newStamp) {
-                            // Existing is newer or equal (e.g. just approved locally) — keep it
-                            merged.set(id, { ...cr, ...existing, id });
-                            return;
+
+                    const existingStamp = stampOf(existing);
+                    const newStamp = stampOf(cr);
+
+                    if (newStamp > existingStamp) {
+                        const next = { ...existing, ...cr, id };
+                        if (!cr.studentId || String(cr.status || '').toLowerCase() === 'vacant' || String(cr.status || '').toLowerCase() === 'ended') {
+                            next.studentId = cr.studentId || null;
+                            next.status = cr.status || (cr.studentId ? 'active' : 'vacant');
                         }
+                        merged.set(id, next);
+                        return;
                     }
-                    merged.set(id, { ...existing, ...cr, id });
+                    if (existingStamp > newStamp) {
+                        const next = { ...cr, ...existing, id };
+                        if (!existing.studentId || String(existing.status || '').toLowerCase() === 'vacant' || String(existing.status || '').toLowerCase() === 'ended') {
+                            next.studentId = existing.studentId || null;
+                            next.status = existing.status || (existing.studentId ? 'active' : 'vacant');
+                        }
+                        merged.set(id, next);
+                        return;
+                    }
+
+                    // Equal stamps:
+                    const prevStatus = String(existing.status || '').trim().toLowerCase();
+                    const newStatus = String(cr.status || '').trim().toLowerCase();
+                    const sameStudent = existing.studentId && cr.studentId && String(existing.studentId) === String(cr.studentId);
+                    if ((prevStatus === 'ended' || prevStatus === 'suspended' || prevStatus === 'vacant') && newStatus === 'active' && sameStudent) {
+                        merged.set(id, { ...cr, ...existing, id, status: prevStatus });
+                    } else if ((newStatus === 'ended' || newStatus === 'suspended' || newStatus === 'vacant') && prevStatus === 'active' && sameStudent) {
+                        merged.set(id, { ...existing, ...cr, id, status: newStatus });
+                    } else if (existing.studentId && !cr.studentId && newStatus !== 'vacant') {
+                        merged.set(id, { ...cr, ...existing, id });
+                    } else {
+                        merged.set(id, { ...existing, ...cr, id });
+                    }
                 });
             };
             add(localCRs);
@@ -21942,7 +22086,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
         // stale snapshot). On conflicting member ids, newer updated_at/elected_on wins.
         function mergePartyMembersSuperset(localMembers, remoteMembers) {
             const merged = new Map();
-            const stampOf = (m) => parseSyncStamp(m && (m.updated_at || m.elected_on || m.created_at) || '');
+            const stampOf = (m) => parseSyncStamp(m && (m.updated_at || m.ended_on || m.elected_on || m.created_at) || '');
             const richness = (m) => Object.values(m || {}).filter(v => v !== null && v !== undefined && v !== '' && v !== 0).length;
             const add = (arr) => {
                 (Array.isArray(arr) ? arr : []).forEach(member => {
@@ -21962,9 +22106,17 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                     } else if (existingStamp > nextStamp) {
                         merged.set(key, { ...member, ...existing });
                     } else {
-                        merged.set(key, richness(member) >= richness(existing)
-                            ? { ...existing, ...member }
-                            : { ...member, ...existing });
+                        const prevStatus = String(existing.status || '').trim().toLowerCase();
+                        const newStatus = String(member.status || '').trim().toLowerCase();
+                        if ((newStatus === 'ended' || newStatus === 'suspended') && prevStatus === 'active') {
+                            merged.set(key, { ...existing, ...member, status: newStatus });
+                        } else if ((prevStatus === 'ended' || prevStatus === 'suspended') && newStatus === 'active') {
+                            merged.set(key, { ...member, ...existing, status: prevStatus });
+                        } else {
+                            merged.set(key, richness(member) >= richness(existing)
+                                ? { ...existing, ...member }
+                                : { ...member, ...existing });
+                        }
                     }
                 });
             };
@@ -22001,42 +22153,51 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             return Array.from(merged.values());
         }
 
-        // Merge class_reps: same pattern as group_crs — newer assignment wins; equal stamps keep first-seen.
+        // Merge class_reps: match by id, prefer newer timestamp (updated_at/ended_on/created_at/elected_on)
         function mergeClassRepsSuperset(localReps, remoteReps) {
             const merged = new Map();
+            const stampOf = (rep) => parseSyncStamp(rep && (rep.updated_at || rep.ended_on || rep.created_at || rep.elected_on) || '');
             const add = (arr) => {
                 (Array.isArray(arr) ? arr : []).forEach(rep => {
                     const id = parseInt(rep.id, 10) || 0;
                     if (!id) return;
                     const existing = merged.get(id);
                     if (!existing) { merged.set(id, { ...rep, id }); return; }
-                    const existingHas = !!(existing.studentId);
-                    const newHas = !!(rep.studentId);
-                    if (!newHas && existingHas) return;
-                    if (newHas && existingHas) {
-                        const existingStamp = parseSyncStamp(existing.updated_at || existing.elected_on || '');
-                        const newStamp = parseSyncStamp(rep.updated_at || rep.elected_on || '');
-                        if (existingStamp >= newStamp) {
-                            const next = { ...rep, ...existing, id };
-                            const prevStatus = String(existing.status || '').trim().toLowerCase();
-                            const newStatus = String(rep.status || '').trim().toLowerCase();
-                            if (prevStatus === 'ended' && newStatus !== 'ended'
-                                && String(existing.studentId) === String(rep.studentId)) {
-                                next.status = 'ended';
-                            }
-                            merged.set(id, next);
-                            return;
+
+                    const existingStamp = stampOf(existing);
+                    const newStamp = stampOf(rep);
+
+                    if (newStamp > existingStamp) {
+                        const next = { ...existing, ...rep, id };
+                        if (!rep.studentId || String(rep.status || '').toLowerCase() === 'vacant' || String(rep.status || '').toLowerCase() === 'ended') {
+                            next.studentId = rep.studentId || null;
+                            next.status = rep.status || (rep.studentId ? 'active' : 'vacant');
                         }
+                        merged.set(id, next);
+                        return;
                     }
-                    const next = { ...existing, ...rep, id };
+                    if (existingStamp > newStamp) {
+                        const next = { ...rep, ...existing, id };
+                        if (!existing.studentId || String(existing.status || '').toLowerCase() === 'vacant' || String(existing.status || '').toLowerCase() === 'ended') {
+                            next.studentId = existing.studentId || null;
+                            next.status = existing.status || (existing.studentId ? 'active' : 'vacant');
+                        }
+                        merged.set(id, next);
+                        return;
+                    }
+
                     const prevStatus = String(existing.status || '').trim().toLowerCase();
                     const newStatus = String(rep.status || '').trim().toLowerCase();
-                    if (prevStatus === 'ended' && newStatus !== 'ended'
-                        && existing.studentId && rep.studentId
-                        && String(existing.studentId) === String(rep.studentId)) {
-                        next.status = 'ended';
+                    const sameStudent = existing.studentId && rep.studentId && String(existing.studentId) === String(rep.studentId);
+                    if ((prevStatus === 'ended' || prevStatus === 'suspended' || prevStatus === 'vacant') && newStatus === 'active' && sameStudent) {
+                        merged.set(id, { ...rep, ...existing, id, status: prevStatus });
+                    } else if ((newStatus === 'ended' || newStatus === 'suspended' || newStatus === 'vacant') && prevStatus === 'active' && sameStudent) {
+                        merged.set(id, { ...existing, ...rep, id, status: newStatus });
+                    } else if (existing.studentId && !rep.studentId && newStatus !== 'vacant') {
+                        merged.set(id, { ...rep, ...existing, id });
+                    } else {
+                        merged.set(id, { ...existing, ...rep, id });
                     }
-                    merged.set(id, next);
                 });
             };
             add(localReps);
@@ -22340,6 +22501,11 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                     server_updated_at: serverData.server_updated_at || serverUpdatedAt || baseline.server_updated_at || '',
                     updated_at: serverData.updated_at || serverUpdatedAt || baseline.updated_at || '',
                     fee_records: mergeFeeRecordsSuperset(localData.fee_records || [], serverData.fee_records || []),
+                    deleted_leadership: mergeDeletedLeadershipSuperset(localData.deleted_leadership || [], serverData.deleted_leadership || []),
+                    leadership: mergeLeadershipSuperset(localData.leadership || [], serverData.leadership || [], mergeDeletedLeadershipSuperset(localData.deleted_leadership || [], serverData.deleted_leadership || [])),
+                    group_crs: mergeGroupCRsSuperset(localData.group_crs || [], serverData.group_crs || []),
+                    class_reps: mergeClassRepsSuperset(localData.class_reps || [], serverData.class_reps || []),
+                    parties: mergePartiesSuperset(localData.parties || [], serverData.parties || []),
                     post_holder_history: mergePostHolderHistorySuperset(localData.post_holder_history || [], serverData.post_holder_history || []),
                     postholder_tickets: mergePostholderTickets(localData.postholder_tickets || {}, serverData.postholder_tickets || {}),
                     postholder_ticket_log: mergePostholderTicketLog(localData.postholder_ticket_log || [], serverData.postholder_ticket_log || []),
@@ -22374,7 +22540,8 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                         serverData.students || []
                     ),
                     fee_records: mergeFeeRecordsSuperset(localData.fee_records || [], serverData.fee_records || []),
-                    leadership: mergeLeadershipSuperset(localData.leadership || [], serverData.leadership || []),
+                    deleted_leadership: mergeDeletedLeadershipSuperset(localData.deleted_leadership || [], serverData.deleted_leadership || []),
+                    leadership: mergeLeadershipSuperset(localData.leadership || [], serverData.leadership || [], mergeDeletedLeadershipSuperset(localData.deleted_leadership || [], serverData.deleted_leadership || [])),
                     group_crs: mergeGroupCRsSuperset(localData.group_crs || [], serverData.group_crs || []),
                     class_reps: mergeClassRepsSuperset(localData.class_reps || [], serverData.class_reps || []),
                     parties: mergePartiesSuperset(localData.parties || [], serverData.parties || []),
@@ -39144,13 +39311,26 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
         function deleteLeadership(postId) {
             const post = db.getLeadership().find(p => p.id === postId);
             if (!post) { showAlert('Leadership post not found.', 'warning'); return; }
-            const today = new Date().toISOString().split('T')[0];
+            const nowIso = new Date().toISOString();
+            const today = nowIso.split('T')[0];
             const postName = post.post || 'Unknown';
             const isActive = normalizePostHolderStatus(post.status) === 'active';
             if (isActive) {
                 // Primary action: end tenure — keeps record in history
                 if (confirm(`Mark "${postName}" as tenure-ended?\n\nThe record will be preserved in history.`)) {
-                    db.updateLeadership(postId, { status: 'ended', ended_on: today });
+                    db.updateLeadership(postId, { status: 'ended', ended_on: today, updated_at: nowIso });
+                    const data = db.getData();
+                    if (Array.isArray(data.pending_election_results)) {
+                        data.pending_election_results.forEach(res => {
+                            if (samePostKey(res.post, postName)) {
+                                res.status = 'superseded';
+                                res.updated_at = nowIso;
+                                res.decided_at = res.decided_at || nowIso;
+                                res.supersede_reason = 'tenure_ended_by_admin';
+                            }
+                        });
+                        db.saveData(data);
+                    }
                     syncPostHolderHistory({ persist: true });
                     if (SERVER_SYNC.enabled && (currentUserRole === 'admin' || currentUserRole === 'teacher')) {
                         pushToServer(db.getData(), { silent: true }).catch(() => {});
@@ -39178,6 +39358,9 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             const postName = post.post || 'Unknown';
             if (confirm(`PERMANENTLY DELETE "${postName}"?\n\nThis removes all records and history. This cannot be undone.`)) {
                 db.deleteLeadership(postId);
+                if (SERVER_SYNC.enabled && (currentUserRole === 'admin' || currentUserRole === 'teacher')) {
+                    pushToServer(db.getData(), { silent: true }).catch(() => {});
+                }
                 refreshAllPostHolderViews();
                 showAlert('Post permanently deleted.', 'success');
             }
@@ -39915,20 +40098,24 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             const data = db.getData();
             let applied = false;
 
+            const nowIso = new Date().toISOString();
             if (table === 'leadership') {
                 const post = (data.leadership || []).find(item => item.id === targetId);
                 if (!post) return false;
                 post.status = desired;
+                post.updated_at = nowIso;
                 applied = true;
             } else if (table === 'group_crs') {
                 const rep = (data.group_crs || []).find(item => item.id === targetId);
                 if (!rep) return false;
                 rep.status = desired;
+                rep.updated_at = nowIso;
                 applied = true;
             } else if (table === 'class_reps') {
                 const rep = (data.class_reps || []).find(item => item.id === targetId);
                 if (!rep) return false;
                 rep.status = desired;
+                rep.updated_at = nowIso;
                 applied = true;
             } else if (table === 'party') {
                 const party = (data.parties || []).find(item => item.id === targetId);
@@ -39936,6 +40123,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                 const member = (party.members || []).find(item => isPartyPresidentDesignation(item.designation));
                 if (!member) return false;
                 member.status = desired;
+                member.updated_at = nowIso;
                 applied = true;
             }
 
@@ -39954,8 +40142,10 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                 submitPostHolderActionRequest('leadership', postId, isSuspending ? 'suspended' : 'active');
                 return;
             }
+            const nowIso = new Date().toISOString();
             pushUndoSnapshot(isSuspending ? 'Suspend leader' : 'Reinstate leader');
             post.status = isSuspending ? 'suspended' : 'active';
+            post.updated_at = nowIso;
             if (!isSuspending) { post.auto_suspend_waived = true; post.resumed_on = formatDateKey(new Date()); }
             savePostHolderData(data);
             refreshAllPostHolderViews();
@@ -39983,6 +40173,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             if (!entry) { showAlert('Post record not found.', 'danger'); return; }
             const newState = !entry.auto_suspend_waived;
             entry.auto_suspend_waived = newState;
+            entry.updated_at = new Date().toISOString();
             if (newState) {
                 // Granting waiver: clear any active 72h warning clocks for this student
                 const sid = parseInt(entry.studentId, 10);
@@ -40018,6 +40209,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                 // Deactivate — no VETO refunded, admin override
                 if (!confirm('Remove VETO Shield? The holder will no longer be protected from auto-suspension.\nNote: the VETO spent to activate it is not refunded.')) return;
                 entry.veto_shield_active = false;
+                entry.updated_at = new Date().toISOString();
                 savePostHolderData(data);
                 return;
             }
@@ -40045,6 +40237,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             entry.veto_shield_active = true;
             const _shieldDate = new Date().toISOString().split('T')[0];
             entry.veto_shield_used_on = _shieldDate;
+            entry.updated_at = new Date().toISOString();
             // Clear active warning clocks — gives a fresh grace window after the shield
             localStorage.removeItem(`ea_rank_warn_${sid}`);
             localStorage.removeItem(`ea_veto_warn_${sid}`);
@@ -40086,7 +40279,9 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                 submitPostHolderActionRequest('class_reps', repId, isSuspending ? 'suspended' : 'active');
                 return;
             }
+            const nowIso = new Date().toISOString();
             rep.status = normalizePostHolderStatus(rep.status) === 'suspended' ? 'active' : 'suspended';
+            rep.updated_at = nowIso;
             if (!isSuspending) { rep.auto_suspend_waived = true; rep.resumed_on = formatDateKey(new Date()); }
             savePostHolderData(data);
             refreshAllPostHolderViews();
@@ -40103,7 +40298,9 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                 submitPostHolderActionRequest('group_crs', repId, isSuspending ? 'suspended' : 'active');
                 return;
             }
+            const nowIso = new Date().toISOString();
             rep.status = normalizePostHolderStatus(rep.status) === 'suspended' ? 'active' : 'suspended';
+            rep.updated_at = nowIso;
             if (!isSuspending) { rep.auto_suspend_waived = true; rep.resumed_on = formatDateKey(new Date()); }
             savePostHolderData(data);
             refreshAllPostHolderViews();
@@ -40125,6 +40322,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                 submitPostHolderActionRequest('party', partyId, isSuspending ? 'suspended' : 'active');
                 return;
             }
+            const nowIso = new Date().toISOString();
             if (normalizePostHolderStatus(member.status) === 'suspended') {
                 member.status = 'active';
                 member.auto_suspend_waived = true;   // prevent vote-power check from re-suspending immediately
@@ -40134,6 +40332,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                 member.auto_suspend_waived = false;  // clear waiver when manually suspending
                 delete member.resumed_on;
             }
+            member.updated_at = nowIso;
             savePostHolderData(data);
             refreshAllPostHolderViews();
             loadScoreboard();
@@ -40144,8 +40343,20 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             const data = db.getData();
             const post = (data.leadership || []).find(item => item.id === postId);
             if (!post) { showAlert('Post not found.', 'warning'); return; }
+            const nowIso = new Date().toISOString();
             post.status = 'ended';
-            post.ended_on = new Date().toISOString().split('T')[0];
+            post.ended_on = nowIso.split('T')[0];
+            post.updated_at = nowIso;
+            if (post.post && Array.isArray(data.pending_election_results)) {
+                data.pending_election_results.forEach(res => {
+                    if (samePostKey(res.post, post.post)) {
+                        res.status = 'superseded';
+                        res.updated_at = nowIso;
+                        res.decided_at = res.decided_at || nowIso;
+                        res.supersede_reason = 'tenure_ended_by_admin';
+                    }
+                });
+            }
             savePostHolderData(data);
         }
 
@@ -40154,8 +40365,21 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             const data = db.getData();
             const rep = (data.class_reps || []).find(item => item.id === repId);
             if (!rep) { showAlert('CR entry not found.', 'warning'); return; }
+            const nowIso = new Date().toISOString();
             rep.status = 'ended';
-            rep.ended_on = new Date().toISOString().split('T')[0];
+            rep.ended_on = nowIso.split('T')[0];
+            rep.updated_at = nowIso;
+            const postTitle = rep.post || ('Class ' + rep.class);
+            if (Array.isArray(data.pending_election_results)) {
+                data.pending_election_results.forEach(res => {
+                    if (samePostKey(res.post, postTitle)) {
+                        res.status = 'superseded';
+                        res.updated_at = nowIso;
+                        res.decided_at = res.decided_at || nowIso;
+                        res.supersede_reason = 'tenure_ended_by_admin';
+                    }
+                });
+            }
             savePostHolderData(data);
         }
 
@@ -40164,8 +40388,21 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             const data = db.getData();
             const cr = (data.group_crs || []).find(item => item.id === repId);
             if (!cr) { showAlert('CR entry not found.', 'warning'); return; }
+            const nowIso = new Date().toISOString();
             cr.status = 'ended';
-            cr.ended_on = new Date().toISOString().split('T')[0];
+            cr.ended_on = nowIso.split('T')[0];
+            cr.updated_at = nowIso;
+            const postTitle = cr.post || ('Group CR ' + cr.group);
+            if (Array.isArray(data.pending_election_results)) {
+                data.pending_election_results.forEach(res => {
+                    if (samePostKey(res.post, postTitle)) {
+                        res.status = 'superseded';
+                        res.updated_at = nowIso;
+                        res.decided_at = res.decided_at || nowIso;
+                        res.supersede_reason = 'tenure_ended_by_admin';
+                    }
+                });
+            }
             savePostHolderData(data);
         }
 
@@ -40174,6 +40411,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             const data = db.getData();
             const party = (data.parties || []).find(item => item.id === partyId);
             if (!party) return;
+            const nowIso = new Date().toISOString();
             // Find active (non-ended) president only
             const member = (party.members || []).find(item =>
                 isPartyPresidentDesignation(item.designation) &&
@@ -40185,7 +40423,8 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             }
             // Mark as ended — keep designation so the history is intact, server merge preserves ended
             member.status = 'ended';
-            member.ended_on = new Date().toISOString().split('T')[0];
+            member.ended_on = nowIso.split('T')[0];
+            member.updated_at = nowIso;
             savePostHolderData(data);
         }
 
@@ -40193,19 +40432,31 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             if (currentUserRole !== 'admin') return;
             if (!confirm('End tenure of all current post holders? This will end all leadership, CR and party president roles immediately.')) return;
             const data = db.getData();
-            const today = new Date().toISOString().split('T')[0];
-            (data.leadership || []).forEach(p => { p.status = 'ended'; p.ended_on = today; });
-            (data.class_reps || []).forEach(r => { r.status = 'ended'; r.ended_on = today; });
-            (data.group_crs || []).forEach(r => { r.status = 'ended'; r.ended_on = today; });
+            const nowIso = new Date().toISOString();
+            const today = nowIso.split('T')[0];
+            (data.leadership || []).forEach(p => { p.status = 'ended'; p.ended_on = today; p.updated_at = nowIso; });
+            (data.class_reps || []).forEach(r => { r.status = 'ended'; r.ended_on = today; r.updated_at = nowIso; });
+            (data.group_crs || []).forEach(r => { r.status = 'ended'; r.ended_on = today; r.updated_at = nowIso; });
             (data.parties || []).forEach(party => {
                 (party.members || []).forEach(member => {
                     if (isPartyPresidentDesignation(member.designation) &&
                             normalizePostHolderStatus(member.status) !== 'ended') {
                         member.status = 'ended';
                         member.ended_on = today;
+                        member.updated_at = nowIso;
                     }
                 });
             });
+            if (Array.isArray(data.pending_election_results)) {
+                data.pending_election_results.forEach(res => {
+                    if (res.status === 'approved' || res.status === 'pending') {
+                        res.status = 'superseded';
+                        res.updated_at = nowIso;
+                        res.decided_at = res.decided_at || nowIso;
+                        res.supersede_reason = 'all_tenures_ended_by_admin';
+                    }
+                });
+            }
             savePostHolderData(data);
         }
 
@@ -42315,23 +42566,19 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             let changed = false;
             const nowIso = new Date().toISOString();
 
-            const findActiveAssignmentMeta = (postName) => {
+            const findAssignmentMeta = (postName) => {
                 const data = db.getData();
                 const groups = getCRGroupsFromPost(postName);
                 let best = null;
                 if (groups.length) {
                     groups.forEach(group => {
-                        const existing = getPreferredGroupCREntry
-                            ? getPreferredGroupCREntry(data.group_crs || [], group)
-                            : (data.group_crs || []).find(x =>
-                                String(x.group || '').toUpperCase() === group
-                                && normalizePostHolderStatus(x.status) === 'active'
-                            );
-                        if (!existing || normalizePostHolderStatus(existing.status) !== 'active') return;
-                        const stamp = parseSyncStamp(existing.updated_at || '');
+                        const existing = (data.group_crs || []).find(x => String(x.group || '').toUpperCase() === group);
+                        if (!existing) return;
+                        const stamp = parseSyncStamp(existing.updated_at || existing.ended_on || existing.elected_on || '');
                         if (!best || stamp >= best.stamp) {
                             best = {
                                 studentId: parseInt(existing.studentId, 10) || 0,
+                                status: normalizePostHolderStatus(existing.status),
                                 stamp,
                                 source: String(existing.source || '')
                             };
@@ -42341,7 +42588,6 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                 }
                 const leadershipPost = (data.leadership || []).find(x =>
                     String(x.post || '').trim().toLowerCase() === String(postName || '').trim().toLowerCase()
-                    && normalizePostHolderStatus(x.status) === 'active'
                 );
                 if (!leadershipPost) return null;
                 const resolved = typeof resolveLeadershipStudent === 'function'
@@ -42349,7 +42595,8 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                     : null;
                 return {
                     studentId: parseInt(leadershipPost.studentId || (resolved && resolved.id) || 0, 10) || 0,
-                    stamp: parseSyncStamp(leadershipPost.updated_at || ''),
+                    status: normalizePostHolderStatus(leadershipPost.status),
+                    stamp: parseSyncStamp(leadershipPost.updated_at || leadershipPost.ended_on || leadershipPost.elected_on || ''),
                     source: String(leadershipPost.source || '')
                 };
             };
@@ -42357,19 +42604,27 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             approvedByPost.forEach((item, postKey) => {
                 const candidate = (db.getCandidates() || []).find(c => parseInt(c.id, 10) === parseInt(item.candidateId, 10));
                 if (!candidate) return;
-                if (!isElectionOutcomeApplied(item.post, candidate.studentId)) {
-                    // Never silently revive a previous election winner over a live different
-                    // postholder. Only re-apply when the election is STRICTLY newer than a
-                    // stamped assignment. Missing assignment timestamps mean "protect current".
-                    const electionStamp = parseSyncStamp(item.decided_at || item.updated_at || item.created_at || '');
-                    const activeMeta = findActiveAssignmentMeta(item.post);
-                    const activeSid = activeMeta ? (parseInt(activeMeta.studentId, 10) || 0) : 0;
-                    const winnerSid = parseInt(candidate.studentId, 10) || 0;
-                    const hasConflictingActive = !!(activeSid && winnerSid && activeSid !== winnerSid);
+                const electionStamp = parseSyncStamp(item.decided_at || item.updated_at || item.created_at || '');
+                const currentMeta = findAssignmentMeta(item.post);
+                const currentSid = currentMeta ? (parseInt(currentMeta.studentId, 10) || 0) : 0;
+                const currentStatus = currentMeta ? currentMeta.status : '';
+                const currentStamp = currentMeta ? (currentMeta.stamp || 0) : 0;
+                const winnerSid = parseInt(candidate.studentId, 10) || 0;
 
-                    if (hasConflictingActive) {
-                        const activeStamp = activeMeta ? (activeMeta.stamp || 0) : 0;
-                        if (electionStamp > activeStamp && activeStamp > 0) {
+                if (!isElectionOutcomeApplied(item.post, candidate.studentId)) {
+                    // Check if the current assignment (active, ended, or vacant) was modified at or after the election:
+                    const isAssignmentNewerOrEqual = currentStamp >= electionStamp && currentStamp > 0;
+                    const isEndedOrVacant = currentStatus === 'ended' || currentStatus === 'vacant';
+
+                    if (isAssignmentNewerOrEqual || (isEndedOrVacant && currentStamp > 0)) {
+                        // The post was explicitly changed, ended, or vacated after/during this election — do not resurrect
+                        item.status = 'superseded';
+                        item.decided_at = item.decided_at || nowIso;
+                        item.updated_at = nowIso;
+                        item.supersede_reason = isEndedOrVacant ? 'post_ended_or_vacated_by_admin' : 'newer_assignment_exists';
+                        changed = true;
+                    } else if (currentSid && winnerSid && currentSid !== winnerSid && currentStamp > 0) {
+                        if (electionStamp > currentStamp) {
                             const ok = db.applyElectionOutcome(item.post, item.candidateId, (item.decided_at || nowIso).split('T')[0]);
                             if (ok) {
                                 changed = true;
@@ -42382,13 +42637,19 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                             item.supersede_reason = 'newer_or_unstamped_active_assignment';
                             changed = true;
                         }
-                    } else {
-                        // Vacant / same holder not yet fully linked — safe to install.
+                    } else if (!currentMeta || (currentStamp === 0 && electionStamp > 0)) {
+                        // Truly fresh election outcome for a never-configured post
                         const ok = db.applyElectionOutcome(item.post, item.candidateId, (item.decided_at || nowIso).split('T')[0]);
                         if (ok) {
                             changed = true;
                             grantPostHolderTickets(candidate.studentId, 'election', item.post);
                         }
+                    } else {
+                        item.status = 'superseded';
+                        item.decided_at = item.decided_at || nowIso;
+                        item.updated_at = nowIso;
+                        item.supersede_reason = 'past_election_not_reapplied';
+                        changed = true;
                     }
                 }
                 records.forEach(other => {
@@ -47532,7 +47793,8 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                 attendance_digest: src.attendance_digest && typeof src.attendance_digest === 'object' ? { ...src.attendance_digest } : null,
                 admin_remarks: Array.isArray(src.admin_remarks) ? src.admin_remarks.map(r => ({
                     ...r,
-                    id: String(r.id || '').trim() || tdsNewRemarkId(),
+                    // Keep existing id; never invent a new one during normalize (breaks ack matching).
+                    id: String(r.id || '').trim(),
                     tone: tdsNormalizeTone(r.tone, r.status_set),
                     teacher_ack_at: String(r.teacher_ack_at || '')
                 })) : []
@@ -47793,6 +48055,13 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             history.innerHTML = remarks.slice().reverse().map(tdsRenderRemarkCard).join('');
         }
 
+        function tdsRemarkMatchKey(summaryId, remark) {
+            const sid = String(summaryId || '').trim();
+            const rid = String((remark && remark.id) || '').trim();
+            if (rid) return `${sid}::id:${rid}`;
+            return `${sid}::txt:${String((remark && remark.at) || '').trim()}::${String((remark && remark.text) || '').trim()}`;
+        }
+
         function tdsCollectPendingRemarks() {
             const login = String(currentLoginId || 'Teacher').trim().toLowerCase();
             const pending = [];
@@ -47808,9 +48077,9 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                         summary_id: row.id,
                         summary_date: row.date,
                         class_scope: row.class_scope,
+                        match_key: tdsRemarkMatchKey(row.id, r),
                         remark: {
                             ...r,
-                            id: String(r.id || '').trim() || tdsNewRemarkId(),
                             tone: tdsNormalizeTone(r.tone, r.status_set)
                         }
                     });
@@ -47825,13 +48094,14 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             const pending = tdsCollectPendingRemarks();
             const modal = document.getElementById('tdsRemarksModal');
             const body = document.getElementById('tdsRemarksModalBody');
+            const ackBtn = document.getElementById('tdsAckRemarksBtn');
             if (!modal || !body) return;
             if (!pending.length) {
                 modal.classList.add('hidden');
                 _tdsPendingRemarkIds = [];
                 return;
             }
-            _tdsPendingRemarkIds = pending.map(p => `${p.summary_id}::${p.remark.id}`);
+            _tdsPendingRemarkIds = pending.map(p => p.match_key);
             body.innerHTML = pending.map(p => `
                 <div style="margin-bottom:14px;">
                     <div style="font-size:12px;color:var(--text-muted);margin-bottom:4px;">
@@ -47840,39 +48110,62 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                     ${tdsRenderRemarkCard(p.remark)}
                 </div>
             `).join('');
+            if (ackBtn) {
+                ackBtn.disabled = false;
+                ackBtn.removeAttribute('disabled');
+            }
             modal.classList.remove('hidden');
         }
 
-        function tdsAckPendingRemarks() {
-            if (currentUserRole !== 'teacher') return;
+        function tdsAckPendingRemarks(event) {
+            if (event) {
+                try { event.preventDefault(); event.stopPropagation(); } catch (_) {}
+            }
+            const ackBtn = document.getElementById('tdsAckRemarksBtn');
+            if (ackBtn) {
+                ackBtn.disabled = false;
+                ackBtn.removeAttribute('disabled');
+            }
+            if (currentUserRole && currentUserRole !== 'teacher' && currentUserRole !== 'admin') return;
             const nowIso = new Date().toISOString();
             const pending = tdsCollectPendingRemarks();
+            const modal = document.getElementById('tdsRemarksModal');
             if (!pending.length) {
-                const modal = document.getElementById('tdsRemarksModal');
                 if (modal) modal.classList.add('hidden');
                 return;
             }
-            const bySummary = new Map();
-            pending.forEach(p => {
-                if (!bySummary.has(p.summary_id)) bySummary.set(p.summary_id, new Set());
-                bySummary.get(p.summary_id).add(String(p.remark.id));
-            });
+            const pendingKeys = new Set((_tdsPendingRemarkIds && _tdsPendingRemarkIds.length)
+                ? _tdsPendingRemarkIds
+                : pending.map(p => p.match_key));
             const data = db.getData();
             if (!Array.isArray(data.teacher_daily_summaries)) data.teacher_daily_summaries = [];
+            let marked = 0;
+            // Do NOT run tdsNormalizeRow here — it can invent new remark ids and break matching.
             data.teacher_daily_summaries = data.teacher_daily_summaries.map(row => {
-                const ids = bySummary.get(row.id);
-                if (!ids) return row;
-                const next = tdsNormalizeRow(row);
-                next.admin_remarks = next.admin_remarks.map(r => {
-                    if (!ids.has(String(r.id)) || r.teacher_ack_at) return r;
+                const remarks = Array.isArray(row.admin_remarks) ? row.admin_remarks : [];
+                if (!remarks.length) return row;
+                let changed = false;
+                const nextRemarks = remarks.map(r => {
+                    if (!r || String(r.teacher_ack_at || '').trim()) return r;
+                    const key = tdsRemarkMatchKey(row.id, r);
+                    if (!pendingKeys.has(key)) return r;
+                    changed = true;
+                    marked += 1;
                     return { ...r, teacher_ack_at: nowIso };
                 });
-                next.updated_by = currentLoginId || 'Teacher';
-                next.updated_at = nowIso;
-                return next;
+                if (!changed) return row;
+                return {
+                    ...row,
+                    admin_remarks: nextRemarks,
+                    updated_by: currentLoginId || 'Teacher',
+                    updated_at: nowIso
+                };
             });
+            if (!marked) {
+                showAlert('Could not mark remarks as noted. Please reopen Daily Summary and try again.', 'warning');
+                return;
+            }
             db.saveData(data, { allowTeacher: true });
-            const modal = document.getElementById('tdsRemarksModal');
             if (modal) modal.classList.add('hidden');
             _tdsPendingRemarkIds = [];
             if (_tdsCurrentId) {
@@ -47882,6 +48175,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             tdsRenderHistory();
             showAlert('Admin remarks noted. Thank you.', 'success');
         }
+        window.tdsAckPendingRemarks = tdsAckPendingRemarks;
 
         function tdsPopulateTeacherNames() {
             const list = document.getElementById('tdsTeacherNames');
