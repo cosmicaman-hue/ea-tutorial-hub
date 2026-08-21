@@ -1927,7 +1927,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                     <label>📅 Month View</label>
                     <div class="month-nav" id="monthSelectorWrap">
                         <span class="month-nav-label">📅 Period</span>
-                        <select id="monthSelector" class="form-control" onchange="loadMonthScoreboard(this.value)" style="min-width:140px;padding:6px 10px;border-radius:6px;border:1px solid var(--border-color,#ccc);background:var(--input-bg,#fff);color:var(--text-primary,#222);font-size:14px;cursor:pointer;"></select>
+                        <select id="monthSelector" class="form-control" onchange="loadMonthScoreboard(this.value)" style="min-width:140px;padding:6px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg-elevated);color:var(--text);font-size:14px;cursor:pointer;"></select>
                     </div>
                 </div>
                 <div class="control-group">
@@ -10446,19 +10446,72 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             });
         }
 
+        // View-model cache for computed monthly totals — keyed by "studentId:month".
+        // This avoids mutating canonical student objects during scoreboard rendering,
+        // which previously caused spurious shadow-sync diffs and cross-device noise.
+        const _sbComputedTotalCache = new Map();
+        function _sbComputedTotalCacheKey(studentId, month) {
+            return `${parseInt(studentId, 10) || 0}:${String(month || '').trim()}`;
+        }
+        function _invalidateSbComputedTotalCache() {
+            _sbComputedTotalCache.clear();
+            _invalidateMonthStudentIdIndex();
+        }
+
+        // ── Versioned month→studentId index ──────────────────────────────────
+        // Pre-computes the exact predicate used by the legacy visibility check:
+        // score.studentId === student.id && score.month === month.
+        // Keeping raw values (rather than coercing IDs or deriving month from
+        // date) makes this an optimization only, with no behavior change.
+        let _monthStudentIdIndex = null;
+        let _monthStudentIdIndexVer = -1;
+        function _getMonthStudentIdIndex() {
+            const data = db.getData ? db.getData() : null;
+            if (!data || !Array.isArray(data.scores)) return null;
+            const ver = _tabRenderVer;
+            if (_monthStudentIdIndex && _monthStudentIdIndexVer === ver) {
+                return _monthStudentIdIndex;
+            }
+            const index = new Map(); // exact month value → Set<raw studentId>
+            for (let i = 0; i < data.scores.length; i++) {
+                const s = data.scores[i];
+                if (!s || !s.month) continue;
+                const monthValue = s.month;
+                let set = index.get(monthValue);
+                if (!set) { set = new Set(); index.set(monthValue, set); }
+                set.add(s.studentId);
+            }
+            _monthStudentIdIndex = index;
+            _monthStudentIdIndexVer = ver;
+            return index;
+        }
+        function _invalidateMonthStudentIdIndex() {
+            _monthStudentIdIndex = null;
+            _monthStudentIdIndexVer = -1;
+        }
+        function _hasScoresForMonth(studentId, month) {
+            const index = _getMonthStudentIdIndex();
+            if (!index) {
+                // Fallback: scan scores directly (original behavior)
+                const data = db.getData ? db.getData() : {};
+                return (data.scores || []).some(s => s.studentId === studentId && s.month === month);
+            }
+            const set = index.get(month);
+            return !!set && set.has(studentId);
+        }
+
         function getStudentVotePower(student, monthKey) {
             if (!student) return 0;
-            // computed_total_score is a side-effect of rendering a month's scoreboard and
-            // is only valid for the month it was computed for (tracked via
-            // computed_total_score_month). Only trust the cache when it is a real finite
-            // number AND matches the target month; otherwise fall back to the live month
-            // total so the displayed vote power is accurate instead of silently showing a
-            // stale previous-month value or clamping to the 1-point floor.
+            // The render path populates _sbComputedTotalCache during scoreboard
+            // rendering. Only trust the cache when it matches the target month;
+            // otherwise fall back to the live month total so the displayed vote
+            // power is accurate instead of silently showing a stale previous-month
+            // value or clamping to the 1-point floor.
             const targetMonth = String(monthKey || getCurrentMonthKey()).trim();
-            const cached = student.computed_total_score;
-            const cachedMonth = String(student.computed_total_score_month || '').trim();
+            const cacheKey = _sbComputedTotalCacheKey(student.id, targetMonth);
+            const cached = _sbComputedTotalCache.get(cacheKey);
             const cacheValid = (cached !== undefined && cached !== null
-                && Number.isFinite(Number(cached)) && cachedMonth === targetMonth);
+                && Number.isFinite(Number(cached)));
             const total = cacheValid
                 ? Number(cached)
                 : getStudentMonthTotal(student.id, targetMonth);
@@ -15608,6 +15661,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                     }
                     this._monthScoresCache.clear();
                     this._scoreboardCache.clear();
+                    _invalidateSbComputedTotalCache();
                     this.saveData(this._cacheData, { system: true, skipSync: true, skipBackup: true });
                 }
             }
@@ -16293,6 +16347,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                 }
                 this._cacheData = data;
                 this._monthScoresCache.clear();
+                _invalidateSbComputedTotalCache();
                 // Invalidate tab render cache on every data mutation so switchTab
                 // knows it must re-render any previously cached tab.
                 _tabRenderVer++;
@@ -17900,10 +17955,17 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                     if (String(month || '').trim() < '2026-02' && row.hasHistoricalMonthlyTotal) {
                         total = parseFloat(row.monthlyImportedTotal) || 0;
                     }
-                    row.rawStudent.computed_total_score = total;
-                    // Track which month this cached total corresponds to so vote-power
-                    // lookups for a different month don't reuse a stale value.
-                    row.rawStudent.computed_total_score_month = String(month || '').trim();
+                    // Cache the computed total in the view-model cache instead of
+                    // mutating the canonical student object. This prevents computed
+                    // values from being serialized into saves and causing spurious
+                    // shadow-sync diffs or cross-device conflict noise.
+                    const _sid = parseInt(row.student && row.student.id, 10) || 0;
+                    if (_sid > 0) {
+                        _sbComputedTotalCache.set(
+                            _sbComputedTotalCacheKey(_sid, String(month || '').trim()),
+                            total
+                        );
+                    }
                     return {
                         student: row.student,
                         dailyScores,
@@ -18157,6 +18219,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                 this._cacheData = null;
                 this._monthScoresCache.clear();
                 this._scoreboardCache.clear();
+                _invalidateSbComputedTotalCache();
                 this.init();
             }
         }
@@ -19216,7 +19279,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                 // No roster at all: fall back to the active flag.
                 return student.active !== false;
             }
-            const hasScores = (data.scores || []).some(score => score.studentId === student.id && score.month === month);
+            const hasScores = _hasScoresForMonth(student.id, month);
             if (hasProfileRoster) {
                 if (inProfileRoster || inLegacyRoster) return true;
                 // Fallback: only show if the student has actual score records for this month.
@@ -20422,6 +20485,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                 db._cacheData = typeof db.getDefaultData === 'function' ? db.getDefaultData() : null;
                 if (db._monthScoresCache) db._monthScoresCache.clear();
                 if (db._scoreboardCache) db._scoreboardCache.clear();
+                _invalidateSbComputedTotalCache();
                 if (db._idb) {
                     const tx = db._idb.transaction('snapshots', 'readwrite');
                     tx.objectStore('snapshots').delete('main');
@@ -22606,6 +22670,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             if (_serverRestoresHistory) {
                 db._monthScoresCache.clear();
                 if (db._scoreboardCache) db._scoreboardCache.clear();
+                _invalidateSbComputedTotalCache();
                 console.info('[EA] applyRemoteSnapshot: locked-month history restored — forcing full tab refresh.');
             }
             scheduleActiveTabRefreshFromSync(showToast ? 90 : 200, { passive: _passive, force: true });
@@ -23852,6 +23917,24 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
         let scoreboardScrollSyncBound = false;
         let scoreboardScrollSyncBusy = false;
         let _sbLastHeaderKey = '';
+        // Cached scroll metrics — avoids forced layout reads on every scroll event.
+        // Invalidated by syncScoreboardDualScrollbars() after render/resize.
+        let _sbCachedMetrics = null;
+        let _sbScrollRafPending = false;
+        // Scroll-state class: toggles .sb-scrolling on the scroll container during
+        // active horizontal scroll to disable heavy paint effects (text-shadows,
+        // box-shadows, filters, transitions) via CSS. Removed after scroll settles.
+        let _sbScrollingTimer = null;
+        function _setSbScrollingActive(bottom) {
+            if (!bottom) return;
+            bottom.classList.add('sb-scrolling');
+            if (_sbScrollingTimer) clearTimeout(_sbScrollingTimer);
+            _sbScrollingTimer = setTimeout(() => {
+                bottom.classList.remove('sb-scrolling');
+                _sbScrollingTimer = null;
+            }, 180);
+        }
+        function _invalidateSbScrollMetrics() { _sbCachedMetrics = null; }
         function getScoreboardDayScrollMetrics(bottom, headerRow) {
             const bottomMax = Math.max(0, (bottom && bottom.scrollWidth ? bottom.scrollWidth : 0) - (bottom && bottom.clientWidth ? bottom.clientWidth : 0));
             if (!bottom || !headerRow) {
@@ -23908,6 +23991,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             if (!top || !spacer || !bottom || !table) return;
 
             const metrics = getScoreboardDayScrollMetrics(bottom, headerRow);
+            _sbCachedMetrics = metrics; // Cache for scroll event handlers
             // Top scrollbar is for day columns only: align it over day viewport.
             if (metrics.dayViewport > 0) {
                 top.style.marginLeft = `${metrics.stickyLeftWidth}px`;
@@ -23925,22 +24009,36 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             if (!scoreboardScrollSyncBound) {
                 top.addEventListener('scroll', () => {
                     if (scoreboardScrollSyncBusy) return;
-                    const activeHeaderRow = document.getElementById('scoreboardHeaderRow');
-                    const activeMetrics = getScoreboardDayScrollMetrics(bottom, activeHeaderRow);
-                    scoreboardScrollSyncBusy = true;
-                    const nextTop = Math.max(0, Math.min(top.scrollLeft, activeMetrics.dayMax));
-                    const nextBottom = Math.max(0, Math.min(activeMetrics.dayStart + nextTop, activeMetrics.bottomMax));
-                    bottom.scrollLeft = nextBottom;
-                    scoreboardScrollSyncBusy = false;
+                    if (_sbScrollRafPending) return;
+                    _sbScrollRafPending = true;
+                    requestAnimationFrame(() => {
+                        _sbScrollRafPending = false;
+                        if (scoreboardScrollSyncBusy) return;
+                        const activeHeaderRow = document.getElementById('scoreboardHeaderRow');
+                        const activeMetrics = _sbCachedMetrics || getScoreboardDayScrollMetrics(bottom, activeHeaderRow);
+                        scoreboardScrollSyncBusy = true;
+                        const nextTop = Math.max(0, Math.min(top.scrollLeft, activeMetrics.dayMax));
+                        const nextBottom = Math.max(0, Math.min(activeMetrics.dayStart + nextTop, activeMetrics.bottomMax));
+                        bottom.scrollLeft = nextBottom;
+                        scoreboardScrollSyncBusy = false;
+                    });
+                    _setSbScrollingActive(bottom);
                 }, { passive: true });
                 bottom.addEventListener('scroll', () => {
                     if (scoreboardScrollSyncBusy) return;
-                    const activeHeaderRow = document.getElementById('scoreboardHeaderRow');
-                    const activeMetrics = getScoreboardDayScrollMetrics(bottom, activeHeaderRow);
-                    scoreboardScrollSyncBusy = true;
-                    const mappedTop = Math.max(0, Math.min((bottom.scrollLeft || 0) - activeMetrics.dayStart, activeMetrics.dayMax));
-                    top.scrollLeft = mappedTop;
-                    scoreboardScrollSyncBusy = false;
+                    if (_sbScrollRafPending) return;
+                    _sbScrollRafPending = true;
+                    requestAnimationFrame(() => {
+                        _sbScrollRafPending = false;
+                        if (scoreboardScrollSyncBusy) return;
+                        const activeHeaderRow = document.getElementById('scoreboardHeaderRow');
+                        const activeMetrics = _sbCachedMetrics || getScoreboardDayScrollMetrics(bottom, activeHeaderRow);
+                        scoreboardScrollSyncBusy = true;
+                        const mappedTop = Math.max(0, Math.min((bottom.scrollLeft || 0) - activeMetrics.dayStart, activeMetrics.dayMax));
+                        top.scrollLeft = mappedTop;
+                        scoreboardScrollSyncBusy = false;
+                    });
+                    _setSbScrollingActive(bottom);
                 }, { passive: true });
                 scoreboardScrollSyncBound = true;
             }
@@ -23952,77 +24050,15 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
         }
 
         function syncScoreboardStickyOffsets() {
-            const table = document.getElementById('scoreboardTable');
-            const headerRow = document.getElementById('scoreboardHeaderRow');
-            if (!table || !headerRow) return;
-            const scoreboardTab = document.getElementById('scoreboard-tab');
-            if (scoreboardTab && scoreboardTab.classList.contains('hidden')) return;
-
-            const rankHeader = headerRow.querySelector('th.rank-cell.sticky-left');
-            const rollHeader = headerRow.querySelector('th.sticky-left-1');
-            const nameHeader = headerRow.querySelector('th.sticky-left-2');
-            const classHeader = headerRow.querySelector('th.sticky-left-3');
-            const feesHeader = headerRow.querySelector('th.sticky-left-4');
-            if (!rankHeader || !rollHeader || !nameHeader || !classHeader || !feesHeader) return;
-
-            const readCssPx = (name, fallback) => {
-                const raw = parseFloat(getComputedStyle(table).getPropertyValue(name));
-                return Number.isFinite(raw) && raw > 0 ? raw : fallback;
-            };
-            const minRankWidth = 80;
-            const minRollWidth = 145;
-            const minNameWidth = 280;
-            const minClassWidth = 76;
-            const minFeesWidth = 44;
-            const currentRankWidth = readCssPx('--sb-rank-w', minRankWidth);
-            const currentRollWidth = readCssPx('--sb-roll-w', minRollWidth);
-            const currentNameWidth = readCssPx('--sb-name-w', minNameWidth);
-            const currentClassWidth = readCssPx('--sb-class-w', minClassWidth);
-            const currentFeesWidth = readCssPx('--sb-fees-w', minFeesWidth);
-            const maxRankWidth = 80;
-            const maxRollWidth = 145;
-            const maxNameWidth = 280;
-            const maxClassWidth = 76;
-            const maxFeesWidth = 44;
-
-            const measureWidth = (el, minWidth, currentWidth, maxWidth) => {
-                const rectWidth = el.getBoundingClientRect().width || 0;
-                const offsetWidth = el.offsetWidth || 0;
-                const scrollWidth = el.scrollWidth || 0;
-                const rawWidth = Math.max(rectWidth, offsetWidth, scrollWidth);
-                if (!Number.isFinite(rawWidth) || rawWidth <= 0) return currentWidth;
-                return Math.min(maxWidth, Math.max(minWidth, Math.round(rawWidth)));
-            };
-
-            const rankWidth = measureWidth(rankHeader, minRankWidth, currentRankWidth, maxRankWidth);
-            const rollWidth = measureWidth(rollHeader, minRollWidth, currentRollWidth, maxRollWidth);
-            const nameWidth = measureWidth(nameHeader, minNameWidth, currentNameWidth, maxNameWidth);
-            const classWidth = measureWidth(classHeader, minClassWidth, currentClassWidth, maxClassWidth);
-            const feesWidth = measureWidth(feesHeader, minFeesWidth, currentFeesWidth, maxFeesWidth);
-
-            const left1 = Math.round(rankWidth);
-            const left2 = Math.round(rankWidth + rollWidth);
-            const left3 = Math.round(rankWidth + rollWidth + nameWidth);
-            const left4 = Math.round(rankWidth + rollWidth + nameWidth + classWidth);
-
-            table.style.setProperty('--sb-rank-w', `${Math.round(rankWidth)}px`);
-            table.style.setProperty('--sb-roll-w', `${Math.round(rollWidth)}px`);
-            table.style.setProperty('--sb-name-w', `${Math.round(nameWidth)}px`);
-            table.style.setProperty('--sb-class-w', `${Math.round(classWidth)}px`);
-            table.style.setProperty('--sb-fees-w', `${Math.round(feesWidth)}px`);
-
-            table.querySelectorAll('th.sticky-left-1, td.sticky-left-1').forEach((el) => {
-                el.style.left = `${left1}px`;
-            });
-            table.querySelectorAll('th.sticky-left-2, td.sticky-left-2').forEach((el) => {
-                el.style.left = `${left2}px`;
-            });
-            table.querySelectorAll('th.sticky-left-3, td.sticky-left-3').forEach((el) => {
-                el.style.left = `${left3}px`;
-            });
-            table.querySelectorAll('th.sticky-left-4, td.sticky-left-4').forEach((el) => {
-                el.style.left = `${left4}px`;
-            });
+            // CSS already handles all sticky-left positioning via calc() with CSS
+            // variables and !important (see offline-scoreboard.css lines ~2717-2736).
+            // The previous JS measurement was a no-op: min and max widths were
+            // identical (80/80, 145/145, 280/280, 76/76, 44/44), so measureWidth()
+            // always returned the same value, and inline left styles were overridden
+            // by the CSS !important rules anyway. This early return eliminates
+            // unnecessary getBoundingClientRect/offsetWidth/scrollWidth calls and
+            // per-cell inline style writes that caused layout thrashing.
+            return;
         }
 
         function stabilizeScoreboardLayout(options = {}) {
@@ -24092,25 +24128,13 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
         }
 
         function sanitizeScoreboardRollCells() {
-            const tbody = document.getElementById('scoreboardBody');
-            if (!tbody) return;
-            tbody.querySelectorAll('tr').forEach((tr) => {
-                const rollCell = tr.querySelector('td.sticky-left-1');
-                if (!rollCell) return;
-                const rawText = String(rollCell.textContent || '').toUpperCase();
-                const match = rawText.match(/EA[A-Z0-9]{5}/);
-                const roll = match ? match[0] : '';
-                if (!roll) return;
-                rollCell.innerHTML = '';
-                const strong = document.createElement('strong');
-                strong.textContent = roll;
-                rollCell.appendChild(strong);
-                rollCell.style.overflow = 'hidden';
-                rollCell.style.whiteSpace = 'nowrap';
-                rollCell.style.textOverflow = 'clip';
-                rollCell.style.zIndex = '44';
-                rollCell.style.isolation = 'isolate';
-            });
+            // No-op: roll cells are already generated correctly by the HTML builder
+            // as <strong>${escapeHtml(formatRollDisplay(row.student.roll))}</strong>,
+            // and all inline styles this function previously set (overflow, white-space,
+            // text-overflow, z-index, isolation) are already defined in offline-scoreboard.css
+            // for #scoreboardTable td.sticky-left-1. This function was causing unnecessary
+            // DOM reads/writes on every row after every render.
+            return;
         }
 
         function formatDateLabel(dateStr) {
@@ -25110,6 +25134,9 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
 
         function loadMonthScoreboard(month, filterOnly) {
             try {
+            const _perfMark = typeof performance !== 'undefined' && performance.mark;
+            const _perfTag = `sb-render-${Date.now()}`;
+            if (_perfMark) { performance.mark(`${_perfTag}-start`); }
             const scoreboardScroll = document.getElementById('scoreboardBottomScroll');
             const scrollToDate = !filterOnly && !(scoreboardScroll && scoreboardScroll.dataset.eaScoreboardReady === '1');
             if (month) {
@@ -25463,6 +25490,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
 
             // Write rows to DOM in chunks across animation frames for smoother rendering.
             // Post-render fixes (sanitize, sticky offsets, etc.) run after all chunks complete.
+            if (_perfMark) { performance.mark(`${_perfTag}-html-done`); }
             eaChunkedInnerHtml(tbody, _htmlRows, {
                 chunkSize: 60,
                 onDone() {
@@ -25474,12 +25502,45 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                     // can paint the innerHTML content before we force reflows with offset
                     // calculations and sticky offset syncs.
                     eaScheduleRender(() => {
+                        if (_perfMark) { performance.mark(`${_perfTag}-dom-inserted`); }
                         sanitizeScoreboardRollCells();
                         syncScoreboardStickyOffsets();
                         applyColumnVisibility();
                         if (!filterOnly) _animateTableRows('scoreboardTable');
                         if (scoreboardScroll) scoreboardScroll.dataset.eaScoreboardReady = '1';
-                        eaNextPaint(() => stabilizeScoreboardLayout({ month, scrollToDate }));
+                        eaNextPaint(() => {
+                            stabilizeScoreboardLayout({ month, scrollToDate });
+                            if (_perfMark) {
+                                performance.mark(`${_perfTag}-done`);
+                                try {
+                                    const mCalc = performance.measure('SB calc+html', `${_perfTag}-start`, `${_perfTag}-html-done`);
+                                    const mDom = performance.measure('SB dom-insert', `${_perfTag}-html-done`, `${_perfTag}-dom-inserted`);
+                                    const mPost = performance.measure('SB post-render', `${_perfTag}-dom-inserted`, `${_perfTag}-done`);
+                                    const mTot = performance.measure('SB total', `${_perfTag}-start`, `${_perfTag}-done`);
+
+                                    const calcDur = (mCalc && typeof mCalc.duration === 'number') ? mCalc.duration : 0;
+                                    const domDur = (mDom && typeof mDom.duration === 'number') ? mDom.duration : 0;
+                                    const postDur = (mPost && typeof mPost.duration === 'number') ? mPost.duration : 0;
+                                    const totDur = (mTot && typeof mTot.duration === 'number') ? mTot.duration : 0;
+
+                                    console.info('[EA Perf]', `SB calc+html: ${calcDur.toFixed(1)}ms, SB dom-insert: ${domDur.toFixed(1)}ms, SB post-render: ${postDur.toFixed(1)}ms, SB total: ${totDur.toFixed(1)}ms`);
+
+                                    // Clear temporary marks and measures to prevent unbounded buffer growth
+                                    if (typeof performance.clearMarks === 'function') {
+                                        performance.clearMarks(`${_perfTag}-start`);
+                                        performance.clearMarks(`${_perfTag}-html-done`);
+                                        performance.clearMarks(`${_perfTag}-dom-inserted`);
+                                        performance.clearMarks(`${_perfTag}-done`);
+                                    }
+                                    if (typeof performance.clearMeasures === 'function') {
+                                        performance.clearMeasures('SB calc+html');
+                                        performance.clearMeasures('SB dom-insert');
+                                        performance.clearMeasures('SB post-render');
+                                        performance.clearMeasures('SB total');
+                                    }
+                                } catch (e) {}
+                            }
+                        });
                     }, true);
                 }
             });
@@ -44563,11 +44624,33 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             }
         });
 
+        // Deduplicated MutationObserver: prevents self-triggering feedback loops
+        // (patchCRTabVetoDisplay mutates the DOM, which would re-notify the observer)
+        // and coalesces multiple mutation bursts into a single idle callback.
+        let _crPatchPending = false;
+        let _crObserver = null;
+        function _runCRPatch() {
+            _crPatchPending = false;
+            if (_crObserver) { try { _crObserver.disconnect(); } catch (e) {} }
+            try { patchCRTabVetoDisplay(); } catch (e) {}
+            if (_crObserver) {
+                try { _crObserver.observe(document.documentElement || document.body, { childList: true, subtree: true }); } catch (e) {}
+            }
+        }
+        function _scheduleCRPatch() {
+            if (_crPatchPending) return;
+            _crPatchPending = true;
+            try {
+                if (typeof window !== 'undefined' && typeof window.requestIdleCallback === 'function') {
+                    window.requestIdleCallback(_runCRPatch, { timeout: 1200 });
+                    return;
+                }
+            } catch (e) {}
+            setTimeout(_runCRPatch, 120);
+        }
         try {
-            const crObserver = new MutationObserver(() => {
-                scheduleUiWork(patchCRTabVetoDisplay);
-            });
-            crObserver.observe(document.documentElement || document.body, { childList: true, subtree: true });
+            _crObserver = new MutationObserver(_scheduleCRPatch);
+            _crObserver.observe(document.documentElement || document.body, { childList: true, subtree: true });
         } catch (e) {}
 
         function repairCombinedCRCandidates() {
@@ -60717,6 +60800,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                         if (dataChanged) {
                             db._monthScoresCache.clear();
                             db._scoreboardCache.clear();
+                            _invalidateSbComputedTotalCache();
                             _tabRenderVer++;
                             switchTab(getActiveTabName());
                         }

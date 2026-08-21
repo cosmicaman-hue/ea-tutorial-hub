@@ -2178,6 +2178,39 @@
             contain: none !important;
         }
 
+        /* ── Scroll-time paint optimization ──────────────────────────────────
+           When the user is actively horizontal-scrolling the scoreboard, add
+           the .sb-scrolling class to the scroll container to temporarily
+           disable text-shadows, box-shadows, filters, and transitions on
+           score cells.  This dramatically reduces per-frame paint cost.
+           Effects are restored when scrolling stops. */
+        .sb-scrolling #scoreboardTable .score-cell,
+        .sb-scrolling #scoreboardTable .score-cell.positive,
+        .sb-scrolling #scoreboardTable .score-cell.negative,
+        .sb-scrolling #scoreboardTable .score-cell.star-awarded,
+        .sb-scrolling #scoreboardTable .score-cell.star-awarded-green,
+        .sb-scrolling #scoreboardTable .score-cell.pts-transfer-in,
+        .sb-scrolling #scoreboardTable .score-cell.pts-transfer-out {
+            text-shadow: none !important;
+            box-shadow: none !important;
+            transition: none !important;
+        }
+        .sb-scrolling #scoreboardTable .pts-transfer-emoji {
+            filter: none !important;
+        }
+        @media (prefers-reduced-motion: reduce) {
+            /* Always disable non-essential paint effects for reduced-motion users */
+            #scoreboardTable .score-cell.positive,
+            #scoreboardTable .score-cell.negative,
+            #scoreboardTable .score-cell.star-awarded,
+            #scoreboardTable .score-cell.star-awarded-green {
+                text-shadow: none !important;
+            }
+            #scoreboardTable .pts-transfer-emoji {
+                filter: none !important;
+            }
+        }
+
         /* MEDALS/BADGES */
         .medal {
             display: inline-block;
@@ -7218,7 +7251,7 @@
             padding: 10px 14px; background: linear-gradient(135deg, rgba(99,102,241,0.12), rgba(168,85,247,0.10));
             border-radius: 10px; border: 1px solid rgba(99,102,241,0.25); margin-bottom: 12px;
         }
-        .vote-action-bar .bar-label { font-weight: 700; font-size: 13px; flex: 1; color: var(--text-primary); }
+        .vote-action-bar .bar-label { font-weight: 700; font-size: 13px; flex: 1; color: var(--text); }
         .vote-btn-nota { background: linear-gradient(135deg,#f59e0b,#d97706)!important; color:#fff!important; border:none!important; font-weight:700!important; transition: transform .15s, box-shadow .15s!important; }
         .vote-btn-nota:hover { transform:scale(1.07)!important; box-shadow:0 4px 14px rgba(245,158,11,.45)!important; }
         .vote-btn-abstain { background: linear-gradient(135deg,#64748b,#475569)!important; color:#fff!important; border:none!important; font-weight:700!important; transition: transform .15s, box-shadow .15s!important; }
