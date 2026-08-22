@@ -9107,8 +9107,11 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
         let forcePublishRunning = false;
         let adminAutoPublishAttempted = false;
         let pendingPushTimer = null;
+        let syncRetryFailures = 0;
+        let syncRetryNotBefore = 0;
         let allowedMonthsFromServer = null;
         const AUTO_PUSH_DELAY_MS = 100;
+        const MAX_SYNC_RETRY_DELAY_MS = 30000;
         let rosterRecoveryInProgress = false;
         let rosterRecoveryQueuedTab = null;
         let rosterRecoveryLastAttemptAt = 0;
@@ -17158,48 +17161,48 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             }
 
             upsertAttendance(record, options = {}) {
+                return this.upsertAttendanceBatch([record], options)[0] || null;
+            }
+
+            upsertAttendanceBatch(records, options = {}) {
                 const data = this.getData();
-                data.attendance = data.attendance || [];
-                const targetDate = String(record.date || '');
-                const targetStudent = String(record.studentId);
-                const normalizedRoll = normalizeAttendanceRoll(record.roll || '');
-                const normalizedRecord = {
-                    ...record,
-                    date: targetDate,
-                    studentId: parseInt(record.studentId, 10) || record.studentId,
-                    roll: normalizedRoll,
-                    status: normalizeAttendanceStatus(record.status),
-                    remarks: String(record.remarks || '')
-                };
-                const existing = data.attendance.find(item =>
-                    String(item.date || '') === targetDate && String(item.studentId) === targetStudent
-                );
-                if (existing) {
-                    Object.assign(existing, normalizedRecord, { updated_at: new Date().toISOString() });
-                } else {
-                    data.attendance.push({
-                        id: generateUniqueId(),
-                        ...normalizedRecord,
-                        created_at: new Date().toISOString(),
-                        updated_at: new Date().toISOString()
-                    });
-                }
+                data.attendance = Array.isArray(data.attendance) ? data.attendance : [];
                 const latestByKey = new Map();
-                (data.attendance || []).forEach(item => {
+                data.attendance.forEach(item => {
                     const key = `${String(item.date || '')}::${String(item.studentId)}`;
-                    const existingItem = latestByKey.get(key);
-                    if (!existingItem) {
-                        latestByKey.set(key, item);
-                        return;
-                    }
-                    const existingStamp = Date.parse(existingItem.updated_at || existingItem.created_at || '') || 0;
+                    const previous = latestByKey.get(key);
+                    const previousStamp = Date.parse(previous && (previous.updated_at || previous.created_at) || '') || 0;
                     const itemStamp = Date.parse(item.updated_at || item.created_at || '') || 0;
-                    if (itemStamp >= existingStamp) {
+                    if (!previous || itemStamp >= previousStamp) latestByKey.set(key, item);
+                });
+                const saved = [];
+                (Array.isArray(records) ? records : []).forEach(record => {
+                    if (!record || typeof record !== 'object') return;
+                    const targetDate = String(record.date || '');
+                    const studentId = parseInt(record.studentId, 10) || record.studentId;
+                    const key = `${targetDate}::${String(studentId)}`;
+                    const stamp = new Date().toISOString();
+                    const normalizedRecord = {
+                        ...record,
+                        date: targetDate,
+                        studentId,
+                        roll: normalizeAttendanceRoll(record.roll || ''),
+                        status: normalizeAttendanceStatus(record.status),
+                        remarks: String(record.remarks || '')
+                    };
+                    let item = latestByKey.get(key);
+                    if (item) {
+                        Object.assign(item, normalizedRecord, { updated_at: stamp });
+                    } else {
+                        item = { id: generateUniqueId(), ...normalizedRecord, created_at: stamp, updated_at: stamp };
                         latestByKey.set(key, item);
                     }
+                    saved.push(item);
                 });
+                if (!saved.length) return saved;
                 data.attendance = Array.from(latestByKey.values());
                 this.saveData(data, { allowTeacher: true, skipSync: options.skipSync === true });
+                return saved;
             }
 
             getSyllabusCatalog() {
@@ -20882,7 +20885,9 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                 if (pendingPushTimer) {
                     clearTimeout(pendingPushTimer);
                 }
-                const baseDelay = customDelayMs !== null ? customDelayMs : AUTO_PUSH_DELAY_MS;
+                const requestedDelay = customDelayMs !== null ? customDelayMs : AUTO_PUSH_DELAY_MS;
+                const cooldownDelay = Math.max(0, syncRetryNotBefore - Date.now());
+                const baseDelay = Math.max(requestedDelay, cooldownDelay);
                 const jitter = (Math.random() - 0.5) * (baseDelay * 0.5);
                 const finalDelay = Math.max(100, baseDelay + jitter);
                 pendingPushTimer = setTimeout(() => {
@@ -20890,6 +20895,17 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                     pushToServer(pendingSyncPayload || db.getData(), { silent: true });
                 }, finalDelay);
             }
+        }
+
+        function scheduleTransientSyncRetry(data, minimumDelayMs = 0) {
+            syncRetryFailures = Math.min(syncRetryFailures + 1, 8);
+            const exponentialDelay = Math.min(
+                1000 * (2 ** (syncRetryFailures - 1)),
+                MAX_SYNC_RETRY_DELAY_MS
+            );
+            const delay = Math.max(minimumDelayMs, exponentialDelay);
+            syncRetryNotBefore = Date.now() + delay;
+            scheduleServerPush(data, delay);
         }
 
         function buildSyncUrl(baseUrl, path) {
@@ -22721,6 +22737,9 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             let authFailureCount = 0;
             let respondedCount = 0;
             let timeoutCount = 0;
+            let rejectionStatus = 0;
+            let rejectionMessage = '';
+            let rejectionRetryAfterMs = 0;
             let newestStamp = 0;
             let newestIso = '';
             let newestServerVersion = 0;
@@ -22766,7 +22785,21 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                         conflictCount += 1;
                         continue;
                     }
-                    if (!resp.ok) throw new Error('Server error');
+                    if (!resp.ok) {
+                        rejectionStatus = resp.status;
+                        const retryAfter = parseInt(resp.headers.get('Retry-After') || '0', 10) || 0;
+                        rejectionRetryAfterMs = Math.max(rejectionRetryAfterMs, retryAfter * 1000);
+                        try {
+                            const raw = await resp.text();
+                            const rejected = raw ? JSON.parse(raw) : {};
+                            rejectionMessage = String(
+                                rejected.error || rejected.message || rejected.code || `HTTP ${resp.status}`
+                            ).slice(0, 180);
+                        } catch (_) {
+                            rejectionMessage = `HTTP ${resp.status}`;
+                        }
+                        continue;
+                    }
                     const payload = await resp.json();
                     successCount += 1;
                     const stamp = parseSyncStamp(payload.updated_at);
@@ -22786,6 +22819,8 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             if (successCount > 0) {
                 const savedData = db.getData();
                 pendingSyncPayload = null;
+                syncRetryFailures = 0;
+                syncRetryNotBefore = 0;
                 if (currentUserRole === 'admin' && Array.isArray(pendingHistoricalScoreOps) && pendingHistoricalScoreOps.length > 0) {
                     pendingHistoricalScoreOps = [];
                 }
@@ -22805,6 +22840,8 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                 return true;
             }
             if (conflictCount > 0) {
+                syncRetryFailures = 0;
+                syncRetryNotBefore = 0;
                 updateSyncStatus('online', 'Online (refreshing)');
                 await pullFromServer(false, true);
                 // After merging server data locally, re-push so any local-only entries
@@ -22832,17 +22869,29 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                 return false;
             }
             if (respondedCount > 0) {
-                updateSyncStatus('online', 'Online (sync rejected)');
+                const statusSuffix = rejectionStatus ? `HTTP ${rejectionStatus}` : 'rejected';
+                updateSyncStatus('online', `Online (sync ${statusSuffix})`);
+                const detail = rejectionMessage || 'Server rejected the sync payload.';
+                if (rejectionStatus === 423 || rejectionStatus === 429 || rejectionStatus >= 500) {
+                    scheduleTransientSyncRetry(data, rejectionRetryAfterMs);
+                    if (!options.silent) {
+                        showAlert(`${detail} Sync will retry automatically.`, 'warning');
+                    }
+                    return false;
+                }
+                syncRetryFailures = 0;
+                syncRetryNotBefore = 0;
                 if (!options.silent) {
-                    showAlert('Server reachable, but sync payload was rejected. Pulling latest snapshot now.', 'warning');
+                    showAlert(`Sync rejected: ${detail} Pulling the latest snapshot.`, 'warning');
                 }
                 await pullFromServer(false, true);
                 return false;
             }
             if (timeoutCount > 0) {
                 updateSyncStatus('online', 'Online (sync timeout)');
+                scheduleTransientSyncRetry(data);
                 if (!options.silent) {
-                    showAlert('Sync timed out while processing a large snapshot. Please retry once.', 'warning');
+                    showAlert('Sync timed out. Changes remain queued and will retry automatically.', 'warning');
                 }
                 return false;
             }
@@ -22850,6 +22899,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             // All targets were unreachable. Persist the payload to a WAL slot in
             // localStorage so the next successful sync can replay it.
             updateSyncStatus('offline', 'Offline');
+            scheduleTransientSyncRetry(data);
             if (SERVER_SYNC.crossOrigin || !isLANHost()) {
                 showCrossOriginOfflineBanner();
             }
@@ -48852,7 +48902,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                 if (localOk && serverOk) {
                     return true;
                 }
-                await new Promise(resolve => setTimeout(resolve, 250 * attempt));
+                await new Promise(resolve => setTimeout(resolve, 250 * (2 ** (attempt - 1))));
             }
             return false;
         }
@@ -48881,37 +48931,47 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                 return;
             }
             const selects = document.querySelectorAll('[data-attendance-student]');
-            let saved = 0;
-            const changedRows = [];
+            const remarksByStudent = new Map(
+                Array.from(document.querySelectorAll('[data-attendance-remarks]')).map(input => [
+                    String(input.getAttribute('data-attendance-remarks') || ''), input
+                ])
+            );
+            const attendanceByStudent = new Map();
+            (db.getAttendance() || []).forEach(item => {
+                if (String(item && item.date || '') !== date) return;
+                const key = String(item.studentId);
+                const previous = attendanceByStudent.get(key);
+                const previousStamp = Date.parse(previous && (previous.updated_at || previous.created_at) || '') || 0;
+                const itemStamp = Date.parse(item.updated_at || item.created_at || '') || 0;
+                if (!previous || itemStamp >= previousStamp) attendanceByStudent.set(key, item);
+            });
+            const pendingRows = [];
             selects.forEach(select => {
                 const studentId = parseInt(select.getAttribute('data-attendance-student'), 10);
                 if (!studentId) return;
-                const remarksInput = document.querySelector(`[data-attendance-remarks="${studentId}"]`);
+                const remarksInput = remarksByStudent.get(String(studentId));
                 const rollAttr = select.getAttribute('data-attendance-roll') || (remarksInput ? remarksInput.getAttribute('data-attendance-roll') : '');
                 const nextStatus = normalizeAttendanceStatus(select.value);
                 const nextRemarks = remarksInput ? String(remarksInput.value || '').trim() : '';
-                const existingRecord = getAttendanceRecord(studentId, date);
+                const existingRecord = attendanceByStudent.get(String(studentId));
                 const currentStatus = normalizeAttendanceStatus(existingRecord && existingRecord.status ? existingRecord.status : 'present');
                 const currentRemarks = String(existingRecord && existingRecord.remarks ? existingRecord.remarks : '').trim();
-                if (currentStatus === nextStatus && currentRemarks === nextRemarks) {
-                    return;
-                }
-                db.upsertAttendance({
+                if (currentStatus === nextStatus && currentRemarks === nextRemarks) return;
+                pendingRows.push({
                     date,
                     studentId,
                     roll: rollAttr,
                     status: nextStatus,
                     remarks: nextRemarks,
                     marked_by: currentLoginId || currentUserRole
-                }, { skipSync: true });
-                const savedRecord = getAttendanceRecord(studentId, date);
-                if (savedRecord) changedRows.push(savedRecord);
-                saved += 1;
+                });
             });
-            if (!changedRows.length) {
+            if (!pendingRows.length) {
                 showAlert('No attendance changes to save', 'info');
                 return;
             }
+            const changedRows = db.upsertAttendanceBatch(pendingRows, { skipSync: true });
+            const saved = changedRows.length;
             if (SERVER_SYNC.enabled && (currentUserRole === 'admin' || currentUserRole === 'teacher')) {
                 const studentIdSet = new Set(changedRows.map(row => String(row && row.studentId || '')).filter(Boolean));
                 const studentsPatch = (db.getStudents() || [])
