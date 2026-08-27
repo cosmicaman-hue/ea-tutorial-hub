@@ -4652,7 +4652,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                 <header class="chess-champion-hero">
                     <div class="chess-champion-kicker"><i class="fas fa-chess-knight"></i> Excel Academy tournament arena</div>
                     <h1 id="chessChampionTitle">Excel Chess Champion</h1>
-                    <p>Every contestant plays 3 basic matches. Top 8 play 3 elimination matches, top 4 play 3 semifinal matches, and the top 2 meet in the finale.</p>
+                    <p>Every contestant plays 3 basic matches. Admin chooses how many advance (Top 8, 9, 10…) into the next phase. Click a previous round to reopen its boards and table.</p>
                     <div id="chessChampionStageRibbon" class="chess-champion-stage-ribbon" aria-live="polite"></div>
                 </header>
 
@@ -4678,6 +4678,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                             </div>
                             <i class="fas fa-bolt chess-champion-heading-icon"></i>
                         </div>
+                        <div id="chessChampionRoundHistory" class="chess-champion-round-history" aria-live="polite"></div>
                         <div id="chessChampionMatchRoom" class="chess-champion-match-room"></div>
                     </aside>
                 </div>
@@ -4706,11 +4707,14 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                             <h3><i class="fas fa-sliders"></i> Tournament settings</h3>
                             <div class="chess-champion-form-grid">
                                 <label>Event name<input id="chessChampionEventName" type="text" data-role-only="admin" maxlength="80"></label>
-                                <label>Format<div id="chessChampionFormatSummary" class="chess-champion-format-summary">Basic 3 → Top 8 × 3 → Top 4 × 3 → Finale</div></label>
+                                <label>Format<div id="chessChampionFormatSummary" class="chess-champion-format-summary">Basic 3 → Top N × 3 → Semifinals × 3 → Finale</div></label>
+                                <label>Next-round entries (from Basic)<input id="chessChampionQualificationCount" type="number" data-role-only="admin" min="2" max="32" step="1"></label>
+                                <label>Semifinal entries<input id="chessChampionSemifinalCount" type="number" data-role-only="admin" min="2" max="16" step="1"></label>
+                                <label>Finale entries<input id="chessChampionFinaleCount" type="number" data-role-only="admin" min="2" max="8" step="1"></label>
                                 <label>Fast win threshold (min)<input id="chessChampionFastMinutes" type="number" data-role-only="admin" min="1" max="180"></label>
                                 <label>Standard threshold (min)<input id="chessChampionStandardMinutes" type="number" data-role-only="admin" min="1" max="240"></label>
                             </div>
-                            <p class="chess-champion-admin-help">Fixed path: every player plays exactly 3 matches in Basic, then Top 8 play 3 Elimination matches, Top 4 play 3 Semifinal matches, and Top 2 contest the Finale. System blocks a 4th match in any of those phases.</p>
+                            <p class="chess-champion-admin-help">Each player plays 3 matches in Basic. Admin then selects how many enter the next phase (Top 8, 9, 10…). Semifinal and Finale entry counts are also Admin-set. Previously held rounds stay in Match Room — click a round chip to reopen that table and those boards.</p>
                             <h4>IPL-style scoring</h4>
                             <div class="chess-champion-form-grid chess-champion-scoring-grid">
                                 <label>Win points<input id="chessChampionWinPoints" type="number" data-role-only="admin" min="0" max="100"></label>
@@ -4725,6 +4729,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                             <p class="chess-champion-admin-help">Winner total = base result points + lower-class upset bonus + opponent-strength bonus + time bonus + Admin-entered kill points × multiplier. Pairings stay in nearby score bands, avoid repeats, and prefer different classes.</p>
                             <div class="chess-champion-admin-actions">
                                 <button class="secondary" type="button" data-role-only="admin" onclick="saveChessChampionConfig()"><i class="fas fa-save"></i> Save settings</button>
+                                <button class="secondary" type="button" data-role-only="admin" onclick="saveChessChampionNextRoundEntries()"><i class="fas fa-user-check"></i> Save next-round entries</button>
                                 <button class="secondary" type="button" data-role-only="admin" onclick="advanceChessChampionTournament()"><i class="fas fa-forward-step"></i> Generate / advance round</button>
                                 <button class="danger" type="button" data-role-only="admin" onclick="resetChessChampionTournament(false)"><i class="fas fa-rotate-left"></i> Reset active event</button>
                                 <button class="secondary" type="button" data-role-only="admin" onclick="resetChessChampionTournament(true)"><i class="fas fa-box-archive"></i> Archive series & reset</button>
@@ -4734,7 +4739,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                         </div>
                         <div id="chessChampionHistoricalCard" class="chess-champion-admin-card">
                             <h3><i class="fas fa-plus-square"></i> Add match</h3>
-                            <p class="chess-champion-admin-help">Admin can add a board for the live phase. Each player may play up to 3 matches in Basic, Elimination, and Semifinals (one board per round). If Round 1 is already used, the system places the next board in Round 2 or 3 automatically.</p>
+                            <p class="chess-champion-admin-help">Each enrolled contestant plays 3 matches against other contestants in this phase. Admin can record any remaining pairing without removing boards already held. Round numbers are labels; the 3-match cap is what matters.</p>
                             <div id="chessChampionAddMatchContext" class="chess-champion-add-context" aria-live="polite"></div>
                             <div class="chess-champion-form-grid">
                                 <label id="chessChampionAddMatchRoundLabel">Round<input id="chessChampionHistoricalRound" type="number" data-role-only="admin" min="1" max="12"></label>
@@ -4838,6 +4843,21 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                     <button class="secondary" type="button" onclick="closeChessChampionReviseMatch()">Cancel</button>
                     <button class="secondary chess-champion-desk-primary" type="button" onclick="saveChessChampionReviseMatch()"><i class="fas fa-save"></i> Save pairing</button>
                 </div>
+            </div>
+        </div>
+
+        <div id="chessChampionRoundHistoryModal" class="chess-champion-modal hidden" role="dialog" aria-modal="true" aria-labelledby="chessChampionRoundHistoryTitle">
+            <div class="chess-champion-modal-backdrop" onclick="closeChessChampionRoundHistory()" aria-hidden="true"></div>
+            <div class="chess-champion-modal-card chess-champion-history-card" role="document">
+                <div class="chess-champion-modal-header">
+                    <div class="chess-champion-modal-heading">
+                        <span class="chess-champion-eyebrow">Held round</span>
+                        <h2 id="chessChampionRoundHistoryTitle">Previous round</h2>
+                        <p id="chessChampionRoundHistoryMeta" class="chess-champion-desk-stage-label"></p>
+                    </div>
+                    <button class="chess-champion-modal-close" type="button" onclick="closeChessChampionRoundHistory()" aria-label="Close"><i class="fas fa-xmark"></i></button>
+                </div>
+                <div id="chessChampionRoundHistoryBody" class="chess-champion-history-body"></div>
             </div>
         </div>
 
@@ -13378,12 +13398,15 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                 round: 0,
                 basicRoundCount: CHESS_CHAMPION_FORMAT.basicRounds,
                 qualificationCount: CHESS_CHAMPION_FORMAT.eliminationQualifiers,
+                semifinalQualificationCount: CHESS_CHAMPION_FORMAT.semifinalQualifiers,
+                finaleQualificationCount: CHESS_CHAMPION_FORMAT.finaleQualifiers,
                 eliminationRoundCount: CHESS_CHAMPION_FORMAT.eliminationRounds,
                 semifinalRoundCount: CHESS_CHAMPION_FORMAT.semifinalRounds,
                 enrolledStudentIds: [],
                 qualifiedStudentIds: [],
                 championStudentId: 0,
                 seriesArchive: [],
+                roundHistory: [],
                 scoring: {
                     winPoints: 3,
                     drawPoints: 1,
@@ -13494,6 +13517,54 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             };
         }
 
+        function normalizeChessChampionRoundHistory(raw, index = 0) {
+            const source = raw && typeof raw === 'object' ? raw : {};
+            const stages = ['basic', 'elimination', 'semifinal', 'finale'];
+            const stage = stages.includes(String(source.stage || '').trim()) ? String(source.stage).trim() : 'basic';
+            const matches = Array.isArray(source.matches) ? source.matches.slice(0, 80).map((item, matchIndex) => {
+                const match = item && typeof item === 'object' ? item : {};
+                return {
+                    id: String(match.id || `history-match-${index}-${matchIndex}`),
+                    stage: stages.includes(String(match.stage || '').trim()) ? String(match.stage).trim() : stage,
+                    round: Math.max(1, Math.min(12, parseInt(match.round, 10) || 1)),
+                    board: Math.max(1, Math.min(1000, parseInt(match.board, 10) || matchIndex + 1)),
+                    whiteId: Math.max(0, parseInt(match.whiteId, 10) || 0),
+                    blackId: Math.max(0, parseInt(match.blackId, 10) || 0),
+                    whiteName: String(match.whiteName || '').trim().slice(0, 80),
+                    blackName: String(match.blackName || '').trim().slice(0, 80),
+                    result: ['', 'white', 'black', 'draw', 'bye'].includes(String(match.result || '').trim()) ? String(match.result || '').trim() : '',
+                    status: String(match.status || '').trim().slice(0, 40),
+                    origin: ['system', 'historical', 'manual'].includes(String(match.origin || '').trim()) ? String(match.origin).trim() : 'system'
+                };
+            }) : [];
+            const standings = Array.isArray(source.standings) ? source.standings.slice(0, 64).map((item, rowIndex) => {
+                const row = item && typeof item === 'object' ? item : {};
+                return {
+                    id: Math.max(0, parseInt(row.id, 10) || 0),
+                    rank: Math.max(1, parseInt(row.rank, 10) || rowIndex + 1),
+                    name: String(row.name || '').trim().slice(0, 80),
+                    roll: String(row.roll || '').trim().slice(0, 20),
+                    points: chessChampionNumber(row.points, 0),
+                    matches: Math.max(0, parseInt(row.matches, 10) || 0),
+                    wins: Math.max(0, parseInt(row.wins, 10) || 0),
+                    draws: Math.max(0, parseInt(row.draws, 10) || 0),
+                    losses: Math.max(0, parseInt(row.losses, 10) || 0)
+                };
+            }).filter(row => row.id > 0) : [];
+            const qualifiedStudentIds = Array.from(new Set((Array.isArray(source.qualifiedStudentIds) ? source.qualifiedStudentIds : []).map(id => parseInt(id, 10)).filter(id => id > 0))).slice(0, 32);
+            return {
+                id: String(source.id || chessChampionId(`round-history-${index}`)),
+                stage,
+                round: Math.max(0, Math.min(12, parseInt(source.round, 10) || 0)),
+                label: String(source.label || '').trim().slice(0, 80),
+                qualificationCount: Math.max(0, Math.min(32, parseInt(source.qualificationCount, 10) || 0)),
+                qualifiedStudentIds,
+                matches,
+                standings,
+                archivedAt: String(source.archivedAt || source.updatedAt || '').trim()
+            };
+        }
+
         function normalizeChessChampionState(raw) {
             const defaults = getDefaultChessChampionState();
             const source = raw && typeof raw === 'object' ? raw : {};
@@ -13508,13 +13579,16 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                 status: Object.prototype.hasOwnProperty.call(CHESS_CHAMPION_STAGE_LABELS, String(source.status || '')) ? String(source.status) : defaults.status,
                 round: Math.max(0, Math.min(12, parseInt(source.round, 10) || 0)),
                 basicRoundCount: CHESS_CHAMPION_FORMAT.basicRounds,
-                qualificationCount: CHESS_CHAMPION_FORMAT.eliminationQualifiers,
+                qualificationCount: chessChampionBounded(source.qualificationCount, 2, 32, defaults.qualificationCount),
+                semifinalQualificationCount: chessChampionBounded(source.semifinalQualificationCount, 2, 16, defaults.semifinalQualificationCount),
+                finaleQualificationCount: chessChampionBounded(source.finaleQualificationCount, 2, 8, defaults.finaleQualificationCount),
                 eliminationRoundCount: CHESS_CHAMPION_FORMAT.eliminationRounds,
                 semifinalRoundCount: CHESS_CHAMPION_FORMAT.semifinalRounds,
                 enrolledStudentIds: Array.from(new Set((Array.isArray(source.enrolledStudentIds) ? source.enrolledStudentIds : []).map(id => parseInt(id, 10)).filter(id => id > 0))),
                 qualifiedStudentIds: Array.from(new Set((Array.isArray(source.qualifiedStudentIds) ? source.qualifiedStudentIds : []).map(id => parseInt(id, 10)).filter(id => id > 0))),
                 championStudentId: Math.max(0, parseInt(source.championStudentId, 10) || 0),
                 seriesArchive: Array.isArray(source.seriesArchive) ? source.seriesArchive.slice(-20).map(normalizeChessChampionArchive).filter(Boolean) : [],
+                roundHistory: Array.isArray(source.roundHistory) ? source.roundHistory.slice(-40).map(normalizeChessChampionRoundHistory).filter(Boolean) : [],
                 scoring: {
                     winPoints: chessChampionBounded(scoring.winPoints, 0, 100, defaults.scoring.winPoints),
                     drawPoints: chessChampionBounded(scoring.drawPoints, 0, 100, defaults.scoring.drawPoints),
@@ -13635,6 +13709,72 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             return state.matches.filter(match => match.stage === stage && chessChampionMatchPlayedBy(match, id)).length;
         }
 
+        function chessChampionMatchUsageInStage(state, studentId, stage) {
+            const id = parseInt(studentId, 10) || 0;
+            if (!id || !stage) return { total: 0, completed: 0, pending: 0 };
+            const matches = state.matches.filter(match => match.stage === stage && chessChampionMatchPlayedBy(match, id));
+            return {
+                total: matches.length,
+                completed: matches.filter(chessChampionMatchComplete).length,
+                pending: matches.filter(chessChampionMatchPending).length,
+            };
+        }
+
+        function chessChampionStageUsageLabel(usage) {
+            const completed = usage.completed || 0;
+            const pending = usage.pending || 0;
+            if (pending > 0) return `${completed} completed · ${pending} pending`;
+            return `${completed} completed`;
+        }
+
+        function chessChampionFindStagePairing(state, stage, round, whiteId, blackId) {
+            const w = parseInt(whiteId, 10) || 0;
+            const b = parseInt(blackId, 10) || 0;
+            if (!w || !b) return null;
+            return state.matches.find(match =>
+                match.stage === stage
+                && parseInt(match.round, 10) === parseInt(round, 10)
+                && ((parseInt(match.whiteId, 10) === w && parseInt(match.blackId, 10) === b)
+                    || (parseInt(match.whiteId, 10) === b && parseInt(match.blackId, 10) === w))
+            ) || null;
+        }
+
+        function chessChampionResolveAdminMatchRound(state, stage, whiteId, blackId, preferredRound = 1, options = {}) {
+            const override = !!options.override;
+            const matchLimit = chessChampionStageMatchLimit(stage);
+            const roundLimit = chessChampionStageRoundLimit(stage) || matchLimit || 1;
+            const whiteUsage = chessChampionMatchUsageInStage(state, whiteId, stage);
+            const blackUsage = chessChampionMatchUsageInStage(state, blackId, stage);
+            if (matchLimit > 0 && (whiteUsage.total >= matchLimit || blackUsage.total >= matchLimit)) {
+                return { round: 0, reason: 'limit', existingPair: null, autoPlaced: false, whiteUsage, blackUsage };
+            }
+            // Admin-recorded boards keep every previously held match. The only gate is
+            // the 3-match-per-player cap. Round numbers are labels, not exclusive slots.
+            const preferred = Math.max(1, Math.min(roundLimit, parseInt(preferredRound, 10) || 1));
+            const order = [preferred, ...Array.from({ length: roundLimit }, (_, i) => i + 1).filter(r => r !== preferred)];
+
+            if (override) {
+                const preferredPair = chessChampionFindStagePairing(state, stage, preferred, whiteId, blackId);
+                if (preferredPair) {
+                    return { round: preferred, reason: 'override', existingPair: preferredPair, autoPlaced: false, whiteUsage, blackUsage };
+                }
+            }
+
+            for (const round of order) {
+                if (chessChampionFindStagePairing(state, stage, round, whiteId, blackId) && !override) continue;
+                if (chessChampionPlayerBusyInRound(state, stage, round, whiteId)) continue;
+                if (chessChampionPlayerBusyInRound(state, stage, round, blackId)) continue;
+                return { round, reason: '', existingPair: null, autoPlaced: round !== preferred, whiteUsage, blackUsage };
+            }
+
+            for (const round of order) {
+                if (chessChampionFindStagePairing(state, stage, round, whiteId, blackId) && !override) continue;
+                return { round, reason: 'extra-board', existingPair: null, autoPlaced: round !== preferred, whiteUsage, blackUsage };
+            }
+
+            return { round: preferred, reason: 'extra-board', existingPair: null, autoPlaced: preferred !== preferredRound, whiteUsage, blackUsage };
+        }
+
         function chessChampionPhasePlayerIds(state) {
             if (state.stage === 'registration' || state.stage === 'basic') {
                 return chessChampionActiveEnrolledIds(state);
@@ -13657,23 +13797,8 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
         }
 
         function chessChampionNextFreeRound(state, stage, whiteId, blackId, preferredRound = 1) {
-            const matchLimit = chessChampionStageMatchLimit(stage);
-            const roundLimit = chessChampionStageRoundLimit(stage) || matchLimit || 1;
-            const whiteCount = chessChampionMatchesInStage(state, whiteId, stage);
-            const blackCount = chessChampionMatchesInStage(state, blackId, stage);
-            if (matchLimit > 0 && (whiteCount >= matchLimit || blackCount >= matchLimit)) {
-                return { round: 0, reason: 'limit' };
-            }
-            const preferred = Math.max(1, Math.min(roundLimit, parseInt(preferredRound, 10) || 1));
-            const order = [preferred, ...Array.from({ length: roundLimit }, (_, i) => i + 1).filter(r => r !== preferred)];
-            for (const round of order) {
-                // Do not place into a locked past round once the tournament has advanced past it.
-                if (state.stage === stage && round < (parseInt(state.round, 10) || 0)) continue;
-                if (chessChampionPlayerBusyInRound(state, stage, round, whiteId)) continue;
-                if (chessChampionPlayerBusyInRound(state, stage, round, blackId)) continue;
-                return { round, reason: '' };
-            }
-            return { round: 0, reason: 'busy' };
+            const resolved = chessChampionResolveAdminMatchRound(state, stage, whiteId, blackId, preferredRound, { override: false });
+            return { round: resolved.round, reason: resolved.reason };
         }
 
         function chessChampionPlayersNeedingMatch(state, stage, ids) {
@@ -13902,9 +14027,139 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             return Math.ceil(Math.max(0, parseInt(playerCount, 10) || 0) / 2);
         }
 
-        function chessChampionEffectiveQualificationCount(state, count) {
+        function chessChampionEffectiveQualificationCount(state, count, selected = null) {
             const available = Math.max(0, parseInt(count, 10) || 0);
-            return Math.min(CHESS_CHAMPION_FORMAT.eliminationQualifiers, available);
+            const wanted = Math.max(2, parseInt(selected == null ? chessChampionNextPhaseEntryCount(state, 'basic') : selected, 10) || 2);
+            return Math.min(wanted, available);
+        }
+
+        function chessChampionNextPhaseEntryCount(state, fromStage = '') {
+            const stage = String(fromStage || state.stage || '').trim();
+            if (stage === 'elimination') return chessChampionBounded(state.semifinalQualificationCount, 2, 16, CHESS_CHAMPION_FORMAT.semifinalQualifiers);
+            if (stage === 'semifinal') return chessChampionBounded(state.finaleQualificationCount, 2, 8, CHESS_CHAMPION_FORMAT.finaleQualifiers);
+            return chessChampionBounded(state.qualificationCount, 2, 32, CHESS_CHAMPION_FORMAT.eliminationQualifiers);
+        }
+
+        function chessChampionFormatPath(state = getChessChampionState()) {
+            const top = chessChampionNextPhaseEntryCount(state, 'basic');
+            const semi = chessChampionNextPhaseEntryCount(state, 'elimination');
+            const finale = chessChampionNextPhaseEntryCount(state, 'semifinal');
+            return `Basic 3 → Top ${top} × 3 → Top ${semi} × 3 → Top ${finale} finale`;
+        }
+
+        function chessChampionCaptureRoundHistory(state, extra = {}) {
+            const stage = extra.stage || state.stage;
+            const round = parseInt(extra.round == null ? state.round : extra.round, 10) || 0;
+            const studentMap = chessChampionStudentMap();
+            const matches = state.matches
+                .filter(match => match.stage === stage && parseInt(match.round, 10) === round)
+                .sort((a, b) => (parseInt(a.board, 10) || 0) - (parseInt(b.board, 10) || 0))
+                .map(match => ({
+                    id: String(match.id),
+                    stage: match.stage,
+                    round: match.round,
+                    board: match.board,
+                    whiteId: match.whiteId,
+                    blackId: match.blackId,
+                    whiteName: chessChampionStudentName(studentMap.get(parseInt(match.whiteId, 10))),
+                    blackName: chessChampionStudentName(studentMap.get(parseInt(match.blackId, 10))),
+                    result: match.result || '',
+                    status: match.status || '',
+                    origin: match.origin || 'system'
+                }));
+            const seedIds = stage === 'basic' ? chessChampionActiveEnrolledIds(state) : (state.qualifiedStudentIds || []);
+            const standings = getChessChampionPhaseStandings(state, stage, seedIds).map(row => ({
+                id: row.id,
+                rank: row.rank,
+                name: chessChampionStudentName(row.student),
+                roll: chessChampionRoll(row.student),
+                points: row.points,
+                matches: row.matches,
+                wins: row.wins,
+                draws: row.draws,
+                losses: row.losses
+            }));
+            return normalizeChessChampionRoundHistory({
+                id: extra.id || chessChampionId(`round-${stage}-${round}`),
+                stage,
+                round,
+                label: extra.label || chessChampionStageLabel(stage, round),
+                qualificationCount: extra.qualificationCount || 0,
+                qualifiedStudentIds: extra.qualifiedStudentIds || [],
+                matches,
+                standings,
+                archivedAt: extra.archivedAt || new Date().toISOString()
+            });
+        }
+
+        function chessChampionAppendRoundHistory(state, snapshot) {
+            const history = Array.isArray(state.roundHistory) ? state.roundHistory.slice() : [];
+            const next = normalizeChessChampionRoundHistory(snapshot);
+            const key = `${next.stage}|${next.round}`;
+            const existingIndex = history.findIndex(item => `${item.stage}|${item.round}` === key);
+            if (existingIndex >= 0) history[existingIndex] = next;
+            else history.push(next);
+            state.roundHistory = history.slice(-40);
+            return state;
+        }
+
+        function renderChessChampionRoundHistory(state) {
+            const target = document.getElementById('chessChampionRoundHistory');
+            if (!target) return;
+            const history = Array.isArray(state.roundHistory) ? state.roundHistory.slice() : [];
+            if (!history.length) {
+                target.innerHTML = '';
+                target.hidden = true;
+                return;
+            }
+            target.hidden = false;
+            const chips = history.slice().reverse().map(item => {
+                const label = item.label || chessChampionStageLabel(item.stage, item.round);
+                return `<button class="chess-champion-history-chip" type="button" onclick="openChessChampionRoundHistory('${escapeHtml(item.id)}')"><i class="fas fa-clock-rotate-left"></i>${escapeHtml(label)}</button>`;
+            }).join('');
+            target.innerHTML = `<div class="chess-champion-history-kicker">Previously held rounds</div><div class="chess-champion-history-chips">${chips}</div>`;
+        }
+
+        function openChessChampionRoundHistory(historyId) {
+            const state = getChessChampionState();
+            const snapshot = (state.roundHistory || []).find(item => String(item.id) === String(historyId));
+            const modal = document.getElementById('chessChampionRoundHistoryModal');
+            const body = document.getElementById('chessChampionRoundHistoryBody');
+            if (!snapshot || !modal || !body) {
+                showAlert('That held round is not available.', 'warning');
+                return;
+            }
+            ensureChessChampionModalPortal(modal);
+            const title = document.getElementById('chessChampionRoundHistoryTitle');
+            const meta = document.getElementById('chessChampionRoundHistoryMeta');
+            if (title) title.textContent = snapshot.label || chessChampionStageLabel(snapshot.stage, snapshot.round);
+            if (meta) {
+                const qualified = (snapshot.qualifiedStudentIds || []).length;
+                meta.textContent = `${snapshot.matches.length} board${snapshot.matches.length === 1 ? '' : 's'} · ${snapshot.standings.length} in table${qualified ? ` · ${qualified} selected for the next phase` : ''}`;
+            }
+            const standingsRows = (snapshot.standings || []).map(row => `<tr><td>${escapeHtml(row.rank)}</td><td>${escapeHtml(row.name || '—')}<small>${escapeHtml(row.roll || '')}</small></td><td>${row.wins || 0}W · ${row.draws || 0}D · ${row.losses || 0}L</td><td>${chessChampionFormatPoints(row.points)}</td></tr>`).join('');
+            const matchRows = (snapshot.matches || []).map(match => {
+                const result = match.result === 'white' ? `${match.whiteName} wins` : (match.result === 'black' ? `${match.blackName} wins` : (match.result === 'draw' ? 'Draw' : 'Pending'));
+                return `<article class="chess-champion-history-match"><span>Board ${escapeHtml(match.board || '')}</span><strong>${escapeHtml(match.whiteName || 'White')} vs ${escapeHtml(match.blackName || 'Black')}</strong><b>${escapeHtml(result)}</b></article>`;
+            }).join('');
+            body.innerHTML = `
+                <section><h3>Standings at this round</h3>${standingsRows ? `<div class="chess-champion-table-wrap"><table class="chess-champion-table"><thead><tr><th>#</th><th>Player</th><th>Record</th><th>Points</th></tr></thead><tbody>${standingsRows}</tbody></table></div>` : '<p class="chess-champion-admin-help">No standings were stored for this round.</p>'}</section>
+                <section><h3>Boards held</h3>${matchRows || '<p class="chess-champion-admin-help">No boards were stored for this round.</p>'}</section>
+            `;
+            modal.classList.remove('hidden');
+            modal.setAttribute('aria-hidden', 'false');
+            chessChampionLockViewportForModal();
+        }
+
+        function closeChessChampionRoundHistory() {
+            const modal = document.getElementById('chessChampionRoundHistoryModal');
+            if (modal) {
+                modal.classList.add('hidden');
+                modal.setAttribute('aria-hidden', 'true');
+            }
+            const endHidden = !document.getElementById('chessChampionEndMatchModal') || document.getElementById('chessChampionEndMatchModal').classList.contains('hidden');
+            const reviseHidden = !document.getElementById('chessChampionReviseMatchModal') || document.getElementById('chessChampionReviseMatchModal').classList.contains('hidden');
+            if (endHidden && reviseHidden) chessChampionUnlockViewportForModal();
         }
 
         function chessChampionCreateMatch(stage, round, whiteId, blackId, board) {
@@ -14134,11 +14389,12 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                 const passed = stageOrder.indexOf(stage) < stageOrder.indexOf(state.stage);
                 return `<span class="chess-champion-stage ${active ? 'is-active' : ''} ${passed ? 'is-passed' : ''}"><i class="fas ${passed ? 'fa-check' : active ? 'fa-circle-play' : 'fa-circle'}"></i>${escapeHtml(CHESS_CHAMPION_STAGE_LABELS[stage])}</span>`;
             }).join('<span class="chess-champion-stage-line" aria-hidden="true"></span>');
+            const top = chessChampionNextPhaseEntryCount(state, 'basic');
             stats.innerHTML = [
-                { icon: 'fa-users', label: 'Registered players', value: enrolled, detail: enrolled >= CHESS_CHAMPION_FORMAT.eliminationQualifiers ? 'Ready for the 3-match basic path' : ('Need ' + CHESS_CHAMPION_FORMAT.eliminationQualifiers + '+ for Top 8 qualification') },
+                { icon: 'fa-users', label: 'Registered players', value: enrolled, detail: enrolled >= top ? `Ready for the 3-match basic path` : (`Need ${top}+ for Top ${top} qualification`) },
                 { icon: 'fa-ranking-star', label: 'Current leader', value: leader ? chessChampionStudentName(leader.student) : '—', detail: leader ? `${chessChampionFormatPoints(leader.points)} pts · ${leader.wins}W ${leader.draws}D` : 'No standings yet' },
                 { icon: 'fa-chess-board', label: 'Matches played', value: completed, detail: `${state.matches.length} scheduled in the ledger` },
-                { icon: 'fa-layer-group', label: 'Format', value: '3×3×3', detail: `Basic 3 · Top 8×3 · Top 4×3 · Finale` }
+                { icon: 'fa-layer-group', label: 'Next-round entries', value: `Top ${top}`, detail: chessChampionFormatPath(state) }
             ].map(item => `<article class="chess-champion-stat-card"><i class="fas ${item.icon}"></i><span class="chess-champion-stat-label">${escapeHtml(item.label)}</span><strong>${escapeHtml(String(item.value))}</strong><small>${escapeHtml(item.detail)}</small></article>`).join('');
         }
 
@@ -14423,7 +14679,6 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                 showAlert(context.reason || 'Match entry is unavailable for the current stage.', 'warning');
                 return;
             }
-            const requestedRound = Math.max(1, Math.min(12, parseInt(document.getElementById('chessChampionHistoricalRound')?.value, 10) || context.round || 1));
             const stage = context.stage;
             const whiteId = parseInt(document.getElementById('chessChampionHistoricalWhite')?.value, 10) || 0;
             const blackId = parseInt(document.getElementById('chessChampionHistoricalBlack')?.value, 10) || 0;
@@ -14442,53 +14697,37 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                 return;
             }
             const matchLimit = chessChampionStageMatchLimit(stage);
-            const whitePlayed = chessChampionMatchesInStage(state, whiteId, stage);
-            const blackPlayed = chessChampionMatchesInStage(state, blackId, stage);
-            if (matchLimit > 0 && whitePlayed >= matchLimit) {
-                showAlert(`${chessChampionStudentName(chessChampionStudentMap().get(whiteId))} already has ${whitePlayed}/${matchLimit} ${stage} matches (limit is ${matchLimit} total, not 1).`, 'warning');
+            const whiteUsage = chessChampionMatchUsageInStage(state, whiteId, stage);
+            const blackUsage = chessChampionMatchUsageInStage(state, blackId, stage);
+            if (matchLimit > 0 && whiteUsage.total >= matchLimit) {
+                showAlert(`${chessChampionStudentName(chessChampionStudentMap().get(whiteId))} already has ${whiteUsage.total}/${matchLimit} ${stage} boards (${chessChampionStageUsageLabel(whiteUsage)}). Delete or complete a pending board before adding another.`, 'warning');
                 return;
             }
-            if (matchLimit > 0 && blackPlayed >= matchLimit) {
-                showAlert(`${chessChampionStudentName(chessChampionStudentMap().get(blackId))} already has ${blackPlayed}/${matchLimit} ${stage} matches (limit is ${matchLimit} total, not 1).`, 'warning');
+            if (matchLimit > 0 && blackUsage.total >= matchLimit) {
+                showAlert(`${chessChampionStudentName(chessChampionStudentMap().get(blackId))} already has ${blackUsage.total}/${matchLimit} ${stage} boards (${chessChampionStageUsageLabel(blackUsage)}). Delete or complete a pending board before adding another.`, 'warning');
                 return;
             }
 
-            // Prefer the Admin-selected round, otherwise place into the next free round
-            // where both players still have capacity under the phase match limit (3 in basic).
-            let round = context.roundEditable
-                ? Math.max(1, Math.min(context.maxRound || chessChampionStageRoundLimit(stage) || 12, requestedRound))
-                : context.round;
-            let autoPlaced = false;
-            let existingPair = state.matches.find(match =>
-                match.stage === stage
-                && parseInt(match.round, 10) === round
-                && ((parseInt(match.whiteId, 10) === whiteId && parseInt(match.blackId, 10) === blackId)
-                    || (parseInt(match.whiteId, 10) === blackId && parseInt(match.blackId, 10) === whiteId))
-            );
-            if (existingPair && !override) {
-                showAlert(existingPair.status === 'completed'
-                    ? 'That pairing is already completed. Enable Override to revise it.'
-                    : 'That pairing already exists in this round. Enable Override only when replacing it intentionally.', 'warning');
+            const requestedRound = Math.max(1, Math.min(
+                context.maxRound || chessChampionStageRoundLimit(stage) || 12,
+                parseInt(document.getElementById('chessChampionHistoricalRound')?.value, 10) || context.round || 1
+            ));
+            const preferredRound = context.roundEditable ? requestedRound : context.round;
+            const placement = chessChampionResolveAdminMatchRound(state, stage, whiteId, blackId, preferredRound, { override });
+            if (!placement.round) {
+                const studentMap = chessChampionStudentMap();
+                const overLimit = whiteUsage.total >= matchLimit
+                    ? chessChampionStudentName(studentMap.get(whiteId))
+                    : chessChampionStudentName(studentMap.get(blackId));
+                showAlert(`${overLimit} already has ${matchLimit} ${stage} matches. Each contestant plays ${matchLimit} matches in this phase; previously held boards are kept.`, 'warning');
                 return;
             }
-            if (!existingPair) {
-                const free = chessChampionNextFreeRound(state, stage, whiteId, blackId, round);
-                if (!free.round) {
-                    if (free.reason === 'limit') {
-                        showAlert(`Both players must stay within ${matchLimit} ${stage} matches each.`, 'warning');
-                    } else {
-                        showAlert(`No free ${stage} round left for this pair. Each player may play up to ${matchLimit} matches total (one board per round).`, 'warning');
-                    }
-                    return;
-                }
-                autoPlaced = free.round !== round;
-                round = free.round;
-                existingPair = state.matches.find(match =>
-                    match.stage === stage
-                    && parseInt(match.round, 10) === round
-                    && ((parseInt(match.whiteId, 10) === whiteId && parseInt(match.blackId, 10) === blackId)
-                        || (parseInt(match.whiteId, 10) === blackId && parseInt(match.blackId, 10) === whiteId))
-                );
+
+            let round = placement.round;
+            let autoPlaced = placement.autoPlaced;
+            let existingPair = override ? placement.existingPair : null;
+            if (override && !existingPair) {
+                existingPair = chessChampionFindStagePairing(state, stage, round, whiteId, blackId);
             }
             let match = existingPair;
             if (existingPair && override) {
@@ -14537,10 +14776,13 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             // earlier boards must stay visible in the match room.
             saveChessChampionState(state);
             renderChessChampionTab();
+            const extraNote = placement.reason === 'extra-board'
+                ? ' Previous boards were kept. This is an additional match under the 3-match cap.'
+                : '';
             showAlert(
                 autoPlaced
-                    ? `Match added in ${chessChampionStageLabel(stage, round)} (next free round within the ${matchLimit}-match limit). Enter kill points and end the match.`
-                    : `Match added for ${chessChampionStageLabel(stage, round)}. Enter kill points and end the match.`,
+                    ? `Match added in ${chessChampionStageLabel(stage, round)} (${whiteUsage.completed + 1}/${matchLimit} and ${blackUsage.completed + 1}/${matchLimit} once recorded).${extraNote} Enter kill points and end the match.`
+                    : `Match added for ${chessChampionStageLabel(stage, round)}.${extraNote} Enter kill points and end the match.`,
                 'success'
             );
             setTimeout(() => openChessChampionEndMatch(match.id), 80);
@@ -14574,6 +14816,9 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             if (!admin) return;
             const values = {
                 chessChampionEventName: state.eventName,
+                chessChampionQualificationCount: chessChampionNextPhaseEntryCount(state, 'basic'),
+                chessChampionSemifinalCount: chessChampionNextPhaseEntryCount(state, 'elimination'),
+                chessChampionFinaleCount: chessChampionNextPhaseEntryCount(state, 'semifinal'),
                 chessChampionFastMinutes: Math.round(state.scoring.fastWinSeconds / 60),
                 chessChampionStandardMinutes: Math.round(state.scoring.standardWinSeconds / 60),
                 chessChampionWinPoints: state.scoring.winPoints,
@@ -14586,17 +14831,23 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                 chessChampionKillMultiplier: state.scoring.killPointMultiplier
             };
             Object.entries(values).forEach(([id, value]) => { const input = document.getElementById(id); if (input) input.value = value; });
-            // Lock settings after kickoff, but keep Advance / Reset available so an
-            // in-progress event can still progress or be cleared back to registration.
+            const formatSummary = document.getElementById('chessChampionFormatSummary');
+            if (formatSummary) formatSummary.textContent = chessChampionFormatPath(state);
+            const nextRoundIds = new Set(['chessChampionQualificationCount', 'chessChampionSemifinalCount', 'chessChampionFinaleCount']);
             panel.querySelectorAll('[data-role-only="admin"]').forEach(el => {
                 if (el.closest('#chessChampionRoster') || el.closest('#chessChampionHistoricalCard')) {
                     el.disabled = false;
+                    return;
+                }
+                if (nextRoundIds.has(el.id)) {
+                    el.disabled = state.stage === 'complete';
                     return;
                 }
                 const onclick = String(el.getAttribute('onclick') || '');
                 const keepEnabled = el.matches('button') && (
                     onclick.includes('advanceChessChampionTournament')
                     || onclick.includes('resetChessChampionTournament')
+                    || onclick.includes('saveChessChampionNextRoundEntries')
                 );
                 el.disabled = state.stage !== 'registration' && !keepEnabled;
             });
@@ -14623,6 +14874,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             renderChessChampionStats(state, standings);
             renderChessChampionStandings(state, standings);
             renderChessChampionMatchRoom(state);
+            renderChessChampionRoundHistory(state);
             renderChessChampionBracket(state);
             renderChessChampionAdmin(state);
             if (roster) roster.scrollTop = preserved.rosterTop;
@@ -14679,6 +14931,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
         function initChessChampionModalPortals() {
             ensureChessChampionModalPortal(document.getElementById('chessChampionEndMatchModal'));
             ensureChessChampionModalPortal(document.getElementById('chessChampionReviseMatchModal'));
+            ensureChessChampionModalPortal(document.getElementById('chessChampionRoundHistoryModal'));
         }
 
         if (document.readyState === 'loading') {
@@ -14736,14 +14989,33 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             if (status) status.textContent = 'Player selection cleared. Choose white and black players again.';
         }
 
+        function applyChessChampionNextRoundEntries(state) {
+            const value = id => document.getElementById(id)?.value;
+            state.qualificationCount = chessChampionBounded(value('chessChampionQualificationCount'), 2, 32, state.qualificationCount || CHESS_CHAMPION_FORMAT.eliminationQualifiers);
+            state.semifinalQualificationCount = chessChampionBounded(value('chessChampionSemifinalCount'), 2, 16, state.semifinalQualificationCount || CHESS_CHAMPION_FORMAT.semifinalQualifiers);
+            state.finaleQualificationCount = chessChampionBounded(value('chessChampionFinaleCount'), 2, 8, state.finaleQualificationCount || CHESS_CHAMPION_FORMAT.finaleQualifiers);
+            return state;
+        }
+
+        function saveChessChampionNextRoundEntries() {
+            if (!chessChampionAdminGuard()) return;
+            const state = applyChessChampionNextRoundEntries(getChessChampionState());
+            saveChessChampionState(state);
+            renderChessChampionTab();
+            showAlert(`Next-round entries saved: ${chessChampionFormatPath(state)}.`, 'success');
+        }
+
         function saveChessChampionConfig() {
             if (!chessChampionAdminGuard()) return;
             const state = getChessChampionState();
-            if (state.stage !== 'registration') { showAlert('Settings are locked after the first round begins.', 'warning'); return; }
+            if (state.stage !== 'registration') {
+                saveChessChampionNextRoundEntries();
+                return;
+            }
             const value = id => document.getElementById(id)?.value;
             state.eventName = String(value('chessChampionEventName') || state.eventName).trim() || 'Excel Chess Champion';
             state.basicRoundCount = CHESS_CHAMPION_FORMAT.basicRounds;
-            state.qualificationCount = CHESS_CHAMPION_FORMAT.eliminationQualifiers;
+            applyChessChampionNextRoundEntries(state);
             state.eliminationRoundCount = CHESS_CHAMPION_FORMAT.eliminationRounds;
             state.semifinalRoundCount = CHESS_CHAMPION_FORMAT.semifinalRounds;
             state.scoring.fastWinSeconds = chessChampionBounded(Math.round(chessChampionNumber(value('chessChampionFastMinutes'), 10) * 60), 60, 10800, state.scoring.fastWinSeconds);
@@ -14770,12 +15042,13 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                 return;
             }
             if (state.stage === 'registration') {
-                if (activeIds.length < CHESS_CHAMPION_FORMAT.eliminationQualifiers) {
-                    showAlert(`Register at least ${CHESS_CHAMPION_FORMAT.eliminationQualifiers} active players so Top 8 can qualify after 3 basic matches each.`, 'warning');
+                const needed = chessChampionNextPhaseEntryCount(state, 'basic');
+                if (activeIds.length < needed) {
+                    showAlert(`Register at least ${needed} active players so Top ${needed} can qualify after 3 basic matches each.`, 'warning');
                     return;
                 }
+                applyChessChampionNextRoundEntries(state);
                 state.basicRoundCount = CHESS_CHAMPION_FORMAT.basicRounds;
-                state.qualificationCount = CHESS_CHAMPION_FORMAT.eliminationQualifiers;
                 state.eliminationRoundCount = CHESS_CHAMPION_FORMAT.eliminationRounds;
                 state.semifinalRoundCount = CHESS_CHAMPION_FORMAT.semifinalRounds;
                 state.championStudentId = 0;
@@ -14831,11 +15104,12 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                         showAlert(`Every contestant already has ${matchLimit} ${state.stage} matches. Advance again to move to the next phase.`, 'info');
                         state.round = roundLimit;
                     } else {
+                        chessChampionAppendRoundHistory(state, chessChampionCaptureRoundHistory(state));
                         state.round = nextRound;
                         state.matches.push(...chessChampionPairIds(state, needing, state.stage, nextRound));
                         saveChessChampionState(state);
                         renderChessChampionTab();
-                        showAlert(`${chessChampionStageLabel(state.stage, nextRound)} generated.`, 'success');
+                        showAlert(`${chessChampionStageLabel(state.stage, nextRound)} generated. Previous round is available from Held rounds.`, 'success');
                         return;
                     }
                 }
@@ -14847,13 +15121,20 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                 }
 
                 if (state.stage === 'basic') {
+                    applyChessChampionNextRoundEntries(state);
                     const standings = getChessChampionPhaseStandings(state, 'basic', activeIds).filter(row => row.id > 0 && chessChampionStudentMap().has(row.id));
-                    const qualifierCount = chessChampionEffectiveQualificationCount(state, standings.length);
-                    if (qualifierCount < CHESS_CHAMPION_FORMAT.eliminationQualifiers) {
-                        showAlert(`Need at least ${CHESS_CHAMPION_FORMAT.eliminationQualifiers} players with completed basic matches to open Elimination.`, 'warning');
+                    const wanted = chessChampionNextPhaseEntryCount(state, 'basic');
+                    const qualifierCount = chessChampionEffectiveQualificationCount(state, standings.length, wanted);
+                    if (qualifierCount < wanted) {
+                        showAlert(`Need at least ${wanted} players with completed basic matches to open the next round (Top ${wanted}).`, 'warning');
                         return;
                     }
-                    state.qualifiedStudentIds = standings.slice(0, CHESS_CHAMPION_FORMAT.eliminationQualifiers).map(row => row.id);
+                    chessChampionAppendRoundHistory(state, chessChampionCaptureRoundHistory(state, {
+                        qualificationCount: wanted,
+                        qualifiedStudentIds: standings.slice(0, wanted).map(row => row.id),
+                        label: `${chessChampionStageLabel('basic', state.round)} · selected Top ${wanted}`
+                    }));
+                    state.qualifiedStudentIds = standings.slice(0, wanted).map(row => row.id);
                     state.championStudentId = 0;
                     state.stage = 'elimination';
                     state.status = 'elimination';
@@ -14861,34 +15142,48 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                     state.matches.push(...chessChampionPairIds(state, state.qualifiedStudentIds, 'elimination', 1));
                     saveChessChampionState(state);
                     renderChessChampionTab();
-                    showAlert(`Top ${CHESS_CHAMPION_FORMAT.eliminationQualifiers} qualified. Elimination Round 1 of ${CHESS_CHAMPION_FORMAT.eliminationRounds} generated (3 matches each).`, 'success');
+                    showAlert(`Top ${wanted} qualified. Elimination Round 1 of ${CHESS_CHAMPION_FORMAT.eliminationRounds} generated (3 matches each). Click a held round to reopen its boards.`, 'success');
                     return;
                 }
 
                 if (state.stage === 'elimination') {
+                    applyChessChampionNextRoundEntries(state);
                     const standings = getChessChampionPhaseStandings(state, 'elimination', state.qualifiedStudentIds);
-                    if (standings.length < CHESS_CHAMPION_FORMAT.semifinalQualifiers) {
-                        showAlert(`Need at least ${CHESS_CHAMPION_FORMAT.semifinalQualifiers} elimination players to open Semifinals.`, 'warning');
+                    const wanted = chessChampionNextPhaseEntryCount(state, 'elimination');
+                    if (standings.length < wanted) {
+                        showAlert(`Need at least ${wanted} elimination players to open Semifinals (Top ${wanted}).`, 'warning');
                         return;
                     }
-                    state.qualifiedStudentIds = standings.slice(0, CHESS_CHAMPION_FORMAT.semifinalQualifiers).map(row => row.id);
+                    chessChampionAppendRoundHistory(state, chessChampionCaptureRoundHistory(state, {
+                        qualificationCount: wanted,
+                        qualifiedStudentIds: standings.slice(0, wanted).map(row => row.id),
+                        label: `${chessChampionStageLabel('elimination', state.round)} · selected Top ${wanted}`
+                    }));
+                    state.qualifiedStudentIds = standings.slice(0, wanted).map(row => row.id);
                     state.stage = 'semifinal';
                     state.status = 'semifinal';
                     state.round = 1;
                     state.matches.push(...chessChampionPairIds(state, state.qualifiedStudentIds, 'semifinal', 1));
                     saveChessChampionState(state);
                     renderChessChampionTab();
-                    showAlert(`Top ${CHESS_CHAMPION_FORMAT.semifinalQualifiers} reached Semifinals. Round 1 of ${CHESS_CHAMPION_FORMAT.semifinalRounds} generated (3 matches each).`, 'success');
+                    showAlert(`Top ${wanted} reached Semifinals. Round 1 of ${CHESS_CHAMPION_FORMAT.semifinalRounds} generated (3 matches each).`, 'success');
                     return;
                 }
 
                 if (state.stage === 'semifinal') {
+                    applyChessChampionNextRoundEntries(state);
                     const standings = getChessChampionPhaseStandings(state, 'semifinal', state.qualifiedStudentIds);
-                    if (standings.length < CHESS_CHAMPION_FORMAT.finaleQualifiers) {
-                        showAlert('Need at least 2 semifinalists to open the Finale.', 'warning');
+                    const wanted = chessChampionNextPhaseEntryCount(state, 'semifinal');
+                    if (standings.length < wanted) {
+                        showAlert(`Need at least ${wanted} semifinalists to open the Finale.`, 'warning');
                         return;
                     }
-                    state.qualifiedStudentIds = standings.slice(0, CHESS_CHAMPION_FORMAT.finaleQualifiers).map(row => row.id);
+                    chessChampionAppendRoundHistory(state, chessChampionCaptureRoundHistory(state, {
+                        qualificationCount: wanted,
+                        qualifiedStudentIds: standings.slice(0, wanted).map(row => row.id),
+                        label: `${chessChampionStageLabel('semifinal', state.round)} · selected Top ${wanted}`
+                    }));
+                    state.qualifiedStudentIds = standings.slice(0, wanted).map(row => row.id);
                     state.stage = 'finale';
                     state.status = 'finale';
                     state.round = 1;
@@ -15123,7 +15418,8 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                 modal.classList.add('hidden');
                 modal.setAttribute('aria-hidden', 'true');
             }
-            if (!document.getElementById('chessChampionReviseMatchModal') || document.getElementById('chessChampionReviseMatchModal').classList.contains('hidden')) {
+            if ((!document.getElementById('chessChampionReviseMatchModal') || document.getElementById('chessChampionReviseMatchModal').classList.contains('hidden'))
+                && (!document.getElementById('chessChampionRoundHistoryModal') || document.getElementById('chessChampionRoundHistoryModal').classList.contains('hidden'))) {
                 chessChampionUnlockViewportForModal();
             }
             activeChessChampionMatchId = '';
@@ -15285,8 +15581,11 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             state.eventName = previous.eventName || state.eventName;
             state.basicRoundCount = previous.basicRoundCount || state.basicRoundCount;
             state.qualificationCount = previous.qualificationCount || state.qualificationCount;
+            state.semifinalQualificationCount = previous.semifinalQualificationCount || state.semifinalQualificationCount;
+            state.finaleQualificationCount = previous.finaleQualificationCount || state.finaleQualificationCount;
             state.scoring = { ...(previous.scoring || state.scoring) };
             state.seriesArchive = Array.isArray(previous.seriesArchive) ? previous.seriesArchive.slice(-20) : [];
+            state.roundHistory = [];
             if (archiveFirst && (previous.matches.length || previous.enrolledStudentIds.length || previous.stage === 'complete')) {
                 state.seriesArchive.push(chessChampionArchiveFromState(previous));
                 state.seriesArchive = state.seriesArchive.slice(-20);
@@ -22480,14 +22779,22 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                 });
                 return Array.from(byId.values()).slice(-20);
             };
+            const mergeRoundHistory = (left, right) => {
+                const byId = new Map();
+                [...(left.roundHistory || []), ...(right.roundHistory || [])].forEach(item => {
+                    const id = String(item && item.id || '').trim() || `${item && item.stage}|${item && item.round}|${item && item.archivedAt}`;
+                    if (id) byId.set(id, item);
+                });
+                return Array.from(byId.values()).slice(-40);
+            };
             if (!localRaw) return remote;
             // Newer eventEpoch is an intentional Admin reset/new event and must win.
             if (localEpoch > remoteEpoch) {
-                const kept = { ...local, seriesArchive: mergeArchives(local, remote) };
+                const kept = { ...local, seriesArchive: mergeArchives(local, remote), roundHistory: mergeRoundHistory(local, remote) };
                 return normalizeChessChampionState(kept);
             }
             if (remoteEpoch > localEpoch) {
-                const kept = { ...remote, seriesArchive: mergeArchives(local, remote) };
+                const kept = { ...remote, seriesArchive: mergeArchives(local, remote), roundHistory: mergeRoundHistory(local, remote) };
                 return normalizeChessChampionState(kept);
             }
             const localReset = String(localRaw && localRaw.stage || '').trim().toLowerCase() === 'registration'
@@ -22499,11 +22806,11 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                 && !remoteRaw.matches.length
                 && remoteStamp > localStamp;
             if (localReset) {
-                const kept = { ...local, seriesArchive: mergeArchives(local, remote) };
+                const kept = { ...local, seriesArchive: mergeArchives(local, remote), roundHistory: mergeRoundHistory(local, remote) };
                 return normalizeChessChampionState(kept);
             }
             if (remoteReset) {
-                const kept = { ...remote, seriesArchive: mergeArchives(local, remote) };
+                const kept = { ...remote, seriesArchive: mergeArchives(local, remote), roundHistory: mergeRoundHistory(local, remote) };
                 return normalizeChessChampionState(kept);
             }
             if (!local.matches.length && remote.matches.length) return remote;
@@ -22523,6 +22830,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             });
             base.matches = Array.from(byId.values());
             base.seriesArchive = mergeArchives(local, remote);
+            base.roundHistory = mergeRoundHistory(local, remote);
             const intentionalClearEnrolled = remoteNewer ? !remote.enrolledStudentIds.length : !local.enrolledStudentIds.length;
             const intentionalClearQualified = remoteNewer ? !remote.qualifiedStudentIds.length : !local.qualifiedStudentIds.length;
             if (local.enrolledStudentIds.length && !base.enrolledStudentIds.length && !intentionalClearEnrolled) base.enrolledStudentIds = local.enrolledStudentIds;
