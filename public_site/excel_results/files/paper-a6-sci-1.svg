@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 540" width="100%" height="100%">
+  <rect width="800" height="540" fill="#f8fafc" rx="16"/>
+  <rect width="800" height="80" fill="#1a4d2e" rx="16"/>
+  <text x="32" y="50" fill="#ffffff" font-family="Arial, sans-serif" font-size="24" font-weight="bold">Excel Academy — Practice Sheet</text>
+  <text x="32" y="130" fill="#0f172a" font-family="Arial, sans-serif" font-size="20" font-weight="bold">Class 6 Science — Plant Cell Model</text>
+  <text x="32" y="160" fill="#64748b" font-family="Arial, sans-serif" font-size="14">Visual reference diagram &amp; self-study questions</text>
+  <circle cx="180" cy="330" r="95" fill="#e0e7ff" stroke="#4f46e5" stroke-width="3"/>
+  <text x="180" y="335" text-anchor="middle" fill="#4338ca" font-family="Arial, sans-serif" font-size="15" font-weight="bold">Plant Cell Diagram</text>
+  <rect x="360" y="220" width="390" height="230" fill="#fef3c7" stroke="#d97706" stroke-width="2" rx="12"/>
+  <text x="385" y="260" fill="#92400e" font-family="Arial, sans-serif" font-size="15" font-weight="bold">Key Questions:</text>
+  <text x="385" y="300" fill="#78350f" font-family="Arial, sans-serif" font-size="14">1. Label the cell wall, nucleus, and chloroplasts.</text>
+  <text x="385" y="340" fill="#78350f" font-family="Arial, sans-serif" font-size="14">2. Contrast plant cell structure with animal cells.</text>
+  <text x="385" y="380" fill="#78350f" font-family="Arial, sans-serif" font-size="14">3. Explain the role of the central vacuole.</text>
+  <text x="385" y="420" fill="#78350f" font-family="Arial, sans-serif" font-size="13" font-style="italic">Time: 30 Mins | Maximum Marks: 25</text>
+</svg>

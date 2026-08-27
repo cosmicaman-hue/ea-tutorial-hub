@@ -8,7 +8,8 @@ This folder contains public files for static hosting on Cloudflare Pages.
 - `credentials.json` - per-student salted SHA-256 login credentials (manually maintained)
 - `offline_scoreboard.html` - full SPA scoreboard (cross-origin mode via meta tag; no longer linked from the public UI)
 - `static/css/offline-scoreboard.css` - SPA stylesheet
-- `_headers` - cache-control rules (keeps `scores.json`, `credentials.json`, and SPA fresh on Cloudflare)
+- `excel_results/` - Excel Results SPA (`catalog.json`, papers, `app.js`) managed from the LAN admin tab; see `excel_results/README.md`
+- `_headers` - cache-control rules (keeps `scores.json`, `credentials.json`, Excel Results catalog, and SPA fresh on Cloudflare)
 
 ## Client-side login gate
 

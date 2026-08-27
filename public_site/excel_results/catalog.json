@@ -1,0 +1,374 @@
+{
+  "version": 1,
+  "updated_at": "2026-08-27T12:13:01Z",
+  "groups": [
+    {
+      "id": "grp-a",
+      "name": "Group A",
+      "description": "Morning batch — Classes 6 and 7.",
+      "sort_order": 0,
+      "classes": [
+        {
+          "id": "cls-a-6",
+          "name": "Class 6",
+          "sort_order": 0,
+          "subjects": [
+            {
+              "id": "sub-a6-math",
+              "name": "Mathematics",
+              "sort_order": 0,
+              "papers": [
+                {
+                  "id": "paper-a6-math-1",
+                  "title": "Paper 1 — Number Sense & Arithmetic",
+                  "description": "Warm-up paper covering place value, HCF/LCM, and perimeter calculation.",
+                  "tags": [
+                    "term-1",
+                    "practice",
+                    "arithmetic"
+                  ],
+                  "file_type": "html",
+                  "original_name": "class6-math-paper-1.html",
+                  "storage_key": "paper-a6-math-1.html",
+                  "size_bytes": 898,
+                  "date_added": "2026-07-15",
+                  "previewable": true
+                },
+                {
+                  "id": "paper-a6-math-2",
+                  "title": "Paper 2 — Fractions & Decimals",
+                  "description": "Printable PDF drill covering operations on fractions and unitary method.",
+                  "tags": [
+                    "term-1",
+                    "pdf",
+                    "fractions"
+                  ],
+                  "file_type": "pdf",
+                  "original_name": "class6-math-paper-2.pdf",
+                  "storage_key": "paper-a6-math-2.pdf",
+                  "size_bytes": 1737,
+                  "date_added": "2026-07-20",
+                  "previewable": true
+                }
+              ]
+            },
+            {
+              "id": "sub-a6-sci",
+              "name": "Science",
+              "sort_order": 1,
+              "papers": [
+                {
+                  "id": "paper-a6-sci-1",
+                  "title": "Paper 1 — Plant & Animal Cells (Diagram Sheet)",
+                  "description": "Visual study diagram and question set for cellular structures and functions.",
+                  "tags": [
+                    "biology",
+                    "diagram",
+                    "svg"
+                  ],
+                  "file_type": "svg",
+                  "original_name": "class6-science-cell-diagram.svg",
+                  "storage_key": "paper-a6-sci-1.svg",
+                  "size_bytes": 1692,
+                  "date_added": "2026-07-22",
+                  "previewable": true
+                },
+                {
+                  "id": "paper-a6-sci-2",
+                  "title": "Paper 2 — Motion & Measurement of Distances",
+                  "description": "Comprehensive question paper on standard units, rectilinear motion, and velocity.",
+                  "tags": [
+                    "physics",
+                    "term-1",
+                    "pdf"
+                  ],
+                  "file_type": "pdf",
+                  "original_name": "class6-science-motion.pdf",
+                  "storage_key": "paper-a6-sci-2.pdf",
+                  "size_bytes": 1735,
+                  "date_added": "2026-07-25",
+                  "previewable": true
+                }
+              ]
+            },
+            {
+              "id": "sub-a6-eng",
+              "name": "English",
+              "sort_order": 2,
+              "papers": [
+                {
+                  "id": "paper-a6-eng-1",
+                  "title": "Paper 1 — Grammar & Reading Comprehension",
+                  "description": "Word document covering tenses, active/passive voice, and unseen passage exercises.",
+                  "tags": [
+                    "grammar",
+                    "reading",
+                    "docx"
+                  ],
+                  "file_type": "docx",
+                  "original_name": "class6-english-comprehension.docx",
+                  "storage_key": "paper-a6-eng-1.docx",
+                  "size_bytes": 956,
+                  "date_added": "2026-07-28",
+                  "previewable": false
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "cls-a-7",
+          "name": "Class 7",
+          "sort_order": 1,
+          "subjects": [
+            {
+              "id": "sub-a7-math",
+              "name": "Mathematics",
+              "sort_order": 0,
+              "papers": [
+                {
+                  "id": "paper-a7-math-1",
+                  "title": "Paper 1 — Integers & Algebraic Expressions",
+                  "description": "Practice set covering rules of integer signs, linear equations, and exponents.",
+                  "tags": [
+                    "algebra",
+                    "integers",
+                    "pdf"
+                  ],
+                  "file_type": "pdf",
+                  "original_name": "class7-math-algebra.pdf",
+                  "storage_key": "paper-a7-math-1.pdf",
+                  "size_bytes": 1739,
+                  "date_added": "2026-08-02",
+                  "previewable": true
+                }
+              ]
+            },
+            {
+              "id": "sub-a7-sci",
+              "name": "Science",
+              "sort_order": 1,
+              "papers": [
+                {
+                  "id": "paper-a7-sci-1",
+                  "title": "Paper 1 — Nutrition in Plants & Animals",
+                  "description": "Interactive HTML paper on photosynthesis, digestive systems, and nutrient absorption.",
+                  "tags": [
+                    "biology",
+                    "nutrition",
+                    "html"
+                  ],
+                  "file_type": "html",
+                  "original_name": "class7-science-nutrition.html",
+                  "storage_key": "paper-a7-sci-1.html",
+                  "size_bytes": 908,
+                  "date_added": "2026-08-04",
+                  "previewable": true
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "grp-b",
+      "name": "Group B",
+      "description": "Afternoon batch — Classes 6 and 7.",
+      "sort_order": 1,
+      "classes": [
+        {
+          "id": "cls-b-6",
+          "name": "Class 6",
+          "sort_order": 0,
+          "subjects": [
+            {
+              "id": "sub-b6-math",
+              "name": "Mathematics",
+              "sort_order": 0,
+              "papers": [
+                {
+                  "id": "paper-b6-math-1",
+                  "title": "Paper 1 — Geometry & Mensuration Basics",
+                  "description": "Basic angles, triangles, polygons, and perimeter drill.",
+                  "tags": [
+                    "geometry",
+                    "pdf"
+                  ],
+                  "file_type": "pdf",
+                  "original_name": "groupB-class6-geometry.pdf",
+                  "storage_key": "paper-b6-math-1.pdf",
+                  "size_bytes": 1732,
+                  "date_added": "2026-08-05",
+                  "previewable": true
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "sessions": [
+    {
+      "id": "ses-2025-26",
+      "name": "2025-26"
+    },
+    {
+      "id": "ses-2026-27",
+      "name": "2026-27"
+    }
+  ],
+  "examinations": [
+    {
+      "id": "exam-midterm",
+      "name": "Mid-Term Exam",
+      "session_id": "ses-2025-26"
+    },
+    {
+      "id": "exam-annual",
+      "name": "Annual Board Prep",
+      "session_id": "ses-2025-26"
+    },
+    {
+      "id": "exam-unit1",
+      "name": "Unit Assessment 1",
+      "session_id": "ses-2026-27"
+    }
+  ],
+  "results": [
+    {
+      "id": "res-1",
+      "student_name": "Asha Sharma",
+      "roll_number": "EA25A01",
+      "registration_number": "REG-2501",
+      "group_id": "grp-a",
+      "class_id": "cls-a-6",
+      "subject_id": "sub-a6-math",
+      "examination_id": "exam-midterm",
+      "session_id": "ses-2025-26",
+      "group_name": "Group A",
+      "class_name": "Class 6",
+      "subject_name": "Mathematics",
+      "examination_name": "Mid-Term Exam",
+      "session_name": "2025-26",
+      "marks": 38,
+      "max_marks": 40,
+      "grade": "A+"
+    },
+    {
+      "id": "res-2",
+      "student_name": "Rohan Verma",
+      "roll_number": "EA25A02",
+      "registration_number": "REG-2502",
+      "group_id": "grp-a",
+      "class_id": "cls-a-6",
+      "subject_id": "sub-a6-math",
+      "examination_id": "exam-midterm",
+      "session_id": "ses-2025-26",
+      "group_name": "Group A",
+      "class_name": "Class 6",
+      "subject_name": "Mathematics",
+      "examination_name": "Mid-Term Exam",
+      "session_name": "2025-26",
+      "marks": 34,
+      "max_marks": 40,
+      "grade": "A"
+    },
+    {
+      "id": "res-3",
+      "student_name": "Sneha Patel",
+      "roll_number": "EA25A03",
+      "registration_number": "REG-2503",
+      "group_id": "grp-a",
+      "class_id": "cls-a-6",
+      "subject_id": "sub-a6-sci",
+      "examination_id": "exam-midterm",
+      "session_id": "ses-2025-26",
+      "group_name": "Group A",
+      "class_name": "Class 6",
+      "subject_name": "Science",
+      "examination_name": "Mid-Term Exam",
+      "session_name": "2025-26",
+      "marks": 36,
+      "max_marks": 40,
+      "grade": "A+"
+    },
+    {
+      "id": "res-4",
+      "student_name": "Meera Sen",
+      "roll_number": "EA25A11",
+      "registration_number": "REG-2511",
+      "group_id": "grp-a",
+      "class_id": "cls-a-7",
+      "subject_id": "sub-a7-sci",
+      "examination_id": "exam-midterm",
+      "session_id": "ses-2025-26",
+      "group_name": "Group A",
+      "class_name": "Class 7",
+      "subject_name": "Science",
+      "examination_name": "Mid-Term Exam",
+      "session_name": "2025-26",
+      "marks": 45,
+      "max_marks": 50,
+      "grade": "A+"
+    },
+    {
+      "id": "res-5",
+      "student_name": "Dev Mukherjee",
+      "roll_number": "EA25A12",
+      "registration_number": "REG-2512",
+      "group_id": "grp-a",
+      "class_id": "cls-a-7",
+      "subject_id": "sub-a7-math",
+      "examination_id": "exam-midterm",
+      "session_id": "ses-2025-26",
+      "group_name": "Group A",
+      "class_name": "Class 7",
+      "subject_name": "Mathematics",
+      "examination_name": "Mid-Term Exam",
+      "session_name": "2025-26",
+      "marks": 41,
+      "max_marks": 50,
+      "grade": "A"
+    },
+    {
+      "id": "res-6",
+      "student_name": "Ananya Iyer",
+      "roll_number": "EA25A13",
+      "registration_number": "REG-2513",
+      "group_id": "grp-a",
+      "class_id": "cls-a-7",
+      "subject_id": "sub-a7-math",
+      "examination_id": "exam-midterm",
+      "session_id": "ses-2025-26",
+      "group_name": "Group A",
+      "class_name": "Class 7",
+      "subject_name": "Mathematics",
+      "examination_name": "Mid-Term Exam",
+      "session_name": "2025-26",
+      "marks": 38,
+      "max_marks": 50,
+      "grade": "B+"
+    },
+    {
+      "id": "res-7",
+      "student_name": "Kabir Das",
+      "roll_number": "EA25B01",
+      "registration_number": "REG-2521",
+      "group_id": "grp-b",
+      "class_id": "cls-b-6",
+      "subject_id": "sub-b6-math",
+      "examination_id": "exam-annual",
+      "session_id": "ses-2025-26",
+      "group_name": "Group B",
+      "class_name": "Class 6",
+      "subject_name": "Mathematics",
+      "examination_name": "Annual Board Prep",
+      "session_name": "2025-26",
+      "marks": 35,
+      "max_marks": 40,
+      "grade": "A"
+    }
+  ]
+}

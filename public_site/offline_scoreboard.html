@@ -1185,6 +1185,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
         <button class="sidebar-nav-item" data-tab="resources" onclick="switchTab('resources')" title="Resources"><i class="fas fa-boxes-stacked" style="color:#14b8a6"></i><span class="sidebar-link-text">Resources</span></button>
         <button class="sidebar-nav-item" data-tab="excel-mela" onclick="switchTab('excel-mela')" title="Excel Mela"><i class="fas fa-gift" style="color:#d946ef"></i><span class="sidebar-link-text">Excel Mela</span></button>
         <button class="sidebar-nav-item" data-tab="syllabus" onclick="switchTab('syllabus')" title="Syllabus"><i class="fas fa-book-open" style="color:#06b6d4"></i><span class="sidebar-link-text">Syllabus</span></button>
+        <button class="sidebar-nav-item" data-tab="excel-results" onclick="switchTab('excel-results')" title="Excel Results"><i class="fas fa-file-lines" style="color:#22c55e"></i><span class="sidebar-link-text">Excel Results</span></button>
         <button class="sidebar-nav-item" data-tab="rules" onclick="switchTab('rules')" title="Rules"><i class="fas fa-scroll" style="color:#22d3ee"></i><span class="sidebar-link-text">Rules</span></button>
         <button class="sidebar-nav-item" data-tab="information" onclick="switchTab('information')" title="Information"><i class="fas fa-circle-info" style="color:#67e8f9"></i><span class="sidebar-link-text">Information</span></button>
         <div class="sidebar-section-label">Rankings</div>
@@ -3578,6 +3579,11 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             </style>
         </div>
 
+        <!-- TAB: EXCEL RESULTS -->
+        <div id="excel-results-tab" class="tab-content hidden">
+            <iframe id="excelResultsFrame" title="Excel Results" src="/scoreboard/excel-results" style="width:100%;min-height:78vh;border:0;border-radius:18px;background:transparent"></iframe>
+        </div>
+
         <!-- TAB: SYLLABUS -->
         <div id="syllabus-tab" class="tab-content hidden">
             <style>
@@ -4789,7 +4795,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                         <strong id="chessChampionWhiteName">White player</strong>
                         <label class="chess-champion-desk-field">
                             <span id="chessChampionWhiteKillLabel">Kill points</span>
-                            <input id="chessChampionWhiteKillPoints" type="number" min="0" max="1000" step="1" inputmode="numeric" oninput="previewChessChampionEndMatch()">
+                            <input id="chessChampionWhiteKillPoints" type="number" min="-1000" max="1000" step="any" inputmode="numeric" oninput="previewChessChampionEndMatch()">
                         </label>
                     </section>
 
@@ -4809,7 +4815,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                         <strong id="chessChampionBlackName">Black player</strong>
                         <label class="chess-champion-desk-field">
                             <span id="chessChampionBlackKillLabel">Kill points</span>
-                            <input id="chessChampionBlackKillPoints" type="number" min="0" max="1000" step="1" inputmode="numeric" oninput="previewChessChampionEndMatch()">
+                            <input id="chessChampionBlackKillPoints" type="number" min="-1000" max="1000" step="any" inputmode="numeric" oninput="previewChessChampionEndMatch()">
                         </label>
                     </section>
                 </div>
@@ -13449,12 +13455,12 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             const result = results.includes(String(match.result || '').trim()) ? String(match.result || '').trim() : '';
             const awards = match.awards && typeof match.awards === 'object' ? match.awards : {};
             const breakdown = match.breakdown && typeof match.breakdown === 'object' ? match.breakdown : {};
-            const legacyKillPoints = Math.max(0, chessChampionNumber(match.killPoints, 0));
+            const legacyKillPoints = chessChampionNumber(match.killPoints, 0);
             const rawKillPointsBySide = match.killPointsBySide && typeof match.killPointsBySide === 'object' ? match.killPointsBySide : {};
             const legacyWinnerSide = result === 'white' || result === 'black' ? result : '';
             const killPointsBySide = {
-                white: chessChampionBounded(rawKillPointsBySide.white, 0, 1000, legacyWinnerSide === 'white' ? legacyKillPoints : 0),
-                black: chessChampionBounded(rawKillPointsBySide.black, 0, 1000, legacyWinnerSide === 'black' ? legacyKillPoints : 0)
+                white: chessChampionBounded(rawKillPointsBySide.white, -1000, 1000, legacyWinnerSide === 'white' ? legacyKillPoints : 0),
+                black: chessChampionBounded(rawKillPointsBySide.black, -1000, 1000, legacyWinnerSide === 'black' ? legacyKillPoints : 0)
             };
             const whiteId = parseInt(match.whiteId, 10) || 0;
             const blackId = parseInt(match.blackId, 10) || 0;
@@ -14275,11 +14281,11 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
 
         function chessChampionNormalizeKillPointsBySide(match, killPointsBySide) {
             const source = killPointsBySide && typeof killPointsBySide === 'object' ? killPointsBySide : {};
-            const legacy = Math.max(0, chessChampionNumber(match && match.killPoints, 0));
+            const legacy = chessChampionNumber(match && match.killPoints, 0);
             const result = String(match && match.result || '').trim();
             return {
-                white: Math.max(0, chessChampionNumber(source.white, result === 'white' ? legacy : 0)),
-                black: Math.max(0, chessChampionNumber(source.black, result === 'black' ? legacy : 0))
+                white: chessChampionBounded(source.white, -1000, 1000, result === 'white' ? legacy : 0),
+                black: chessChampionBounded(source.black, -1000, 1000, result === 'black' ? legacy : 0)
             };
         }
 
@@ -14326,7 +14332,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             const black = chessChampionStudentMap().get(blackId);
             const scoring = state.scoring;
             const kills = chessChampionNormalizeKillPointsBySide(match, killPointsBySide);
-            const killBonus = side => Math.max(0, chessChampionNumber(kills[side], 0)) * scoring.killPointMultiplier;
+            const killBonus = side => chessChampionNumber(kills[side], 0) * scoring.killPointMultiplier;
             const drawBreakdown = side => {
                 const base = scoring.drawPoints;
                 const sideKillPoints = kills[side];
@@ -14833,23 +14839,16 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             Object.entries(values).forEach(([id, value]) => { const input = document.getElementById(id); if (input) input.value = value; });
             const formatSummary = document.getElementById('chessChampionFormatSummary');
             if (formatSummary) formatSummary.textContent = chessChampionFormatPath(state);
-            const nextRoundIds = new Set(['chessChampionQualificationCount', 'chessChampionSemifinalCount', 'chessChampionFinaleCount']);
             panel.querySelectorAll('[data-role-only="admin"]').forEach(el => {
-                if (el.closest('#chessChampionRoster') || el.closest('#chessChampionHistoricalCard')) {
-                    el.disabled = false;
+                if (el.closest('#chessChampionRoster')) {
+                    el.disabled = state.stage !== 'registration';
                     return;
                 }
-                if (nextRoundIds.has(el.id)) {
+                if (el.closest('#chessChampionHistoricalCard')) {
                     el.disabled = state.stage === 'complete';
                     return;
                 }
-                const onclick = String(el.getAttribute('onclick') || '');
-                const keepEnabled = el.matches('button') && (
-                    onclick.includes('advanceChessChampionTournament')
-                    || onclick.includes('resetChessChampionTournament')
-                    || onclick.includes('saveChessChampionNextRoundEntries')
-                );
-                el.disabled = state.stage !== 'registration' && !keepEnabled;
+                el.disabled = state.stage === 'complete';
             });
             renderChessChampionRoster(state);
             renderChessChampionHistoricalForm(state);
@@ -15008,8 +15007,8 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
         function saveChessChampionConfig() {
             if (!chessChampionAdminGuard()) return;
             const state = getChessChampionState();
-            if (state.stage !== 'registration') {
-                saveChessChampionNextRoundEntries();
+            if (state.stage === 'complete') {
+                showAlert('The event is complete. Reset or archive the event before saving new settings.', 'warning');
                 return;
             }
             const value = id => document.getElementById(id)?.value;
@@ -15022,7 +15021,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             state.scoring.standardWinSeconds = chessChampionBounded(Math.round(chessChampionNumber(value('chessChampionStandardMinutes'), 20) * 60), state.scoring.fastWinSeconds, 14400, state.scoring.standardWinSeconds);
             state.scoring.winPoints = chessChampionBounded(value('chessChampionWinPoints'), 0, 100, state.scoring.winPoints);
             state.scoring.drawPoints = chessChampionBounded(value('chessChampionDrawPoints'), 0, 100, state.scoring.drawPoints);
-            state.scoring.lossPoints = chessChampionBounded(value('chessChampionLossPoints'), 0, 100, state.scoring.lossPoints);
+            state.scoring.lossPoints = chessChampionBounded(value('chessChampionLossPoints'), -100, 100, state.scoring.lossPoints);
             state.scoring.classBonusPerLevel = chessChampionBounded(value('chessChampionClassBonus'), 0, 20, state.scoring.classBonusPerLevel);
             state.scoring.opponentBonusPerFivePoints = chessChampionBounded(value('chessChampionOpponentBonus'), 0, 20, state.scoring.opponentBonusPerFivePoints);
             state.scoring.fastTimeBonus = chessChampionBounded(value('chessChampionFastBonus'), 0, 50, state.scoring.fastTimeBonus);
@@ -15030,7 +15029,8 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             state.scoring.killPointMultiplier = chessChampionBounded(value('chessChampionKillMultiplier'), 0, 20, state.scoring.killPointMultiplier);
             saveChessChampionState(state);
             renderChessChampionTab();
-            showAlert('Excel Chess Champion settings saved.', 'success');
+            const stageLabel = chessChampionStageLabel(state.stage, state.round);
+            showAlert(`Excel Chess Champion settings saved for ${stageLabel}.`, 'success');
         }
 
         function advanceChessChampionTournament() {
@@ -15221,8 +15221,8 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
 
         function getChessChampionEndMatchValues() {
             return {
-                white: chessChampionBounded(document.getElementById('chessChampionWhiteKillPoints')?.value, 0, 1000, 0),
-                black: chessChampionBounded(document.getElementById('chessChampionBlackKillPoints')?.value, 0, 1000, 0),
+                white: chessChampionBounded(document.getElementById('chessChampionWhiteKillPoints')?.value, -1000, 1000, 0),
+                black: chessChampionBounded(document.getElementById('chessChampionBlackKillPoints')?.value, -1000, 1000, 0),
                 durationSeconds: chessChampionBounded(Math.round(chessChampionNumber(document.getElementById('chessChampionEndMatchDuration')?.value, 0) * 60), 0, 36000, 0)
             };
         }
@@ -20545,7 +20545,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             const isTeacher = roleIsTrusted && currentUserRole === 'teacher';
             const isStudent = roleIsTrusted && !isAdmin && !isTeacher;
             // Tabs visible to everyone (students, teachers, admins)
-            if (['scoreboard', 'group-scoreboard', 'information', 'rules', 'syllabus',
+            if (['scoreboard', 'group-scoreboard', 'information', 'rules', 'syllabus', 'excel-results',
                  'resources', 'excel-mela', 'team-competition', 'excel-chess-champion', 'awf', 'good-conduct',
                  'appeals', 'proposals', 'party-standings'].includes(tabName)) return true;
             // Student-only tabs
@@ -20582,6 +20582,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             setTabVisibility('information', true);
             setTabVisibility('rules', true);
             setTabVisibility('syllabus', true);
+            setTabVisibility('excel-results', true);
             setTabVisibility('resources', true);
             setTabVisibility('excel-mela', true);
             setTabVisibility('team-competition', true);

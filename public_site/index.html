@@ -11,6 +11,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Arvo:wght@400;700&display=swap" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="./excel_results/styles.css">
     <style>
         :root {
             --bg: #faf8f3;
@@ -1270,6 +1271,7 @@
             <button id="tabRanking" class="tab-btn" type="button">Ranking</button>
             <button id="tabParties" class="tab-btn" type="button">Parties</button>
             <button id="tabChess" class="tab-btn" type="button">Chess Champion</button>
+            <button id="tabExcelResults" class="tab-btn" type="button">Excel Results</button>
             <button id="tabInfo" class="tab-btn" type="button">Information</button>
         </nav>
     </header>
@@ -1500,6 +1502,10 @@
             </div>
         </section>
 
+        <section id="excelResultsPanel" class="panel panel-shell" aria-label="Excel Results">
+            <div id="excelResultsRoot"></div>
+        </section>
+
         <section id="infoPanel" class="panel panel-shell">
             <div class="login-gate" id="infoGate">
                 <div class="login-gate-icon">🔒</div>
@@ -1568,12 +1574,14 @@
         const tabRanking = document.getElementById('tabRanking');
         const tabParties = document.getElementById('tabParties');
         const tabChess = document.getElementById('tabChess');
+        const tabExcelResults = document.getElementById('tabExcelResults');
         const tabInfo = document.getElementById('tabInfo');
         const homePanel = document.getElementById('homePanel');
         const scoreboardPanel = document.getElementById('scoreboardPanel');
         const rankingPanel = document.getElementById('rankingPanel');
         const partiesPanel = document.getElementById('partiesPanel');
         const chessPanel = document.getElementById('chessPanel');
+        const excelResultsPanel = document.getElementById('excelResultsPanel');
         const infoPanel = document.getElementById('infoPanel');
 
         const loginModal = document.getElementById('loginModal');
@@ -2464,17 +2472,20 @@
             const isRanking = tabKey === 'ranking';
             const isParties = tabKey === 'parties';
             const isChess = tabKey === 'chess';
+            const isExcelResults = tabKey === 'excel-results';
             tabHome.classList.toggle('active', isHome);
             tabScoreboard.classList.toggle('active', isScoreboard);
             tabRanking.classList.toggle('active', isRanking);
             tabParties.classList.toggle('active', isParties);
             tabChess.classList.toggle('active', isChess);
+            tabExcelResults.classList.toggle('active', isExcelResults);
             tabInfo.classList.toggle('active', tabKey === 'info');
             homePanel.classList.toggle('active', isHome);
             scoreboardPanel.classList.toggle('active', isScoreboard);
             rankingPanel.classList.toggle('active', isRanking);
             partiesPanel.classList.toggle('active', isParties);
             chessPanel.classList.toggle('active', isChess);
+            excelResultsPanel.classList.toggle('active', isExcelResults);
             infoPanel.classList.toggle('active', tabKey === 'info');
             if (isHome) {
                 document.querySelectorAll('.appear').forEach((el, idx) => {
@@ -2513,6 +2524,10 @@
             if (!isLoggedIn()) { activeTab = 'chess'; openLoginModal(); return; }
             setActiveTab('chess');
         });
+        tabExcelResults.addEventListener('click', () => {
+            setActiveTab('excel-results');
+            if (String(location.hash || '').indexOf('#er') !== 0) location.hash = '#er/';
+        });
         tabInfo.addEventListener('click', () => {
             if (!isLoggedIn()) { openLoginModal(); return; }
             setActiveTab('info');
@@ -2531,7 +2546,8 @@
         document.getElementById('infoLoginLink').addEventListener('click', openLoginModal);
 
         // ── Init ──
-        setActiveTab('home');
+        if (String(location.hash || '').indexOf('#er') === 0) setActiveTab('excel-results');
+        else setActiveTab('home');
         applyAuthState();
         requestAnimationFrame(() => {
             document.querySelectorAll('.appear').forEach((el, idx) => {
@@ -2583,5 +2599,14 @@
         themeBtn.addEventListener('click', () => { isDark = !isDark; applyTheme(); });
         applyTheme();
     </script>
+    <script>
+        window.EA_EXCEL_RESULTS_CONFIG = {
+            mode: 'public',
+            catalogUrl: './excel_results/catalog.json',
+            filesBase: './excel_results/files/',
+            requireAuthForResults: true
+        };
+    </script>
+    <script src="./excel_results/app.js"></script>
 </body>
 </html>
