@@ -461,7 +461,8 @@
             padding: 10px 12px;
             border-bottom: 2px solid var(--line);
             text-align: left;
-            color: var(--muted);
+            color: #1e293b;
+            font-weight: 700;
             font-size: 12px;
             text-transform: uppercase;
             letter-spacing: .5px;
@@ -760,7 +761,13 @@
         body.dark .panel-shell { background: #050505; border-color: rgba(34,197,94,.16); }
         body.dark .controls { background: #0a0a0a; border-bottom-color: rgba(255,255,255,.07); }
         body.dark .scoreboard-table { background: #000; }
-        body.dark .scoreboard-table th,
+        body.dark .scoreboard-table th {
+            background: rgba(15, 23, 18, 0.98);
+            backdrop-filter: blur(8px);
+            color: #94a3b8;
+            font-weight: 700;
+            border-bottom: 2px solid rgba(255,255,255,.14);
+        }
         body.dark .scoreboard-table td { border-bottom-color: rgba(255,255,255,.06); }
         body.dark .info-item { background: #080808; border-color: rgba(255,255,255,.08); }
         body.dark .info-box { background: #040404; border-color: rgba(255,255,255,.07); }
@@ -1084,201 +1091,6 @@
         body.dark .party-modal-stat { background: #111; border-color: rgba(255,255,255,.07); }
         .party-modal-stat .stat-val {
             font: 800 1.25rem/1 "Poppins", sans-serif; color: var(--party-label, var(--party-color, var(--primary)));
-        }
-        .party-modal-stat .stat-label {
-            font: 600 .62rem/1 "Poppins", sans-serif; color: var(--muted);
-            margin-top: 5px; text-transform: uppercase; letter-spacing: .5px;
-        }
-        .party-modal-powerbar-wrap { padding: 0 20px 16px; }
-        .party-modal-powerbar-label {
-            display: flex; justify-content: space-between; align-items: baseline;
-            font: 600 .72rem/1 "Poppins", sans-serif; color: var(--muted); margin-bottom: 6px;
-        }
-        .party-modal-powerbar {
-            position: relative; height: 14px; border-radius: 999px; overflow: hidden;
-            background: var(--surface-2); border: 1px solid var(--line);
-        }
-        body.dark .party-modal-powerbar { background: #111; border-color: rgba(255,255,255,.08); }
-        .party-modal-powerbar .powerbar-fill {
-            position: absolute; left: 0; top: 0; bottom: 0; width: 0%;
-            background: linear-gradient(90deg, #22c55e 0%, #16a34a 60%, #15803d 100%);
-            border-radius: 999px;
-            transition: width 1.2s cubic-bezier(.22,1,.36,1);
-            box-shadow: 0 0 12px rgba(34,197,94,.5);
-        }
-        .party-modal-powerbar .powerbar-fill::after {
-            content: ''; position: absolute; inset: 0;
-            background: linear-gradient(90deg, transparent, rgba(255,255,255,.4), transparent);
-            animation: partyPowerShine 2s linear infinite;
-        }
-        @keyframes partyPowerShine { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
-        .party-modal-section-title {
-            font: 700 .78rem/1 "Poppins", sans-serif; color: var(--primary);
-            text-transform: uppercase; letter-spacing: .6px;
-            padding: 4px 20px 10px; margin: 0;
-        }
-        .party-modal-members { list-style: none; margin: 0; padding: 0 16px 22px; }
-        .party-modal-member {
-            display: flex; align-items: center; gap: 12px;
-            padding: 10px 12px; margin-bottom: 8px; border-radius: 12px;
-            background: var(--surface-2); border: 1px solid var(--line);
-            animation: partyMemberIn .4s ease backwards;
-        }
-        body.dark .party-modal-member { background: #0d0d0d; border-color: rgba(255,255,255,.07); }
-        .party-modal-member .m-avatar {
-            flex: 0 0 38px; width: 38px; height: 38px; border-radius: 50%;
-            display: grid; place-items: center;
-            font: 800 .85rem/1 "Poppins", sans-serif; color: #fff;
-            background: var(--party-color, var(--primary));
-            box-shadow: 0 0 12px color-mix(in srgb, var(--party-color, #1a4d2e) 45%, transparent);
-        }
-        .party-modal-member .m-info {
-            flex: 1 1 auto; min-width: 0; padding: 1px 4px 1px 0;
-        }
-        .party-modal-member .m-name {
-            display: block;
-            font: 700 .9rem/1.25 "Poppins", sans-serif; color: var(--text);
-            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-        }
-        .party-modal-member .m-sub {
-            display: flex; align-items: center; flex-wrap: wrap; gap: 7px;
-            margin-top: 5px;
-            color: var(--muted);
-        }
-        .party-modal-member .m-roll {
-            display: inline-block;
-            font-family: "Arial Narrow", "Roboto Condensed", "Segoe UI", Arial, sans-serif;
-            font-size: .68rem; font-weight: 700; font-stretch: condensed; line-height: 1.1;
-            letter-spacing: .08em; color: var(--text); text-transform: uppercase;
-            white-space: nowrap;
-        }
-        .party-modal-member .m-class {
-            display: inline-block;
-            font: 400 .68rem/1.1 "Lora", Georgia, serif;
-            white-space: nowrap;
-        }
-        .party-modal-member .m-role {
-            flex: 0 0 auto; font: 700 .62rem/1 "Poppins", sans-serif;
-            padding: 4px 9px; border-radius: 999px; text-transform: uppercase; letter-spacing: .4px;
-            background: color-mix(in srgb, var(--party-color, #1a4d2e) 14%, transparent);
-            color: var(--party-label, var(--party-color, var(--primary)));
-            border: 1px solid color-mix(in srgb, var(--party-color, #1a4d2e) 28%, transparent);
-        }
-        .party-modal-member .m-score {
-            flex: 0 0 auto; min-width: 54px; padding-left: 10px;
-            text-align: right; border-left: 1px solid var(--line);
-        }
-        .party-modal-member .m-score .m-score-val {
-            display: block;
-            font: 800 1rem/1 "Poppins", sans-serif; color: var(--party-label, var(--party-color, var(--primary)));
-            white-space: nowrap;
-        }
-        .party-modal-member .m-score .m-vp {
-            display: block; margin-top: 5px;
-            font: 600 .62rem/1 "Poppins", sans-serif; color: var(--muted);
-            letter-spacing: .04em; white-space: nowrap;
-        }
-        @keyframes partyMemberIn { from { opacity: 0; transform: translateX(-14px); } to { opacity: 1; transform: translateX(0); } }
-        .party-modal-close {
-            position: absolute; top: 14px; right: 14px; z-index: 4;
-            width: 34px; height: 34px; border-radius: 50%;
-            display: grid; place-items: center; cursor: pointer;
-            background: rgba(0,0,0,.35); color: #fff; border: none;
-            font-size: 1.1rem; line-height: 1;
-            transition: background .2s, transform .2s;
-        }
-        .party-modal-close:hover { background: rgba(0,0,0,.6); transform: rotate(90deg); }
-        .party-modal-empty { text-align: center; color: var(--muted); padding: 50px 20px; font-size: .9rem; }
-        @media (max-width: 480px) {
-            .party-modal-stats { grid-template-columns: repeat(2, 1fr); }
-            .party-modal-member .m-role { display: none; }
-        }
-        /* Chess Champion — light theme default */
-        #chessPanel .public-chess-shell { position: relative; overflow: hidden; padding: 18px; background: radial-gradient(circle at 10% 0%, rgba(212,175,55,.14), transparent 38%), radial-gradient(circle at 90% 100%, rgba(26,77,46,.10), transparent 40%), linear-gradient(145deg, var(--surface-2), var(--bg) 52%, #fff); color: var(--text); }
-        #chessPanel .public-chess-hero { position: relative; overflow: hidden; padding: 44px 22px 34px; border: 1px solid rgba(26,77,46,.18); border-radius: 22px; text-align: center; background: radial-gradient(circle at 82% 15%, rgba(247,147,30,.12), transparent 40%), linear-gradient(145deg, #fff, var(--surface-2)); box-shadow: 0 18px 48px rgba(26,77,46,.12); }
-        #chessPanel .public-chess-hero::after { content: ''; position: absolute; inset: 0; pointer-events: none; background-image: linear-gradient(rgba(26,77,46,.04) 1px, transparent 1px), linear-gradient(90deg, rgba(26,77,46,.04) 1px, transparent 1px); background-size: 34px 34px; mask-image: linear-gradient(130deg, #000, transparent 80%); }
-        #chessPanel .public-chess-kicker { position: relative; z-index: 1; color: var(--gold); font: 900 .66rem/1.2 "Poppins", sans-serif; letter-spacing: .18em; text-transform: uppercase; }
-        #chessPanel .public-chess-kicker i { margin-right: 6px; animation: publicChessFloat 3s ease-in-out infinite; }
-        #chessPanel .public-chess-hero h2 { position: relative; z-index: 1; margin: 12px 0 8px; color: var(--primary); font: 900 clamp(2rem, 5vw, 4.3rem)/.98 "Poppins", sans-serif; letter-spacing: .02em; }
-        #chessPanel .public-chess-hero p { position: relative; z-index: 1; max-width: 650px; margin: 0 auto; color: var(--muted); font-size: .96rem; line-height: 1.6; }
-        #chessPanel .public-chess-stage { position: relative; z-index: 1; display: flex; justify-content: center; flex-wrap: wrap; gap: 7px; margin-top: 22px; }
-        #chessPanel .public-chess-stage span { padding: 7px 10px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); background: rgba(255,255,255,.85); font: 800 .62rem/1 "Poppins", sans-serif; letter-spacing: .08em; text-transform: uppercase; }
-        #chessPanel .public-chess-stage span.is-active { border-color: rgba(212,175,55,.65); color: var(--primary); background: rgba(212,175,55,.15); box-shadow: 0 0 18px rgba(212,175,55,.12); }
-        #chessPanel .public-chess-stage span.is-passed { border-color: rgba(26,77,46,.35); color: var(--primary); background: rgba(26,77,46,.08); }
-        #chessPanel .public-chess-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin: 14px 0; }
-        #chessPanel .public-chess-stat { min-height: 95px; padding: 13px; border: 1px solid var(--line); border-radius: 15px; background: var(--surface); border-left: 4px solid var(--primary); animation: publicChessCardIn .5s cubic-bezier(.16,1,.3,1) both; }
-        #chessPanel .public-chess-stat:nth-child(2) { border-left-color: var(--secondary); }
-        #chessPanel .public-chess-stat:nth-child(3) { border-left-color: var(--gold); }
-        #chessPanel .public-chess-stat:nth-child(4) { border-left-color: var(--accent); }
-        #chessPanel .public-chess-stat i { display: block; margin-bottom: 9px; color: var(--gold); }
-        #chessPanel .public-chess-stat small { display: block; color: var(--muted); font: 700 .62rem/1.2 "Poppins", sans-serif; letter-spacing: .08em; text-transform: uppercase; }
-        #chessPanel .public-chess-stat strong { display: block; overflow: hidden; margin-top: 5px; color: var(--text); font: 900 1.1rem/1.15 "Poppins", sans-serif; text-overflow: ellipsis; white-space: nowrap; }
-        #chessPanel .public-chess-stat span { display: block; margin-top: 5px; color: var(--muted); font-size: .69rem; }
-        #chessPanel .public-chess-grid { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(300px, .9fr); gap: 14px; }
-        #chessPanel .public-chess-card { overflow: hidden; border: 1px solid var(--line); border-radius: 18px; background: var(--surface); box-shadow: 0 12px 32px rgba(26,77,46,.08); }
-        #chessPanel .public-chess-card-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; padding: 15px 16px 12px; border-bottom: 1px solid var(--line); background: rgba(244,240,232,.5); }
-        #chessPanel .public-chess-card-heading small { display: block; color: var(--gold); font: 900 .6rem/1.2 "Poppins", sans-serif; letter-spacing: .14em; text-transform: uppercase; }
-        #chessPanel .public-chess-card-heading strong { display: block; margin-top: 4px; color: var(--text); font: 900 1rem/1.2 "Poppins", sans-serif; }
-        #chessPanel .public-chess-card-heading > span:last-child,
-        #chessPanel .public-chess-card-heading > i { color: var(--muted); font-size: .68rem; }
-        #chessPanel .public-chess-card-heading > i { color: var(--gold); font-size: 1rem; }
-        #chessPanel .public-chess-table-wrap { overflow-x: auto; }
-        #chessPanel .public-chess-table { width: 100%; min-width: 560px; border-collapse: collapse; font-family: "Poppins", "Segoe UI", sans-serif; }
-        #chessPanel .public-chess-table th { padding: 9px 10px; color: var(--muted); background: var(--surface-2); font-size: .59rem; letter-spacing: .1em; text-align: left; text-transform: uppercase; }
-        #chessPanel .public-chess-table td { padding: 10px; border-top: 1px solid var(--line); color: var(--text); font-size: .72rem; }
-        #chessPanel .public-chess-table tbody tr { animation: publicChessRowIn .45s cubic-bezier(.16,1,.3,1) both; }
-        #chessPanel .public-chess-table tbody tr:hover { background: rgba(26,77,46,.04); }
-        #chessPanel .public-chess-table tbody tr:nth-child(1) { background: linear-gradient(105deg, rgba(212,175,55,.18) 0%, transparent 70%); }
-        #chessPanel .public-chess-table tbody tr:nth-child(2) { background: linear-gradient(105deg, rgba(148,163,184,.14) 0%, transparent 70%); }
-        #chessPanel .public-chess-table tbody tr:nth-child(3) { background: linear-gradient(105deg, rgba(247,147,30,.14) 0%, transparent 70%); }
-        #chessPanel .public-chess-rank { display: grid; width: 25px; height: 25px; place-items: center; border: 1px solid var(--line); border-radius: 50%; color: var(--muted); font-weight: 900; }
-        #chessPanel .public-chess-table tbody tr:nth-child(1) .public-chess-rank { border-color: var(--gold); color: var(--gold); }
-        #chessPanel .public-chess-table tbody tr:nth-child(2) .public-chess-rank { border-color: #94a3b8; color: #64748b; }
-        #chessPanel .public-chess-table tbody tr:nth-child(3) .public-chess-rank { border-color: var(--secondary); color: var(--secondary); }
-        #chessPanel .public-chess-name { display: block; color: var(--text); font-weight: 800; }
-        #chessPanel .public-chess-sub { display: block; margin-top: 3px; color: var(--muted); font-size: .6rem; }
-        #chessPanel .public-chess-points { color: var(--gold); font-size: .98rem; font-weight: 950; }
-        #chessPanel .public-chess-matches { max-height: 560px; overflow-y: auto; padding: 12px; }
-        #chessPanel .public-chess-round-group + .public-chess-round-group { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
-        #chessPanel .public-chess-round-title { margin: 0 0 9px; color: var(--primary); font: 900 .62rem/1.2 "Poppins", sans-serif; letter-spacing: .12em; text-transform: uppercase; }
-        #chessPanel .public-chess-match.is-admin-origin { border-color: rgba(212,175,55,.45); }
-        #chessPanel .public-chess-match.is-admin-origin .public-chess-match-top b { color: var(--gold); }
-        #chessPanel .public-chess-match.is-complete { border-color: rgba(26,77,46,.35); }
-        #chessPanel .public-chess-match { margin-bottom: 9px; padding: 11px; border: 1px solid rgba(99,102,241,.18); border-radius: 13px; background: var(--surface-2); animation: publicChessMatchIn .48s cubic-bezier(.16,1,.3,1) both; }
-        #chessPanel .public-chess-match:last-child { margin-bottom: 0; }
-        #chessPanel .public-chess-match-top { display: flex; justify-content: space-between; color: var(--muted); font: 800 .58rem/1.2 "Poppins", sans-serif; letter-spacing: .1em; text-transform: uppercase; }
-        #chessPanel .public-chess-match-top b { color: var(--primary); }
-        #chessPanel .public-chess-versus { display: grid; grid-template-columns: minmax(0, 1fr) 25px minmax(0, 1fr); align-items: center; gap: 5px; margin-top: 10px; }
-        #chessPanel .public-chess-versus > span { color: var(--gold); font-size: .58rem; font-weight: 900; text-align: center; }
-        #chessPanel .public-chess-versus > div:last-child { text-align: right; }
-        #chessPanel .public-chess-versus > div:last-child .public-chess-player { align-items: flex-end; }
-        #chessPanel .public-chess-player { display: inline-flex; align-items: flex-start; flex-direction: column; gap: 3px; color: var(--text); font-size: .68rem; font-weight: 800; }
-        #chessPanel .public-chess-player.is-winner { color: var(--primary); }
-        #chessPanel .public-chess-player small { color: var(--muted); font-size: .58rem; font-weight: 600; }
-        #chessPanel .public-chess-match-note { margin-top: 9px; color: var(--muted); font-size: .62rem; }
-        #chessPanel .public-chess-bracket-card { margin-top: 14px; }
-        #chessPanel .public-chess-bracket { display: flex; gap: 11px; overflow-x: auto; padding: 14px; }
-        #chessPanel .public-chess-bracket-column { min-width: 205px; flex: 1 0 205px; }
-        #chessPanel .public-chess-bracket-column h4 { margin: 0 0 9px; color: var(--gold); font: 900 .62rem/1.2 "Poppins", sans-serif; letter-spacing: .13em; text-transform: uppercase; }
-        #chessPanel .public-chess-bracket-match { margin-bottom: 9px; padding: 9px; border: 1px solid rgba(99,102,241,.18); border-radius: 12px; background: var(--surface-2); animation: publicChessBracketIn .5s cubic-bezier(.16,1,.3,1) both; }
-        #chessPanel .public-chess-bracket-match > small { display: block; margin-bottom: 5px; color: var(--muted); font-size: .56rem; }
-        #chessPanel .public-chess-bracket-player { display: flex; justify-content: space-between; gap: 6px; padding: 7px 5px; color: var(--text); font: 700 .65rem/1.2 "Poppins", sans-serif; }
-        #chessPanel .public-chess-bracket-player + .public-chess-bracket-player { border-top: 1px solid var(--line); }
-        #chessPanel .public-chess-bracket-player.is-winner { color: var(--primary); }
-        #chessPanel .public-chess-bracket-player b { color: var(--primary); }
-        #chessPanel .public-chess-bracket-status { margin-top: 6px; color: var(--muted); font-size: .57rem; }
-        #chessPanel .public-chess-series-card { margin-top: 14px; }
-        #chessPanel .public-chess-series-list { padding: 12px; }
-        #chessPanel .public-chess-series-item { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-2); }
-        #chessPanel .public-chess-series-item + .public-chess-series-item { margin-top: 8px; }
-        #chessPanel .public-chess-series-item strong { display: block; color: var(--text); font-size: .68rem; }
-        #chessPanel .public-chess-series-item small { display: block; margin-top: 3px; color: var(--muted); font-size: .58rem; }
-        #chessPanel .public-chess-series-item > span { color: var(--gold); font-size: .64rem; font-weight: 800; text-align: right; }
-        #chessPanel .public-chess-empty { padding: 42px 18px; color: var(--muted); font: 700 .76rem/1.5 "Poppins", sans-serif; text-align: center; }
-        #chessPanel .public-chess-empty i { display: block; margin-bottom: 10px; color: var(--gold); font-size: 1.8rem; }
-        @keyframes publicChessFloat { 0%, 100% { transform: translateY(0) rotate(-5deg); } 50% { transform: translateY(-5px) rotate(5deg); } }
-        @keyframes publicChessCardIn { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
-        @keyframes publicChessRowIn { from { opacity: 0; transform: translateX(-8px); } to { opacity: 1; transform: translateX(0); } }
         }
         .party-modal-stat .stat-label {
             font: 600 .62rem/1 "Poppins", sans-serif; color: var(--muted);
