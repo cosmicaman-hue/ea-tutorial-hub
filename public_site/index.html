@@ -2491,12 +2491,10 @@ function renderInfo(data) {
                 } else if (item.layout === 'planner' && item.planner_data) {
                     body = '<div class="info-boxes">' + renderPublicPlannerHtml(item.planner_data) + '</div>';
                 } else if (item.content) {
-                    const boxes = String(item.content).split('
-').filter(line => line.trim()).map(line =>
+                    const boxes = String(item.content).split('\n').filter(line => line.trim()).map(line =>
                         '<div class="info-box">' + escapeHtml(line) + '</div>'
                     ).join('');
-                    body = '<div class="info-boxes">' + (boxes || '<div class="info-box">' + escapeHtml(item.content).replace(/
-/g, '<br>') + '</div>') + '</div>';
+                    body = '<div class="info-boxes">' + (boxes || '<div class="info-box">' + escapeHtml(item.content).replace(/\n/g, '<br>') + '</div>') + '</div>';
                 }
                 let attach = '';
                 if (item.attachment && item.attachment.data_url) {
