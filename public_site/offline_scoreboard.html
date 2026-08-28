@@ -1186,6 +1186,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
         <button class="sidebar-nav-item" data-tab="excel-mela" onclick="switchTab('excel-mela')" title="Excel Mela"><i class="fas fa-gift" style="color:#d946ef"></i><span class="sidebar-link-text">Excel Mela</span></button>
         <button class="sidebar-nav-item" data-tab="syllabus" onclick="switchTab('syllabus')" title="Syllabus"><i class="fas fa-book-open" style="color:#06b6d4"></i><span class="sidebar-link-text">Syllabus</span></button>
         <button class="sidebar-nav-item" data-tab="excel-results" onclick="switchTab('excel-results')" title="Excel Results"><i class="fas fa-file-lines" style="color:#22c55e"></i><span class="sidebar-link-text">Excel Results</span></button>
+        <button class="sidebar-nav-item" data-tab="excel-study-notes" onclick="switchTab('excel-study-notes')" title="Excel Study Notes"><i class="fas fa-book" style="color:#ef4444"></i><span class="sidebar-link-text">Excel Study Notes</span></button>
         <button class="sidebar-nav-item" data-tab="rules" onclick="switchTab('rules')" title="Rules"><i class="fas fa-scroll" style="color:#22d3ee"></i><span class="sidebar-link-text">Rules</span></button>
         <button class="sidebar-nav-item" data-tab="information" onclick="switchTab('information')" title="Information"><i class="fas fa-circle-info" style="color:#67e8f9"></i><span class="sidebar-link-text">Information</span></button>
         <div class="sidebar-section-label">Rankings</div>
@@ -1836,6 +1837,9 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             </button>
             <button class="tab-button" onclick="switchTab('syllabus')" style="--tab-icon: #06b6d4;">
                 <i class="fas fa-book-open"></i> Syllabus
+            </button>
+            <button class="tab-button" onclick="switchTab('excel-study-notes')" style="--tab-icon: #ef4444;">
+                <i class="fas fa-book"></i> Excel Study Notes
             </button>
             <button class="tab-button" onclick="switchTab('rules')" style="--tab-icon: #22d3ee;">
                 <i class="fas fa-scroll"></i> Rules
@@ -3582,6 +3586,11 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
         <!-- TAB: EXCEL RESULTS -->
         <div id="excel-results-tab" class="tab-content hidden">
             <iframe id="excelResultsFrame" title="Excel Results" src="/scoreboard/excel-results" style="width:100%;min-height:78vh;border:0;border-radius:18px;background:transparent"></iframe>
+        </div>
+
+        <!-- TAB: EXCEL STUDY NOTES -->
+        <div id="excel-study-notes-tab" class="tab-content hidden">
+            <iframe id="excelStudyNotesFrame" title="Excel Study Notes" src="/scoreboard/excel-study-notes" style="width:100%;min-height:82vh;border:0;border-radius:18px;background:transparent"></iframe>
         </div>
 
         <!-- TAB: SYLLABUS -->
@@ -20545,7 +20554,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             const isTeacher = roleIsTrusted && currentUserRole === 'teacher';
             const isStudent = roleIsTrusted && !isAdmin && !isTeacher;
             // Tabs visible to everyone (students, teachers, admins)
-            if (['scoreboard', 'group-scoreboard', 'information', 'rules', 'syllabus', 'excel-results',
+            if (['scoreboard', 'group-scoreboard', 'information', 'rules', 'syllabus', 'excel-results', 'excel-study-notes',
                  'resources', 'excel-mela', 'team-competition', 'excel-chess-champion', 'awf', 'good-conduct',
                  'appeals', 'proposals', 'party-standings'].includes(tabName)) return true;
             // Student-only tabs
@@ -20583,6 +20592,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             setTabVisibility('rules', true);
             setTabVisibility('syllabus', true);
             setTabVisibility('excel-results', true);
+            setTabVisibility('excel-study-notes', true);
             setTabVisibility('resources', true);
             setTabVisibility('excel-mela', true);
             setTabVisibility('team-competition', true);

@@ -30,3 +30,29 @@
 /excel_results/files/*
   Cache-Control: public, max-age=3600, must-revalidate
 
+/excel_results/files/*.html
+  Content-Security-Policy: sandbox; default-src 'none'; img-src 'self' data: blob:; style-src 'unsafe-inline'; font-src data:
+
+/excel_results/files/*.htm
+  Content-Security-Policy: sandbox; default-src 'none'; img-src 'self' data: blob:; style-src 'unsafe-inline'; font-src data:
+
+/excel_results/files/*.svg
+  Content-Security-Policy: sandbox; default-src 'none'; img-src 'self' data: blob:; style-src 'unsafe-inline'; font-src data:
+
+/excel_study_notes/catalog.json
+  Cache-Control: no-store, no-cache, must-revalidate, max-age=0
+  Pragma: no-cache
+  Expires: 0
+
+/excel_study_notes/app.js
+  Cache-Control: no-cache, must-revalidate, max-age=0
+
+/excel_study_notes/styles.css
+  Cache-Control: public, max-age=3600, must-revalidate
+
+/excel_study_notes/files/*
+  Cache-Control: no-store, no-cache, must-revalidate, max-age=0
+  Content-Disposition: inline
+  X-Content-Type-Options: nosniff
+  Content-Security-Policy: frame-ancestors 'self'
+

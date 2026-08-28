@@ -1,6 +1,7 @@
 {
   "version": 1,
-  "updated_at": "2026-08-27T16:16:40Z",
+  "revision": 1,
+  "updated_at": "2026-08-28T14:58:14Z",
   "groups": [
     {
       "id": "grp-a",
@@ -17,86 +18,19 @@
               "id": "sub-a6-math",
               "name": "Mathematics",
               "sort_order": 0,
-              "papers": [
-                {
-                  "id": "paper-a6-math-2",
-                  "title": "Paper 2 — Fractions & Decimals",
-                  "description": "Printable PDF drill covering operations on fractions and unitary method.",
-                  "tags": [
-                    "term-1",
-                    "pdf",
-                    "fractions"
-                  ],
-                  "file_type": "pdf",
-                  "original_name": "class6-math-paper-2.pdf",
-                  "storage_key": "paper-a6-math-2.pdf",
-                  "size_bytes": 1737,
-                  "date_added": "2026-07-20",
-                  "previewable": true
-                }
-              ]
+              "papers": []
             },
             {
               "id": "sub-a6-sci",
               "name": "Science",
               "sort_order": 1,
-              "papers": [
-                {
-                  "id": "paper-a6-sci-1",
-                  "title": "Paper 1 — Plant & Animal Cells (Diagram Sheet)",
-                  "description": "Visual study diagram and question set for cellular structures and functions.",
-                  "tags": [
-                    "biology",
-                    "diagram",
-                    "svg"
-                  ],
-                  "file_type": "svg",
-                  "original_name": "class6-science-cell-diagram.svg",
-                  "storage_key": "paper-a6-sci-1.svg",
-                  "size_bytes": 1692,
-                  "date_added": "2026-07-22",
-                  "previewable": true
-                },
-                {
-                  "id": "paper-a6-sci-2",
-                  "title": "Paper 2 — Motion & Measurement of Distances",
-                  "description": "Comprehensive question paper on standard units, rectilinear motion, and velocity.",
-                  "tags": [
-                    "physics",
-                    "term-1",
-                    "pdf"
-                  ],
-                  "file_type": "pdf",
-                  "original_name": "class6-science-motion.pdf",
-                  "storage_key": "paper-a6-sci-2.pdf",
-                  "size_bytes": 1735,
-                  "date_added": "2026-07-25",
-                  "previewable": true
-                }
-              ]
+              "papers": []
             },
             {
               "id": "sub-a6-eng",
               "name": "English",
               "sort_order": 2,
-              "papers": [
-                {
-                  "id": "paper-a6-eng-1",
-                  "title": "Paper 1 — Grammar & Reading Comprehension",
-                  "description": "Word document covering tenses, active/passive voice, and unseen passage exercises.",
-                  "tags": [
-                    "grammar",
-                    "reading",
-                    "docx"
-                  ],
-                  "file_type": "docx",
-                  "original_name": "class6-english-comprehension.docx",
-                  "storage_key": "paper-a6-eng-1.docx",
-                  "size_bytes": 956,
-                  "date_added": "2026-07-28",
-                  "previewable": false
-                }
-              ]
+              "papers": []
             }
           ]
         },
@@ -109,47 +43,13 @@
               "id": "sub-a7-math",
               "name": "Mathematics",
               "sort_order": 0,
-              "papers": [
-                {
-                  "id": "paper-a7-math-1",
-                  "title": "Paper 1 — Integers & Algebraic Expressions",
-                  "description": "Practice set covering rules of integer signs, linear equations, and exponents.",
-                  "tags": [
-                    "algebra",
-                    "integers",
-                    "pdf"
-                  ],
-                  "file_type": "pdf",
-                  "original_name": "class7-math-algebra.pdf",
-                  "storage_key": "paper-a7-math-1.pdf",
-                  "size_bytes": 1739,
-                  "date_added": "2026-08-02",
-                  "previewable": true
-                }
-              ]
+              "papers": []
             },
             {
               "id": "sub-a7-sci",
               "name": "Science",
               "sort_order": 1,
-              "papers": [
-                {
-                  "id": "paper-a7-sci-1",
-                  "title": "Paper 1 — Nutrition in Plants & Animals",
-                  "description": "Interactive HTML paper on photosynthesis, digestive systems, and nutrient absorption.",
-                  "tags": [
-                    "biology",
-                    "nutrition",
-                    "html"
-                  ],
-                  "file_type": "html",
-                  "original_name": "class7-science-nutrition.html",
-                  "storage_key": "paper-a7-sci-1.html",
-                  "size_bytes": 908,
-                  "date_added": "2026-08-04",
-                  "previewable": true
-                }
-              ]
+              "papers": []
             }
           ]
         }
@@ -170,23 +70,7 @@
               "id": "sub-b6-math",
               "name": "Mathematics",
               "sort_order": 0,
-              "papers": [
-                {
-                  "id": "paper-b6-math-1",
-                  "title": "Paper 1 — Geometry & Mensuration Basics",
-                  "description": "Basic angles, triangles, polygons, and perimeter drill.",
-                  "tags": [
-                    "geometry",
-                    "pdf"
-                  ],
-                  "file_type": "pdf",
-                  "original_name": "groupB-class6-geometry.pdf",
-                  "storage_key": "paper-b6-math-1.pdf",
-                  "size_bytes": 1732,
-                  "date_added": "2026-08-05",
-                  "previewable": true
-                }
-              ]
+              "papers": []
             }
           ]
         }

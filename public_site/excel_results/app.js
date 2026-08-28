@@ -14,6 +14,15 @@
     }
   }
 
+  function publicAuthRoll() {
+    try {
+      const auth = JSON.parse(localStorage.getItem('ea_public_auth') || 'null');
+      return String(auth && auth.roll || '').trim().toLowerCase();
+    } catch (e) {
+      return '';
+    }
+  }
+
   const cfg = Object.assign({
     mode: 'public',
     catalogUrl: './excel_results/catalog.json',
@@ -23,6 +32,7 @@
     adminCatalogUrl: '',
     uploadUrl: '',
     importResultsUrl: '',
+    previewResultsUrl: '',
     importCatalogUrl: '',
     exportUrl: '',
     publishUrl: '',
@@ -50,6 +60,8 @@
     previewPaper: null,
     formError: '',
     csvPreviewRows: null,
+    csvFile: null,
+    csrfToken: '',
   };
 
   function parseRoute() {
@@ -115,10 +127,20 @@
   }
 
   async function fetchJson(url, options) {
-    const resp = await fetch(url, Object.assign({ cache: 'no-store', credentials: 'same-origin' }, options || {}));
+    const opts = Object.assign({ cache: 'no-store', credentials: 'same-origin' }, options || {});
+    const method = String(opts.method || 'GET').toUpperCase();
+    if (method !== 'GET' && method !== 'HEAD' && state.csrfToken) {
+      const headers = new Headers(opts.headers || {});
+      headers.set('X-CSRFToken', state.csrfToken);
+      opts.headers = headers;
+    }
+    const resp = await fetch(url, opts);
     const data = await resp.json().catch(() => ({}));
     if (!resp.ok || data.success === false) {
-      throw new Error(data.error || ('HTTP ' + resp.status));
+      const error = new Error(data.error || ('HTTP ' + resp.status));
+      error.status = resp.status;
+      error.data = data;
+      throw error;
     }
     return data;
   }
@@ -414,7 +436,7 @@
     if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'].includes(t)) {
       viewportHtml = `<img alt="${esc(p.title)}" src="${esc(url)}">`;
     } else if (['html', 'htm', 'txt'].includes(t)) {
-      viewportHtml = `<iframe title="${esc(p.title)}" src="${esc(url)}" sandbox="allow-same-origin allow-scripts"></iframe>`;
+      viewportHtml = `<iframe title="${esc(p.title)}" src="${esc(url)}" sandbox=""></iframe>`;
     } else if (t === 'pdf') {
       viewportHtml = `<embed type="application/pdf" src="${esc(url)}#toolbar=1&navpanes=0">`;
     } else {
@@ -467,6 +489,8 @@
 
     const rows = filterResults(state.catalog.results || []);
     const groups = state.catalog.groups || [];
+    const classes = [];
+    groups.forEach((g) => (g.classes || []).forEach((c) => classes.push({ id: c.id, name: `${g.name} · ${c.name}` })));
     const sessions = state.catalog.sessions || [];
     const exams = state.catalog.examinations || [];
 
@@ -505,6 +529,8 @@
           <input aria-label="Search results" placeholder="Search by student name, roll number, registration, class, or exam..." value="${esc(state.resultQuery)}" data-result-q>
         </div>
         <select aria-label="Group filter" data-rf="group">${opt('', 'All Groups', state.resultFilters.group)}${groups.map((g) => opt(g.id, g.name, state.resultFilters.group)).join('')}</select>
+        <select aria-label="Class filter" data-rf="className">${opt('', 'All Classes', state.resultFilters.className)}${classes.map((c) => opt(c.id, c.name, state.resultFilters.className)).join('')}</select>
+        <select aria-label="Subject filter" data-rf="subject">${opt('', 'All Subjects', state.resultFilters.subject)}${uniqueResultSubjects(groups).map((s) => opt(s.id, s.name, state.resultFilters.subject)).join('')}</select>
         <select aria-label="Session filter" data-rf="session">${opt('', 'All Sessions', state.resultFilters.session)}${sessions.map((s) => opt(s.id, s.name, state.resultFilters.session)).join('')}</select>
         <select aria-label="Exam filter" data-rf="exam">${opt('', 'All Examinations', state.resultFilters.exam)}${exams.map((e) => opt(e.id, e.name, state.resultFilters.exam)).join('')}</select>
         <div class="er-view-toggle" aria-label="View toggle">
@@ -515,7 +541,7 @@
 
       <div class="er-results-summary-bar">
         <div class="er-summary-metrics">
-          <span class="er-metric-tag"><i class="fas fa-users"></i> Showing: <strong>${rows.length}</strong> candidates</span>
+          <span class="er-metric-tag"><i class="fas fa-users"></i> Showing: <strong>${uniqueResultCandidates(rows)}</strong> candidates</span>
           <span class="er-metric-tag"><i class="fas fa-chart-line"></i> Average: <strong>${avgPct}%</strong></span>
           <span class="er-metric-tag"><i class="fas fa-award"></i> Top Score: <strong>${topPct}</strong></span>
         </div>
@@ -612,8 +638,12 @@
 
   function filterResults(rows) {
     const q = state.resultQuery.trim().toLowerCase();
+    const ownRoll = cfg.mode === 'public' && cfg.requireAuthForResults && cfg.resultsScope === 'own' ? publicAuthRoll() : '';
     return rows.filter((r) => {
+      if (ownRoll && String(r.roll_number || '').trim().toLowerCase() !== ownRoll) return false;
       if (state.resultFilters.group && r.group_id !== state.resultFilters.group) return false;
+      if (state.resultFilters.className && r.class_id !== state.resultFilters.className) return false;
+      if (state.resultFilters.subject && r.subject_id !== state.resultFilters.subject) return false;
       if (state.resultFilters.session && r.session_id !== state.resultFilters.session) return false;
       if (state.resultFilters.exam && r.examination_id !== state.resultFilters.exam) return false;
       if (!q) return true;
@@ -628,6 +658,22 @@
         r.session_name,
       ].join(' ').toLowerCase().includes(q);
     });
+  }
+
+  function uniqueResultSubjects(groups) {
+    const seen = new Set();
+    const result = [];
+    groups.forEach((g) => (g.classes || []).forEach((c) => (c.subjects || []).forEach((s) => {
+      if (!seen.has(s.id)) {
+        seen.add(s.id);
+        result.push({ id: s.id, name: s.name });
+      }
+    })));
+    return result.sort((a, b) => String(a.name).localeCompare(String(b.name)));
+  }
+
+  function uniqueResultCandidates(rows) {
+    return new Set(rows.map((r) => String(r.roll_number || r.student_name || r.id || '').trim().toLowerCase())).size;
   }
 
   // ==========================================================================
@@ -811,7 +857,19 @@
       `).join('') || empty('Create groups, classes, and subjects in the Structure tab first.')}`;
   }
 
+  function selectOptions(items, value, labelKey = 'name') {
+    return opt('', '— Select —', value) + items.map((item) => opt(item.id, item[labelKey], value)).join('');
+  }
+
   function adminResults(cat) {
+    const preview = state.csvPreviewRows;
+    const groups = cat.groups || [];
+    const classes = [];
+    const subjects = [];
+    groups.forEach((g) => (g.classes || []).forEach((c) => {
+      classes.push({ id: c.id, name: `${g.name} · ${c.name}` });
+      (c.subjects || []).forEach((s) => subjects.push({ id: s.id, name: `${g.name} · ${c.name} · ${s.name}` }));
+    }));
     return `
       <div class="er-actions" style="margin-bottom:18px;">
         <button class="er-btn" type="button" data-add="result"><i class="fas fa-plus"></i> Add Single Result</button>
@@ -825,6 +883,18 @@
         <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;">
           <input type="file" accept=".csv,text/csv" data-import-csv>
         </div>
+        ${preview ? `
+          <div class="er-import-preview" style="margin-top:14px;padding:14px;border:1px solid var(--er-line);border-radius:12px;background:var(--er-surface);">
+            <strong>Import preview</strong>
+            <span class="er-muted" style="margin-left:8px;">${preview.row_count} rows · ${preview.valid_count} valid</span>
+            ${preview.issues.length ? `
+              <div class="er-error" style="margin-top:10px;"><i class="fas fa-circle-exclamation"></i> ${esc(preview.issues.slice(0, 8).join(' · '))}${preview.issues.length > 8 ? ' …' : ''}</div>
+              <p class="er-muted" style="margin:8px 0 0;">Nothing was written. Fix the CSV and preview it again.</p>
+            ` : `
+              <div class="er-success" style="margin-top:10px;"><i class="fas fa-circle-check"></i> All rows map to the current catalog and have valid marks.</div>
+              <button class="er-btn" type="button" style="margin-top:10px;" data-confirm-csv>Import ${preview.valid_count} rows</button>
+            `}
+          </div>` : ''}
       </div>
 
       <div class="er-table-wrap">
@@ -852,11 +922,11 @@
                 <td><input style="min-width:120px;" data-path="results.${i}.student_name" value="${esc(r.student_name || '')}"></td>
                 <td><input style="width:80px;" data-path="results.${i}.roll_number" value="${esc(r.roll_number || '')}"></td>
                 <td><input style="width:80px;" data-path="results.${i}.registration_number" value="${esc(r.registration_number || '')}"></td>
-                <td><input style="width:80px;" data-path="results.${i}.group_id" value="${esc(r.group_id || '')}"></td>
-                <td><input style="width:80px;" data-path="results.${i}.class_id" value="${esc(r.class_id || '')}"></td>
-                <td><input style="width:80px;" data-path="results.${i}.subject_id" value="${esc(r.subject_id || '')}"></td>
-                <td><input style="width:90px;" data-path="results.${i}.examination_id" value="${esc(r.examination_id || '')}"></td>
-                <td><input style="width:80px;" data-path="results.${i}.session_id" value="${esc(r.session_id || '')}"></td>
+                <td><select style="width:130px;" data-path="results.${i}.group_id">${selectOptions(groups, r.group_id || '')}</select></td>
+                <td><select style="width:150px;" data-path="results.${i}.class_id">${selectOptions(classes, r.class_id || '')}</select></td>
+                <td><select style="width:170px;" data-path="results.${i}.subject_id">${selectOptions(subjects, r.subject_id || '')}</select></td>
+                <td><select style="width:130px;" data-path="results.${i}.examination_id">${selectOptions(cat.examinations || [], r.examination_id || '')}</select></td>
+                <td><select style="width:110px;" data-path="results.${i}.session_id">${selectOptions(cat.sessions || [], r.session_id || '')}</select></td>
                 <td><input style="width:50px;" data-path="results.${i}.marks" value="${esc(r.marks == null ? '' : r.marks)}"></td>
                 <td><input style="width:50px;" data-path="results.${i}.max_marks" value="${esc(r.max_marks == null ? '' : r.max_marks)}"></td>
                 <td><input style="width:50px;" data-path="results.${i}.grade" value="${esc(r.grade || '')}"></td>
@@ -1012,14 +1082,27 @@
     try {
       const data = await fetchJson(cfg.adminCatalogUrl, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(state.adminCatalog && state.adminCatalog.revision != null ? { 'If-Match': String(state.adminCatalog.revision) } : {}),
+        },
         body: JSON.stringify(state.adminCatalog),
       });
       state.adminCatalog = data.data;
       toast('Changes saved successfully! Public snapshot updated on local disk.');
       await loadPublic();
     } catch (err) {
-      state.formError = err.message;
+      if (err.status === 409 && cfg.adminCatalogUrl) {
+        try {
+          const latest = await fetchJson(cfg.adminCatalogUrl);
+          state.adminCatalog = latest.data;
+          state.formError = 'Another admin saved changes first. Your editor was reloaded; review and save again.';
+        } catch (reloadErr) {
+          state.formError = err.message;
+        }
+      } else {
+        state.formError = err.message;
+      }
     }
     render();
   }
@@ -1180,15 +1263,39 @@
     el.querySelectorAll('[data-import-csv]').forEach((n) => {
       n.addEventListener('change', async () => {
         if (!n.files[0]) return;
+        state.csvFile = n.files[0];
         const body = new FormData();
-        body.append('file', n.files[0]);
+        body.append('file', state.csvFile);
         try {
-          const data = await fetchJson(cfg.importResultsUrl, { method: 'POST', body });
-          state.adminCatalog = data.data;
-          toast('Imported ' + data.imported + ' result records successfully!');
+          const data = await fetchJson(cfg.previewResultsUrl || cfg.importResultsUrl, { method: 'POST', body });
+          state.csvPreviewRows = data;
+          state.formError = '';
           render();
         } catch (err) {
-          toast(err.message);
+          state.formError = err.message;
+          render();
+        }
+      });
+    });
+    el.querySelectorAll('[data-confirm-csv]').forEach((n) => {
+      n.addEventListener('click', async () => {
+        if (!state.csvFile) return;
+        const body = new FormData();
+        body.append('file', state.csvFile);
+        try {
+          const data = await fetchJson(cfg.importResultsUrl, {
+            method: 'POST',
+            headers: state.adminCatalog && state.adminCatalog.revision != null ? { 'If-Match': String(state.adminCatalog.revision) } : {},
+            body,
+          });
+          state.adminCatalog = data.data;
+          state.csvPreviewRows = null;
+          state.csvFile = null;
+          toast(`Imported ${data.imported} result records${data.skipped ? `; skipped ${data.skipped} duplicates` : ''}.`);
+          render();
+        } catch (err) {
+          state.formError = err.message;
+          render();
         }
       });
     });
@@ -1197,7 +1304,14 @@
         if (!n.files[0]) return;
         const text = await n.files[0].text();
         try {
-          const data = await fetchJson(cfg.importCatalogUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: text });
+          const data = await fetchJson(cfg.importCatalogUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              ...(state.adminCatalog && state.adminCatalog.revision != null ? { 'If-Match': String(state.adminCatalog.revision) } : {}),
+            },
+            body: text,
+          });
           state.adminCatalog = data.data;
           toast('Database catalog restored successfully!');
           render();
@@ -1235,6 +1349,14 @@
   }
 
   function render() {
+    const active = document.activeElement;
+    const focusState = active && root.contains(active) && active.dataset && (active.dataset.q != null || active.dataset.resultQ != null)
+      ? {
+          selector: active.dataset.q != null ? '[data-q]' : '[data-result-q]',
+          start: typeof active.selectionStart === 'number' ? active.selectionStart : null,
+          end: typeof active.selectionEnd === 'number' ? active.selectionEnd : null,
+        }
+      : null;
     let body = '';
     if (state.loading) {
       body = '<div class="er-skel" aria-busy="true"></div><div class="er-skel"></div><div class="er-skel"></div>';
@@ -1275,6 +1397,16 @@
 
     bind(root);
 
+    if (focusState) {
+      const next = root.querySelector(focusState.selector);
+      if (next) {
+        next.focus();
+        if (focusState.start != null && typeof next.setSelectionRange === 'function') {
+          next.setSelectionRange(focusState.start, focusState.end);
+        }
+      }
+    }
+
     const retry = root.querySelector('[data-retry]');
     if (retry) retry.addEventListener('click', loadAll);
   }
@@ -1300,6 +1432,7 @@
         const me = await fetchJson(cfg.meUrl);
         state.role = me.role;
         state.canAdmin = !!me.can_admin;
+        state.csrfToken = me.csrf_token || '';
       }
       await loadPublic();
       if (state.canAdmin && cfg.adminCatalogUrl) {
