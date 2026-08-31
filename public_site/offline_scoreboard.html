@@ -2273,6 +2273,68 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                 </p>
             </div>
 
+            <div class="form-card record-penalty-card" id="recordScorePenaltyCard">
+                <div class="record-penalty-heading">
+                    <div>
+                        <h3><i class="fas fa-gavel"></i> Apply Penalty</h3>
+                        <p class="section-subtitle">Deduct points from one student or a whole target group. Every penalty keeps its reason and appears in the table with a red penalty shade.</p>
+                    </div>
+                    <span class="record-penalty-legend"><i class="fas fa-circle"></i> Penalty entry</span>
+                </div>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>Target</label>
+                        <select id="recordPenaltyTargetMode" onchange="updateRecordPenaltyTargetFields()">
+                            <option value="single">Single student</option>
+                            <option value="group">Group</option>
+                            <option value="class">Class</option>
+                            <option value="selected">Selected students</option>
+                            <option value="postholders">All active postholders</option>
+                        </select>
+                    </div>
+                    <div class="form-group" id="recordPenaltyGroupField" data-penalty-target-field="group" style="display:none;">
+                        <label>Group</label>
+                        <select id="recordPenaltyGroup" onchange="updateRecordPenaltyTargetFields()">
+                            <option value="all">All Groups</option>
+                        </select>
+                    </div>
+                    <div class="form-group" id="recordPenaltyClassField" data-penalty-target-field="class" style="display:none;">
+                        <label>Class</label>
+                        <select id="recordPenaltyClass" onchange="updateRecordPenaltyTargetFields()">
+                            <option value="">Select class...</option>
+                            <option value="2">Class 2</option>
+                            <option value="3">Class 3</option>
+                            <option value="4">Class 4</option>
+                            <option value="5">Class 5</option>
+                            <option value="6">Class 6</option>
+                            <option value="7">Class 7</option>
+                            <option value="8">Class 8</option>
+                            <option value="9">Class 9</option>
+                            <option value="10">Class 10</option>
+                            <option value="11">Class 11</option>
+                            <option value="12">Class 12</option>
+                        </select>
+                    </div>
+                    <div class="form-group" id="recordPenaltySingleHint" data-penalty-target-field="single">
+                        <label>Student</label>
+                        <div class="record-penalty-selected-student" id="recordPenaltySingleStudent">Choose a student in the form above.</div>
+                    </div>
+                    <div class="form-group">
+                        <label>Points to Deduct *</label>
+                        <input type="number" id="recordPenaltyPoints" min="1" max="9999" step="1" placeholder="e.g. 10" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Reason *</label>
+                        <input type="text" id="recordPenaltyReason" maxlength="240" placeholder="e.g. Late submission" required>
+                    </div>
+                </div>
+                <div class="record-penalty-actions">
+                    <span class="record-penalty-target-summary" id="recordPenaltyTargetSummary">1 student will receive this penalty.</span>
+                    <button class="secondary" type="button" onclick="clearRecordPenaltyForm()">Clear</button>
+                    <button class="danger record-penalty-apply-btn" type="button" onclick="applyRecordPenalty()"><i class="fas fa-gavel"></i> Apply Penalty</button>
+                </div>
+            </div>
+
             <div class="form-card">
                 <h3><i class="fas fa-users"></i> Student List (Record Score)</h3>
                 <div class="form-grid" style="margin-bottom: 10px;">
@@ -2327,6 +2389,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                         <table class="scoreboard" id="recordStudentsTable">
                             <thead>
                                 <tr>
+                                    <th style="width: 42px; text-align:center;" title="Select students for a bulk penalty"><input type="checkbox" id="recordPenaltySelectAll" onchange="toggleAllRecordPenaltySelection(this.checked)" aria-label="Select all visible students"></th>
                                     <th style="width: 105px;">Roll No.</th>
                                     <th style="width: 210px;">Student Name</th>
                                     <th style="width: 90px;">Class</th>
@@ -16843,6 +16906,10 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                     existing.star_usage_disciplinary = nextStarUsageDisciplinary;
                     existing.recordedBy = score.recordedBy || existing.recordedBy;
                     existing.updated_at = new Date().toISOString();
+                    if (score.entry_type !== undefined) existing.entry_type = score.entry_type;
+                    if (score.penalty_history !== undefined) {
+                        existing.penalty_history = Array.isArray(score.penalty_history) ? score.penalty_history.slice() : [];
+                    }
                     // Transfer metadata must be explicitly copied when present in the incoming
                     // payload — the merge above only covers listed fields, so star_transfer_in/out
                     // would be silently lost if the incoming score carries them (e.g. the transfer
@@ -19151,6 +19218,8 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                 normalized.recordedBy = String(op.recordedBy || currentLoginId || 'admin').trim();
                 normalized.star_usage_normal = Math.max(0, parseInt(op.star_usage_normal, 10) || 0);
                 normalized.star_usage_disciplinary = Math.max(0, parseInt(op.star_usage_disciplinary, 10) || 0);
+                if (Array.isArray(op.penalty_history)) normalized.penalty_history = op.penalty_history.slice();
+                if (op.entry_type !== undefined) normalized.entry_type = String(op.entry_type || 'manual').trim() || 'manual';
                 if (op.history_entry && typeof op.history_entry === 'object') {
                     normalized.history_entry = op.history_entry;
                 }
@@ -20497,6 +20566,14 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                 listGroupFilter.innerHTML = groupFilterSelect.innerHTML;
                 listGroupFilter.value = listSelected || 'all';
             }
+            const penaltyGroupSelect = document.getElementById('recordPenaltyGroup');
+            if (penaltyGroupSelect) {
+                const penaltySelected = penaltyGroupSelect.value || 'all';
+                penaltyGroupSelect.innerHTML = '<option value="all">All Groups</option>' +
+                    groups.map(group => `<option value="${escapeHtml(String(group))}">Group ${escapeHtml(String(group))}</option>`).join('');
+                penaltyGroupSelect.value = groups.includes(penaltySelected) || penaltySelected === 'all' ? penaltySelected : 'all';
+            }
+            updateRecordPenaltyTargetFields();
         }
 
         // Month picker in Student List — changes here cascade to the main scoreMonth selector
@@ -26026,7 +26103,10 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             // Wire event handlers once — re-assigning .onchange on every tab switch is wasteful.
             if (!_scoreEventsWired) {
                 _scoreEventsWired = true;
-                document.getElementById('scoreStudent').onchange = loadExistingScore;
+                document.getElementById('scoreStudent').onchange = () => {
+                    loadExistingScore();
+                    updateRecordPenaltyTargetFields();
+                };
                 document.getElementById('scoreDate').onchange = () => {
                     const d = getElementValue('scoreDate');
                     if (d) {
@@ -27426,6 +27506,238 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             showAlert(`Converted ${pointsNeeded} points to ${units} star(s) for ${studentName}.`, 'success');
         }
 
+        // ── Record Score penalties ─────────────────────────────────────────────
+        // Penalties remain part of the existing student/date score row so all
+        // scoreboard totals continue to use the same source.  penalty_history
+        // provides the explicit audit trail while the [PENALTY] note marker keeps
+        // the distinction visible to older sync/import paths.
+        let recordPenaltySelectedStudentIds = new Set();
+        let recordPenaltyApplyInProgress = false;
+
+        function getRecordPenaltyContext() {
+            const date = String(getElementValue('scoreDate') || '').trim();
+            const month = String(getElementValue('scoreMonth') || (date ? date.substring(0, 7) : getCurrentMonthKey())).trim();
+            const statusFilter = getElementValue('scoreStatusFilter') || 'active';
+            return { date, month, statusFilter };
+        }
+
+        function getRecordPenaltyTargetStudents() {
+            const { month, statusFilter } = getRecordPenaltyContext();
+            const mode = getElementValue('recordPenaltyTargetMode') || 'single';
+            const candidates = getRecordScoreStudentCandidates(month, statusFilter);
+            const byId = new Map(candidates.map(student => [parseInt(student.id, 10), student]));
+            if (mode === 'single') {
+                const sid = parseInt(getElementValue('scoreStudent'), 10) || 0;
+                const student = byId.get(sid) || db.getStudents().find(item => parseInt(item.id, 10) === sid);
+                return student ? [student] : [];
+            }
+            if (mode === 'group') {
+                const group = String(getElementValue('recordPenaltyGroup') || 'all').trim().toUpperCase();
+                return candidates.filter(student => group === 'ALL' || String(getStudentGroup(student) || '').trim().toUpperCase() === group);
+            }
+            if (mode === 'class') {
+                const classValue = String(getElementValue('recordPenaltyClass') || '').trim();
+                return classValue ? candidates.filter(student => String(student.class || '') === classValue) : [];
+            }
+            if (mode === 'selected') {
+                return candidates.filter(student => recordPenaltySelectedStudentIds.has(parseInt(student.id, 10)));
+            }
+            if (mode === 'postholders') {
+                const data = db.getData();
+                return candidates.filter(student => getStudentPostholderContext(student, data).isPostholder);
+            }
+            return [];
+        }
+
+        function updateRecordPenaltyTargetFields() {
+            const mode = getElementValue('recordPenaltyTargetMode') || 'single';
+            document.querySelectorAll('[data-penalty-target-field]').forEach(field => {
+                const fieldMode = field.getAttribute('data-penalty-target-field');
+                field.style.display = fieldMode === mode ? '' : 'none';
+            });
+            const singleHint = document.getElementById('recordPenaltySingleStudent');
+            if (singleHint) {
+                const sid = parseInt(getElementValue('scoreStudent'), 10) || 0;
+                const student = sid ? db.getStudents().find(item => parseInt(item.id, 10) === sid) : null;
+                singleHint.textContent = student
+                    ? `${student.base_name || student.name || 'Student'} (${formatRollDisplay(student.roll || '')})`
+                    : 'Choose a student in the form above.';
+            }
+            const summary = document.getElementById('recordPenaltyTargetSummary');
+            if (summary) {
+                const count = getRecordPenaltyTargetStudents().length;
+                summary.textContent = `${count} student${count === 1 ? '' : 's'} will receive this penalty.`;
+            }
+        }
+
+        function toggleRecordPenaltySelection(studentId, checked) {
+            const sid = parseInt(studentId, 10) || 0;
+            if (!sid) return;
+            if (checked) recordPenaltySelectedStudentIds.add(sid);
+            else recordPenaltySelectedStudentIds.delete(sid);
+            updateRecordPenaltyTargetFields();
+            const selectAll = document.getElementById('recordPenaltySelectAll');
+            if (selectAll) {
+                const visible = Array.from(document.querySelectorAll('#recordStudentsBody input.record-penalty-select'));
+                selectAll.checked = visible.length > 0 && visible.every(input => input.checked);
+                selectAll.indeterminate = visible.some(input => input.checked) && !selectAll.checked;
+            }
+        }
+
+        function toggleAllRecordPenaltySelection(checked) {
+            document.querySelectorAll('#recordStudentsBody tr[data-student-id]').forEach(row => {
+                const sid = parseInt(row.getAttribute('data-student-id'), 10) || 0;
+                const checkbox = row.querySelector('input.record-penalty-select');
+                if (!sid || !checkbox) return;
+                checkbox.checked = !!checked;
+                if (checked) recordPenaltySelectedStudentIds.add(sid);
+                else recordPenaltySelectedStudentIds.delete(sid);
+            });
+            updateRecordPenaltyTargetFields();
+        }
+
+        function clearRecordPenaltyForm() {
+            const points = document.getElementById('recordPenaltyPoints');
+            const reason = document.getElementById('recordPenaltyReason');
+            if (points) points.value = '';
+            if (reason) reason.value = '';
+        }
+
+        function buildPenaltyNote(reason, appliedPoints) {
+            const amount = Math.abs(parseInt(appliedPoints, 10) || 0);
+            return `[PENALTY] -${amount} pts: ${String(reason || '').trim()}`;
+        }
+
+        function getPenaltyHistoryTotal(row) {
+            if (!row || !Array.isArray(row.penalty_history)) return 0;
+            return row.penalty_history.reduce((total, item) => total + (parseInt(item && item.points, 10) || 0), 0);
+        }
+
+        async function applyRecordPenalty() {
+            if (recordPenaltyApplyInProgress) return;
+            const { date, month } = getRecordPenaltyContext();
+            const deduction = parseInt(getElementValue('recordPenaltyPoints'), 10);
+            const reason = String(getElementValue('recordPenaltyReason') || '').trim();
+            if (!date || !month) { showAlert('Select a date and month first.', 'warning'); return; }
+            if (!isMonthAllowedForCurrentUser(month) || !canMutateRecordScoreMonth(month)) {
+                showAlert('This month cannot be modified by the current user.', 'warning'); return;
+            }
+            if (!teacherValidateCurrentMonth(date, month, 'Penalty')) return;
+            if (!Number.isFinite(deduction) || deduction <= 0 || deduction > 9999) {
+                showAlert('Enter a positive number of points to deduct.', 'warning'); return;
+            }
+            if (!reason) { showAlert('Enter a reason for the penalty.', 'warning'); return; }
+            const targets = getRecordPenaltyTargetStudents();
+            if (!targets.length) {
+                showAlert('Choose at least one valid penalty target.', 'warning');
+                return;
+            }
+            const mode = getElementValue('recordPenaltyTargetMode') || 'single';
+            const modeLabel = mode === 'postholders' ? 'active postholders' : mode === 'selected' ? 'selected students' : mode;
+            if (!confirm(`Apply -${deduction} points to ${targets.length} ${modeLabel} on ${date}?\n\nReason: ${reason}`)) return;
+
+            recordPenaltyApplyInProgress = true;
+            const actor = currentLoginId || currentUserRole || 'system';
+            const targetLabel = mode === 'group'
+                ? `Group ${getElementValue('recordPenaltyGroup') || 'All'}`
+                : mode === 'class' ? `Class ${getElementValue('recordPenaltyClass') || ''}` : modeLabel;
+            let appliedCount = 0;
+            let skippedCount = 0;
+            const penaltyData = db.getData();
+            if (!Array.isArray(penaltyData.scores)) penaltyData.scores = [];
+            try {
+                targets.forEach(student => {
+                    const sid = parseInt(student.id, 10) || 0;
+                    if (!sid) return;
+                    const existing = penaltyData.scores.find(score => parseInt(score.studentId, 10) === sid && String(score.date || '') === date) || null;
+                    const existingPoints = existing ? (parseInt(existing.points, 10) || 0) : 0;
+                    const isGcb = !!student.gcb;
+                    const finalPoints = isGcb ? Math.max(-20, existingPoints - deduction) : existingPoints - deduction;
+                    const appliedPoints = finalPoints - existingPoints;
+                    if (appliedPoints === 0) { skippedCount += 1; return; }
+                    const now = new Date().toISOString();
+                    const penaltyEntry = {
+                        id: generateUniqueId(),
+                        points: appliedPoints,
+                        requested_points: -deduction,
+                        reason,
+                        date,
+                        month,
+                        target: targetLabel,
+                        recordedBy: actor,
+                        created_at: now
+                    };
+                    const penaltyHistory = Array.isArray(existing && existing.penalty_history)
+                        ? existing.penalty_history.slice() : [];
+                    penaltyHistory.push(penaltyEntry);
+                    const previousNotes = String(existing && existing.notes || '').trim();
+                    const noteText = buildPenaltyNote(reason, appliedPoints);
+                    const scorePayload = {
+                        studentId: sid, date, month, points: finalPoints,
+                        stars: existing ? (parseInt(existing.stars, 10) || 0) : 0,
+                        vetos: existing ? (parseInt(existing.vetos, 10) || 0) : 0,
+                        notes: previousNotes ? `${previousNotes} | ${noteText}` : noteText,
+                        recordedBy: actor,
+                        entry_type: 'manual',
+                        penalty_history: penaltyHistory,
+                        _newHistoryEntry: {
+                            entry_type: 'penalty', delta: appliedPoints, total: finalPoints,
+                            actor, role: currentUserRole || 'unknown', timestamp: now,
+                            note: reason, penalty_reason: reason
+                        }
+                    };
+                    const adminHistoricalWrite = canAdminRecordHistoricalScore(month);
+                    if (adminHistoricalWrite) {
+                        queueAdminHistoricalScoreOp({
+                            type: 'upsert', studentId: sid, date, month,
+                            points: finalPoints, stars: scorePayload.stars, vetos: scorePayload.vetos,
+                            notes: scorePayload.notes, recordedBy: actor,
+                            penalty_history: penaltyHistory,
+                            history_entry: scorePayload._newHistoryEntry
+                        });
+                    }
+                    // Apply the whole bulk operation to the in-memory ledger and
+                    // persist once after the loop; serializing the full legacy
+                    // snapshot once is important when a group has many students.
+                    const historyEntry = scorePayload._newHistoryEntry;
+                    delete scorePayload._newHistoryEntry;
+                    if (existing) {
+                        existing.points = scorePayload.points;
+                        existing.month = scorePayload.month;
+                        existing.notes = scorePayload.notes;
+                        existing.stars = scorePayload.stars;
+                        existing.vetos = scorePayload.vetos;
+                        existing.recordedBy = scorePayload.recordedBy;
+                        existing.entry_type = scorePayload.entry_type;
+                        existing.penalty_history = penaltyHistory;
+                        existing.updated_at = now;
+                        if (!Array.isArray(existing.history)) existing.history = [];
+                        existing.history.push(historyEntry);
+                    } else {
+                        scorePayload.id = generateUniqueId();
+                        scorePayload.created_at = now;
+                        scorePayload.updated_at = now;
+                        scorePayload.history = [historyEntry];
+                        penaltyData.scores.push(scorePayload);
+                    }
+                    appliedCount += 1;
+                });
+                reconcileVetoCountersFromScores(month, { persist: false });
+                db.saveData(penaltyData, getRecordScoreSaveOptions(month, { allowTeacher: true }));
+                if (SERVER_SYNC.enabled && (currentUserRole === 'admin' || currentUserRole === 'teacher')) {
+                    pushToServer(db.getData(), { silent: true });
+                }
+                recordPenaltySelectedStudentIds.clear();
+                loadRecordStudentTable();
+                scheduleScoreboardRefresh();
+                const skippedText = skippedCount ? ` ${skippedCount} skipped due to the -20 GCB floor.` : '';
+                showAlert(`Penalty applied to ${appliedCount} student${appliedCount === 1 ? '' : 's'}.${skippedText}`, appliedCount ? 'danger' : 'warning');
+                clearRecordPenaltyForm();
+            } finally {
+                recordPenaltyApplyInProgress = false;
+            }
+        }
+
         function renderRecordScoreDateStrip(monthKey, selectedDate) {
             const strip = document.getElementById('recordScoreDateStrip');
             if (!strip) return;
@@ -27596,12 +27908,19 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                 const storedStars = hasExisting ? (parseInt(safeProp(dayScore, 'stars'), 10) || 0) : null;
                 const storedVetos = hasExisting ? (parseInt(safeProp(dayScore, 'vetos'), 10) || 0) : null;
                 const recordedBy = hasExisting ? String(safeProp(dayScore, 'recordedBy') || '').trim() : '';
+                const penaltyHistory = hasExisting && Array.isArray(dayScore.penalty_history) ? dayScore.penalty_history : [];
+                const penaltyTotal = getPenaltyHistoryTotal(dayScore);
+                const hasPenalty = penaltyHistory.length > 0 || /\[PENALTY\]|\bPenalty by\b/i.test(String(safeProp(dayScore, 'notes') || ''));
                 const storedTitleParts = [];
                 if (storedPoints !== null) storedTitleParts.push(`Stored: ${storedPoints} pts`);
                 if (recordedBy) storedTitleParts.push(`Recorded by: ${recordedBy}`);
+                if (hasPenalty) storedTitleParts.push(`Penalty total: ${penaltyTotal || 'marked penalty'}`);
                 if (date && attendancePenalty < 0) storedTitleParts.push(`Attendance penalty ${attendancePenalty} is auto-applied in scoreboard total`);
                 const storedBadge = storedPoints !== null
-                    ? `<span class="stored-score-badge" onclick="showScoreHistory(${student.id}, '${date}')" title="${escapeHtml(storedTitleParts.join(' | '))} — Click for history">${storedPoints}</span>`
+                    ? `<span class="stored-score-badge${hasPenalty ? ' penalty-score-badge' : ''}" onclick="showScoreHistory(${student.id}, '${date}')" title="${escapeHtml(storedTitleParts.join(' | '))} — Click for history">${storedPoints}</span>`
+                    : '';
+                const penaltyBadge = hasPenalty
+                    ? `<span class="record-penalty-badge" title="${escapeHtml(penaltyHistory.map(item => item.reason || '').filter(Boolean).join(' | ') || 'Penalty entry')}" >PENALTY ${penaltyTotal < 0 ? penaltyTotal : ''}</span>`
                     : '';
                 const attendancePenaltyBadge = (date && attendancePenalty < 0)
                     ? `<span class="stored-veto-badge" style="margin-left:6px;background:rgba(127,29,29,.35);border-color:rgba(248,113,113,.55);color:#fecaca;" title="Attendance penalty ${attendancePenalty} (${normalizeAttendanceStatus(safeProp(attendanceRecord, 'status'))}) is auto-applied to scoreboard total and is not an accidental score.">ATT ${attendancePenalty}</span>`
@@ -27617,9 +27936,10 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                     ? `<button type="button" class="record-star-undo-btn" title="Admin tally repair: edit/reset this saved score row" onclick="openAdminScoreRepair(${student.id}, '${date}', event)">✎</button>`
                     : '';
                 const storedVetoBadge = storedVetos ? `<span class="stored-veto-badge" title="Stored: ${storedVetos} VETO(s)">${storedVetos}</span>` : '';
-                const rowClass = `${student.active === false ? 'inactive-row' : ''} ${hasExisting ? 'score-recorded-row' : ''}`.trim();
+                const rowClass = `${student.active === false ? 'inactive-row' : ''} ${hasExisting ? 'score-recorded-row' : ''} ${hasPenalty ? 'penalty-recorded-row' : ''}`.trim();
                 return `
                 <tr class="${rowClass}" data-student-id="${student.id}">
+                    <td class="record-penalty-select-cell"><input type="checkbox" class="record-penalty-select" ${recordPenaltySelectedStudentIds.has(sid) ? 'checked' : ''} onchange="toggleRecordPenaltySelection(${sid}, this.checked)" aria-label="Select ${escapeHtml(student.base_name || student.name || student.roll || 'student')} for penalty"></td>
                     <td>${formatRollDisplay(student.roll)}</td>
                     <td>${renderStudentName(getMonthAwareStudent(student, month, profileMap), month)}</td>
                     <td>${student.class}</td>
@@ -27629,7 +27949,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                     <td data-col="record-vetos">${monthVetoAwardByStudent[student.id] || 0}</td>
                     <td data-col="record-status">${student.active === false ? 'Inactive' : 'Active'}</td>
                     <td>
-                        <div class="score-input-wrapper">${storedBadge}${attendancePenaltyBadge}${sourceBadge}
+                        <div class="score-input-wrapper${hasPenalty ? ' penalty-score-cell' : ''}">${penaltyBadge}${storedBadge}${attendancePenaltyBadge}${sourceBadge}
                         <input type="number" class="score-input" placeholder="${hasExisting ? '+/- to adjust' : 'e.g. 50 or -50'}"
                             value="${pointsValue}"
                             oninput="updateRecordScoreDraft(${student.id}, this, 0)"
@@ -27676,7 +27996,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                 chunkSize: 60,
                 onDone() {
                     if (filtered.length === 0) {
-                        tbody.innerHTML = `<tr><td colspan="14" class="text-center" style="padding: 30px;">No students match the filters</td></tr>`;
+                        tbody.innerHTML = `<tr><td colspan="15" class="text-center" style="padding: 30px;">No students match the filters</td></tr>`;
                     }
                     // Defer animation, column visibility, and font adjustments to next rAF
                     // so the record table content paints before we force reflows.
@@ -27686,6 +28006,13 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                         autoAdjustTableFonts();
                         refreshStarTransferModule(true);
                         refreshPointsTransferModule(true);
+                        const selectAll = document.getElementById('recordPenaltySelectAll');
+                        const visible = Array.from(tbody.querySelectorAll('input.record-penalty-select'));
+                        if (selectAll) {
+                            selectAll.checked = visible.length > 0 && visible.every(input => input.checked);
+                            selectAll.indeterminate = visible.some(input => input.checked) && !selectAll.checked;
+                        }
+                        updateRecordPenaltyTargetFields();
                     });
                 }
             });
@@ -30407,7 +30734,14 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             const month = date.substring(0, 7);
             const actor = currentLoginId || currentUserRole || 'system';
             const newPoints = currentPoints + penaltyPts;
-            const noteText = `Penalty by ${penaltyLabel} (${penaltyPts})${reason ? ': ' + reason : ''}`;
+            const noteText = `[PENALTY] ${penaltyPts} pts by ${penaltyLabel}${reason ? ': ' + reason : ''}`;
+            const penaltyHistory = existingScore && Array.isArray(existingScore.penalty_history)
+                ? existingScore.penalty_history.slice() : [];
+            penaltyHistory.push({
+                id: generateUniqueId(), points: penaltyPts, requested_points: penaltyPts,
+                reason: reason || `Penalty by ${penaltyLabel}`, date, month,
+                target: penaltyLabel, recordedBy: actor, created_at: new Date().toISOString()
+            });
 
             db.addScore({
                 studentId: sid, date, month, points: newPoints,
@@ -30415,9 +30749,11 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                 vetos: existingScore ? (parseInt(existingScore.vetos, 10) || 0) : 0,
                 notes: (existingScore && existingScore.notes ? existingScore.notes + ' | ' : '') + noteText,
                 recordedBy: actor,
+                entry_type: 'manual',
+                penalty_history: penaltyHistory,
                 _newHistoryEntry: {
-                    delta: penaltyPts, total: newPoints, actor, role: penaltyRole,
-                    timestamp: new Date().toISOString(), note: noteText
+                    entry_type: 'penalty', delta: penaltyPts, total: newPoints, actor, role: penaltyRole,
+                    timestamp: new Date().toISOString(), note: reason || noteText, penalty_reason: reason || ''
                 }
             });
             loadMonthScoreboard(localStorage.getItem(ACTIVE_SCOREBOARD_MONTH_KEY) || getCurrentMonthKey());

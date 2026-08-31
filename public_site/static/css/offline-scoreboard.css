@@ -2211,6 +2211,75 @@
             }
         }
 
+/* Record Score penalty treatment: a deliberate coral/red shade that remains
+   legible in both dark and light themes and is separate from attendance badges. */
+.record-penalty-card {
+    border: 1px solid rgba(248, 113, 113, .42);
+    background: linear-gradient(135deg, rgba(127, 29, 29, .22), rgba(69, 10, 10, .12));
+}
+.record-penalty-heading, .record-penalty-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    flex-wrap: wrap;
+}
+.record-penalty-heading h3 { margin-bottom: 4px; }
+.record-penalty-legend, .record-penalty-target-summary {
+    color: #fecaca;
+    font-size: 12px;
+    font-weight: 700;
+}
+.record-penalty-legend i { color: #ef4444; margin-right: 5px; }
+.record-penalty-selected-student {
+    min-height: 38px;
+    display: flex;
+    align-items: center;
+    padding: 8px 10px;
+    border: 1px solid rgba(248, 113, 113, .3);
+    border-radius: 7px;
+    color: #fecaca;
+    background: rgba(69, 10, 10, .25);
+    font-size: 13px;
+}
+.record-penalty-apply-btn { box-shadow: 0 0 0 2px rgba(248, 113, 113, .12); }
+.record-penalty-select-cell { text-align: center; }
+.record-penalty-select { accent-color: #ef4444; width: 16px; height: 16px; cursor: pointer; }
+.record-penalty-badge {
+    display: inline-flex;
+    align-items: center;
+    margin-right: 6px;
+    padding: 3px 7px;
+    border-radius: 5px;
+    background: #7f1d1d;
+    border: 1px solid #f87171;
+    color: #fee2e2;
+    font-size: 10px;
+    font-weight: 900;
+    letter-spacing: .35px;
+    white-space: nowrap;
+}
+.penalty-score-cell {
+    border-radius: 7px;
+    background: rgba(127, 29, 29, .26);
+    padding: 3px;
+}
+.penalty-score-badge { background: #7f1d1d !important; border-color: #f87171 !important; color: #fee2e2 !important; }
+#recordStudentsTable tr.penalty-recorded-row > td {
+    background: rgba(127, 29, 29, .095);
+    border-top-color: rgba(248, 113, 113, .22);
+    border-bottom-color: rgba(248, 113, 113, .22);
+}
+#recordStudentsTable tr.penalty-recorded-row > td:first-child { box-shadow: inset 3px 0 0 #ef4444; }
+body.light-mode .record-penalty-card {
+    background: linear-gradient(135deg, #fff1f2, #fff7f7);
+    border-color: #fda4af;
+}
+body.light-mode .record-penalty-legend, body.light-mode .record-penalty-target-summary,
+body.light-mode .record-penalty-selected-student { color: #9f1239; }
+body.light-mode .record-penalty-selected-student { background: #fff1f2; border-color: #fda4af; }
+body.light-mode #recordStudentsTable tr.penalty-recorded-row > td { background: #fff1f2; }
+
         /* MEDALS/BADGES */
         .medal {
             display: inline-block;
@@ -3212,7 +3281,7 @@
         .receipt-row.total { font-weight: bold; border-top: 1px dashed #ccc; padding-top: 6px; margin-top: 6px; }
         .receipt-footer { border-top: 2px dashed #ccc; padding-top: 10px; margin-top: 12px; text-align: center; font-size: 11px; color: #666; }
         /* Print: hide everything except receipt */
-        @media print {
+@media print {
             body > *:not(#feeReceiptModal) { display: none !important; }
             #feeReceiptModal { position: static !important; background: transparent !important; }
             #feeReceiptModal .validation-modal-content { box-shadow: none !important; border: none !important; }
