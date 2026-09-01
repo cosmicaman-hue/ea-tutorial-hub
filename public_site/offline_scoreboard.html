@@ -19320,9 +19320,8 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
         }
 
         function reconcileClassValuesToCurrentMonthRoster(data, options = {}) {
-            // Sync student.class (canonical source) into month_roster_profiles for the
-            // current month.  This repairs stale class values that were copied from a
-            // previous month's profile instead of the live student record.
+            // Keep student.class and current month roster profile class in sync,
+            // respecting timestamps and never reverting a newer/promoted class.
             if (!data || !Array.isArray(data.students)) return false;
             const monthKey = String(options.monthKey || getCurrentMonthKey()).trim();
             if (!monthKey) return false;
@@ -19335,17 +19334,38 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                 if (r && s.active !== false) studentsByRoll.set(r, s);
             });
             let changed = false;
+            const nowIso = new Date().toISOString();
             profiles.forEach(profile => {
                 if (!profile || typeof profile !== 'object') return;
                 const pRoll = normalizeRosterValue(profile.roll);
                 const student = studentsByRoll.get(pRoll);
-                if (!student || student.class === undefined || student.class === null) return;
-                const studentClass = parseInt(student.class, 10);
-                if (Number.isNaN(studentClass)) return;
-                if (profile.class !== studentClass) {
+                if (!student) return;
+                const profileClassNum = (profile.class !== undefined && profile.class !== null) ? parseInt(profile.class, 10) : null;
+                const studentClassNum = (student.class !== undefined && student.class !== null) ? parseInt(student.class, 10) : null;
+                const profileClass = (profileClassNum !== null && !Number.isNaN(profileClassNum)) ? profileClassNum : null;
+                const studentClass = (studentClassNum !== null && !Number.isNaN(studentClassNum)) ? studentClassNum : null;
+
+                if (profileClass === null && studentClass !== null) {
                     profile.class = studentClass;
-                    if (student.class_updated_at) profile.class_updated_at = student.class_updated_at;
+                    profile.class_updated_at = student.class_updated_at || nowIso;
                     changed = true;
+                } else if (studentClass === null && profileClass !== null) {
+                    student.class = profileClass;
+                    student.class_updated_at = profile.class_updated_at || nowIso;
+                    changed = true;
+                } else if (profileClass !== null && studentClass !== null && profileClass !== studentClass) {
+                    const profileStamp = parseSyncStamp(profile.class_updated_at || profile.updated_at || '');
+                    const studentStamp = parseSyncStamp(student.class_updated_at || student.updated_at || '');
+                    if (studentStamp > profileStamp) {
+                        profile.class = studentClass;
+                        profile.class_updated_at = student.class_updated_at || nowIso;
+                        changed = true;
+                    } else {
+                        // Profile class is newer or equal: sync to student master record
+                        student.class = profileClass;
+                        student.class_updated_at = profile.class_updated_at || nowIso;
+                        changed = true;
+                    }
                 }
             });
             return changed;
@@ -25266,10 +25286,27 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                 const name = (student && (student.name || student.base_name)) || (prev && prev.name) || roll;
                 const baseName = (student && (student.base_name || student.name)) || (prev && prev.base_name) || roll;
                 if (!isValidStudentName(baseName)) return;
-                // Always prefer student.class (canonical source) over prev month profile class.
-                // Use nullish coalescing so class=0 is not treated as falsy.
-                const classRaw = (student && (student.class ?? null)) ?? (prev && prev.class) ?? null;
-                const classNum = parseInt(classRaw, 10);
+                // Carry forward class: prioritize prev.class (the student's class at the end of the previous month).
+                // If student.class in master table has a newer explicit update stamp after prevMonth, use student.class.
+                const prevClassNum = (prev && prev.class !== undefined && prev.class !== null) ? parseInt(prev.class, 10) : null;
+                const studentClassNum = (student && student.class !== undefined && student.class !== null) ? parseInt(student.class, 10) : null;
+                const prevClassStamp = parseSyncStamp((prev && (prev.class_updated_at || prev.updated_at)) || '');
+                const studentClassStamp = parseSyncStamp((student && (student.class_updated_at || student.updated_at)) || '');
+
+                let resolvedClass = null;
+                if (studentClassNum !== null && !Number.isNaN(studentClassNum) && studentClassStamp > prevClassStamp && studentClassStamp > parseSyncStamp(`${prevMonth}-28T00:00:00Z`)) {
+                    resolvedClass = studentClassNum;
+                } else if (prevClassNum !== null && !Number.isNaN(prevClassNum)) {
+                    resolvedClass = prevClassNum;
+                } else if (studentClassNum !== null && !Number.isNaN(studentClassNum)) {
+                    resolvedClass = studentClassNum;
+                }
+
+                if (student && resolvedClass !== null && student.class !== resolvedClass) {
+                    student.class = resolvedClass;
+                    student.class_updated_at = new Date().toISOString();
+                }
+
                 const sid = student ? (parseInt(student.id, 10) || 0) : 0;
                 const computedCarry = sid > 0 ? computeExpectedIndividualVetoCarryForMonth(sid, todayMonth) : null;
                 const carryIndividualVetos = computedCarry === null
@@ -25294,7 +25331,8 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                     name: name || baseName,
                     base_name: baseName,
                     name_updated_at: (student && student.name_updated_at) || (student && student.updated_at) || '',
-                    class: Number.isNaN(classNum) ? null : classNum,
+                    class: resolvedClass,
+                    class_updated_at: (student && student.class_updated_at) || (prev && prev.class_updated_at) || new Date().toISOString(),
                     month_star_count: carryStars,
                     month_veto_count: carryIndividualVetos,
                     month_designations: []
@@ -25304,19 +25342,6 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             data.month_students = data.month_students || {};
             data.month_roster_profiles = data.month_roster_profiles || {};
             data.month_students[todayMonth] = newProfiles.map(p => p.roll);
-            // Post-creation class sync: ensure every profile's class matches the
-            // canonical student.class from data.students[], not just the previous
-            // month's profile which may be stale after a class upgrade.
-            newProfiles.forEach(profile => {
-                const pRoll = normalizeRosterValue(profile.roll);
-                const matched = studentsByRoll.get(pRoll);
-                if (matched && matched.class !== undefined && matched.class !== null) {
-                    const matchedClass = parseInt(matched.class, 10);
-                    if (!Number.isNaN(matchedClass)) {
-                        profile.class = matchedClass;
-                    }
-                }
-            });
             data.month_roster_profiles[todayMonth] = newProfiles;
             db.saveData(data);
             eaLog(`[AutoMonth] Created ${todayMonth} roster from ${prevMonth} (${newProfiles.length} students)`);
