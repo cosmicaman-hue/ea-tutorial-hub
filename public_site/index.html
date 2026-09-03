@@ -1332,6 +1332,58 @@
         #excelStudyNotesPanel .sn-hero { border-radius: 16px; box-shadow: none; }
         #excelStudyNotesPanel .sn-admin { display: none; }
 
+
+        /* Header controls layout & Helpdesk button */
+        .header-controls {
+            margin-left: auto;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex: 0 0 auto;
+            flex-wrap: nowrap;
+        }
+        #headerHelpdeskBtn {
+            width: auto !important;
+            min-width: 36px;
+            height: 36px;
+            border-radius: 999px !important;
+            padding: 0 12px !important;
+            display: inline-flex !important;
+            align-items: center;
+            gap: 6px;
+            font-size: 13px !important;
+            font-weight: 600;
+            color: var(--primary);
+            background: var(--surface-2);
+            border: 1px solid var(--line);
+            white-space: nowrap;
+            flex-shrink: 0;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+        }
+        #headerHelpdeskBtn:hover {
+            background: rgba(26,77,46,0.08);
+            color: var(--primary);
+            border-color: var(--primary);
+        }
+        body.dark #headerHelpdeskBtn {
+            background: #111a14;
+            color: #22c55e;
+            border-color: rgba(255,255,255,0.12);
+        }
+        body.dark #headerHelpdeskBtn:hover {
+            background: rgba(34,197,94,0.14);
+            border-color: #22c55e;
+        }
+        @media (max-width: 580px) {
+            .header-controls { gap: 4px; }
+            #headerHelpdeskBtn {
+                padding: 0 8px !important;
+                font-size: 11.5px !important;
+                height: 32px;
+            }
+            .helpdesk-btn-text { display: none; }
+        }
+
         /* ── HELPDESK & FEEDBACK ── */
         .helpdesk-cat-btn {
             padding: 9px 13px;
@@ -1771,11 +1823,19 @@
                                 Send WhatsApp Directly To:
                             </label>
                             <select id="helpdeskOfficerSelect" style="width: 100%; background: var(--surface-2); color: var(--text); border: 1px solid var(--line); border-radius: 10px; padding: 11px 13px; font-size: 14px; font-family: inherit;">
-                                <option value="917756485368" data-role="director">🏛️ Director / Administration (Admissions, Suggestions & Operations)</option>
-                                <option value="917756485368" data-role="academic">📚 Academic Coordinator (Classes, Tests & Score Inquiries)</option>
-                                <option value="917756485368" data-role="accounts">🧾 Accounts & Fee Desk (Fee Receipts, Due Inquiries)</option>
-                                <option value="917756485368" data-role="grievance">🛡️ Student Grievance Cell (Student Welfare, Complaints)</option>
+                                <option value="919767092670" data-role="director">🏛️ Director / Administration (Admissions, Suggestions & Operations)</option>
+                                <option value="919767092670" data-role="academic">📚 Academic Coordinator (Classes, Tests & Score Inquiries)</option>
+                                <option value="919767092670" data-role="accounts">🧾 Accounts & Fee Desk (Fee Receipts, Due Inquiries)</option>
+                                <option value="919767092670" data-role="grievance">🛡️ Student Grievance Cell (Student Welfare, Complaints)</option>
                             </select>
+                        </div>
+
+                                                <!-- Anonymous Toggle -->
+                        <div style="margin-bottom: 14px; background: var(--surface-2); border: 1px dashed var(--line); border-radius: 12px; padding: 10px 14px; display: flex; align-items: center; gap: 10px;">
+                            <input type="checkbox" id="helpdeskAnonymousCheck" style="width: 18px; height: 18px; accent-color: var(--primary); cursor: pointer;">
+                            <label for="helpdeskAnonymousCheck" style="font-size: 13px; font-weight: 600; color: var(--text); cursor: pointer; user-select: none; margin: 0;">
+                                🛡️ Submit Anonymously / गुमनाम रूप से भेजें <span style="font-size: 11px; color: var(--muted); font-weight: normal;">(Hides name & phone for confidential complaints/suggestions)</span>
+                            </label>
                         </div>
 
                         <!-- Row 1: Name and Phone -->
@@ -1896,7 +1956,102 @@
         </div>
     </div>
 
-    <!-- ── PARTY DETAIL MODAL ── -->
+    <!-- ── HELPDESK MODAL ── -->
+    <div class="helpdesk-modal-overlay" id="helpdeskModal" aria-hidden="true" role="dialog" aria-modal="true">
+        <div class="helpdesk-modal">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; border-bottom: 1px solid var(--line); padding-bottom: 10px;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <span style="font-size: 24px;">💬</span>
+                    <div>
+                        <h3 style="margin: 0; color: var(--primary); font-family: 'Poppins', sans-serif; font-size: 1.15rem; font-weight: 700;">Helpdesk & Feedback</h3>
+                        <p style="margin: 0; font-size: 12px; color: var(--muted);">Direct communication with Academy Administration</p>
+                    </div>
+                </div>
+                <button type="button" id="closeHelpdeskModalBtn" style="background: transparent; border: none; font-size: 20px; color: var(--muted); cursor: pointer; padding: 4px 8px;">✕</button>
+            </div>
+
+            <!-- Quick WhatsApp or Portal Trigger inside Modal -->
+            <div style="display: flex; gap: 6px; background: var(--surface-2); padding: 4px; border-radius: 10px; margin-bottom: 14px;">
+                <button type="button" id="modalChannelWhatsapp" style="flex: 1; padding: 8px 12px; border-radius: 8px; font-size: 12px; font-weight: 700; border: none; cursor: pointer; background: #25D366; color: white;">
+                    <i class="fab fa-whatsapp"></i> WhatsApp
+                </button>
+                <button type="button" id="modalChannelPortal" style="flex: 1; padding: 8px 12px; border-radius: 8px; font-size: 12px; font-weight: 600; border: none; cursor: pointer; background: transparent; color: var(--muted);">
+                    <i class="fas fa-clipboard-list"></i> Portal Log
+                </button>
+            </div>
+
+            <form id="modalHelpdeskForm">
+                <div style="margin-bottom: 10px;">
+                    <label style="display: block; font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; margin-bottom: 4px;">Topic</label>
+                    <select id="modalCategory" style="width: 100%; background: var(--surface-2); color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 9px 11px; font-size: 13px;">
+                        <option value="SUGGESTION">💡 Suggestion / Idea</option>
+                        <option value="FEE_QUERY">🧾 Fee & Payment Query</option>
+                        <option value="SCORE_QUERY">📊 Score & Academic Query</option>
+                        <option value="COMPLAINT">⚠️ Complaint / Grievance</option>
+                        <option value="GENERAL">❓ General Inquiry</option>
+                    </select>
+                </div>
+
+                <div id="modalOfficerRow" style="margin-bottom: 10px;">
+                    <label style="display: block; font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; margin-bottom: 4px;">Send WhatsApp To:</label>
+                    <select id="modalOfficerSelect" style="width: 100%; background: var(--surface-2); color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 9px 11px; font-size: 13px;">
+                        <option value="919767092670">🏛️ Director / Administration</option>
+                        <option value="919767092670">📚 Academic Coordinator</option>
+                        <option value="919767092670">🧾 Accounts & Fee Desk</option>
+                        <option value="919767092670">🛡️ Student Grievance Cell</option>
+                    </select>
+                </div>
+
+                <!-- Modal Anonymous Toggle -->
+                <div style="margin-bottom: 10px; background: var(--surface-2); border: 1px dashed var(--line); border-radius: 8px; padding: 8px 10px; display: flex; align-items: center; gap: 8px;">
+                    <input type="checkbox" id="modalAnonymousCheck" style="width: 16px; height: 16px; accent-color: var(--primary); cursor: pointer;">
+                    <label for="modalAnonymousCheck" style="font-size: 12px; font-weight: 600; color: var(--text); cursor: pointer; user-select: none; margin: 0;">
+                        🛡️ Submit Anonymously / गुमनाम (Confidential)
+                    </label>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
+                    <div>
+                        <label style="display: block; font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; margin-bottom: 4px;">Your Name</label>
+                        <input type="text" id="modalName" placeholder="Name" style="width: 100%; background: var(--surface-2); color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 9px 11px; font-size: 13px;">
+                    </div>
+                    <div>
+                        <label style="display: block; font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; margin-bottom: 4px;">Mobile / WhatsApp</label>
+                        <input type="tel" id="modalPhone" placeholder="Phone" style="width: 100%; background: var(--surface-2); color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 9px 11px; font-size: 13px;">
+                    </div>
+                </div>
+
+                <div style="margin-bottom: 10px;">
+                    <label style="display: block; font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; margin-bottom: 4px;">Roll No. / Class (Optional)</label>
+                    <input type="text" id="modalRoll" placeholder="e.g. EA24B15" style="width: 100%; background: var(--surface-2); color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 9px 11px; font-size: 13px;">
+                </div>
+
+                <div style="margin-bottom: 12px;">
+                    <label style="display: block; font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; margin-bottom: 4px;">Message Details *</label>
+                    <textarea id="modalMessage" rows="3" required placeholder="Your message here..." style="width: 100%; background: var(--surface-2); color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 9px 11px; font-size: 13px; resize: vertical; min-height: 70px;"></textarea>
+                </div>
+
+                <div style="display:none;" aria-hidden="true">
+                    <input type="text" id="modalHoney" name="honey" tabindex="-1" autocomplete="off">
+                </div>
+
+                <div id="modalErrorAlert" style="display:none; padding: 8px 12px; background: rgba(239,68,68,0.12); color: #dc2626; border-radius: 8px; font-size: 12px; font-weight: 600; margin-bottom: 12px;"></div>
+
+                <button type="submit" id="modalActionBtn" style="width: 100%; padding: 11px 16px; border-radius: 10px; background: #25D366; color: white; border: none; font-family: 'Poppins', sans-serif; font-size: 13.5px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                    <i class="fab fa-whatsapp"></i> Send via WhatsApp
+                </button>
+            </form>
+
+            <div id="modalSuccessAlert" style="display:none; text-align: center; padding: 20px 10px;">
+                <div style="font-size: 32px; color: #16a34a; margin-bottom: 8px;">✓</div>
+                <h4 style="margin: 0 0 6px; color: var(--primary);">Query Submitted!</h4>
+                <p style="font-size: 12.5px; color: var(--muted); margin: 0 0 14px;">Your feedback has been received by Excel Academy.</p>
+                <button type="button" id="modalDoneBtn" style="padding: 8px 18px; border-radius: 999px; background: var(--primary); color: white; border: none; font-size: 12px; font-weight: 600; cursor: pointer;">Done</button>
+            </div>
+        </div>
+    </div>
+
+        <!-- ── PARTY DETAIL MODAL ── -->
     <div class="party-modal-overlay" id="partyModal" aria-hidden="true" role="dialog" aria-modal="true">
         <div class="party-modal" id="partyModalCard">
             <button type="button" class="party-modal-close" id="partyModalClose" aria-label="Close">✕</button>
@@ -2991,7 +3146,7 @@ function renderInfo(data) {
                 const phone = (document.getElementById('helpdeskPhone').value || '').trim();
                 const roll = (document.getElementById('helpdeskRoll').value || '').trim();
                 const message = (document.getElementById('helpdeskMessage').value || '').trim();
-                const officerPhone = document.getElementById('helpdeskOfficerSelect').value || '917756485368';
+                const officerPhone = document.getElementById('helpdeskOfficerSelect').value || '919767092670';
                 const errBox = document.getElementById('helpdeskErrorAlert');
 
                 if (!name || name.length < 2) {
@@ -3048,15 +3203,37 @@ function renderInfo(data) {
                 btnSubmit.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Submitting...';
                 errBox.style.display = 'none';
 
+                const isAnon = helpdeskAnonymousCheck && helpdeskAnonymousCheck.checked;
+                const finalName = isAnon ? (name || 'Anonymous (गुमनाम)') : name;
+                const finalPhone = isAnon ? (phone || 'N/A') : phone;
+
+                if (!isAnon) {
+                    if (!name || name.length < 2) {
+                        errBox.textContent = 'Please enter your name or check Submit Anonymously.';
+                        errBox.style.display = 'block';
+                        btnSubmit.disabled = false;
+                        btnSubmit.innerHTML = '<i class="fas fa-paper-plane"></i> Submit to Helpdesk Log';
+                        return;
+                    }
+                    if (!phone || phone.replace(/\D/g, '').length < 10) {
+                        errBox.textContent = 'Please enter a valid 10-digit mobile number or check Submit Anonymously.';
+                        errBox.style.display = 'block';
+                        btnSubmit.disabled = false;
+                        btnSubmit.innerHTML = '<i class="fas fa-paper-plane"></i> Submit to Helpdesk Log';
+                        return;
+                    }
+                }
+
                 try {
                     const res = await fetch('/api/feedback', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                             category: currentPanelCategory,
-                            name: name,
-                            phone: phone,
-                            roll_no: roll || null,
+                            name: finalName,
+                            phone: finalPhone,
+                            roll_no: isAnon ? null : (roll || null),
+                            is_anonymous: isAnon,
                             message: message
                         })
                     });
@@ -3145,7 +3322,7 @@ function renderInfo(data) {
                 const errBox = document.getElementById('modalErrorAlert');
 
                 if (modalChannel === 'whatsapp') {
-                    const officerPhone = document.getElementById('modalOfficerSelect').value || '917756485368';
+                    const officerPhone = document.getElementById('modalOfficerSelect').value || '919767092670';
                     const text = generateEaWhatsAppText({ category: cat, name: name, phone: phone, rollNo: roll, message: message });
                     const url = 'https://wa.me/' + officerPhone.replace(/\D/g, '') + '?text=' + encodeURIComponent(text);
                     window.open(url, '_blank', 'noopener,noreferrer');
