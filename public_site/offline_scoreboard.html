@@ -1204,6 +1204,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
         <button class="sidebar-nav-item" id="sidebarAppealsBtn" data-tab="appeals" onclick="switchTab('appeals')" title="Appeals"><i class="fas fa-bullhorn" style="color:#ef4444"></i><span class="sidebar-link-text">Appeals</span></button>
         <button class="sidebar-nav-item" id="sidebarNotificationsBtn" data-tab="notifications" onclick="switchTab('notifications')" title="Notifications"><i class="fas fa-bell" style="color:#f43f5e"></i><span class="sidebar-link-text">Notifications</span></button>
         <button class="sidebar-nav-item" id="sidebarProposalsBtn" data-tab="proposals" onclick="switchTab('proposals')" title="Proposals"><i class="fas fa-comments" style="color:#14b8a6"></i><span class="sidebar-link-text">Proposals</span></button>
+        <button class="sidebar-nav-item" id="sidebarHelpdeskBtn" data-tab="helpdesk" onclick="switchTab('helpdesk')" title="Student & Parent Helpdesk"><i class="fas fa-headset" style="color:#22c55e"></i><span class="sidebar-link-text">Helpdesk</span><span id="helpdeskPendingBadge" class="sidebar-badge hidden" style="background:#ef4444;color:#fff;border-radius:999px;font-size:10px;font-weight:700;padding:2px 6px;margin-left:auto;"></span></button>
         <div class="sidebar-section-label">Records</div>
         <button class="sidebar-nav-item" data-tab="notebooks" onclick="switchTab('notebooks')" title="Notebooks Check"><i class="fas fa-clipboard-check" style="color:#a78bfa"></i><span class="sidebar-link-text">Notebooks Check</span></button>
         <button class="sidebar-nav-item" data-tab="attendance" onclick="switchTab('attendance')" title="Attendance"><i class="fas fa-user-check" style="color:#10b981"></i><span class="sidebar-link-text">Attendance</span></button>
@@ -1233,6 +1234,9 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
 <div class="mobile-topbar">
     <button class="mobile-menu-btn" id="mobileMenuBtn" type="button" title="Open menu"><i class="fas fa-bars"></i></button>
     <span>EXCEL ACADEMY</span>
+    <button id="mobileHelpdeskBtn" type="button" onclick="openHelpdeskModal()" title="Student & Parent Helpdesk" style="background:transparent;border:none;color:#22c55e;font-size:16px;cursor:pointer;padding:6px 10px;margin-left:auto;display:flex;align-items:center;gap:4px;">
+        <i class="fas fa-headset"></i>
+    </button>
 </div>
         <div class="header">
         <div class="hdr-grid"></div>
@@ -1263,6 +1267,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                     <span class="header-chip"><i class="fas fa-bolt"></i> Live Sync</span>
                     <span class="header-chip"><i class="fas fa-shield-alt"></i> Audit Safe</span>
                     <span class="header-chip"><i class="fas fa-globe-asia"></i> LAN + Cloud Ready</span>
+                    <button class="header-chip" id="headerHelpdeskBtn" type="button" onclick="openHelpdeskModal()" style="cursor:pointer;background:rgba(34,197,94,0.18);color:#22c55e;border:1px solid rgba(34,197,94,0.35);font-weight:600;"><i class="fas fa-headset"></i> Helpdesk</button>
                 </div>
             </div>
         </div>
@@ -1885,6 +1890,10 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             </button>
             <button class="tab-button" id="proposalsTabButton" onclick="switchTab('proposals')" style="--tab-icon: #14b8a6;">
                 <i class="fas fa-comments"></i> Proposals
+            </button>
+            <button class="tab-button" id="tabHelpdeskBtn" onclick="switchTab('helpdesk')" style="--tab-icon: #22c55e;">
+                <i class="fas fa-headset"></i> Helpdesk
+                <span id="helpdeskTabBadge" class="badge hidden" style="background:#ef4444;color:#fff;border-radius:999px;font-size:10px;font-weight:700;padding:1px 5px;margin-left:4px;"></span>
             </button>
             <button class="tab-button" onclick="switchTab('attendance')" style="--tab-icon: #10b981;">
                 <i class="fas fa-user-check"></i> Attendance
@@ -6632,6 +6641,242 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             </div>
         </div>
 
+        <!-- TAB: HELPDESK & FEEDBACK -->
+        <div id="helpdesk-tab" class="tab-content hidden">
+            <!-- HEADER / HERO -->
+            <div class="form-card" style="text-align: center; padding: 24px 20px; margin-bottom: 20px;">
+                <div style="display: inline-flex; align-items: center; justify-content: center; width: 54px; height: 54px; border-radius: 16px; background: linear-gradient(135deg, rgba(34, 197, 94, 0.2), rgba(16, 185, 129, 0.35)); color: #22c55e; font-size: 24px; margin-bottom: 12px; border: 1px solid rgba(34, 197, 94, 0.4);">
+                    <i class="fas fa-headset"></i>
+                </div>
+                <h2 style="margin: 0 0 8px; color: var(--primary); font-size: 1.6rem; letter-spacing: -0.01em;">
+                    Student & Parent Helpdesk
+                </h2>
+                <p style="margin: 0 auto; max-width: 620px; color: var(--text-muted); font-size: 13.5px; line-height: 1.5;">
+                    Welcome to the official communication desk of Excel Academy. Submit your suggestions, inquire about fee or academic records, or voice concerns directly to the leadership.
+                </p>
+
+                <!-- CHANNEL SWITCHER -->
+                <div style="display: flex; max-width: 480px; margin: 18px auto 0; gap: 8px; background: rgba(15, 23, 42, 0.6); padding: 5px; border-radius: 12px; border: 1px solid var(--border);">
+                    <button type="button" id="tabChannelWhatsappBtn" onclick="switchHelpdeskChannel('whatsapp')" style="flex: 1; padding: 10px 14px; border-radius: 8px; font-size: 13px; font-weight: 700; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 7px; background: #25D366; color: white; transition: all 0.2s ease;">
+                        <i class="fab fa-whatsapp" style="font-size: 15px;"></i> Instant WhatsApp Desk
+                    </button>
+                    <button type="button" id="tabChannelPortalBtn" onclick="switchHelpdeskChannel('portal')" style="flex: 1; padding: 10px 14px; border-radius: 8px; font-size: 13px; font-weight: 600; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 7px; background: transparent; color: var(--text-muted); transition: all 0.2s ease;">
+                        <i class="fas fa-file-lines"></i> Submit to Helpdesk Log
+                    </button>
+                </div>
+            </div>
+
+            <!-- SUBMISSION FORM CARD -->
+            <div class="form-card" id="helpdeskSubmitCard">
+                <div id="helpdeskSuccessAlert" style="display: none; text-align: center; padding: 24px 16px;">
+                    <div style="width: 50px; height: 50px; border-radius: 50%; background: rgba(34, 197, 94, 0.18); color: #22c55e; font-size: 24px; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 12px; border: 1px solid rgba(34, 197, 94, 0.4);">
+                        <i class="fas fa-check"></i>
+                    </div>
+                    <h3 style="margin: 0 0 8px; color: var(--primary); font-size: 1.3rem;">Message Registered Successfully!</h3>
+                    <p style="margin: 0 auto 16px; max-width: 440px; color: var(--text-muted); font-size: 13px; line-height: 1.5;">
+                        Your note has been registered with the Academy Helpdesk. The management or respective department coordinator will review and follow up.
+                    </p>
+                    <button type="button" class="secondary" onclick="resetHelpdeskForm()">
+                        <i class="fas fa-plus"></i> Submit Another Query
+                    </button>
+                </div>
+
+                <form id="helpdeskForm" onsubmit="handleHelpdeskFormSubmit(event)" autocomplete="off">
+                    <!-- CATEGORY PILLS -->
+                    <div class="form-group" style="margin-bottom: 16px;">
+                        <label style="display: block; margin-bottom: 8px; font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted);">
+                            Select Query Topic / विषय चुनें *
+                        </label>
+                        <div class="helpdesk-cat-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 8px;">
+                            <button type="button" class="helpdesk-cat-pill active" data-cat="SUGGESTION" onclick="selectHelpdeskCategory('SUGGESTION')">
+                                💡 Suggestion / Idea
+                            </button>
+                            <button type="button" class="helpdesk-cat-pill" data-cat="FEE_QUERY" onclick="selectHelpdeskCategory('FEE_QUERY')">
+                                🧾 Fee & Payment Query
+                            </button>
+                            <button type="button" class="helpdesk-cat-pill" data-cat="SCORE_QUERY" onclick="selectHelpdeskCategory('SCORE_QUERY')">
+                                📊 Score & Academic Query
+                            </button>
+                            <button type="button" class="helpdesk-cat-pill" data-cat="COMPLAINT" onclick="selectHelpdeskCategory('COMPLAINT')">
+                                ⚠️ Complaint / Grievance
+                            </button>
+                            <button type="button" class="helpdesk-cat-pill" data-cat="GENERAL" onclick="selectHelpdeskCategory('GENERAL')">
+                                ❓ General Inquiry
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- WHATSAPP RECIPIENT SELECT -->
+                    <div id="helpdeskRecipientGroup" class="form-group" style="margin-bottom: 16px;">
+                        <label style="display: block; margin-bottom: 6px; font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted);">
+                            Send WhatsApp Directly To:
+                        </label>
+                        <select id="helpdeskOfficerSelect" style="width: 100%;">
+                            <option value="919767092670" data-role="director">🏛️ Director / Administration (Admissions, Suggestions & Operations)</option>
+                            <option value="919767092670" data-role="academic">📚 Academic Coordinator (Classes, Tests & Score Inquiries)</option>
+                            <option value="919767092670" data-role="accounts">🧾 Accounts & Fee Desk (Fee Receipts, Due Inquiries)</option>
+                            <option value="919767092670" data-role="grievance">🛡️ Student Grievance Cell (Student Welfare, Complaints)</option>
+                        </select>
+                    </div>
+
+                    <!-- ANONYMOUS TOGGLE -->
+                    <div style="margin-bottom: 16px; background: rgba(30, 41, 59, 0.35); border: 1px dashed var(--border); border-radius: 10px; padding: 10px 14px; display: flex; align-items: center; gap: 10px;">
+                        <input type="checkbox" id="helpdeskAnonymousCheck" onchange="toggleHelpdeskAnonymous(this.checked)" style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary);">
+                        <label for="helpdeskAnonymousCheck" style="font-size: 13px; font-weight: 600; color: var(--text); cursor: pointer; user-select: none; margin: 0;">
+                            🛡️ Submit Anonymously / गुमनाम रूप से भेजें <span style="font-size: 11px; color: var(--text-muted); font-weight: normal;">(Hides name & phone for confidential complaints/suggestions)</span>
+                        </label>
+                    </div>
+
+                    <!-- IDENTIFIERS GRID -->
+                    <div id="helpdeskIdentityGroup" class="form-grid" style="margin-bottom: 14px;">
+                        <div class="form-group">
+                            <label>Student / Parent Name *</label>
+                            <input type="text" id="helpdeskName" placeholder="e.g. Ramesh Kumar / Ananya">
+                        </div>
+                        <div class="form-group">
+                            <label>WhatsApp / Mobile Number *</label>
+                            <input type="tel" id="helpdeskPhone" placeholder="e.g. 9876543210">
+                        </div>
+                        <div class="form-group" style="grid-column: 1 / -1;">
+                            <label>Roll No. or Class (Optional)</label>
+                            <input type="text" id="helpdeskRoll" placeholder="e.g. EA24B15 or Class 10">
+                        </div>
+                    </div>
+
+                    <!-- MESSAGE -->
+                    <div class="form-group" style="margin-bottom: 16px;">
+                        <label>Message / Query Details *</label>
+                        <textarea id="helpdeskMessage" rows="4" placeholder="Please write your suggestion, inquiry, or grievance in detail (min 5 characters)..." required></textarea>
+                    </div>
+
+                    <!-- HONEYPOT -->
+                    <div style="display:none;" aria-hidden="true">
+                        <input type="text" id="helpdeskHoney" name="honey" tabindex="-1" autocomplete="off">
+                    </div>
+
+                    <!-- ERROR ALERT BOX -->
+                    <div id="helpdeskErrorAlert" style="display:none; padding: 10px 14px; background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 8px; font-size: 13px; font-weight: 600; margin-bottom: 16px;"></div>
+
+                    <!-- SUBMIT ACTIONS -->
+                    <div id="helpdeskWhatsappAction">
+                        <button type="button" id="btnDispatchWhatsapp" onclick="dispatchHelpdeskWhatsapp()" style="width: 100%; padding: 12px 18px; border-radius: 10px; background: #25D366; color: white; border: none; font-size: 14px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 4px 14px rgba(37, 211, 102, 0.3);">
+                            <i class="fab fa-whatsapp" style="font-size: 17px;"></i> Open & Send via WhatsApp
+                        </button>
+                        <p style="margin: 8px 0 0; text-align: center; font-size: 12px; color: var(--text-muted);">
+                            A formatted message with your details will be opened in WhatsApp for instant delivery.
+                        </p>
+                    </div>
+
+                    <div id="helpdeskPortalAction" style="display: none;">
+                        <button type="submit" id="btnSubmitPortal" style="width: 100%; padding: 12px 18px; border-radius: 10px; background: var(--primary); color: #0b0f19; border: none; font-size: 14px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                            <i class="fas fa-paper-plane"></i> Submit to Helpdesk Log
+                        </button>
+                        <p style="margin: 8px 0 0; text-align: center; font-size: 12px; color: var(--text-muted);">
+                            Your note is securely recorded into the administration portal.
+                        </p>
+                    </div>
+                </form>
+            </div>
+
+            <!-- INFO CARDS ROW -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin-bottom: 24px;">
+                <div class="form-card" style="padding: 16px 18px; margin-bottom: 0;">
+                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px; color: var(--primary); font-weight: 700; font-size: 13.5px;">
+                        <i class="fas fa-clock"></i> Desk Working Hours
+                    </div>
+                    <div style="font-size: 12.5px; color: var(--text-muted); line-height: 1.4;">
+                        Mon - Sat: 8:00 AM – 6:30 PM<br>Sunday: By Appointment
+                    </div>
+                </div>
+                <div class="form-card" style="padding: 16px 18px; margin-bottom: 0;">
+                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px; color: #22c55e; font-weight: 700; font-size: 13.5px;">
+                        <i class="fab fa-whatsapp"></i> 24x7 WhatsApp Dispatch
+                    </div>
+                    <div style="font-size: 12.5px; color: var(--text-muted); line-height: 1.4;">
+                        Instant routing to Coordinator & Management
+                    </div>
+                </div>
+                <div class="form-card" style="padding: 16px 18px; margin-bottom: 0;">
+                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px; color: #38bdf8; font-weight: 700; font-size: 13.5px;">
+                        <i class="fas fa-shield-halved"></i> Fair Redressal Policy
+                    </div>
+                    <div style="font-size: 12.5px; color: var(--text-muted); line-height: 1.4;">
+                        All grievances reviewed confidentially within 24-48 hours
+                    </div>
+                </div>
+            </div>
+
+            <!-- STAFF MANAGEMENT CONSOLE (Visible only to Admin and Teacher) -->
+            <div class="form-card" id="helpdeskStaffSection" style="display: none;">
+                <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; border-bottom: 1px solid var(--border); padding-bottom: 12px;">
+                    <div>
+                        <h3 style="margin: 0; color: var(--primary); display: flex; align-items: center; gap: 8px; font-size: 1.2rem;">
+                            <i class="fas fa-inbox"></i> Staff Helpdesk Ticket Console
+                        </h3>
+                        <p style="margin: 4px 0 0; font-size: 12px; color: var(--text-muted);">
+                            Review, filter, update ticket statuses, and respond directly to students and parents.
+                        </p>
+                    </div>
+                    <button class="secondary" onclick="loadHelpdeskTickets(true)">
+                        <i class="fas fa-sync-alt"></i> Refresh Inbox
+                    </button>
+                </div>
+
+                <!-- METRICS ROW -->
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 16px;">
+                    <div style="background: rgba(15, 23, 42, 0.5); border: 1px solid var(--border); border-radius: 10px; padding: 12px; text-align: center;">
+                        <div id="helpdeskMetricTotal" style="font-size: 20px; font-weight: 700; color: var(--text);">0</div>
+                        <div style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.5px;">Total Tickets</div>
+                    </div>
+                    <div style="background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 10px; padding: 12px; text-align: center;">
+                        <div id="helpdeskMetricPending" style="font-size: 20px; font-weight: 700; color: #f59e0b;">0</div>
+                        <div style="font-size: 11px; text-transform: uppercase; color: #f59e0b; letter-spacing: 0.5px;">Pending</div>
+                    </div>
+                    <div style="background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 10px; padding: 12px; text-align: center;">
+                        <div id="helpdeskMetricInReview" style="font-size: 20px; font-weight: 700; color: #38bdf8;">0</div>
+                        <div style="font-size: 11px; text-transform: uppercase; color: #38bdf8; letter-spacing: 0.5px;">In Review</div>
+                    </div>
+                    <div style="background: rgba(34, 197, 94, 0.1); border: 1px solid rgba(34, 197, 94, 0.3); border-radius: 10px; padding: 12px; text-align: center;">
+                        <div id="helpdeskMetricResolved" style="font-size: 20px; font-weight: 700; color: #22c55e;">0</div>
+                        <div style="font-size: 11px; text-transform: uppercase; color: #22c55e; letter-spacing: 0.5px;">Resolved</div>
+                    </div>
+                </div>
+
+                <!-- FILTER CONTROLS -->
+                <div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 16px; background: rgba(15, 23, 42, 0.3); padding: 10px; border-radius: 8px;">
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                        <label style="font-size: 12px; color: var(--text-muted); font-weight: 600;">Status:</label>
+                        <select id="helpdeskFilterStatus" onchange="filterHelpdeskTickets()" style="padding: 6px 10px; font-size: 12px; border-radius: 6px;">
+                            <option value="ALL">All Statuses</option>
+                            <option value="PENDING">Pending Only</option>
+                            <option value="IN_REVIEW">In Review</option>
+                            <option value="RESOLVED">Resolved</option>
+                            <option value="DISMISSED">Dismissed</option>
+                        </select>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                        <label style="font-size: 12px; color: var(--text-muted); font-weight: 600;">Category:</label>
+                        <select id="helpdeskFilterCategory" onchange="filterHelpdeskTickets()" style="padding: 6px 10px; font-size: 12px; border-radius: 6px;">
+                            <option value="ALL">All Topics</option>
+                            <option value="SUGGESTION">💡 Suggestions</option>
+                            <option value="FEE_QUERY">🧾 Fee Queries</option>
+                            <option value="SCORE_QUERY">📊 Score Queries</option>
+                            <option value="COMPLAINT">⚠️ Complaints</option>
+                            <option value="GENERAL">❓ General</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- TICKETS LIST -->
+                <div id="helpdeskTicketsList" style="display: flex; flex-direction: column; gap: 12px;">
+                    <div style="text-align: center; color: var(--text-muted); padding: 30px 10px;">
+                        <i class="fas fa-spinner fa-spin" style="font-size: 20px; margin-bottom: 8px;"></i>
+                        <div>Loading Helpdesk tickets...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- TAB: ATTENDANCE -->
         <div id="attendance-tab" class="tab-content hidden">
             <div class="form-card" id="markAttendanceCard">
@@ -8497,6 +8742,100 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                     </div>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <!-- MODAL: HELPDESK QUICK ACCESS -->
+    <div id="helpdeskModal" class="modal">
+        <div class="modal-content" style="max-width: 580px;">
+            <div class="modal-header">
+                <h2><i class="fas fa-headset" style="color: #22c55e;"></i> Student & Parent Helpdesk</h2>
+                <button class="close-btn" onclick="closeHelpdeskModal()">&times;</button>
+            </div>
+
+            <!-- CHANNEL SELECTOR -->
+            <div style="display: flex; gap: 8px; margin-bottom: 16px; background: rgba(15, 23, 42, 0.5); padding: 4px; border-radius: 10px; border: 1px solid var(--border);">
+                <button type="button" id="modalChannelWhatsappBtn" onclick="switchModalHelpdeskChannel('whatsapp')" style="flex: 1; padding: 8px 12px; border-radius: 6px; font-size: 12.5px; font-weight: 700; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; background: #25D366; color: white;">
+                    <i class="fab fa-whatsapp"></i> WhatsApp Direct
+                </button>
+                <button type="button" id="modalChannelPortalBtn" onclick="switchModalHelpdeskChannel('portal')" style="flex: 1; padding: 8px 12px; border-radius: 6px; font-size: 12.5px; font-weight: 600; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; background: transparent; color: var(--text-muted);">
+                    <i class="fas fa-file-lines"></i> Submit to Log
+                </button>
+            </div>
+
+            <div id="modalHelpdeskSuccessAlert" style="display: none; text-align: center; padding: 20px 10px;">
+                <div style="width: 44px; height: 44px; border-radius: 50%; background: rgba(34, 197, 94, 0.18); color: #22c55e; font-size: 20px; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 10px;">
+                    <i class="fas fa-check"></i>
+                </div>
+                <h4 style="margin: 0 0 6px; color: var(--primary);">Message Submitted!</h4>
+                <p style="margin: 0 auto 14px; max-width: 360px; color: var(--text-muted); font-size: 12.5px;">
+                    Your query has been logged. Academy staff will follow up.
+                </p>
+                <button type="button" class="secondary" onclick="resetModalHelpdeskForm()">Submit Another</button>
+            </div>
+
+            <form id="modalHelpdeskForm" onsubmit="handleModalHelpdeskSubmit(event)" autocomplete="off">
+                <div class="form-group" style="margin-bottom: 12px;">
+                    <label>Query Topic *</label>
+                    <select id="modalHelpdeskCategory" onchange="onModalCategoryChange(this.value)" style="width: 100%;">
+                        <option value="SUGGESTION">💡 Suggestion / Idea</option>
+                        <option value="FEE_QUERY">🧾 Fee & Payment Query</option>
+                        <option value="SCORE_QUERY">📊 Score & Academic Query</option>
+                        <option value="COMPLAINT">⚠️ Complaint / Grievance</option>
+                        <option value="GENERAL">❓ General Inquiry</option>
+                    </select>
+                </div>
+
+                <div id="modalHelpdeskOfficerRow" class="form-group" style="margin-bottom: 12px;">
+                    <label>Send WhatsApp To:</label>
+                    <select id="modalHelpdeskOfficerSelect" style="width: 100%;">
+                        <option value="919767092670">🏛️ Director / Administration</option>
+                        <option value="919767092670">📚 Academic Coordinator</option>
+                        <option value="919767092670">🧾 Accounts & Fee Desk</option>
+                        <option value="919767092670">🛡️ Student Grievance Cell</option>
+                    </select>
+                </div>
+
+                <div style="margin-bottom: 12px; background: rgba(30, 41, 59, 0.3); border: 1px dashed var(--border); border-radius: 8px; padding: 8px 12px; display: flex; align-items: center; gap: 8px;">
+                    <input type="checkbox" id="modalHelpdeskAnonymousCheck" onchange="toggleModalAnonymous(this.checked)" style="width: 16px; height: 16px; cursor: pointer; accent-color: var(--primary);">
+                    <label for="modalHelpdeskAnonymousCheck" style="font-size: 12px; font-weight: 600; color: var(--text); cursor: pointer; user-select: none; margin: 0;">
+                        🛡️ Submit Anonymously (गुमनाम)
+                    </label>
+                </div>
+
+                <div id="modalHelpdeskIdentityGroup" class="form-grid" style="margin-bottom: 12px;">
+                    <div class="form-group">
+                        <label>Your Name *</label>
+                        <input type="text" id="modalHelpdeskName" placeholder="e.g. Ramesh Kumar">
+                    </div>
+                    <div class="form-group">
+                        <label>Mobile Number *</label>
+                        <input type="tel" id="modalHelpdeskPhone" placeholder="e.g. 9876543210">
+                    </div>
+                    <div class="form-group" style="grid-column: 1 / -1;">
+                        <label>Roll No. or Class (Optional)</label>
+                        <input type="text" id="modalHelpdeskRoll" placeholder="e.g. EA24B15">
+                    </div>
+                </div>
+
+                <div class="form-group" style="margin-bottom: 12px;">
+                    <label>Message *</label>
+                    <textarea id="modalHelpdeskMessage" rows="3" placeholder="Enter details of your query..." required></textarea>
+                </div>
+
+                <div style="display:none;" aria-hidden="true">
+                    <input type="text" id="modalHelpdeskHoney" name="honey" tabindex="-1" autocomplete="off">
+                </div>
+
+                <div id="modalHelpdeskErrorAlert" style="display:none; padding: 8px 12px; background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 6px; font-size: 12px; font-weight: 600; margin-bottom: 12px;"></div>
+
+                <div class="form-buttons" style="margin-top: 14px;">
+                    <button type="button" class="secondary" onclick="closeHelpdeskModal()">Cancel</button>
+                    <button type="submit" id="modalHelpdeskActionBtn" style="background: #25D366; color: white; border: none; font-weight: 700;">
+                        <i class="fab fa-whatsapp"></i> Send via WhatsApp
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 
@@ -18781,6 +19120,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                     'reports':               loadReportsTab,
                     'awf':                   loadAwfTab,
                     'notebooks':             loadNotebooksTab,
+                    'helpdesk':              loadHelpdeskTab,
                 };
             }
             const _renderer = _tabDomCache.renderers[tabName];
@@ -20653,7 +20993,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             // Tabs visible to everyone (students, teachers, admins)
             if (['scoreboard', 'group-scoreboard', 'information', 'rules', 'syllabus', 'excel-results', 'excel-study-notes',
                  'resources', 'excel-mela', 'team-competition', 'excel-chess-champion', 'awf', 'good-conduct',
-                 'appeals', 'proposals', 'party-standings'].includes(tabName)) return true;
+                 'appeals', 'proposals', 'party-standings', 'helpdesk'].includes(tabName)) return true;
             // Student-only tabs
             if (tabName === 'my-dashboard') return isStudent;
             // Teacher + Admin tabs
@@ -20699,6 +21039,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             setTabVisibility('appeals', true);
             setTabVisibility('proposals', true);
             setTabVisibility('party-standings', true);
+            setTabVisibility('helpdesk', true);
 
             // Student-only tabs
             setTabVisibility('my-dashboard', isStudent);
@@ -20748,6 +21089,16 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             const publishBtn = document.getElementById('globalPublishBtn');
             if (publishBtn) publishBtn.style.display = (SERVER_SYNC.enabled && isAdmin) ? '' : 'none';
             updateAuthButtons();
+            if (isAdmin || isTeacher) {
+                if (typeof updateHelpdeskBadges === 'function') {
+                    void updateHelpdeskBadges();
+                }
+            } else {
+                const sbBadge = document.getElementById('helpdeskPendingBadge');
+                const tbBadge = document.getElementById('helpdeskTabBadge');
+                if (sbBadge) sbBadge.style.display = 'none';
+                if (tbBadge) tbBadge.classList.add('hidden');
+            }
 
             renderPointsStarConfigUI();
             renderGoodConductFormulaUI();
@@ -20795,6 +21146,8 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                     if (el.closest('#proposals-tab')) return;
                     if (el.closest('#party-standings-tab')) return;
                     if (el.closest('#my-dashboard-tab')) return;
+                    if (el.closest('#helpdesk-tab')) return;
+                    if (el.closest('#helpdeskModal')) return;
                     el.disabled = true;
                 });
             }
@@ -20838,7 +21191,9 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                         el.closest('#office-tab') ||
                         el.closest('#voting-tab') ||
                         el.closest('#leadership-selection-tab') ||
-                        el.closest('#notifications-tab')
+                        el.closest('#notifications-tab') ||
+                        el.closest('#helpdesk-tab') ||
+                        el.closest('#helpdeskModal')
                     ) {
                         el.disabled = false;
                         return;
@@ -41879,8 +42234,638 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
         }
 
         // ============================================================
+        // HELPDESK & FEEDBACK CONTROLLERS
+        // ============================================================
+
+        let _helpdeskCurrentChannel = 'whatsapp';
+        let _helpdeskCurrentCategory = 'SUGGESTION';
+        let _helpdeskCachedTickets = [];
+
+        function generateEaWhatsAppText({ category, name, phone, rollNo, message }) {
+            const catMap = {
+                'SUGGESTION': '💡 Suggestion / विचार एवं सुझाव',
+                'FEE_QUERY': '🧾 Fee & Payment Query / फीस संबंधी पूछताछ',
+                'SCORE_QUERY': '📊 Score & Academic Query / अंक व पढ़ाई संबंधी पूछताछ',
+                'COMPLAINT': '⚠️ Complaint / Grievance / शिकायत अथवा समस्या',
+                'GENERAL': '❓ General Inquiry / सामान्य जानकारी'
+            };
+            const catTitle = catMap[category] || catMap['GENERAL'];
+            const dateStr = new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' });
+            let lines = [
+                '🎓 *EXCEL ACADEMY — HELPDESK & FEEDBACK*',
+                '━━━━━━━━━━━━━━━━━━━━',
+                '*Topic / विषय:* ' + catTitle,
+                '*Sender / Name:* ' + name,
+                '*Contact No:* ' + phone
+            ];
+            if (rollNo && rollNo.trim()) {
+                lines.push('*Roll No / Class:* ' + rollNo.trim());
+            }
+            lines.push('━━━━━━━━━━━━━━━━━━━━');
+            lines.push('*Message / विवरण:*');
+            lines.push(message.trim());
+            lines.push('━━━━━━━━━━━━━━━━━━━━');
+            lines.push('_Sent via Excel Academy System (' + dateStr + ')_');
+            return lines.join('\n');
+        }
+
+        function openHelpdeskModal() {
+            openModal('helpdeskModal', { centerViewport: true });
+            prefillHelpdeskUserFields('modal');
+        }
+
+        function closeHelpdeskModal() {
+            closeModal('helpdeskModal');
+        }
+
+        function prefillHelpdeskUserFields(prefix) {
+            try {
+                const roll = currentStudentRoll || localStorage.getItem('ea_login_id') || '';
+                let name = '';
+                if (roll) {
+                    const data = (typeof db !== 'undefined' && db.getData) ? db.getData() : {};
+                    const s = (data.students || []).find(st => st.id === roll);
+                    if (s && s.name) name = s.name;
+                }
+                const nameInput = document.getElementById(prefix === 'modal' ? 'modalHelpdeskName' : 'helpdeskName');
+                const rollInput = document.getElementById(prefix === 'modal' ? 'modalHelpdeskRoll' : 'helpdeskRoll');
+                if (nameInput && !nameInput.value && name) nameInput.value = name;
+                if (rollInput && !rollInput.value && roll) rollInput.value = roll;
+            } catch (e) {
+                // ignore
+            }
+        }
+
+        function switchHelpdeskChannel(channel) {
+            _helpdeskCurrentChannel = channel;
+            const waBtn = document.getElementById('tabChannelWhatsappBtn');
+            const portalBtn = document.getElementById('tabChannelPortalBtn');
+            const recipientGroup = document.getElementById('helpdeskRecipientGroup');
+            const waAction = document.getElementById('helpdeskWhatsappAction');
+            const portalAction = document.getElementById('helpdeskPortalAction');
+
+            if (channel === 'whatsapp') {
+                if (waBtn) { waBtn.style.background = '#25D366'; waBtn.style.color = 'white'; }
+                if (portalBtn) { portalBtn.style.background = 'transparent'; portalBtn.style.color = 'var(--text-muted)'; }
+                if (recipientGroup) recipientGroup.style.display = 'block';
+                if (waAction) waAction.style.display = 'block';
+                if (portalAction) portalAction.style.display = 'none';
+            } else {
+                if (portalBtn) { portalBtn.style.background = 'var(--primary)'; portalBtn.style.color = '#0b0f19'; }
+                if (waBtn) { waBtn.style.background = 'transparent'; waBtn.style.color = 'var(--text-muted)'; }
+                if (recipientGroup) recipientGroup.style.display = 'none';
+                if (waAction) waAction.style.display = 'none';
+                if (portalAction) portalAction.style.display = 'block';
+            }
+        }
+
+        function selectHelpdeskCategory(cat) {
+            _helpdeskCurrentCategory = cat;
+            document.querySelectorAll('.helpdesk-cat-pill').forEach(pill => {
+                if (pill.getAttribute('data-cat') === cat) {
+                    pill.classList.add('active');
+                } else {
+                    pill.classList.remove('active');
+                }
+            });
+            const officerSelect = document.getElementById('helpdeskOfficerSelect');
+            if (officerSelect) {
+                if (cat === 'FEE_QUERY') officerSelect.selectedIndex = 2;
+                else if (cat === 'SCORE_QUERY') officerSelect.selectedIndex = 1;
+                else if (cat === 'COMPLAINT') officerSelect.selectedIndex = 3;
+                else officerSelect.selectedIndex = 0;
+            }
+        }
+
+        function toggleHelpdeskAnonymous(isAnon) {
+            const nameGroup = document.getElementById('helpdeskIdentityGroup');
+            const nameInput = document.getElementById('helpdeskName');
+            const phoneInput = document.getElementById('helpdeskPhone');
+            if (isAnon) {
+                if (nameInput) nameInput.required = false;
+                if (phoneInput) phoneInput.required = false;
+                if (nameGroup) nameGroup.style.opacity = '0.5';
+            } else {
+                if (nameInput) nameInput.required = true;
+                if (phoneInput) phoneInput.required = true;
+                if (nameGroup) nameGroup.style.opacity = '1';
+            }
+        }
+
+        function dispatchHelpdeskWhatsapp() {
+            const errBox = document.getElementById('helpdeskErrorAlert');
+            const name = (document.getElementById('helpdeskName')?.value || '').trim();
+            const phone = (document.getElementById('helpdeskPhone')?.value || '').trim();
+            const roll = (document.getElementById('helpdeskRoll')?.value || '').trim();
+            const message = (document.getElementById('helpdeskMessage')?.value || '').trim();
+            const officerPhone = document.getElementById('helpdeskOfficerSelect')?.value || '919767092670';
+
+            if (!name || name.length < 2) {
+                if (errBox) { errBox.textContent = 'Please enter your name.'; errBox.style.display = 'block'; }
+                return;
+            }
+            if (!phone || phone.replace(/\D/g, '').length < 10) {
+                if (errBox) { errBox.textContent = 'Please enter a valid 10-digit mobile number.'; errBox.style.display = 'block'; }
+                return;
+            }
+            if (!message || message.length < 5) {
+                if (errBox) { errBox.textContent = 'Please write your message in detail (at least 5 characters).'; errBox.style.display = 'block'; }
+                return;
+            }
+            if (errBox) errBox.style.display = 'none';
+
+            const text = generateEaWhatsAppText({
+                category: _helpdeskCurrentCategory,
+                name: name,
+                phone: phone,
+                rollNo: roll,
+                message: message
+            });
+            const cleanPhone = officerPhone.replace(/\D/g, '');
+            const url = 'https://wa.me/' + cleanPhone + '?text=' + encodeURIComponent(text);
+            window.open(url, '_blank', 'noopener,noreferrer');
+        }
+
+        async function handleHelpdeskFormSubmit(e) {
+            e.preventDefault();
+            const errBox = document.getElementById('helpdeskErrorAlert');
+            const honey = (document.getElementById('helpdeskHoney')?.value || '').trim();
+            const name = (document.getElementById('helpdeskName')?.value || '').trim();
+            const phone = (document.getElementById('helpdeskPhone')?.value || '').trim();
+            const roll = (document.getElementById('helpdeskRoll')?.value || '').trim();
+            const message = (document.getElementById('helpdeskMessage')?.value || '').trim();
+            const isAnon = !!document.getElementById('helpdeskAnonymousCheck')?.checked;
+            const btnSubmit = document.getElementById('btnSubmitPortal');
+
+            if (honey) {
+                document.getElementById('helpdeskForm').style.display = 'none';
+                document.getElementById('helpdeskSuccessAlert').style.display = 'block';
+                return;
+            }
+
+            if (!isAnon) {
+                if (!name || name.length < 2) {
+                    if (errBox) { errBox.textContent = 'Please enter your name or check Submit Anonymously.'; errBox.style.display = 'block'; }
+                    return;
+                }
+                if (!phone || phone.replace(/\D/g, '').length < 10) {
+                    if (errBox) { errBox.textContent = 'Please enter a valid 10-digit mobile number or check Submit Anonymously.'; errBox.style.display = 'block'; }
+                    return;
+                }
+            }
+            if (!message || message.length < 5) {
+                if (errBox) { errBox.textContent = 'Please write your message in detail (at least 5 characters).'; errBox.style.display = 'block'; }
+                return;
+            }
+
+            if (errBox) errBox.style.display = 'none';
+            if (btnSubmit) {
+                btnSubmit.disabled = true;
+                btnSubmit.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Submitting...';
+            }
+
+            const payload = {
+                category: _helpdeskCurrentCategory,
+                name: isAnon ? (name || 'Anonymous (गुमनाम)') : name,
+                phone: isAnon ? (phone || 'N/A') : phone,
+                roll_no: isAnon ? null : (roll || null),
+                is_anonymous: isAnon,
+                message: message
+            };
+
+            try {
+                const resp = await eaFetch('/api/feedback', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const resData = await resp.json().catch(() => ({}));
+                if (resp.ok && resData.success) {
+                    document.getElementById('helpdeskForm').style.display = 'none';
+                    document.getElementById('helpdeskSuccessAlert').style.display = 'block';
+                    if (currentUserRole === 'admin' || currentUserRole === 'teacher') {
+                        loadHelpdeskTickets(true);
+                    }
+                } else {
+                    throw new Error(resData.error || 'Server error submitting feedback.');
+                }
+            } catch (err) {
+                // Offline fallback save
+                try {
+                    const localTickets = JSON.parse(localStorage.getItem('ea_feedback_tickets') || '[]');
+                    localTickets.unshift({ ...payload, submitted_at: new Date().toISOString() });
+                    localStorage.setItem('ea_feedback_tickets', JSON.stringify(localTickets.slice(0, 50)));
+                    document.getElementById('helpdeskForm').style.display = 'none';
+                    document.getElementById('helpdeskSuccessAlert').style.display = 'block';
+                } catch (e2) {
+                    if (errBox) {
+                        errBox.textContent = err.message || 'Submission error. Please send via WhatsApp.';
+                        errBox.style.display = 'block';
+                    }
+                }
+            } finally {
+                if (btnSubmit) {
+                    btnSubmit.disabled = false;
+                    btnSubmit.innerHTML = '<i class="fas fa-paper-plane"></i> Submit to Helpdesk Log';
+                }
+            }
+        }
+
+        function resetHelpdeskForm() {
+            const form = document.getElementById('helpdeskForm');
+            const alert = document.getElementById('helpdeskSuccessAlert');
+            const msg = document.getElementById('helpdeskMessage');
+            if (msg) msg.value = '';
+            if (alert) alert.style.display = 'none';
+            if (form) form.style.display = 'block';
+            prefillHelpdeskUserFields('tab');
+        }
+
+        // Modal specific controls
+        let _modalHelpdeskChannel = 'whatsapp';
+        function switchModalHelpdeskChannel(channel) {
+            _modalHelpdeskChannel = channel;
+            const waBtn = document.getElementById('modalChannelWhatsappBtn');
+            const portalBtn = document.getElementById('modalChannelPortalBtn');
+            const officerRow = document.getElementById('modalHelpdeskOfficerRow');
+            const actionBtn = document.getElementById('modalHelpdeskActionBtn');
+
+            if (channel === 'whatsapp') {
+                if (waBtn) { waBtn.style.background = '#25D366'; waBtn.style.color = 'white'; }
+                if (portalBtn) { portalBtn.style.background = 'transparent'; portalBtn.style.color = 'var(--text-muted)'; }
+                if (officerRow) officerRow.style.display = 'block';
+                if (actionBtn) {
+                    actionBtn.style.background = '#25D366';
+                    actionBtn.innerHTML = '<i class="fab fa-whatsapp"></i> Send via WhatsApp';
+                }
+            } else {
+                if (portalBtn) { portalBtn.style.background = 'var(--primary)'; portalBtn.style.color = '#0b0f19'; }
+                if (waBtn) { waBtn.style.background = 'transparent'; waBtn.style.color = 'var(--text-muted)'; }
+                if (officerRow) officerRow.style.display = 'none';
+                if (actionBtn) {
+                    actionBtn.style.background = 'var(--primary)';
+                    actionBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Submit to Log';
+                }
+            }
+        }
+
+        function onModalCategoryChange(cat) {
+            const sel = document.getElementById('modalHelpdeskOfficerSelect');
+            if (sel) {
+                if (cat === 'FEE_QUERY') sel.selectedIndex = 2;
+                else if (cat === 'SCORE_QUERY') sel.selectedIndex = 1;
+                else if (cat === 'COMPLAINT') sel.selectedIndex = 3;
+                else sel.selectedIndex = 0;
+            }
+        }
+
+        function toggleModalAnonymous(isAnon) {
+            const group = document.getElementById('modalHelpdeskIdentityGroup');
+            if (group) group.style.opacity = isAnon ? '0.5' : '1';
+        }
+
+        async function handleModalHelpdeskSubmit(e) {
+            e.preventDefault();
+            const cat = document.getElementById('modalHelpdeskCategory')?.value || 'GENERAL';
+            const name = (document.getElementById('modalHelpdeskName')?.value || '').trim();
+            const phone = (document.getElementById('modalHelpdeskPhone')?.value || '').trim();
+            const roll = (document.getElementById('modalHelpdeskRoll')?.value || '').trim();
+            const message = (document.getElementById('modalHelpdeskMessage')?.value || '').trim();
+            const honey = (document.getElementById('modalHelpdeskHoney')?.value || '').trim();
+            const errBox = document.getElementById('modalHelpdeskErrorAlert');
+            const isAnon = !!document.getElementById('modalHelpdeskAnonymousCheck')?.checked;
+
+            if (_modalHelpdeskChannel === 'whatsapp') {
+                if (!name || name.length < 2) {
+                    if (errBox) { errBox.textContent = 'Please enter your name.'; errBox.style.display = 'block'; }
+                    return;
+                }
+                if (!phone || phone.replace(/\D/g, '').length < 10) {
+                    if (errBox) { errBox.textContent = 'Please enter a valid 10-digit mobile number.'; errBox.style.display = 'block'; }
+                    return;
+                }
+                if (!message || message.length < 5) {
+                    if (errBox) { errBox.textContent = 'Please enter at least 5 characters.'; errBox.style.display = 'block'; }
+                    return;
+                }
+                if (errBox) errBox.style.display = 'none';
+                const officerPhone = document.getElementById('modalHelpdeskOfficerSelect')?.value || '919767092670';
+                const text = generateEaWhatsAppText({ category: cat, name: name, phone: phone, rollNo: roll, message: message });
+                window.open('https://wa.me/' + officerPhone.replace(/\D/g, '') + '?text=' + encodeURIComponent(text), '_blank', 'noopener,noreferrer');
+                closeHelpdeskModal();
+                return;
+            }
+
+            // Portal mode
+            if (honey) {
+                document.getElementById('modalHelpdeskForm').style.display = 'none';
+                document.getElementById('modalHelpdeskSuccessAlert').style.display = 'block';
+                return;
+            }
+
+            if (!isAnon) {
+                if (!name || name.length < 2) {
+                    if (errBox) { errBox.textContent = 'Please enter your name or choose anonymous.'; errBox.style.display = 'block'; }
+                    return;
+                }
+                if (!phone || phone.replace(/\D/g, '').length < 10) {
+                    if (errBox) { errBox.textContent = 'Please enter a valid 10-digit mobile number.'; errBox.style.display = 'block'; }
+                    return;
+                }
+            }
+            if (!message || message.length < 5) {
+                if (errBox) { errBox.textContent = 'Please enter at least 5 characters.'; errBox.style.display = 'block'; }
+                return;
+            }
+            if (errBox) errBox.style.display = 'none';
+
+            const actionBtn = document.getElementById('modalHelpdeskActionBtn');
+            if (actionBtn) {
+                actionBtn.disabled = true;
+                actionBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Submitting...';
+            }
+
+            const payload = {
+                category: cat,
+                name: isAnon ? (name || 'Anonymous (गुमनाम)') : name,
+                phone: isAnon ? (phone || 'N/A') : phone,
+                roll_no: isAnon ? null : (roll || null),
+                is_anonymous: isAnon,
+                message: message
+            };
+
+            try {
+                const resp = await eaFetch('/api/feedback', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const resData = await resp.json().catch(() => ({}));
+                if (resp.ok && resData.success) {
+                    document.getElementById('modalHelpdeskForm').style.display = 'none';
+                    document.getElementById('modalHelpdeskSuccessAlert').style.display = 'block';
+                    if (currentUserRole === 'admin' || currentUserRole === 'teacher') {
+                        loadHelpdeskTickets(true);
+                    }
+                } else {
+                    throw new Error(resData.error || 'Server submission failed.');
+                }
+            } catch (err) {
+                try {
+                    const localTickets = JSON.parse(localStorage.getItem('ea_feedback_tickets') || '[]');
+                    localTickets.unshift({ ...payload, submitted_at: new Date().toISOString() });
+                    localStorage.setItem('ea_feedback_tickets', JSON.stringify(localTickets.slice(0, 50)));
+                    document.getElementById('modalHelpdeskForm').style.display = 'none';
+                    document.getElementById('modalHelpdeskSuccessAlert').style.display = 'block';
+                } catch (e2) {
+                    if (errBox) {
+                        errBox.textContent = err.message || 'Submission error. Please send via WhatsApp.';
+                        errBox.style.display = 'block';
+                    }
+                }
+            } finally {
+                if (actionBtn) {
+                    actionBtn.disabled = false;
+                    actionBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Submit to Log';
+                }
+            }
+        }
+
+        function resetModalHelpdeskForm() {
+            const form = document.getElementById('modalHelpdeskForm');
+            const alert = document.getElementById('modalHelpdeskSuccessAlert');
+            const msg = document.getElementById('modalHelpdeskMessage');
+            if (msg) msg.value = '';
+            if (alert) alert.style.display = 'none';
+            if (form) form.style.display = 'block';
+            prefillHelpdeskUserFields('modal');
+        }
+
+        // Tab Loader & Staff Functions
+        function loadHelpdeskTab() {
+            prefillHelpdeskUserFields('tab');
+            const staffSection = document.getElementById('helpdeskStaffSection');
+            const isStaff = (currentUserRole === 'admin' || currentUserRole === 'teacher');
+            if (staffSection) {
+                staffSection.style.display = isStaff ? 'block' : 'none';
+            }
+            if (isStaff) {
+                loadHelpdeskTickets();
+            }
+        }
+
+        async function loadHelpdeskTickets(force = false) {
+            const listEl = document.getElementById('helpdeskTicketsList');
+            if (!listEl) return;
+            if (force) {
+                listEl.innerHTML = '<div style="text-align:center; color:var(--text-muted); padding:30px 10px;"><i class="fas fa-spinner fa-spin" style="font-size:20px; margin-bottom:8px;"></i><div>Refreshing tickets...</div></div>';
+            }
+
+            try {
+                const resp = await eaFetch('/api/feedback', { method: 'GET' });
+                const resData = await resp.json().catch(() => ({}));
+                if (resp.ok && resData.success && Array.isArray(resData.messages)) {
+                    _helpdeskCachedTickets = resData.messages;
+                    renderHelpdeskMetrics();
+                    renderHelpdeskTicketsList();
+                    updateHelpdeskBadges();
+                } else {
+                    listEl.innerHTML = '<div style="text-align:center; color:var(--text-muted); padding:20px;">' + _esc(resData.error || 'Unable to load tickets') + '</div>';
+                }
+            } catch (e) {
+                listEl.innerHTML = '<div style="text-align:center; color:var(--text-muted); padding:20px;">Cannot connect to helpdesk server. Please check connection.</div>';
+            }
+        }
+
+        function renderHelpdeskMetrics() {
+            const total = _helpdeskCachedTickets.length;
+            const pending = _helpdeskCachedTickets.filter(t => (t.status || 'PENDING') === 'PENDING').length;
+            const inReview = _helpdeskCachedTickets.filter(t => t.status === 'IN_REVIEW').length;
+            const resolved = _helpdeskCachedTickets.filter(t => t.status === 'RESOLVED').length;
+
+            const tEl = document.getElementById('helpdeskMetricTotal');
+            const pEl = document.getElementById('helpdeskMetricPending');
+            const irEl = document.getElementById('helpdeskMetricInReview');
+            const rEl = document.getElementById('helpdeskMetricResolved');
+
+            if (tEl) tEl.textContent = total;
+            if (pEl) pEl.textContent = pending;
+            if (irEl) irEl.textContent = inReview;
+            if (rEl) rEl.textContent = resolved;
+        }
+
+        function filterHelpdeskTickets() {
+            renderHelpdeskTicketsList();
+        }
+
+        function renderHelpdeskTicketsList() {
+            const listEl = document.getElementById('helpdeskTicketsList');
+            if (!listEl) return;
+
+            const statusFilter = document.getElementById('helpdeskFilterStatus')?.value || 'ALL';
+            const catFilter = document.getElementById('helpdeskFilterCategory')?.value || 'ALL';
+
+            let filtered = _helpdeskCachedTickets;
+            if (statusFilter !== 'ALL') {
+                filtered = filtered.filter(t => (t.status || 'PENDING') === statusFilter);
+            }
+            if (catFilter !== 'ALL') {
+                filtered = filtered.filter(t => t.category === catFilter);
+            }
+
+            if (!filtered.length) {
+                listEl.innerHTML = '<div style="text-align:center; color:var(--text-muted); padding:30px 10px; background:rgba(15,23,42,0.3); border-radius:10px;"><i class="fas fa-inbox" style="font-size:28px; opacity:0.5; margin-bottom:8px;"></i><div>No helpdesk tickets matching this filter.</div></div>';
+                return;
+            }
+
+            const catLabels = {
+                'SUGGESTION': { label: '💡 Suggestion', color: '#f59e0b' },
+                'FEE_QUERY': { label: '🧾 Fee Query', color: '#10b981' },
+                'SCORE_QUERY': { label: '📊 Score Query', color: '#38bdf8' },
+                'COMPLAINT': { label: '⚠️ Complaint', color: '#ef4444' },
+                'GENERAL': { label: '❓ General', color: '#94a3b8' }
+            };
+
+            const statusStyles = {
+                'PENDING': { label: 'PENDING', bg: 'rgba(245,158,11,0.15)', color: '#f59e0b', border: 'rgba(245,158,11,0.35)' },
+                'IN_REVIEW': { label: 'IN REVIEW', bg: 'rgba(56,189,248,0.15)', color: '#38bdf8', border: 'rgba(56,189,248,0.35)' },
+                'RESOLVED': { label: 'RESOLVED', bg: 'rgba(34,197,94,0.15)', color: '#22c55e', border: 'rgba(34,197,94,0.35)' },
+                'DISMISSED': { label: 'DISMISSED', bg: 'rgba(148,163,184,0.15)', color: '#94a3b8', border: 'rgba(148,163,184,0.35)' }
+            };
+
+            listEl.innerHTML = filtered.map(t => {
+                const catMeta = catLabels[t.category] || catLabels['GENERAL'];
+                const curStatus = t.status || 'PENDING';
+                const stMeta = statusStyles[curStatus] || statusStyles['PENDING'];
+                const dateStr = t.submitted_at ? new Date(t.submitted_at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) : 'Recent';
+                const cleanPhone = (t.phone || '').replace(/\D/g, '');
+                const hasPhone = !t.is_anonymous && cleanPhone.length >= 10;
+                const waReplyText = encodeURIComponent(`Hello ${_esc(t.name || 'Student')}, regarding your ticket #${t.id} (${catMeta.label}) at Excel Academy:\n\n`);
+
+                return `
+                <div style="background: rgba(15, 23, 42, 0.5); border: 1px solid var(--border); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 10px;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <span style="font-size: 11px; font-weight: 700; color: var(--text-muted); font-family: monospace;">#${t.id}</span>
+                            <span style="font-size: 11px; padding: 2px 8px; border-radius: 6px; font-weight: 700; color: ${catMeta.color}; background: rgba(255,255,255,0.05); border: 1px solid ${catMeta.color}33;">
+                                ${catMeta.label}
+                            </span>
+                            <span style="font-size: 11px; padding: 2px 8px; border-radius: 6px; font-weight: 700; color: ${stMeta.color}; background: ${stMeta.bg}; border: 1px solid ${stMeta.border};">
+                                ${stMeta.label}
+                            </span>
+                        </div>
+                        <span style="font-size: 11px; color: var(--text-muted);">${dateStr}</span>
+                    </div>
+
+                    <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 12px; font-size: 13px;">
+                        <div>
+                            <strong>From:</strong>
+                            ${t.is_anonymous
+                                ? '<span style="color:#a855f7; font-weight:600;"><i class="fas fa-shield-alt"></i> Confidential (Anonymous)</span>'
+                                : `<span style="color:var(--text); font-weight:600;">${_esc(t.name || '-')}</span>`
+                            }
+                        </div>
+                        ${!t.is_anonymous && t.roll_no ? `<div><strong>Roll/Class:</strong> <span style="color:var(--text); font-family:monospace;">${_esc(t.roll_no)}</span></div>` : ''}
+                        ${!t.is_anonymous && t.phone && t.phone !== 'N/A' ? `<div><strong>Phone:</strong> <a href="tel:${_esc(t.phone)}" style="color:var(--primary); text-decoration:underline;">${_esc(t.phone)}</a></div>` : ''}
+                    </div>
+
+                    <div style="background: rgba(30, 41, 59, 0.4); border-radius: 8px; padding: 12px; font-size: 13.5px; line-height: 1.5; color: var(--text); white-space: pre-wrap; word-break: break-word;">
+                        ${_esc(t.message || '')}
+                    </div>
+
+                    <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; padding-top: 6px; border-top: 1px solid rgba(255,255,255,0.05);">
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <label style="font-size: 12px; color: var(--text-muted); font-weight: 600;">Update Status:</label>
+                            <select onchange="updateHelpdeskTicketStatus(${t.id}, this.value)" style="padding: 5px 8px; font-size: 12px; border-radius: 6px; background: rgba(30, 41, 59, 0.8); border: 1px solid var(--border);">
+                                <option value="PENDING"${curStatus === 'PENDING' ? ' selected' : ''}>Pending</option>
+                                <option value="IN_REVIEW"${curStatus === 'IN_REVIEW' ? ' selected' : ''}>In Review</option>
+                                <option value="RESOLVED"${curStatus === 'RESOLVED' ? ' selected' : ''}>Resolved</option>
+                                <option value="DISMISSED"${curStatus === 'DISMISSED' ? ' selected' : ''}>Dismissed</option>
+                            </select>
+                        </div>
+                        <div style="display: flex; gap: 8px;">
+                            ${hasPhone ? `
+                            <a href="https://wa.me/${cleanPhone}?text=${waReplyText}" target="_blank" rel="noopener noreferrer" style="display:inline-flex; align-items:center; gap:6px; padding:6px 12px; border-radius:6px; background:#25D366; color:white; font-size:12px; font-weight:600; text-decoration:none;">
+                                <i class="fab fa-whatsapp"></i> Reply on WhatsApp
+                            </a>` : ''}
+                        </div>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        async function updateHelpdeskTicketStatus(ticketId, newStatus) {
+            try {
+                const resp = await eaFetch('/api/feedback/' + ticketId + '/status', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status: newStatus })
+                });
+                const resData = await resp.json().catch(() => ({}));
+                if (resp.ok && resData.success) {
+                    const ticket = _helpdeskCachedTickets.find(t => t.id === ticketId);
+                    if (ticket) ticket.status = newStatus;
+                    renderHelpdeskMetrics();
+                    renderHelpdeskTicketsList();
+                    updateHelpdeskBadges();
+                    showAlert('Ticket #' + ticketId + ' status updated to ' + newStatus, 'success');
+                } else {
+                    showAlert('Status update failed: ' + (resData.error || 'Server error'), 'danger');
+                }
+            } catch (e) {
+                showAlert('Error updating ticket status: ' + String(e.message || e), 'danger');
+            }
+        }
+
+        async function updateHelpdeskBadges() {
+            const isStaff = (currentUserRole === 'admin' || currentUserRole === 'teacher');
+            if (!isStaff) {
+                const sbBadge = document.getElementById('helpdeskPendingBadge');
+                const tbBadge = document.getElementById('helpdeskTabBadge');
+                if (sbBadge) sbBadge.style.display = 'none';
+                if (tbBadge) tbBadge.classList.add('hidden');
+                return;
+            }
+
+            let pendingCount = 0;
+            if (_helpdeskCachedTickets.length > 0) {
+                pendingCount = _helpdeskCachedTickets.filter(t => (t.status || 'PENDING') === 'PENDING').length;
+            } else {
+                try {
+                    const resp = await eaFetch('/api/feedback?status=PENDING', { method: 'GET' });
+                    const resData = await resp.json().catch(() => ({}));
+                    if (resp.ok && resData.success && Array.isArray(resData.messages)) {
+                        pendingCount = resData.messages.length;
+                    }
+                } catch (e) {
+                    return;
+                }
+            }
+
+            const sbBadge = document.getElementById('helpdeskPendingBadge');
+            const tbBadge = document.getElementById('helpdeskTabBadge');
+            if (sbBadge) {
+                if (pendingCount > 0) {
+                    sbBadge.textContent = pendingCount;
+                    sbBadge.style.display = 'inline-block';
+                } else {
+                    sbBadge.style.display = 'none';
+                }
+            }
+            if (tbBadge) {
+                if (pendingCount > 0) {
+                    tbBadge.textContent = pendingCount;
+                    tbBadge.classList.remove('hidden');
+                } else {
+                    tbBadge.classList.add('hidden');
+                }
+            }
+        }
+
+        // ============================================================
         // REPORTS TAB
         // ============================================================
+
 
         function loadReportsTab() {
             const data = db.getData ? db.getData() : {};

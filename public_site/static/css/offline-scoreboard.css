@@ -2210,7 +2210,49 @@
                 filter: none !important;
             }
         }
-
+        /* ── HELPDESK & FEEDBACK STYLES ── */
+        .helpdesk-cat-pill {
+            padding: 10px 14px;
+            border-radius: 10px;
+            background: rgba(30, 41, 59, 0.4);
+            border: 1px solid var(--border);
+            color: var(--text);
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            text-align: left;
+            transition: all 0.2s var(--ease-out);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            user-select: none;
+        }
+        .helpdesk-cat-pill:hover {
+            background: rgba(251, 191, 36, 0.12);
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+        .helpdesk-cat-pill.active {
+            background: linear-gradient(135deg, rgba(251, 191, 36, 0.22), rgba(217, 119, 6, 0.32));
+            border-color: var(--primary);
+            color: var(--primary);
+            box-shadow: 0 0 12px rgba(251, 191, 36, 0.18);
+        }
+        body.light-mode .helpdesk-cat-pill {
+            background: #f1f5f9;
+            border-color: #cbd5e1;
+            color: #1e293b;
+        }
+        body.light-mode .helpdesk-cat-pill:hover {
+            background: #e2e8f0;
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+        body.light-mode .helpdesk-cat-pill.active {
+            background: rgba(37, 99, 235, 0.12);
+            border-color: var(--primary);
+            color: var(--primary);
+        }
 /* Record Score penalty treatment: a deliberate coral/red shade that remains
    legible in both dark and light themes and is separate from attendance badges. */
 .record-penalty-card {
