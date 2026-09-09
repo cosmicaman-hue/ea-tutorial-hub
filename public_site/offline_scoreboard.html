@@ -16229,12 +16229,16 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             static IDB_SNAPSHOT_MIN_INTERVAL_MS = 5000; // 5s between snapshots
             _lastSnapshotTs = 0;
 
-            _idbWriteRollingSnapshot(serialized) {
+            _idbWriteRollingSnapshot(data) {
                 if (!this._idb) return;
                 const now = Date.now();
                 if (now - this._lastSnapshotTs < ScoreboardDB.IDB_SNAPSHOT_MIN_INTERVAL_MS) return;
-                this._lastSnapshotTs = now;
                 try {
+                    // Serialize only after the availability/throttle gates pass.
+                    // Previously every rapid edit stringified the full snapshot
+                    // even when this method immediately skipped the backup.
+                    const serialized = JSON.stringify(data);
+                    this._lastSnapshotTs = now;
                     const tx = this._idb.transaction('rolling_snapshots', 'readwrite');
                     const store = tx.objectStore('rolling_snapshots');
                     store.put({ ts: now, iso: new Date(now).toISOString(), data: serialized });
@@ -17052,7 +17056,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                 }
                 // ── E1: Rolling pre-save snapshot (throttled, async) ────────────
                 if (previousPersisted && !options.skipBackup) {
-                    try { this._idbWriteRollingSnapshot(JSON.stringify(previousPersisted)); } catch (e) {}
+                    try { this._idbWriteRollingSnapshot(previousPersisted); } catch (e) {}
                 }
                 preserveHistoricalMonthSnapshots(data, previousPersisted, options);
                 if (!options.preserveTimestamp) {
