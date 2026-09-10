@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#1a4d2e">
+  <title>Excel Study Notes — Excel Academy</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Lora:wght@500;700&family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/excel_study_notes/styles.css">
+</head>
+<body class="sn-lan">
+  <script>(function(){if(localStorage.getItem('ea_theme')==='dark')document.body.classList.add('dark');})()</script>
+  <div id="excelStudyNotesRoot"></div>
+  <script>
+    window.EA_EXCEL_STUDY_NOTES_CONFIG = {
+      mode: 'lan',
+      catalogUrl: '/scoreboard/excel-study-notes/api/catalog',
+      meUrl: '/scoreboard/excel-study-notes/api/me',
+      adminCatalogUrl: '/scoreboard/excel-study-notes/api/admin/catalog',
+      uploadUrl: '/scoreboard/excel-study-notes/api/admin/upload',
+      importCatalogUrl: '/scoreboard/excel-study-notes/api/admin/import-catalog',
+      exportUrl: '/scoreboard/excel-study-notes/api/admin/export',
+      publishUrl: '/scoreboard/excel-study-notes/api/admin/publish-public',
+      filesBase: '/scoreboard/excel-study-notes/files/'
+    };
+  </script>
+  <script src="/static/excel_study_notes/app.js"></script>
+</body>
+</html>

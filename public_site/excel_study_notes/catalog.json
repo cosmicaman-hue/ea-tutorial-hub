@@ -1,0 +1,208 @@
+{
+  "version": 1,
+  "revision": 10,
+  "updated_at": "2026-09-10T15:17:21Z",
+  "groups": [
+    {
+      "id": "grp-a610e04369",
+      "name": "Group A",
+      "description": "",
+      "sort_order": 0,
+      "classes": [
+        {
+          "id": "cls-3ed3fa4be7",
+          "name": "Class 2",
+          "sort_order": 0,
+          "subjects": []
+        },
+        {
+          "id": "cls-fce733edd9",
+          "name": "Class 3",
+          "sort_order": 1,
+          "subjects": []
+        },
+        {
+          "id": "cls-b72644cc3b",
+          "name": "Class 4",
+          "sort_order": 2,
+          "subjects": []
+        }
+      ]
+    },
+    {
+      "id": "grp-a883ab47b0",
+      "name": "Group B",
+      "description": "",
+      "sort_order": 1,
+      "classes": [
+        {
+          "id": "cls-c6e3ab885a",
+          "name": "Class 5",
+          "sort_order": 0,
+          "subjects": []
+        },
+        {
+          "id": "cls-5033c3cedf",
+          "name": "Class 6",
+          "sort_order": 1,
+          "subjects": []
+        }
+      ]
+    },
+    {
+      "id": "grp-d28a1b1430",
+      "name": "Group C",
+      "description": "",
+      "sort_order": 2,
+      "classes": [
+        {
+          "id": "cls-31162a85fd",
+          "name": "Class 7",
+          "sort_order": 0,
+          "subjects": []
+        },
+        {
+          "id": "cls-dda0da0f70",
+          "name": "Class 8",
+          "sort_order": 1,
+          "subjects": []
+        }
+      ]
+    },
+    {
+      "id": "grp-c2169b2314",
+      "name": "Group D",
+      "description": "",
+      "sort_order": 3,
+      "classes": [
+        {
+          "id": "cls-1f3910dfb2",
+          "name": "Class 9",
+          "sort_order": 0,
+          "subjects": [
+            {
+              "id": "sub-2bd3a9ccbb",
+              "name": "Science",
+              "sort_order": 0,
+              "notes": []
+            },
+            {
+              "id": "sub-d0c7bc1857",
+              "name": "SST",
+              "sort_order": 1,
+              "notes": [
+                {
+                  "id": "note-4d249e96c0",
+                  "title": "Chapter 1",
+                  "description": "Understanding Social Science",
+                  "tags": [],
+                  "file_type": "pdf",
+                  "original_name": "C9-SST-CH1-Notes.pdf",
+                  "storage_key": "note-4d249e96c0-149d9a798aa3.pdf",
+                  "size_bytes": 357592,
+                  "date_added": "2026-09-01T13:40:03Z"
+                },
+                {
+                  "id": "note-34dd028f58",
+                  "title": "Chapter 2",
+                  "description": "Shaping of the Earth's surface",
+                  "tags": [],
+                  "file_type": "pdf",
+                  "original_name": "C9-SST-CH2-Notes.pdf",
+                  "storage_key": "note-34dd028f58-18faba6a5173.pdf",
+                  "size_bytes": 254750,
+                  "date_added": "2026-09-01T13:40:54Z"
+                },
+                {
+                  "id": "note-8fddeb2a68",
+                  "title": "Chapter 3",
+                  "description": "Atmosphere and Climate",
+                  "tags": [],
+                  "file_type": "pdf",
+                  "original_name": "C9-SST-CH3-Notes.pdf",
+                  "storage_key": "note-8fddeb2a68-549665789d7b.pdf",
+                  "size_bytes": 565730,
+                  "date_added": "2026-09-01T13:41:28Z"
+                }
+              ]
+            },
+            {
+              "id": "sub-e866a49d20",
+              "name": "English Literature",
+              "sort_order": 2,
+              "notes": []
+            },
+            {
+              "id": "sub-34fd0c1e46",
+              "name": "English Grammar",
+              "sort_order": 3,
+              "notes": []
+            },
+            {
+              "id": "sub-a53890f66a",
+              "name": "Hindi Literature",
+              "sort_order": 4,
+              "notes": []
+            },
+            {
+              "id": "sub-3c116a5e6d",
+              "name": "Hindi Grammar",
+              "sort_order": 5,
+              "notes": [
+                {
+                  "id": "note-be7c0e4caa",
+                  "title": "Hindi Grammar",
+                  "description": "नुक्ता और संधि ",
+                  "tags": [],
+                  "file_type": "pdf",
+                  "original_name": "Hindi-Vyakaran.pdf",
+                  "storage_key": "note-be7c0e4caa-10627d072f03.pdf",
+                  "size_bytes": 517264,
+                  "date_added": "2026-09-10T15:14:30Z"
+                }
+              ]
+            },
+            {
+              "id": "sub-b193dc9fa8",
+              "name": "Information Technology",
+              "sort_order": 6,
+              "notes": []
+            },
+            {
+              "id": "sub-31ce9f793e",
+              "name": "Artificial Intelligence",
+              "sort_order": 7,
+              "notes": []
+            },
+            {
+              "id": "sub-21aaf52e13",
+              "name": "Subject",
+              "sort_order": 8,
+              "notes": []
+            }
+          ]
+        },
+        {
+          "id": "cls-01a523b95d",
+          "name": "Class 10",
+          "sort_order": 1,
+          "subjects": []
+        }
+      ]
+    },
+    {
+      "id": "grp-54bc47f8c0",
+      "name": "Group H",
+      "description": "",
+      "sort_order": 4,
+      "classes": [
+        {
+          "id": "cls-481f6d7c8a",
+          "name": "Class 11",
+          "sort_order": 0,
+          "subjects": []
+        }
+      ]
+    }
+  ]
+}
