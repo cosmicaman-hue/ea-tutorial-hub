@@ -82,7 +82,8 @@
   }
 
   function isPublicAuthenticated() {
-    try { return !!JSON.parse(localStorage.getItem('ea_public_auth') || 'null'); } catch (e) { return false; }
+    const authKey = String(config.authStorageKey || 'ea_public_auth');
+    try { return !!JSON.parse(localStorage.getItem(authKey) || 'null'); } catch (e) { return false; }
   }
 
   function fileUrl(storageKey) {
@@ -107,7 +108,10 @@
   }
 
   function renderGate() {
-    root.innerHTML = '<div class="sn-gate"><h1>Excel Study Notes</h1><p>Sign in to read the academy\'s published PDF notes. Notes open inside the protected reader and are not offered as ordinary downloads.</p><p class="sn-privacy">The browser must receive PDF pixels to display them. Copying, printing, download controls, and context menus are deterred, but no browser can absolutely prevent screenshots or determined network capture.</p></div>';
+    const loginAction = config.loginUrl
+      ? '<p><a class="sn-btn primary" href="' + esc(config.loginUrl) + '">Sign in on the main site</a></p>'
+      : '';
+    root.innerHTML = '<div class="sn-gate"><h1>Excel Study Notes</h1><p>Sign in to read the academy\'s published PDF notes. Notes open inside the protected reader and are not offered as ordinary downloads.</p>' + loginAction + '<p class="sn-privacy">The browser must receive PDF pixels to display them. Copying, printing, download controls, and context menus are deterred, but no browser can absolutely prevent screenshots or determined network capture.</p></div>';
   }
 
   function renderLoading() {
@@ -466,8 +470,6 @@
     if (event.key === 'PrintScreen') event.preventDefault();
     if (event.key === 'Escape') closeReader();
   });
-  window.addEventListener('ea-auth-changed', function () { if (config.mode === 'public') load(); });
-
   async function load() {
     state.loading = true;
     state.catalog = null;
@@ -495,5 +497,11 @@
   }
 
   root.addEventListener('click', function (event) { if (event.target.closest('[data-retry]')) load(); });
+  if (config.mode === 'public' && config.requireAuthForNotes) {
+    window.addEventListener('ea-auth-changed', load);
+    window.addEventListener('storage', function (event) {
+      if (event.key === String(config.authStorageKey || 'ea_public_auth')) load();
+    });
+  }
   load();
 }());
