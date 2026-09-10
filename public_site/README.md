@@ -9,7 +9,8 @@ This folder contains public files for static hosting on Cloudflare Pages.
 - `offline_scoreboard.html` - full SPA scoreboard (cross-origin mode via meta tag; no longer linked from the public UI)
 - `static/css/offline-scoreboard.css` - SPA stylesheet
 - `excel_results/` - Excel Results SPA (`catalog.json`, papers, `app.js`) managed from the LAN admin tab; see `excel_results/README.md`
-- `_headers` - cache-control rules (keeps `scores.json`, `credentials.json`, Excel Results catalog, and SPA fresh on Cloudflare)
+- `excel_study_notes/` - published-only PDF Study Notes catalog, reader assets, and files managed from the LAN admin tab
+- `_headers` - cache-control rules (keeps `scores.json`, `credentials.json`, Excel Results, Study Notes, and SPA assets fresh on Cloudflare)
 
 ## Client-side login gate
 
