@@ -3493,6 +3493,7 @@ function renderInfo(data) {
             catalogUrl: './excel_study_notes/catalog.json',
             filesBase: './excel_study_notes/files/',
             authStorageKey: 'ea_public_auth',
+            isAuthenticated: function () { return isLoggedIn(); },
             requireAuthForNotes: true
         };
     </script>

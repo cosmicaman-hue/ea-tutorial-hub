@@ -82,6 +82,9 @@
   }
 
   function isPublicAuthenticated() {
+    if (typeof config.isAuthenticated === 'function') {
+      try { return !!config.isAuthenticated(); } catch (e) {}
+    }
     const authKey = String(config.authStorageKey || 'ea_public_auth');
     try { return !!JSON.parse(localStorage.getItem(authKey) || 'null'); } catch (e) { return false; }
   }
