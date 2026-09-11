@@ -1451,5 +1451,14 @@
     document.body.classList.add('dark');
   }
 
+  if (cfg.mode === 'public') {
+    window.addEventListener('ea-auth-changed', () => {
+      render();
+    });
+    window.addEventListener('storage', (e) => {
+      if (e.key === 'ea_public_auth') render();
+    });
+  }
+
   loadAll();
 })();

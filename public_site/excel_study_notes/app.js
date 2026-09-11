@@ -316,7 +316,9 @@
         body: JSON.stringify(state.adminCatalog),
       });
       state.adminCatalog = body.data;
-      state.catalog = await fetchJson(config.catalogUrl).then(function (response) { return response.data; });
+      state.catalog = await fetchJson(config.catalogUrl).then(function (response) {
+        return response && response.data ? response.data : response;
+      });
       state.status = 'Saved. Published visibility has been refreshed.';
       state.statusType = 'success';
       render();
@@ -490,7 +492,8 @@
         state.csrf = me.csrf_token || '';
         if (state.canAdmin) state.adminCatalog = (await fetchJson(config.adminCatalogUrl)).data;
       }
-      state.catalog = (await fetchJson(config.catalogUrl)).data;
+      const catData = await fetchJson(config.catalogUrl);
+      state.catalog = catData && catData.data ? catData.data : catData;
       state.loading = false;
       render();
     } catch (error) {

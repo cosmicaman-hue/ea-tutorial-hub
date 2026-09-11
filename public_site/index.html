@@ -3422,10 +3422,37 @@ function renderInfo(data) {
         document.getElementById('publicRankingReplay').addEventListener('click', replayPublicRanking);
         document.getElementById('infoLoginLink').addEventListener('click', openLoginModal);
 
-        // ── Init ──
-        if (String(location.hash || '').indexOf('#er') === 0) setActiveTab('excel-results');
-        else if (String(location.hash || '').indexOf('#sn') === 0) setActiveTab('excel-study-notes');
-        else setActiveTab('home');
+        // ── Init & Hash Routing ──
+        function handleHash() {
+            const h = String(location.hash || '').toLowerCase();
+            if (h.indexOf('#er') === 0 || h.indexOf('#excel-results') === 0) {
+                setActiveTab('excel-results');
+                if (!isLoggedIn() && h.indexOf('#er/results') === 0) openLoginModal();
+            } else if (h.indexOf('#sn') === 0 || h.indexOf('#excel-study-notes') === 0) {
+                if (!isLoggedIn()) {
+                    activeTab = 'excel-study-notes';
+                    openLoginModal();
+                } else {
+                    setActiveTab('excel-study-notes');
+                }
+            } else if (h === '#scoreboard') {
+                if (!isLoggedIn()) openLoginModal(); else setActiveTab('scoreboard');
+            } else if (h === '#ranking') {
+                if (!isLoggedIn()) openLoginModal(); else setActiveTab('ranking');
+            } else if (h === '#parties') {
+                if (!isLoggedIn()) openLoginModal(); else setActiveTab('parties');
+            } else if (h === '#chess') {
+                if (!isLoggedIn()) openLoginModal(); else setActiveTab('chess');
+            } else if (h === '#info') {
+                if (!isLoggedIn()) openLoginModal(); else setActiveTab('info');
+            } else if (h === '#helpdesk') {
+                setActiveTab('helpdesk');
+            } else if (!h || h === '#home' || h === '#') {
+                setActiveTab('home');
+            }
+        }
+        handleHash();
+        window.addEventListener('hashchange', handleHash);
         applyAuthState();
         requestAnimationFrame(() => {
             document.querySelectorAll('.appear').forEach((el, idx) => {
