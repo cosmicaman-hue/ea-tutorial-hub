@@ -3657,12 +3657,12 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
 
         <!-- TAB: EXCEL RESULTS -->
         <div id="excel-results-tab" class="tab-content hidden">
-            <iframe id="excelResultsFrame" title="Excel Results" src="/scoreboard/excel-results" style="width:100%;min-height:78vh;border:0;border-radius:18px;background:transparent"></iframe>
+            <iframe id="excelResultsFrame" title="Excel Results" src="about:blank" data-src="./excel_results/index.html" style="width:100%;min-height:78vh;border:0;border-radius:18px;background:transparent"></iframe>
         </div>
 
         <!-- TAB: EXCEL STUDY NOTES -->
         <div id="excel-study-notes-tab" class="tab-content hidden">
-            <iframe id="excelStudyNotesFrame" title="Excel Study Notes" src="/scoreboard/excel-study-notes" style="width:100%;min-height:82vh;border:0;border-radius:18px;background:transparent"></iframe>
+            <iframe id="excelStudyNotesFrame" title="Excel Study Notes" src="about:blank" data-src="./excel_study_notes/index.html" style="width:100%;min-height:82vh;border:0;border-radius:18px;background:transparent"></iframe>
         </div>
 
         <!-- TAB: SYLLABUS -->
@@ -9420,7 +9420,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
         }
 
         async function checkinDevice(event = 'login') {
-            if (!SERVER_SYNC.enabled) return;
+            if (!SERVER_SYNC.enabled || !hasServerSession) return;
             try {
                 const info = parseDeviceInfo();
                 await eaFetch('/scoreboard/device-checkin', {
@@ -9560,6 +9560,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
         let currentLoginId = '';
         let currentStudentRoll = '';
         let hasServerSession = false;
+        let sessionContextChecked = !SERVER_SYNC.enabled;
         let feesModuleEnabled = true;
         let currentStudentPositions = {};  // populated after session loads for students
         let isSelfProfileEditMode = false;
@@ -11131,6 +11132,8 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
         async function refreshServerHealth() {
             const body = document.getElementById('serverHealthBody');
             if (!body) return;
+            const role = normalizeUserRole(currentUserRole);
+            if (!hasServerSession || (role !== 'admin' && role !== 'teacher')) return;
             const urls = getSyncBaseUrls();
             if (!urls.length) {
                 body.innerHTML = '<tr><td colspan="5" style="text-align:center; color:var(--text-muted);">No server URLs configured.</td></tr>';
@@ -11188,6 +11191,8 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
         async function refreshSupabaseHealth() {
             const textEl = document.getElementById('supabaseHealthText');
             if (!textEl) return;
+            const role = normalizeUserRole(currentUserRole);
+            if (!hasServerSession || (role !== 'admin' && role !== 'teacher')) return;
             textEl.style.color = 'var(--text-muted)';
             textEl.textContent = 'Checking Supabase...';
             try {
@@ -19010,6 +19015,38 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             return _tabDomCache;
         }
 
+        function _prepareProtectedModuleTab(tabName) {
+            const frameIdByTab = {
+                'excel-results': 'excelResultsFrame',
+                'excel-study-notes': 'excelStudyNotesFrame'
+            };
+            const frameId = frameIdByTab[tabName];
+            if (!frameId) return true;
+
+            const frame = document.getElementById(frameId);
+            if (!frame) return true;
+            if (SERVER_SYNC.enabled && !hasServerSession) {
+                // During startup, wait for the session probe before deciding that
+                // login is required. This avoids redirecting users with valid cookies.
+                if (!sessionContextChecked) return true;
+                _writeTabToSession(tabName);
+                _writeTabToHash(tabName);
+                if (SERVER_SYNC.crossOrigin || !isLANHost()) {
+                    window.__eaPendingProtectedTab = tabName;
+                    openCrossOriginLoginModal();
+                } else {
+                    const next = `/scoreboard/offline#tab=${encodeURIComponent(tabName)}`;
+                    window.location.href = `/auth/login?next=${encodeURIComponent(next)}`;
+                }
+                return false;
+            }
+
+            if (frame.getAttribute('src') === 'about:blank') {
+                frame.setAttribute('src', frame.dataset.src || 'about:blank');
+            }
+            return true;
+        }
+
         function switchTab(tabName, evt) {
             if (typeof window.__eaRequestSidebarClose === 'function') {
                 window.__eaRequestSidebarClose();
@@ -19038,6 +19075,8 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             if (!isTabAccessibleForCurrentRole(tabName)) {
                 tabName = 'scoreboard';
             }
+
+            if (!_prepareProtectedModuleTab(tabName)) return;
 
             // Hide all tabs (remove any lingering entrance class too)
             _allTabs.forEach(tab => {
@@ -21557,6 +21596,11 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                         await refreshAllowedMonthsFromServer();
                         applyRolePermissions();
                         await pullFromServer(false, true).catch(() => {});
+                        const pendingTab = window.__eaPendingProtectedTab;
+                        if (pendingTab) {
+                            window.__eaPendingProtectedTab = '';
+                            switchTab(pendingTab);
+                        }
                     }
                 } else {
                     if (errEl) { errEl.textContent = (data && data.error) || 'Login failed. Please try again.'; errEl.style.display = 'block'; }
@@ -62326,8 +62370,6 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             ensureDefaultServerEndpoints();
             applyColumnVisibility();
             populateServerEndpointInputs();
-            refreshServerHealth();
-            refreshSupabaseHealth();
             updateAuthButtons();
             // Reset admin historical edit mode on every fresh load
             window.__eaAdminHistoricalEditEnabled = false;
@@ -62544,7 +62586,13 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                 if ((SERVER_SYNC.crossOrigin || !isLANHost()) && !navigator.onLine) {
                     showCrossOriginOfflineBanner();
                 }
-                await loadSessionContext(3);
+                const sessionReady = await loadSessionContext(3);
+                sessionContextChecked = true;
+                if (sessionReady && (currentUserRole === 'admin' || currentUserRole === 'teacher')) {
+                    refreshServerHealth();
+                    refreshSupabaseHealth();
+                }
+                _prepareProtectedModuleTab(getActiveTabName());
                 await refreshAllowedMonthsFromServer();
                 if (!TEMP_DISABLE_AUTO_SYNC_LOOPS) {
                     checkinDevice('login');
