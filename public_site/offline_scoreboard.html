@@ -184,7 +184,7 @@
         <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
         <link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@900&display=swap" rel="stylesheet">
     </noscript>
-    <link rel="stylesheet" href="/static/css/offline-scoreboard.css?v=9">
+    <link rel="stylesheet" href="/static/css/offline-scoreboard.css?v=10">
 
 <script>
     // System Performance Overhaul: Async localstorage debouncer (Per-Key Isolated)
@@ -2326,7 +2326,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                     </div>
                     <div class="form-group" id="recordPenaltySingleHint" data-penalty-target-field="single">
                         <label>Student</label>
-                        <div class="record-penalty-selected-student" id="recordPenaltySingleStudent">Choose a student in the form above.</div>
+                        <select id="recordPenaltySingleStudent" aria-label="Student to penalize" onchange="updateRecordPenaltyTargetFields()"><option value="">Select student...</option></select>
                     </div>
                     <div class="form-group">
                         <label>Points to Deduct *</label>
@@ -6884,7 +6884,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                 <div class="form-grid">
                     <div class="form-group">
                         <label>Date</label>
-                        <input type="date" id="attendanceDate" onchange="loadAttendanceTab()">
+                        <input type="date" id="attendanceDate" onchange="loadAttendanceTab(this.value.substring(0, 7))">
                     </div>
                     <div class="form-group">
                         <label>Month</label>
@@ -6924,6 +6924,8 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                 <div class="form-buttons">
                     <button class="secondary" onclick="markAllAttendance('present')">Mark All Present</button>
                     <button class="secondary" onclick="markAllAttendance('absent')">Mark All Absent</button>
+                    <button class="secondary" onclick="markAllAttendance('holiday')">Mark All Holiday</button>
+                    <span class="section-subtitle">Holiday carries no penalty and is excluded from attendance percentages.</span>
                     <button onclick="saveAttendance()">Save Attendance</button>
                 </div>
 
@@ -6991,6 +6993,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                         <select id="bulkAttendanceMarkStatus1" onchange="renderBulkAttendanceCalendar(); renderBulkAttendanceDates();">
                             <option value="absent">Absent</option>
                             <option value="leave">Leave</option>
+                            <option value="holiday">Holiday</option>
                             <option value="present">Present</option>
                             <option value="late">Late</option>
                         </select>
@@ -7001,6 +7004,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                             <option value="">None</option>
                             <option value="absent">Absent</option>
                             <option value="leave">Leave</option>
+                            <option value="holiday">Holiday</option>
                             <option value="present">Present</option>
                             <option value="late">Late</option>
                         </select>
@@ -7011,6 +7015,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                             <option value="">None</option>
                             <option value="absent">Absent</option>
                             <option value="leave">Leave</option>
+                            <option value="holiday">Holiday</option>
                             <option value="present">Present</option>
                             <option value="late">Late</option>
                         </select>
@@ -7025,6 +7030,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                             <option value="present" selected>Present</option>
                             <option value="absent">Absent</option>
                             <option value="leave">Leave</option>
+                            <option value="holiday">Holiday</option>
                             <option value="late">Late</option>
                         </select>
                     </div>
@@ -7057,11 +7063,12 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                                     <th style="width: 120px;">Absent</th>
                                     <th style="width: 120px;">Late</th>
                                     <th style="width: 120px;">Leave</th>
+                                    <th>Holiday</th>
                                 </tr>
                             </thead>
                             <tbody id="attendanceReportBody">
                                 <tr>
-                                    <td colspan="7" class="text-center loading">Loading...</td>
+                                    <td colspan="8" class="text-center loading">Loading...</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -7110,12 +7117,13 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                                     <th style="width: 120px;">Absent</th>
                                     <th style="width: 120px;">Late</th>
                                     <th style="width: 120px;">Leave</th>
+                                    <th>Holiday</th>
                                     <th style="width: 120px;">Present %</th>
                                 </tr>
                             </thead>
                             <tbody id="attendanceStudentReportBody">
                                 <tr>
-                                    <td colspan="9" class="text-center loading">Loading...</td>
+                                    <td colspan="10" class="text-center loading">Loading...</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -7872,6 +7880,14 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                 .nb-selector-row label { font-size: 0.78rem; font-weight: 600; color: #555; text-transform: uppercase; letter-spacing: .4px; }
                 .nb-selector-row select, .nb-selector-row input[type="date"] { border: 1.5px solid #ced4da; border-radius: 8px; padding: 7px 10px; font-size: 0.9rem; background: #fff; min-width: 140px; }
                 .nb-selector-row select:focus, .nb-selector-row input:focus { outline: none; border-color: #667eea; }
+                .nb-selector-row input[type="search"] { border:1.5px solid #ced4da; border-radius:8px; padding:7px 10px; font-size:.9rem; background:var(--card-bg, #fff); color:inherit; }
+                .nb-roster-bar { display:flex; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:12px; }
+                .nb-roster-bar button { min-height:44px; padding:8px 14px; border-radius:8px; }
+                .nb-entry-actions { position:sticky; bottom:0; z-index:2; display:flex; flex-wrap:wrap; gap:8px; align-items:center; padding:12px; background:var(--card-bg, #fff); border:1px solid #667eea; border-radius:10px; }
+                body:not(.light-mode) .nb-entry-actions { background:#1e293b; }
+                .nb-page button:disabled { opacity:.5; cursor:not-allowed; }
+                .nb-grade-pill { min-height:40px; }
+                .nb-grade-pill:focus-visible { outline:3px solid #667eea; outline-offset:2px; }
                 .nb-all-completed-bar { display: flex; align-items: center; gap: 10px; background: #f0f4ff; border: 1.5px solid #c7d2fe; border-radius: 9px; padding: 9px 14px; margin-bottom: 12px; }
                 .nb-all-completed-bar input[type="checkbox"] { width: 17px; height: 17px; cursor: pointer; accent-color: #667eea; }
                 .nb-all-completed-bar label { cursor: pointer; font-weight: 600; font-size: 0.88rem; color: #3730a3; margin: 0; }
@@ -8214,6 +8230,12 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                         <div class="field"><label>Group</label><select id="nbEntryGroup"><option value="">-- Select Group --</option></select></div>
                         <div class="field"><label>Class</label><select id="nbEntryClass" disabled><option value="">-- Select Class --</option></select></div>
                         <div class="field"><label>Student</label><select id="nbEntryStudent" disabled><option value="">-- Select Student --</option></select></div>
+                        <div class="field"><label for="nbStudentSearch">Find student in class</label><input type="search" id="nbStudentSearch" placeholder="Name or roll…" oninput="nbFilterStudents()" disabled></div>
+                    </div>
+                    <div class="nb-roster-bar">
+                        <button type="button" class="secondary" id="nbPreviousStudentBtn" onclick="nbMoveStudent(-1)" disabled>← Previous</button>
+                        <span id="nbStudentPosition" role="status" aria-live="polite">Select a class to load students.</span>
+                        <button type="button" class="secondary" id="nbNextStudentBtn" onclick="nbNextStudent()" disabled>Next →</button>
                     </div>
                     <div id="nbLastCheck" class="nb-last-check" style="display:none"></div>
                     <div id="nbSubjectPanel" style="display:none">
@@ -8251,10 +8273,10 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                             <label><i class="fas fa-comment-dots me-1"></i>Consolidated Remarks</label>
                             <textarea class="nb-consol-textarea" id="nbConsolRemarks" placeholder="Overall feedback for this student's notebooks…"></textarea>
                         </div>
-                        <div style="display:flex;flex-wrap:wrap;align-items:center">
+                        <div class="nb-entry-actions">
                             <button class="nb-btn-save" id="nbSaveBtn" onclick="nbSaveCheck()"><i class="fas fa-save me-2"></i>Save &amp; Add to Scoreboard</button>
-                            <button class="nb-btn-next" id="nbNextStudentBtn" onclick="nbNextStudent()" disabled><i class="fas fa-forward me-1"></i> Next Student</button>
-                            <span id="nbSaveStatus" style="margin-left:12px;font-size:.87rem;color:#555"></span>
+                            <button class="nb-btn-next" id="nbSaveNextBtn" onclick="nbSaveCheck(true)" disabled><i class="fas fa-forward me-1"></i> Save &amp; Next</button>
+                            <span id="nbSaveStatus" role="status" aria-live="polite" style="font-size:.87rem"></span>
                         </div>
                         <div class="nb-kb-hint">
                             <span><kbd>1</kbd> Excellent</span>
@@ -8266,7 +8288,9 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                             <span><kbd>7</kbd> Untidy</span>
                             <span><kbd>8</kbd> Not Submitted</span>
                             <span><kbd>Space</kbd> Toggle check</span>
-                            <span><kbd>Enter</kbd> Save</span>
+                            <span><kbd>Ctrl + Enter</kbd> Save</span>
+                            <span><kbd>Ctrl + Shift + Enter</kbd> Save &amp; Next</span>
+                            <span><kbd>Alt + ← / →</kbd> Previous / Next</span>
                             <span><kbd>→</kbd> Next student</span>
                         </div>
                     </div>
@@ -17890,6 +17914,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             upsertAttendanceBatch(records, options = {}) {
                 const data = this.getData();
                 data.attendance = Array.isArray(data.attendance) ? data.attendance : [];
+                const previousAttendance = data.attendance.map(row => row && typeof row === 'object' ? { ...row } : row);
                 const latestByKey = new Map();
                 data.attendance.forEach(item => {
                     const key = `${String(item.date || '')}::${String(item.studentId)}`;
@@ -17919,12 +17944,20 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                     } else {
                         item = { id: generateUniqueId(), ...normalizedRecord, created_at: stamp, updated_at: stamp };
                         latestByKey.set(key, item);
+                        data.attendance.push(item);
                     }
                     saved.push(item);
                 });
                 if (!saved.length) return saved;
-                data.attendance = Array.from(latestByKey.values());
-                this.saveData(data, { allowTeacher: true, skipSync: options.skipSync === true });
+                // Preserve collision and orphan rows; only the latest matching mark is edited.
+                try {
+                    if (this.saveData(data, { allowTeacher: true, skipSync: options.skipSync === true }) === false) {
+                        throw new Error('Attendance could not be saved locally. Your previous marks were retained.');
+                    }
+                } catch (error) {
+                    data.attendance = previousAttendance;
+                    throw error;
+                }
                 return saved;
             }
 
@@ -19053,6 +19086,470 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             }
             _switchTabImpl(tabName, evt);
         }
+        // EA_WORKSPACES_BEGIN
+/* EA workspaces: embedded in the three offline SPA copies for offline hosting.
+ * Keep module permissions, saves, calculations and historical records separate.
+ */
+const EA_WORKSPACES = [
+    ['results', 'Results', ['scoreboard', 'ranking', 'group-scoreboard', 'party-standings']],
+    ['daily', 'Daily Work', ['attendance', 'notebooks', 'add-score']],
+    ['students', 'Student Progress', ['my-dashboard', 'students', 'profile', 'good-conduct']],
+    ['learning', 'Learning', ['syllabus', 'excel-study-notes', 'excel-results']],
+    ['requests', 'Requests & Notices', ['helpdesk', 'appeals', 'proposals', 'notifications']],
+    ['governance', 'Governance', ['office', 'gr', 'leadership', 'voting', 'leadership-selection', 'party']],
+    ['welfare', 'Resources & Welfare', ['resources', 'awf']],
+    ['fees', 'Fees', ['fees']],
+    ['reports', 'Reporting', ['daily-summary', 'reports']],
+    ['information', 'Information', ['information', 'rules']],
+    ['events', 'Events Archive', ['excel-mela', 'team-competition', 'excel-chess-champion']],
+    ['admin', 'Administration', ['teachers', 'tools', 'settings']]
+];
+let eaResultsMonth = '';
+let eaDailyContext = null;
+let eaDailyApplying = false;
+let eaHolidayBusy = false;
+let eaHolidayPreview = null;
+let eaPublishAttempt = null; // Session-only; do not store private server errors on shared browsers.
+
+function eaWorkspaceAllowed(tab) {
+    return isTabAccessibleForCurrentRole(tab);
+}
+function eaWorkspaceAdmin() {
+    return currentUserRole === 'admin' && (!SERVER_SYNC.enabled || hasServerSession);
+}
+function eaWorkspaceButton(tab) {
+    return document.querySelector(`.sidebar-nav-item[data-tab="${tab}"]`);
+}
+function eaWorkspaceLabel(tab) {
+    return eaWorkspaceButton(tab)?.querySelector('.sidebar-link-text')?.textContent.trim() || tab;
+}
+function eaWorkspaceElement(tag, text, className) {
+    const el = document.createElement(tag);
+    if (text !== undefined) el.textContent = text;
+    if (className) el.className = className;
+    return el;
+}
+function eaWorkspaceInit() {
+    const nav = document.querySelector('.sidebar-nav');
+    if (!nav || nav.dataset.workspacesReady) return;
+    nav.dataset.workspacesReady = 'true';
+    nav.querySelectorAll('.sidebar-section-label').forEach(el => el.remove());
+    EA_WORKSPACES.forEach(([key, label, tabs]) => {
+        const group = eaWorkspaceElement('details', undefined, 'ea-nav-group');
+        group.dataset.workspace = key;
+        group.open = ['results', 'daily', 'students'].includes(key);
+        group.append(eaWorkspaceElement('summary', label));
+        tabs.forEach(tab => { const btn = eaWorkspaceButton(tab); if (btn) group.append(btn); });
+        nav.append(group);
+    });
+    const settings = document.getElementById('settings-tab');
+    if (settings) {
+        const card = eaWorkspaceElement('section', undefined, 'card ea-workspace-card');
+        card.id = 'eaEventSettings';
+        card.append(eaWorkspaceElement('h3', 'Seasonal event shortcuts'));
+        card.append(eaWorkspaceElement('p', 'Choose events to keep open in this browser. All events and their history remain available in Events Archive.'));
+        EA_WORKSPACES.find(w => w[0] === 'events')[2].forEach(tab => {
+            const label = eaWorkspaceElement('label', undefined, 'ea-inline-choice');
+            const input = eaWorkspaceElement('input'); input.type = 'checkbox';
+            input.dataset.eventShortcut = tab;
+            try { input.checked = localStorage.getItem('ea_event_shortcut_' + tab) === 'true'; } catch (_) {}
+            input.addEventListener('change', () => {
+                if (!eaWorkspaceAdmin()) return;
+                try { localStorage.setItem('ea_event_shortcut_' + tab, String(input.checked)); } catch (_) {}
+                eaWorkspaceRefresh();
+            });
+            label.append(input, document.createTextNode(eaWorkspaceLabel(tab))); card.append(label);
+        });
+        const subjectBtn = eaWorkspaceElement('button', 'Notebook subject settings', 'btn btn-secondary');
+        subjectBtn.type = 'button';
+        subjectBtn.addEventListener('click', async () => {
+            if (!eaWorkspaceAdmin()) return;
+            switchTab('notebooks');
+            await eaWorkspaceWait(() => nbInitialized);
+            nbSwitchSubTab('settings');
+        });
+        card.append(subjectBtn); settings.prepend(card);
+    }
+    eaWorkspaceWrapAdvanced('bulkPastAttendanceCard', 'Advanced: retrospective bulk attendance');
+    eaWorkspaceWrapAdvanced('pointsStarConversionModule', 'Advanced: points to stars');
+    eaWorkspaceWrapAdvanced('starVetoConversionModule', 'Advanced: stars to VETO');
+    document.addEventListener('change', eaWorkspaceCapture);
+    document.addEventListener('input', event => {
+        if (event.target.closest('#add-score-tab') && !event.target.closest('.ea-workspace-bar')) {
+            const id = event.target.id || '';
+            if (['scorePoints','scoreStars','scoreVetos','scoreNotes'].includes(id)) {
+                document.getElementById('add-score-tab').dataset.workspaceDraft = 'true';
+            }
+        }
+    });
+    eaWorkspaceHolidayInit();
+}
+function eaWorkspaceWrapAdvanced(id, label) {
+    const card = document.getElementById(id);
+    if (!card || card.closest('.ea-advanced')) return;
+    const details = eaWorkspaceElement('details', undefined, 'ea-advanced');
+    details.append(eaWorkspaceElement('summary', label));
+    card.before(details); details.append(card);
+}
+function eaWorkspaceRefresh(tab = getActiveTabName()) {
+    eaWorkspaceInit();
+    EA_WORKSPACES.forEach(([key, , tabs]) => {
+        const group = document.querySelector(`.ea-nav-group[data-workspace="${key}"]`);
+        if (!group) return;
+        group.hidden = !tabs.some(eaWorkspaceAllowed);
+        if (tabs.includes(tab)) group.open = true;
+        if (key === 'events') {
+            const active = tabs.filter(t => {
+                try { return localStorage.getItem('ea_event_shortcut_' + t) === 'true'; } catch (_) { return false; }
+            });
+            group.querySelector('summary').textContent = active.length ? 'Events · active season' : 'Events Archive';
+            if (active.length) group.open = true;
+            tabs.forEach(t => eaWorkspaceButton(t)?.classList.toggle('ea-season-active', active.includes(t)));
+            let archive = group.querySelector('.ea-event-archive');
+            if (!archive) {
+                archive = eaWorkspaceElement('details', undefined, 'ea-event-archive');
+                archive.append(eaWorkspaceElement('summary', 'Other events & history'));
+                group.append(archive);
+            }
+            const signature = active.join('|');
+            if (group.dataset.season !== signature) {
+                tabs.forEach(t => {
+                    const button = eaWorkspaceButton(t);
+                    if (button) (active.length && !active.includes(t) ? archive : group).append(button);
+                });
+                group.append(archive); archive.open = false; group.dataset.season = signature;
+            }
+            archive.hidden = !active.length || active.length === tabs.length;
+            if (tabs.includes(tab) && active.length && !active.includes(tab)) archive.open = true;
+        }
+    });
+    const eventSettings = document.getElementById('eaEventSettings');
+    if (eventSettings) eventSettings.hidden = !eaWorkspaceAdmin();
+    const advanced = document.getElementById('bulkPastAttendanceCard')?.closest('.ea-advanced');
+    if (advanced) advanced.hidden = !eaWorkspaceAdmin();
+    const holiday = document.getElementById('eaHolidayCalendar');
+    if (holiday) holiday.hidden = !eaWorkspaceAdmin();
+    const panel = document.getElementById('eaPublishPanel');
+    if (panel) panel.hidden = !eaWorkspaceAdmin();
+    const workspace = EA_WORKSPACES.find(w => w[2].includes(tab));
+    const host = document.getElementById(tab + '-tab');
+    if (!host || !workspace || !eaWorkspaceAllowed(tab)) return;
+    let bar = host.querySelector('.ea-workspace-bar');
+    if (!bar) { bar = eaWorkspaceElement('section', undefined, 'ea-workspace-bar'); host.prepend(bar); }
+    bar.replaceChildren(eaWorkspaceElement('strong', workspace[1]));
+    workspace[2].filter(eaWorkspaceAllowed).forEach(target => {
+        const btn = eaWorkspaceElement('button', eaWorkspaceLabel(target), 'ea-workspace-link');
+        btn.type = 'button'; btn.dataset.allow = 'true';
+        btn.setAttribute('aria-current', String(target === tab));
+        btn.addEventListener('click', () => eaWorkspaceOpen(target)); bar.append(btn);
+    });
+    if (workspace[0] === 'results') eaWorkspaceResultsBar(bar, tab);
+    if (workspace[0] === 'daily') eaWorkspaceDailyBar(bar);
+    if (workspace[0] === 'admin' && eaWorkspaceAdmin()) eaWorkspacePublishPanel();
+}
+function eaWorkspaceResultsBar(bar, tab) {
+    const label = eaWorkspaceElement('label', 'Month ');
+    const input = eaWorkspaceElement('input'); input.type = 'month'; input.dataset.allow = 'true';
+    const ids = {scoreboard:'monthSelector', ranking:'rankingMonth', 'group-scoreboard':'groupMonthFilter', 'party-standings':'partyStandingsMonthFilter'};
+    input.value = getElementValue(ids[tab]) || eaResultsMonth || getCurrentMonthKey();
+    input.setAttribute('aria-label', 'Shared Results month');
+    input.addEventListener('change', () => {
+        if (!input.value) return;
+        const select = document.getElementById(ids[tab]);
+        if (!select || !Array.from(select.options).some(o => o.value === input.value)) {
+            showAlert('This month is not available in this Results view.', 'warning');
+            input.value = eaResultsMonth || getElementValue(ids[tab]); return;
+        }
+        eaResultsMonth = input.value;
+        select.value = input.value; select.dispatchEvent(new Event('change', {bubbles:true}));
+    });
+    label.append(input); bar.append(label);
+}
+function eaWorkspaceCapture(event) {
+    const ids = ['monthSelector','rankingMonth','groupMonthFilter','partyStandingsMonthFilter'];
+    if (ids.includes(event.target.id) && /^\d{4}-\d{2}$/.test(event.target.value)) {
+        eaResultsMonth = event.target.value;
+        eaWorkspaceRefresh(getActiveTabName());
+    }
+    const dailyIds = ['scoreStudent','scoreDate','nbEntryStudent','nbEntryDate','attendanceDate'];
+    if (!dailyIds.includes(event.target.id) || eaDailyApplying) return;
+    const tab = getActiveTabName();
+    let student = null, date = '';
+    if (tab === 'add-score') {
+        student = db.getStudents().find(s => String(s.id) === getElementValue('scoreStudent'));
+        date = getElementValue('scoreDate');
+    } else if (tab === 'notebooks') {
+        student = db.getStudents().find(s => normalizeAttendanceRoll(s.roll) === normalizeAttendanceRoll(getElementValue('nbEntryStudent')));
+        date = getElementValue('nbEntryDate');
+    } else if (tab === 'attendance') {
+        date = getElementValue('attendanceDate');
+        student = eaDailyContext && db.getStudents().find(s => String(s.id) === eaDailyContext.studentId);
+    }
+    if (date) eaDailyContext = {studentId:student ? String(student.id) : '', date};
+    eaWorkspaceRefresh(tab);
+}
+function eaWorkspaceDailyBar(bar) {
+    const fields = eaWorkspaceElement('div', undefined, 'ea-daily-context');
+    const search = eaWorkspaceElement('input'); search.type = 'search';
+    search.placeholder = 'Find name or roll'; search.setAttribute('aria-label', 'Find Daily Work student');
+    const select = eaWorkspaceElement('select'); select.setAttribute('aria-label', 'Daily Work student');
+    const roster = db.getStudents().filter(s => s.active !== false);
+    function options(query = '') {
+        select.replaceChildren(new Option('Choose student…', ''));
+        roster.filter(s => String(s.id) === eaDailyContext?.studentId || `${s.name} ${s.roll}`.toLowerCase().includes(query.toLowerCase())).forEach(s => {
+            select.add(new Option(`${s.roll} · ${s.name} · ${s.class || ''}`, String(s.id)));
+        });
+        select.value = eaDailyContext?.studentId || '';
+    }
+    options(); search.addEventListener('input', () => options(search.value));
+    const date = eaWorkspaceElement('input'); date.type = 'date';
+    date.setAttribute('aria-label', 'Daily Work date'); date.value = eaDailyContext?.date || formatDateKey(new Date());
+    const remember = () => { eaDailyContext = {studentId:select.value, date:date.value}; };
+    select.addEventListener('change', remember); date.addEventListener('change', remember);
+    const hint = eaWorkspaceElement('small', 'Choose student/date, then open a Daily Work screen above. Each screen saves separately.');
+    fields.append(search, select, date, hint); bar.append(fields);
+    if (getActiveTabName() === 'attendance') {
+        const discard = eaWorkspaceElement('button', 'Discard attendance draft', 'btn btn-secondary');
+        discard.type = 'button'; discard.addEventListener('click', eaWorkspaceDiscardAttendance);
+        fields.append(discard);
+    }
+}
+function eaWorkspaceDiscardAttendance() {
+    if (!eaWorkspaceAllowed('attendance') || eaDailyApplying || eaHolidayBusy) return false;
+    if (!Object.keys(attendanceDraftState.rows || {}).length) {
+        showAlert('There is no attendance draft to discard.', 'info'); return false;
+    }
+    if (!confirm('Discard unsaved attendance entries? Saved attendance records remain unchanged.')) return false;
+    resetAttendanceDraft(getElementValue('attendanceDate'), getElementValue('attendanceMonth'));
+    loadAttendanceTab(); eaWorkspaceRefresh(getActiveTabName());
+    return true;
+}
+async function eaWorkspaceWait(predicate) {
+    for (let i = 0; i < 100; i++) {
+        if (predicate()) return;
+        await new Promise(resolve => setTimeout(resolve, 80));
+    }
+    throw new Error('The screen is still loading. Try again once loading completes.');
+}
+async function eaWorkspaceOpen(tab) {
+    if (!eaWorkspaceAllowed(tab) || eaDailyApplying) return false;
+    const daily = ['attendance','notebooks','add-score'].includes(tab);
+    const context = daily && eaDailyContext ? {...eaDailyContext} : null;
+    if (context && tab === 'notebooks' && !nbAllowContextChange()) return false;
+    if (context && tab === 'add-score' && document.getElementById('add-score-tab').dataset.workspaceDraft === 'true') {
+        if (!confirm('Changing Daily Work context will reload the score form. Discard unsaved score edits?')) return false;
+    }
+    if (context && tab === 'attendance' && Object.keys(attendanceDraftState.rows || {}).length) {
+        showAlert('Save or discard the current attendance draft before applying Daily Work context.', 'warning'); return false;
+    }
+    eaDailyApplying = true;
+    try {
+        switchTab(tab);
+        await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+        if (getActiveTabName() !== tab || !eaWorkspaceAllowed(tab)) return false;
+        if (context) await eaWorkspaceApplyDaily(tab, context);
+        if (['scoreboard','ranking','group-scoreboard','party-standings'].includes(tab) && eaResultsMonth) {
+            const ids = {scoreboard:'monthSelector',ranking:'rankingMonth','group-scoreboard':'groupMonthFilter','party-standings':'partyStandingsMonthFilter'};
+            const input = document.getElementById(ids[tab]);
+            if (input && Array.from(input.options).some(o => o.value === eaResultsMonth)) {
+                input.value = eaResultsMonth; input.dispatchEvent(new Event('change', {bubbles:true}));
+            } else showAlert('The shared month is unavailable here; this view keeps its own month.', 'info');
+        }
+        eaWorkspaceRefresh(tab); return true;
+    } catch (error) { showAlert(error.message, 'warning'); return false; }
+    finally { eaDailyApplying = false; }
+}
+function eaWorkspaceChange(id, value) {
+    const input = document.getElementById(id);
+    if (!input) throw new Error('This screen is not ready.');
+    if (input.value === String(value)) return;
+    if (input.tagName === 'SELECT' && !Array.from(input.options).some(o => o.value === String(value))) {
+        throw new Error('Selected student context is unavailable in this screen. Choose from its current roster.');
+    }
+    input.value = value; input.dispatchEvent(new Event('change', {bubbles:true}));
+}
+async function eaWorkspaceApplyDaily(tab, context) {
+    if (!context.date || !/^\d{4}-\d{2}-\d{2}$/.test(context.date)) throw new Error('Choose a valid Daily Work date.');
+    const month = context.date.slice(0,7);
+    if (!teacherValidateCurrentMonth(context.date, month, 'Daily Work') || !isMonthAllowedForCurrentUser(month)) {
+        throw new Error('You cannot modify this month.');
+    }
+    const original = db.getStudents().find(s => String(s.id) === context.studentId);
+    if (context.studentId && !original) throw new Error('The selected student is no longer available. Choose again.');
+    const student = original ? getMonthAwareStudent(original, month, getMonthRosterProfileMap(month)) : null;
+    if (tab === 'attendance') {
+        eaWorkspaceChange('attendanceMonth', month);
+        eaWorkspaceChange('attendanceDate', context.date);
+        if (student) eaWorkspaceChange('attendanceGroupFilter', getStudentGroup(student));
+        loadAttendanceTab();
+        if (student) document.querySelector(`[data-attendance-student="${student.id}"]`)?.closest('tr')?.scrollIntoView({block:'center'});
+    } else if (tab === 'add-score') {
+        if (student) clearScoreForm();
+        eaWorkspaceChange('scoreDate', context.date);
+        if (student) {
+            eaWorkspaceChange('scoreGroupFilter', getStudentGroup(student));
+            eaWorkspaceChange('scoreClassFilter', String(student.class || ''));
+            eaWorkspaceChange('scoreStudent', String(student.id));
+        }
+        document.getElementById('add-score-tab').dataset.workspaceDraft = '';
+    } else if (tab === 'notebooks') {
+        await eaWorkspaceWait(() => nbInitialized && document.getElementById('nbEntryGroup').options.length > 1);
+        if (student && !Array.from(document.getElementById('nbEntryGroup').options).some(o => o.value === getStudentGroup(student))) {
+            throw new Error('The selected group is unavailable in Notebooks. Choose from its current roster.');
+        }
+        // The handoff already obtained discard confirmation. Avoid prompting again
+        // at every cascading selector, and clear the old grades before loading.
+        if (nbEntryBaseline !== null && nbEntrySignature() !== nbEntryBaseline) nbResetSubjectPanel();
+        if (student) {
+            eaWorkspaceChange('nbEntryGroup', getStudentGroup(student));
+            await eaWorkspaceWait(() => !nbLoading);
+            eaWorkspaceChange('nbEntryClass', String(student.class || ''));
+            await eaWorkspaceWait(() => !nbLoading);
+            document.getElementById('nbStudentSearch').value = '';
+            nbFilterStudents();
+            eaWorkspaceChange('nbEntryStudent', String(student.roll));
+            await eaWorkspaceWait(() => !nbLoading);
+        }
+        eaWorkspaceChange('nbEntryDate', context.date);
+    }
+}
+function eaWorkspacePublishPanel() {
+    const host = document.getElementById('settings-tab');
+    if (!host || !eaWorkspaceAdmin()) return;
+    let panel = document.getElementById('eaPublishPanel');
+    if (!panel) { panel = eaWorkspaceElement('section', undefined, 'card ea-workspace-card'); panel.id = 'eaPublishPanel'; host.prepend(panel); }
+    panel.replaceChildren(eaWorkspaceElement('h3', 'Publishing status'));
+    const result = eaPublishAttempt?.public_site || {};
+    const commitLabels = {committed:'Created', not_confirmed:'Not confirmed', not_requested:'Not requested'};
+    const list = eaWorkspaceElement('dl', undefined, 'ea-publish-stages');
+    const stages = [
+        ['Last attempt', eaPublishAttempt?.attempted_at || 'No attempt in this session'],
+        ['Local public snapshot', result.local_snapshot === 'written' ? `Written · ${result.updated_at || ''}` : 'Not confirmed'],
+        ['Git commit', commitLabels[result.commit_status] || result.commit_status || 'Not confirmed'],
+        ['GitHub delivery', result.pushed === true ? 'Delivered' : (result.status === 'write_only' ? 'Failed; local snapshot retained' : 'Not confirmed')],
+        ['Hosting verification', 'Not checked. GitHub delivery does not confirm a hosting deployment.']
+    ];
+    stages.forEach(([label, value]) => list.append(eaWorkspaceElement('dt', label), eaWorkspaceElement('dd', value)));
+    panel.append(list);
+    if (result.error) panel.append(eaWorkspaceElement('p', result.error, 'ea-publish-error'));
+    if (eaPublishAttempt?.error) panel.append(eaWorkspaceElement('p', eaPublishAttempt.error, 'ea-publish-error'));
+    const retry = eaWorkspaceElement('button', 'Publish / Retry GitHub delivery', 'btn btn-primary');
+    retry.type = 'button'; retry.disabled = !SERVER_SYNC.enabled || forcePublishRunning;
+    retry.addEventListener('click', forcePublishNow); panel.append(retry);
+    const help = eaWorkspaceElement('details'); help.append(eaWorkspaceElement('summary', 'GitHub authentication recovery'));
+    help.append(eaWorkspaceElement('p', 'On the server computer, sign in using Git Credential Manager, then retry publishing.'));
+    help.append(eaWorkspaceElement('code', 'git credential-manager github login --force --browser'));
+    panel.append(help);
+}
+function eaWorkspacePublishResult(payload) {
+    eaPublishAttempt = {...payload, attempted_at:new Date().toISOString()};
+    eaWorkspacePublishPanel();
+}
+function eaWorkspaceHolidayInit() {
+    const host = document.getElementById('attendance-tab');
+    if (!host || document.getElementById('eaHolidayCalendar')) return;
+    const panel = eaWorkspaceElement('details', undefined, 'card ea-workspace-card');
+    panel.id = 'eaHolidayCalendar'; panel.append(eaWorkspaceElement('summary', 'Holiday calendar · Admin'));
+    panel.append(eaWorkspaceElement('p', 'Preview holidays for active students in the selected month. Existing marks are retained unless you explicitly confirm replacement.'));
+    const fields = [['eaHolidayFrom','From','date'],['eaHolidayTo','To','date'],['eaHolidayReason','Holiday name / reason','text']];
+    fields.forEach(([id,text,type]) => {
+        const label = eaWorkspaceElement('label', text + ' '), input = eaWorkspaceElement('input');
+        input.id = id; input.type = type; if (type === 'text') input.maxLength = 200;
+        label.append(input); panel.append(label);
+    });
+    const label = eaWorkspaceElement('label', 'Group '), group = eaWorkspaceElement('select'); group.id = 'eaHolidayGroup';
+    group.add(new Option('All groups', 'all'));
+    Array.from(new Set(db.getStudents().map(getStudentGroup).filter(Boolean))).sort().forEach(g => group.add(new Option(g,g)));
+    label.append(group); panel.append(label);
+    const preview = eaWorkspaceElement('button', 'Preview affected dates & students', 'btn btn-secondary');
+    preview.type = 'button'; preview.addEventListener('click', eaWorkspaceHolidayPreview);
+    const output = eaWorkspaceElement('div'); output.id = 'eaHolidayPreview'; output.setAttribute('aria-live','polite');
+    const apply = eaWorkspaceElement('button', 'Confirm holiday marks', 'btn btn-primary'); apply.id = 'eaHolidayApply';
+    apply.type = 'button'; apply.disabled = true; apply.addEventListener('click', eaWorkspaceHolidayApply);
+    panel.append(preview, output, apply);
+    panel.addEventListener('input', () => { eaHolidayPreview = null; apply.disabled = true; output.textContent = 'Settings changed. Preview again.'; });
+    panel.addEventListener('change', () => { eaHolidayPreview = null; apply.disabled = true; output.textContent = 'Settings changed. Preview again.'; });
+    host.append(panel);
+}
+function eaWorkspaceHolidayPlan() {
+    if (!eaWorkspaceAdmin()) throw new Error('Only Admin can apply a holiday range.');
+    const from = getElementValue('eaHolidayFrom'), to = getElementValue('eaHolidayTo');
+    const reason = getElementValue('eaHolidayReason').trim(), group = getElementValue('eaHolidayGroup');
+    const valid = value => /^\d{4}-\d{2}-\d{2}$/.test(value) && new Date(value + 'T12:00:00Z').toISOString().slice(0,10) === value;
+    if (!valid(from) || !valid(to) || from > to || from.slice(0,7) !== to.slice(0,7)) throw new Error('Choose a valid range within one month.');
+    if (!reason) throw new Error('Enter the holiday name or reason.');
+    const month = from.slice(0,7);
+    if (!isMonthAllowedForCurrentUser(month)) throw new Error('You cannot modify this month.');
+    const profiles = getMonthRosterProfileMap(month);
+    const students = getAttendanceStudentsByStatus(db.getStudents(), 'active', month)
+        .map(s => getMonthAwareStudent(s, month, profiles)).filter(s => group === 'all' || getStudentGroup(s) === group);
+    if (!students.length) throw new Error('No active students match this group and month.');
+    const existing = new Map();
+    db.getAttendance().forEach(row => {
+        const key = `${row.studentId}|${row.date}`, previous = existing.get(key);
+        if (!previous || (Date.parse(row.updated_at || row.created_at) || 0) >= (Date.parse(previous.updated_at || previous.created_at) || 0)) existing.set(key,row);
+    });
+    const rows = [], replacements = [], dates = [];
+    for (let day = Number(from.slice(8)); day <= Number(to.slice(8)); day++) {
+        const date = `${month}-${String(day).padStart(2,'0')}`; dates.push(date);
+        students.forEach(student => {
+            const previous = existing.get(`${student.id}|${date}`);
+            if (previous && normalizeAttendanceStatus(previous.status) === 'holiday') return;
+            if (previous) replacements.push({date,roll:student.roll,status:previous.status,remarks:previous.remarks || ''});
+            rows.push({date,studentId:student.id,roll:normalizeAttendanceRoll(student.roll),status:'holiday',
+                remarks:previous?.remarks ? `${previous.remarks} | Holiday: ${reason}` : `Holiday: ${reason}`,
+                ...(previous ? {holiday_previous_mark:{id:previous.id,status:previous.status,remarks:previous.remarks || '',
+                    marked_by:previous.marked_by || '',created_at:previous.created_at || '',updated_at:previous.updated_at || ''}} : {}),
+                marked_by:currentLoginId || currentUserRole});
+        });
+    }
+    return {from,to,group,reason,dates,students,rows,replacements};
+}
+function eaWorkspaceHolidayPreview() {
+    if (eaHolidayBusy) return;
+    try {
+        eaHolidayPreview = eaWorkspaceHolidayPlan();
+        const plan = eaHolidayPreview, output = document.getElementById('eaHolidayPreview');
+        output.replaceChildren(eaWorkspaceElement('p', `${plan.dates.length} date(s), ${plan.students.length} students, ${plan.rows.length} new or changed marks. ${plan.replacements.length} existing marks will be replaced.`));
+        output.append(eaWorkspaceElement('p', 'Dates: ' + plan.dates.join(', ')));
+        const details = eaWorkspaceElement('details'); details.append(eaWorkspaceElement('summary','Affected students and existing marks'));
+        details.append(eaWorkspaceElement('p', plan.students.map(s => `${s.roll} · ${s.name}`).join(', ')));
+        plan.replacements.forEach(r => details.append(eaWorkspaceElement('p', `${r.date} · ${r.roll} · ${r.status}${r.remarks ? ' · ' + r.remarks : ''}`)));
+        output.append(details); document.getElementById('eaHolidayApply').disabled = !plan.rows.length;
+    } catch (error) { eaHolidayPreview = null; showAlert(error.message, 'warning'); document.getElementById('eaHolidayApply').disabled = true; }
+}
+async function eaWorkspaceHolidayApply() {
+    if (eaHolidayBusy || !eaHolidayPreview || !eaWorkspaceAdmin()) return false;
+    let plan;
+    try { plan = eaWorkspaceHolidayPlan(); } catch (error) { showAlert(error.message, 'warning'); return false; }
+    if (JSON.stringify(plan) !== JSON.stringify(eaHolidayPreview)) {
+        eaWorkspaceHolidayPreview(); showAlert('Attendance or roster changed. Review the refreshed preview before confirming.', 'warning'); return false;
+    }
+    if (Object.keys(attendanceDraftState.rows || {}).length) {
+        showAlert('Save or discard the attendance draft before applying holidays.', 'warning'); return false;
+    }
+    if (!confirm(`Apply ${plan.rows.length} holiday marks for ${plan.from} to ${plan.to}? ${plan.replacements.length} existing marks will be replaced; existing remarks are retained.`)) return false;
+    eaHolidayBusy = true;
+    const button = document.getElementById('eaHolidayApply'); button.disabled = true;
+    try {
+        const changed = db.upsertAttendanceBatch(plan.rows, {skipSync:true});
+        if (!changed.length) throw new Error('No holiday changes were saved.');
+        let pushed = true;
+        if (SERVER_SYNC.enabled && changed.length) {
+            const ids = new Set(changed.map(r => String(r.studentId)));
+            const students = db.getStudents().filter(s => ids.has(String(s.id))).map(s => ({id:s.id,roll:normalizeAttendanceRoll(s.roll)})).filter(s => s.roll);
+            pushed = await pushAttendancePatchReliable({attendance:changed,students}, changed);
+        }
+        eaHolidayPreview = null;
+        document.getElementById('eaHolidayPreview').textContent = `${changed.length} holiday marks saved locally.${pushed ? '' : ' Server sync is pending and will retry.'}`;
+        loadAttendanceTab(); loadAttendanceReport(); loadScoreboard();
+        showAlert(pushed ? 'Holiday marks saved.' : 'Holiday marks saved locally; server sync pending.', pushed ? 'success' : 'warning');
+        return true;
+    } catch (error) { showAlert('Could not complete holiday marking: ' + error.message, 'danger'); return false; }
+    finally { eaHolidayBusy = false; }
+}
+        // EA_WORKSPACES_END
+
         function _switchTabImpl(tabName, evt) {
             const _tabDom = _getTabDomCache();
             const _allTabs = _tabDom.tabs;
@@ -19177,6 +19674,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                     requestAnimationFrame(() => {
                         if (_renderFrame !== _tabRenderFrame) return;
                         _safeRender(_renderer, tabName);
+                        eaWorkspaceRefresh(tabName);
                     });
                 }
             }
@@ -19184,6 +19682,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                 scoreboardRefreshPending = false;
                 stabilizeScoreboardLayout({ month: getElementValue('monthSelector') || getCurrentMonthKey() });
             }
+            eaWorkspaceRefresh(tabName);
             _writeTabToSession(tabName);
             _writeTabToHash(tabName);
             if (tabName === 'ranking') startRankingAnimationLoop();
@@ -21260,6 +21759,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                 el.disabled = !isAdmin;
             });
             enforceTeacherCurrentMonthOnlyUi();
+            eaWorkspaceRefresh();
         }
 
         // localStorage keys for remembering the last logged-in profile per browser.
@@ -22241,7 +22741,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             const merged = new Map();
             const normalizeStatus = (value) => {
                 const status = String(value || '').trim().toLowerCase();
-                if (status === 'absent' || status === 'late' || status === 'leave' || status === 'present') return status;
+                if (status === 'absent' || status === 'late' || status === 'leave' || status === 'holiday' || status === 'present') return status;
                 return 'present';
             };
             const existingIdByRoll = new Map();
@@ -24345,6 +24845,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                 return;
             }
             forcePublishRunning = true;
+            eaWorkspacePublishResult({mode:'running'});
             const btn = document.getElementById('globalPublishBtn');
             const prevHtml = btn ? btn.innerHTML : '';
             if (btn) {
@@ -24384,6 +24885,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                     const shortBody = await resp.text().catch(() => '');
                     throw new Error(`non-JSON server response (${resp.status}) ${shortBody.slice(0, 120)}`);
                 }
+                eaWorkspacePublishResult(payload);
                 if (!resp.ok || !payload.success) {
                     throw new Error(payload.error || `publish failed (HTTP ${resp.status})`);
                 }
@@ -24393,7 +24895,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                     if (String(publicStatus).toLowerCase() === 'write_only' && publicSite.error) {
                         showAlert(`Force Publish wrote local public snapshot, but Git push failed: ${publicSite.error}`, 'warning', 0);
                     } else {
-                        showAlert(`Force Publish complete ✓  Cloudflare public site: ${publicStatus}`, 'success', 0);
+                        showAlert(`Local snapshot: ${publicStatus}. GitHub delivery: ${publicSite.pushed === true ? 'confirmed' : 'not confirmed'}. Hosting deployment has not been verified.`, publicSite.pushed === true ? 'success' : 'info', 0);
                     }
                     refreshServerHealth();
                     refreshSupabaseHealth();
@@ -24436,13 +24938,15 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                     pendingSyncPayload = db.getData();
                     scheduleSyncUpload(true);
                 } catch (fallbackErr) { /* ignore */ }
-                showAlert(`Force Publish accepted locally; remote replication will retry in background (${msg}).`, 'warning');
+                eaWorkspacePublishResult({error:msg});
+                showAlert(`Force Publish could not confirm delivery (${msg}). Normal sync has been queued; check Publishing status before retrying.`, 'warning');
             } finally {
                 if (btn) {
                     btn.disabled = false;
                     btn.innerHTML = prevHtml || '<i class="fas fa-upload"></i> Force Publish';
                 }
                 forcePublishRunning = false;
+                eaWorkspacePublishPanel();
             }
         }
 
@@ -27955,8 +28459,8 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             const candidates = getRecordScoreStudentCandidates(month, statusFilter);
             const byId = new Map(candidates.map(student => [parseInt(student.id, 10), student]));
             if (mode === 'single') {
-                const sid = parseInt(getElementValue('scoreStudent'), 10) || 0;
-                const student = byId.get(sid) || db.getStudents().find(item => parseInt(item.id, 10) === sid);
+                const sid = parseInt(getElementValue('recordPenaltySingleStudent'), 10) || 0;
+                const student = byId.get(sid);
                 return student ? [student] : [];
             }
             if (mode === 'group') {
@@ -27985,11 +28489,14 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             });
             const singleHint = document.getElementById('recordPenaltySingleStudent');
             if (singleHint) {
-                const sid = parseInt(getElementValue('scoreStudent'), 10) || 0;
-                const student = sid ? db.getStudents().find(item => parseInt(item.id, 10) === sid) : null;
-                singleHint.textContent = student
-                    ? `${student.base_name || student.name || 'Student'} (${formatRollDisplay(student.roll || '')})`
-                    : 'Choose a student in the form above.';
+                const { month, statusFilter } = getRecordPenaltyContext();
+                const candidates = getRecordScoreStudentCandidates(month, statusFilter);
+                const previous = singleHint.value;
+                singleHint.replaceChildren(new Option('Select student...', ''));
+                candidates.forEach(student => {
+                    singleHint.add(new Option(`${student.base_name || student.name || 'Student'} (${formatRollDisplay(student.roll || '')})`, String(student.id)));
+                });
+                singleHint.value = candidates.some(student => String(student.id) === previous) ? previous : '';
             }
             const summary = document.getElementById('recordPenaltyTargetSummary');
             if (summary) {
@@ -29852,6 +30359,77 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
         let nbCurrentType = 'tuition';
         let nbCurrentStudentRoll = null;
         let nbInitialized = false;
+        let nbStudentRoster = [];
+        let nbEntryBaseline = null;
+        let nbEntryContext = {};
+        let nbSaving = false;
+        let nbLoading = false;
+        let nbLoadGeneration = 0;
+
+        function nbEntrySignature() {
+            return JSON.stringify({ subjects: nbCollectSubjects(), remarks: document.getElementById('nbConsolRemarks').value.trim() });
+        }
+
+        function nbRememberContext() {
+            ['nbEntryGroup', 'nbEntryClass', 'nbEntryStudent', 'nbEntryDate'].forEach(id => {
+                nbEntryContext[id] = document.getElementById(id).value;
+            });
+        }
+
+        function nbAllowContextChange(control) {
+            const blocked = nbSaving || nbLoading;
+            const dirty = nbEntryBaseline !== null && nbEntrySignature() !== nbEntryBaseline;
+            if (blocked || (dirty && !confirm('Notebook scores have unsaved changes. Discard them and continue? Use Save or Save & Next to keep them.'))) {
+                if (control) control.value = nbEntryContext[control.id] || '';
+                return false;
+            }
+            return true;
+        }
+
+        function nbFilterStudents() {
+            const sel = document.getElementById('nbEntryStudent');
+            const term = document.getElementById('nbStudentSearch').value.trim().toLowerCase();
+            const matches = nbStudentRoster.filter(student => `${student.roll} ${student.name}`.toLowerCase().includes(term));
+            const visible = matches.slice();
+            const current = nbStudentRoster.find(student => String(student.roll) === String(nbCurrentStudentRoll));
+            if (current && !visible.includes(current)) visible.unshift(current);
+            sel.replaceChildren(new Option(matches.length ? '-- Select Student --' : 'No matching students', ''));
+            visible.forEach(student => sel.add(new Option(`${student.roll} – ${student.name}`, String(student.roll))));
+            sel.value = nbCurrentStudentRoll || '';
+            nbRefreshEntryControls();
+        }
+
+        function nbRefreshEntryControls() {
+            const busy = nbSaving || nbLoading;
+            const idx = nbStudentRoster.findIndex(student => String(student.roll) === String(nbCurrentStudentRoll));
+            document.getElementById('nbEntryGroup').disabled = busy;
+            document.getElementById('nbEntryClass').disabled = busy || !document.getElementById('nbEntryGroup').value;
+            document.getElementById('nbEntryStudent').disabled = busy || !nbStudentRoster.length;
+            document.getElementById('nbStudentSearch').disabled = busy || !nbStudentRoster.length;
+            document.getElementById('nbEntryDate').disabled = busy;
+            document.querySelectorAll('.type-pill[data-nbtype]').forEach(pill => { pill.disabled = busy; });
+            document.getElementById('nbSubjectPanel').inert = busy;
+            document.getElementById('nbSaveBtn').disabled = busy || !nbCurrentStudentRoll || nbEntryBaseline === null;
+            document.getElementById('nbPreviousStudentBtn').disabled = busy || idx <= 0;
+            document.getElementById('nbNextStudentBtn').disabled = busy || !nbStudentRoster.length || idx >= nbStudentRoster.length - 1;
+            document.getElementById('nbSaveNextBtn').disabled = busy || idx < 0 || idx >= nbStudentRoster.length - 1 || nbEntryBaseline === null;
+            document.getElementById('nbStudentPosition').textContent = nbStudentRoster.length
+                ? `${idx >= 0 ? idx + 1 : 0} / ${nbStudentRoster.length} students${nbLoading ? ' · Loading…' : ''}`
+                : 'Select a class to load students.';
+        }
+
+        function nbMoveStudent(direction) {
+            if (!nbAllowContextChange()) return;
+            const idx = nbStudentRoster.findIndex(student => String(student.roll) === String(nbCurrentStudentRoll));
+            const next = nbStudentRoster[idx + direction];
+            if (!next) return;
+            document.getElementById('nbStudentSearch').value = '';
+            nbCurrentStudentRoll = String(next.roll);
+            nbFilterStudents();
+            nbRememberContext();
+            nbLoadSubjectRows();
+            nbLoadLastCheck();
+        }
 
         function nbEscHtml(str) {
             if (str === null || str === undefined) return '';
@@ -29864,14 +30442,18 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             const el = document.getElementById('nbAlert');
             if (!el) return;
             el.className = 'nb-alert ' + type + ' show';
-            el.innerHTML = '<i class="fas fa-' + (type === 'success' ? 'check-circle' : 'exclamation-circle') + ' me-1"></i>' + msg;
+            el.innerHTML = '<i class="fas fa-' + (type === 'success' ? 'check-circle' : 'exclamation-circle') + ' me-1"></i>' + nbEscHtml(msg);
             setTimeout(function () { el.className = 'nb-alert'; }, 5500);
         }
 
         function nbApiFetch(url, opts) {
             opts = opts || {};
             const defaults = { headers: { 'Content-Type': 'application/json' }, credentials: 'include' };
-            return eaFetch(url, Object.assign(defaults, opts)).then(function (r) { return r.json(); });
+            return eaFetch(url, Object.assign(defaults, opts)).then(async function (r) {
+                const data = await r.json();
+                if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
+                return data;
+            });
         }
 
         function nbToday() { return new Date().toISOString().slice(0, 10); }
@@ -29917,6 +30499,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             // Wire type pills
             document.querySelectorAll('.type-pill[data-nbtype]').forEach(function (pill) {
                 pill.addEventListener('click', function () {
+                    if (!nbAllowContextChange()) return;
                     document.querySelectorAll('.type-pill[data-nbtype]').forEach(function (p) { p.classList.remove('active'); });
                     pill.classList.add('active');
                     nbCurrentType = pill.dataset.nbtype;
@@ -29926,6 +30509,16 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             });
             // Set today's date
             document.getElementById('nbEntryDate').value = nbToday();
+            nbRememberContext();
+            nbRefreshEntryControls();
+            document.getElementById('nbConsolRemarks').addEventListener('input', nbMarkEntryDirty);
+            document.getElementById('nbSubjectRows').addEventListener('input', nbMarkEntryDirty);
+            window.addEventListener('beforeunload', function (event) {
+                if (nbSaving || (nbEntryBaseline !== null && nbEntrySignature() !== nbEntryBaseline)) {
+                    event.preventDefault();
+                    event.returnValue = '';
+                }
+            });
 
             // Load groups + score limits in parallel
             try {
@@ -29954,49 +30547,76 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
 
             // Wire cascade selectors
             document.getElementById('nbEntryGroup').addEventListener('change', async function () {
+                if (!nbAllowContextChange(this)) return;
                 const group = this.value;
                 nbResetSubjectPanel();
+                nbCurrentStudentRoll = null;
+                nbStudentRoster = [];
+                document.getElementById('nbStudentSearch').value = '';
                 const classSel = document.getElementById('nbEntryClass');
                 const studSel = document.getElementById('nbEntryStudent');
                 classSel.innerHTML = '<option value="">-- Select Class --</option>';
                 studSel.innerHTML = '<option value="">-- Select Student --</option>';
                 classSel.disabled = !group;
                 studSel.disabled = true;
+                nbRememberContext();
+                nbRefreshEntryControls();
                 if (!group) return;
-                const data = await nbApiFetch('/notebooks/api/classes?group=' + encodeURIComponent(group));
-                (data.classes || []).forEach(function (c) {
-                    const opt = document.createElement('option');
-                    opt.value = opt.textContent = c;
-                    classSel.appendChild(opt);
-                });
-                classSel.disabled = false;
+                nbLoading = true;
+                nbRefreshEntryControls();
+                try {
+                    const data = await nbApiFetch('/notebooks/api/classes?group=' + encodeURIComponent(group));
+                    (data.classes || []).forEach(function (c) {
+                        const opt = document.createElement('option');
+                        opt.value = opt.textContent = c;
+                        classSel.appendChild(opt);
+                    });
+                    if (data.classes && data.classes.length === 1) {
+                        classSel.value = String(data.classes[0]);
+                    }
+                } catch (error) { nbShowAlert('Could not load classes: ' + error.message, 'error'); }
+                finally { nbLoading = false; nbRefreshEntryControls(); }
+                if (classSel.value) classSel.dispatchEvent(new Event('change'));
             });
 
             document.getElementById('nbEntryClass').addEventListener('change', async function () {
+                if (!nbAllowContextChange(this)) return;
                 const group = document.getElementById('nbEntryGroup').value;
                 const cls = this.value;
                 nbResetSubjectPanel();
+                nbCurrentStudentRoll = null;
+                nbStudentRoster = [];
+                document.getElementById('nbStudentSearch').value = '';
                 const studSel = document.getElementById('nbEntryStudent');
                 studSel.innerHTML = '<option value="">-- Select Student --</option>';
                 studSel.disabled = !cls;
+                nbRememberContext();
+                nbRefreshEntryControls();
                 if (!cls) return;
-                const data = await nbApiFetch('/notebooks/api/students?group=' + encodeURIComponent(group) + '&class_name=' + encodeURIComponent(cls));
-                (data.students || []).forEach(function (s) {
-                    const opt = document.createElement('option');
-                    opt.value = s.roll;
-                    opt.textContent = s.roll + ' – ' + s.name;
-                    studSel.appendChild(opt);
-                });
-                studSel.disabled = false;
+                nbLoading = true;
+                nbRefreshEntryControls();
+                try {
+                    const data = await nbApiFetch('/notebooks/api/students?group=' + encodeURIComponent(group) + '&class_name=' + encodeURIComponent(cls));
+                    nbStudentRoster = data.students || [];
+                    nbFilterStudents();
+                    if (nbStudentRoster.length === 1) studSel.value = String(nbStudentRoster[0].roll);
+                } catch (error) { nbShowAlert('Could not load students: ' + error.message, 'error'); }
+                finally { nbLoading = false; nbRefreshEntryControls(); }
+                if (studSel.value) studSel.dispatchEvent(new Event('change'));
             });
 
             document.getElementById('nbEntryStudent').addEventListener('change', function () {
+                if (!nbAllowContextChange(this)) return;
                 nbCurrentStudentRoll = this.value || null;
+                nbRememberContext();
+                nbRefreshEntryControls();
                 if (nbCurrentStudentRoll) { nbLoadSubjectRows(); nbLoadLastCheck(); }
                 else nbResetSubjectPanel();
             });
 
             document.getElementById('nbEntryDate').addEventListener('change', function () {
+                if (!nbAllowContextChange(this)) return;
+                nbRememberContext();
                 if (nbCurrentStudentRoll) nbLoadSubjectRows();
             });
 
@@ -30025,7 +30645,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                         if (!nbGetSelectedGrade(tr)) nbSetGrade(tr, 'Good');
                     } else {
                         cb.checked = false;
-                        tr.querySelectorAll('.nb-grade-pill').forEach(function (p) { p.disabled = true; });
+                        tr.querySelectorAll('.nb-grade-pill').forEach(function (p) { p.disabled = false; });
                         nbSetGrade(tr, '');
                     }
                     nbUpdateRowBadge(tr);
@@ -30085,6 +30705,13 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                 if (!nbCurrentStudentRoll) return;
                 var entryPane = document.getElementById('nb-tab-entry');
                 if (!entryPane || entryPane.style.display === 'none') return;
+                if (document.getElementById('notebooks-tab').classList.contains('hidden') || nbSaving || nbLoading) return;
+                if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                    e.preventDefault(); nbSaveCheck(e.shiftKey); return;
+                }
+                if (e.altKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+                    e.preventDefault(); nbMoveStudent(e.key === 'ArrowLeft' ? -1 : 1); return;
+                }
                 if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
                 var key = e.key;
                 if (key >= '1' && key <= '8') {
@@ -30093,7 +30720,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                     if (!grade) return;
                     var rows = document.querySelectorAll('#nbSubjectRows tr.subject-row:not(.nb-exempt-row)');
                     if (rows.length === 0) return;
-                    var target = null;
+                    var target = e.target.closest ? e.target.closest('#nbSubjectRows tr.subject-row:not(.nb-exempt-row)') : null;
                     rows.forEach(function (tr) {
                         var cb = tr.querySelector('.sub-checkbox');
                         if (cb && cb.checked && !nbGetSelectedGrade(tr) && !target) target = tr;
@@ -30105,6 +30732,8 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                         });
                     }
                     if (target) {
+                        const targetCb = target.querySelector('.sub-checkbox');
+                        if (targetCb) targetCb.checked = true;
                         nbSetGrade(target, grade.value);
                         nbUpdateRowBadge(target);
                         nbUpdateTotals();
@@ -30130,6 +30759,8 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
         }
 
         function nbResetSubjectPanel() {
+            nbEntryBaseline = null;
+            nbLoadGeneration += 1;
             document.getElementById('nbSubjectPanel').style.display = 'none';
             document.getElementById('nbEntryEmpty').style.display = '';
             document.getElementById('nbSubjectRows').innerHTML = '';
@@ -30144,6 +30775,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             if (allCb) allCb.checked = false;
             document.getElementById('nbLastCheck').style.display = 'none';
             document.getElementById('nbNextStudentBtn').disabled = true;
+            nbRefreshEntryControls();
         }
 
         var NB_GRADES = [
@@ -30157,12 +30789,12 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             {value: 'Not submitted', label: 'NS', cls: 'gp-not-submitted', key: '8'},
         ];
 
-        function nbGradePillsHtml(selectedGrade, disabled) {
+        function nbGradePillsHtml(selectedGrade) {
             return '<div class="nb-grade-pills">' + NB_GRADES.map(function (g) {
                 var active = g.value === selectedGrade ? ' nb-grade-pill-active ' + g.cls : '';
-                var dis = disabled ? ' disabled' : '';
+                var dis = '';
                 return '<button type="button" class="nb-grade-pill' + active + '"' + dis +
-                    ' data-grade="' + nbEscHtml(g.value) + '"' +
+                    ' data-grade="' + nbEscHtml(g.value) + '" aria-label="' + nbEscHtml(g.value) + '" aria-pressed="' + (g.value === selectedGrade) + '"' +
                     ' title="' + nbEscHtml(g.value) + ' (' + (NB_GRADE_POINTS[g.value] >= 0 ? '+' : '') + NB_GRADE_POINTS[g.value] + ')">' +
                     nbEscHtml(g.label) + '<span class="gp-key">' + g.key + '</span></button>';
             }).join('') + '</div>';
@@ -30175,6 +30807,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
 
         function nbSetGrade(row, grade) {
             row.querySelectorAll('.nb-grade-pill').forEach(function (p) {
+                p.setAttribute('aria-pressed', String(p.dataset.grade === grade));
                 p.classList.remove('nb-grade-pill-active', 'gp-excellent', 'gp-very-good', 'gp-good', 'gp-fair', 'gp-satisfactory', 'gp-incomplete', 'gp-untidy', 'gp-not-submitted');
                 if (p.dataset.grade === grade) {
                     var g = NB_GRADES.find(function (x) { return x.value === grade; });
@@ -30191,105 +30824,112 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
 
             let savedSnapshot = null;
             if (preserveData) savedSnapshot = nbSnapshotSubjectData();
+            if (!preserveData) nbResetSubjectPanel();
+            const generation = ++nbLoadGeneration;
+            nbLoading = true;
+            nbRefreshEntryControls();
 
-            const results = await Promise.all([
-                nbApiFetch('/notebooks/api/subjects?group=' + encodeURIComponent(group) + '&class_name=' + encodeURIComponent(cls) + '&type=' + nbCurrentType),
-                nbApiFetch('/notebooks/api/check?roll=' + encodeURIComponent(roll) + '&date=' + encodeURIComponent(dateVal) + '&type=' + nbCurrentType),
-                nbApiFetch('/notebooks/api/exemptions?roll=' + encodeURIComponent(roll) + '&type=' + nbCurrentType),
-            ]);
+            try {
+                const results = await Promise.all([
+                    nbApiFetch('/notebooks/api/subjects?group=' + encodeURIComponent(group) + '&class_name=' + encodeURIComponent(cls) + '&type=' + nbCurrentType),
+                    nbApiFetch('/notebooks/api/check?roll=' + encodeURIComponent(roll) + '&date=' + encodeURIComponent(dateVal) + '&type=' + nbCurrentType),
+                    nbApiFetch('/notebooks/api/exemptions?roll=' + encodeURIComponent(roll) + '&type=' + nbCurrentType),
+                ]);
 
-            const subjects = results[0].subjects || [];
-            const existingCheck = results[1].check;
-            const exemptSet = new Set(results[2].exemptions || []);
+                if (generation !== nbLoadGeneration) return;
+                const subjects = results[0].subjects || [];
+                const existingCheck = results[1].check;
+                const exemptSet = new Set(results[2].exemptions || []);
 
-            const existingMap = {};
-            if (existingCheck && existingCheck.subject_checks) {
-                existingCheck.subject_checks.forEach(function (sc) { existingMap[sc.subject_name] = sc; });
-            }
-
-            const warn = document.getElementById('nbDefaultSubjectWarning');
-            warn.style.display = results[0].is_default ? 'block' : 'none';
-
-            const tbody = document.getElementById('nbSubjectRows');
-            tbody.innerHTML = '';
-
-            subjects.forEach(function (sub) {
-                const isExempt = exemptSet.has(sub.name);
-                let ex = {};
-                if (savedSnapshot && savedSnapshot[sub.name]) {
-                    ex = savedSnapshot[sub.name];
-                } else if (existingMap[sub.name]) {
-                    ex = existingMap[sub.name];
+                const existingMap = {};
+                if (existingCheck && existingCheck.subject_checks) {
+                    existingCheck.subject_checks.forEach(function (sc) { existingMap[sc.subject_name] = sc; });
                 }
 
-                const isChecked = !isExempt && (ex.is_checked || false);
-                const grade = (isChecked ? ex.grade : '') || '';
-                const remarks = ex.remarks || '';
+                const warn = document.getElementById('nbDefaultSubjectWarning');
+                warn.style.display = results[0].is_default ? 'block' : 'none';
 
-                let rowHtml;
-                if (isExempt) {
-                    rowHtml = '<tr class="subject-row nb-exempt-row" data-subject-name="' + nbEscHtml(sub.name) + '">' +
-                        '<td><span class="nb-exempt-label">N/A</span> ' + nbEscHtml(sub.name) + '</td>' +
-                        '<td class="nb-check-cell" style="color:#aaa">—</td>' +
-                        '<td style="color:#aaa;font-style:italic;font-size:.82rem" colspan="2">Not applicable for this student</td>' +
-                        '<td></td>' +
-                        '<td class="nb-check-cell"><button class="nb-btn-unexempt" title="Mark subject as applicable again"><i class="fas fa-rotate-left me-1"></i>Restore</button></td>' +
-                        '</tr>';
-                } else {
-                    const pts = (isChecked && grade) ? (NB_GRADE_POINTS[grade] || 0) : 0;
-                    const ptsCls = pts > 0 ? 'nb-pts-positive' : pts < 0 ? 'nb-pts-negative' : 'nb-pts-neutral';
-                    rowHtml = '<tr class="subject-row" data-subject-name="' + nbEscHtml(sub.name) + '">' +
-                        '<td>' + nbEscHtml(sub.name) + '</td>' +
-                        '<td class="nb-check-cell"><input type="checkbox" class="sub-checkbox"' + (isChecked ? ' checked' : '') + '></td>' +
-                        '<td>' + nbGradePillsHtml(grade, !isChecked) + '</td>' +
-                        '<td class="nb-check-cell"><span class="nb-pts-badge ' + ptsCls + '">' + (pts >= 0 ? '+' : '') + pts + '</span></td>' +
-                        '<td><textarea class="nb-remarks-input" rows="1" placeholder="Remarks…">' + nbEscHtml(remarks) + '</textarea></td>' +
-                        '<td class="nb-check-cell"><button class="nb-btn-exempt-sub" title="Mark as not applicable"><i class="fas fa-ban"></i></button></td>' +
-                        '</tr>';
+                const tbody = document.getElementById('nbSubjectRows');
+                tbody.innerHTML = '';
+
+                subjects.forEach(function (sub) {
+                    const isExempt = exemptSet.has(sub.name);
+                    let ex = {};
+                    if (savedSnapshot && savedSnapshot[sub.name]) {
+                        ex = savedSnapshot[sub.name];
+                    } else if (existingMap[sub.name]) {
+                        ex = existingMap[sub.name];
+                    }
+
+                    const isChecked = !isExempt && (ex.is_checked || false);
+                    const grade = (isChecked ? ex.grade : '') || '';
+                    const remarks = ex.remarks || '';
+
+                    let rowHtml;
+                    if (isExempt) {
+                        rowHtml = '<tr class="subject-row nb-exempt-row" data-subject-name="' + nbEscHtml(sub.name) + '">' +
+                            '<td><span class="nb-exempt-label">N/A</span> ' + nbEscHtml(sub.name) + '</td>' +
+                            '<td class="nb-check-cell" style="color:#aaa">—</td>' +
+                            '<td style="color:#aaa;font-style:italic;font-size:.82rem" colspan="2">Not applicable for this student</td>' +
+                            '<td></td>' +
+                            '<td class="nb-check-cell"><button class="nb-btn-unexempt" title="Mark subject as applicable again"><i class="fas fa-rotate-left me-1"></i>Restore</button></td>' +
+                            '</tr>';
+                    } else {
+                        const pts = (isChecked && grade) ? (NB_GRADE_POINTS[grade] || 0) : 0;
+                        const ptsCls = pts > 0 ? 'nb-pts-positive' : pts < 0 ? 'nb-pts-negative' : 'nb-pts-neutral';
+                        rowHtml = '<tr class="subject-row" data-subject-name="' + nbEscHtml(sub.name) + '">' +
+                            '<td>' + nbEscHtml(sub.name) + '</td>' +
+                            '<td class="nb-check-cell"><input type="checkbox" class="sub-checkbox"' + (isChecked ? ' checked' : '') + '></td>' +
+                            '<td>' + nbGradePillsHtml(grade) + '</td>' +
+                            '<td class="nb-check-cell"><span class="nb-pts-badge ' + ptsCls + '">' + (pts >= 0 ? '+' : '') + pts + '</span></td>' +
+                            '<td><textarea class="nb-remarks-input" rows="1" placeholder="Remarks…">' + nbEscHtml(remarks) + '</textarea></td>' +
+                            '<td class="nb-check-cell"><button class="nb-btn-exempt-sub" title="Mark as not applicable"><i class="fas fa-ban"></i></button></td>' +
+                            '</tr>';
+                    }
+                    tbody.insertAdjacentHTML('beforeend', rowHtml);
+                });
+
+                if (!preserveData && existingCheck) {
+                    document.getElementById('nbConsolRemarks').value = existingCheck.consolidated_remarks || '';
+                    document.getElementById('nbSaveStatus').textContent = '✓ Record exists for this date (editing)';
+                    document.getElementById('nbSaveStatus').style.color = '#16a34a';
+                } else if (!preserveData) {
+                    document.getElementById('nbConsolRemarks').value = '';
+                    document.getElementById('nbSaveStatus').textContent = '';
                 }
-                tbody.insertAdjacentHTML('beforeend', rowHtml);
-            });
 
-            if (!preserveData && existingCheck) {
-                document.getElementById('nbConsolRemarks').value = existingCheck.consolidated_remarks || '';
-                document.getElementById('nbSaveStatus').textContent = '✓ Record exists for this date (editing)';
-                document.getElementById('nbSaveStatus').style.color = '#16a34a';
-            } else if (!preserveData) {
-                document.getElementById('nbConsolRemarks').value = '';
-                document.getElementById('nbSaveStatus').textContent = '';
+                nbUpdateTotals();
+                if (!preserveData) nbEntryBaseline = nbEntrySignature();
+                document.getElementById('nbSubjectPanel').style.display = '';
+                document.getElementById('nbEntryEmpty').style.display = 'none';
+            } catch (error) {
+                if (generation === nbLoadGeneration) nbShowAlert('Could not load notebook check: ' + error.message, 'error');
+            } finally {
+                if (generation === nbLoadGeneration) {
+                    nbLoading = false;
+                    nbRefreshEntryControls();
+                }
             }
-
-            nbUpdateTotals();
-            document.getElementById('nbSubjectPanel').style.display = '';
-            document.getElementById('nbEntryEmpty').style.display = 'none';
         }
 
         function nbOnCheckboxChange(cb) {
             const row = cb.closest('tr');
-            const pills = row.querySelectorAll('.nb-grade-pill');
             if (cb.checked) {
-                pills.forEach(function (p) { p.disabled = false; });
                 if (!nbGetSelectedGrade(row)) nbSetGrade(row, 'Good');
             } else {
-                pills.forEach(function (p) { p.disabled = true; });
                 nbSetGrade(row, '');
-                const allCb = document.getElementById('nbAllCompletedCb');
-                if (allCb) allCb.checked = false;
             }
             nbUpdateRowBadge(row);
             nbUpdateTotals();
         }
 
         function nbOnPillClick(pill) {
+            if (nbSaving || nbLoading) return;
             const row = pill.closest('tr');
             const cb = row.querySelector('.sub-checkbox');
-            if (!cb || !cb.checked) return;
-            const currentGrade = nbGetSelectedGrade(row);
-            if (currentGrade === pill.dataset.grade) {
-                nbSetGrade(row, '');
-            } else {
-                nbSetGrade(row, pill.dataset.grade);
-            }
+            if (!cb) return;
+            cb.checked = true;
+            nbSetGrade(row, pill.dataset.grade);
             nbUpdateRowBadge(row);
             nbUpdateTotals();
         }
@@ -30353,6 +30993,17 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             } else {
                 capWarn.style.display = 'none';
             }
+            const allCb = document.getElementById('nbAllCompletedCb');
+            allCb.checked = nonExemptTotal > 0 && checked === nonExemptTotal;
+            allCb.indeterminate = checked > 0 && checked < nonExemptTotal;
+            nbMarkEntryDirty();
+        }
+
+        function nbMarkEntryDirty() {
+            if (!nbSaving && nbEntryBaseline !== null && nbEntrySignature() !== nbEntryBaseline) {
+                document.getElementById('nbSaveStatus').textContent = 'Unsaved changes - Save to add these scores';
+                document.getElementById('nbSaveStatus').style.color = '#d97706';
+            }
         }
 
         function nbCollectSubjects() {
@@ -30372,11 +31023,9 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             return rows;
         }
 
-        async function nbSaveCheck() {
-            if (!nbCurrentStudentRoll) return;
+        async function nbSaveCheck(goNext = false) {
+            if (!nbCurrentStudentRoll || nbSaving || nbLoading || nbEntryBaseline === null) return false;
             const btn = document.getElementById('nbSaveBtn');
-            btn.disabled = true;
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Saving…';
             const payload = {
                 roll: nbCurrentStudentRoll,
                 date: document.getElementById('nbEntryDate').value,
@@ -30384,21 +31033,34 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                 subjects: nbCollectSubjects(),
                 consolidated_remarks: document.getElementById('nbConsolRemarks').value.trim(),
             };
+            if (!payload.date) { nbShowAlert('Select a date first.', 'error'); return false; }
+            const signature = nbEntrySignature();
+            let saved = false;
+            nbSaving = true;
+            nbRefreshEntryControls();
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Saving...';
+            document.getElementById('nbSaveStatus').textContent = 'Saving to scoreboard...';
             try {
                 const data = await nbApiFetch('/notebooks/save', { method: 'POST', body: JSON.stringify(payload) });
-                if (data.success) {
-                    nbShowAlert(data.message || 'Saved successfully!', 'success');
-                    document.getElementById('nbSaveStatus').textContent = '✓ Saved successfully';
-                    document.getElementById('nbSaveStatus').style.color = '#16a34a';
-                    document.getElementById('nbNextStudentBtn').disabled = false;
-                } else {
-                    nbShowAlert(data.error || 'Save failed', 'error');
-                }
-            } catch (e) {
-                nbShowAlert('Network error: ' + e.message, 'error');
+                if (!data.success) throw new Error(data.error || 'Save failed');
+                saved = true;
+                nbEntryBaseline = signature;
+                nbShowAlert(data.message || 'Saved successfully!', 'success');
+                document.getElementById('nbSaveStatus').textContent = 'Saved to scoreboard: ' + (data.total_points >= 0 ? '+' : '') + data.total_points + ' points';
+                document.getElementById('nbSaveStatus').style.color = '#16a34a';
+                nbLoadLastCheck();
+                if (SERVER_SYNC.enabled) pullFromServer(false).catch(error => console.warn('Notebook scoreboard refresh:', error));
+            } catch (error) {
+                nbShowAlert('Save failed: ' + error.message + ' Your entries remain here for retry.', 'error');
+                document.getElementById('nbSaveStatus').textContent = 'Not saved to scoreboard - Retry Save';
+                document.getElementById('nbSaveStatus').style.color = '#dc2626';
+            } finally {
+                nbSaving = false;
+                btn.innerHTML = '<i class="fas fa-save me-2"></i>Save &amp; Add to Scoreboard';
+                nbRefreshEntryControls();
             }
-            btn.disabled = false;
-            btn.innerHTML = '<i class="fas fa-save me-2"></i>Save &amp; Add to Scoreboard';
+            if (saved && goNext) nbMoveStudent(1);
+            return saved;
         }
 
         /* ── Records sub-tab ── */
@@ -30743,25 +31405,19 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
 
         /* ── Next Student ── */
         function nbNextStudent() {
-            const sel = document.getElementById('nbEntryStudent');
-            const idx = sel.selectedIndex;
-            if (idx < 0 || idx >= sel.options.length - 1) {
-                nbShowAlert('No more students in list.', 'error');
-                return;
-            }
-            sel.selectedIndex = idx + 1;
-            nbCurrentStudentRoll = sel.value || null;
-            if (nbCurrentStudentRoll) { nbLoadSubjectRows(); nbLoadLastCheck(); }
-            else nbResetSubjectPanel();
+            nbMoveStudent(1);
         }
 
         /* ── Last Check Indicator ── */
         async function nbLoadLastCheck() {
             if (!nbCurrentStudentRoll) return;
             const el = document.getElementById('nbLastCheck');
+            const roll = nbCurrentStudentRoll;
+            const type = nbCurrentType;
             el.style.display = 'none';
             try {
                 const data = await nbApiFetch('/notebooks/api/records?roll=' + encodeURIComponent(nbCurrentStudentRoll) + '&type=' + nbCurrentType);
+                if (roll !== nbCurrentStudentRoll || type !== nbCurrentType) return;
                 const records = data.records || [];
                 if (records.length === 0) return;
                 const last = records[0];
@@ -32102,6 +32758,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
         // ───────────────────────────────────────────────────────────────────────────
 
         function clearScoreForm() {
+            document.getElementById('add-score-tab').dataset.workspaceDraft = '';
             const _today = formatDateKey(new Date());
             document.getElementById('scoreStudent').value = '';
             document.getElementById('scoreDate').value = _today;
@@ -45556,21 +46213,25 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             if (raw === 'present' || raw === 'p') return 'present';
             if (raw === 'absent' || raw === 'a') return 'absent';
             if (raw === 'leave' || raw === 'l') return 'leave';
+            if (raw === 'holiday' || raw === 'h') return 'holiday';
             if (entry && typeof entry.present === 'boolean') return entry.present ? 'present' : 'absent';
             return '';
         }
 
         function getAttendanceWorkingDayKeys(entries, monthKey) {
-            const dayMap = new Map();
+            const latest = new Map();
             (entries || []).forEach(entry => {
                 const dateKey = String(entry && entry.date ? entry.date : '').trim();
                 if (!dateKey || dateKey.length < 10) return;
                 if (monthKey && getAttendanceEntryMonth(entry) !== monthKey) return;
-                const list = dayMap.get(dateKey) || [];
-                list.push(entry);
-                dayMap.set(dateKey, list);
+                const key = `${entry.studentId || normalizeAttendanceRoll(entry.roll || '')}::${dateKey}`;
+                const prev = latest.get(key);
+                const stamp = item => Date.parse(item && (item.updated_at || item.created_at) || '') || 0;
+                if (!prev || stamp(entry) >= stamp(prev)) latest.set(key, entry);
             });
-            return Array.from(dayMap.keys()).sort();
+            return Array.from(new Set(Array.from(latest.values())
+                .filter(entry => getAttendanceStatusValue(entry) !== 'holiday')
+                .map(entry => String(entry.date).trim()))).sort();
         }
 
         function initAttendancePrizeMonthSelect() {
@@ -45813,11 +46474,12 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                 getAttendanceEntryMonth(entry) === month &&
                 parseInt(entry.studentId, 10) === studentId
             ).sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')));
-            const stats = { present: 0, leave: 0, absent: 0 };
+            const stats = { present: 0, leave: 0, absent: 0, holiday: 0 };
             const htmlRows = rows.map(entry => {
                 const status = getAttendanceStatusValue(entry);
                 if (status === 'present') stats.present += 1;
                 if (status === 'leave') stats.leave += 1;
+                if (status === 'holiday') stats.holiday += 1;
                 if (status === 'absent') stats.absent += 1;
                 return `
                     <tr>
@@ -45832,7 +46494,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                     <strong>${escapeHtml(student ? getStudentDisplayNamePlain(student) : 'Student')}</strong> •
                     Present: <strong>${stats.present}</strong> •
                     Leave: <strong>${stats.leave}</strong> •
-                    Absent: <strong>${stats.absent}</strong>
+                    Absent: <strong>${stats.absent}</strong> • Holiday: <strong>${stats.holiday}</strong>
                 </div>
                 <table class="scoreboard" style="margin-top:8px;">
                     <thead><tr><th>Date</th><th>Status</th><th>Note</th></tr></thead>
@@ -46153,7 +46815,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             const counters = new Map();
             latestByStudentDate.forEach(({ entry, resolvedSid }) => {
                 const status = getAttendanceStatusValue(entry);
-                if (!status) return;
+                if (!status || status === 'holiday') return;
                 if (!counters.has(resolvedSid)) counters.set(resolvedSid, { present: 0, absent: 0, leave: 0, markedDays: 0 });
                 const row = counters.get(resolvedSid);
                 if (status === 'present') row.present += 1;
@@ -48891,7 +49553,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
 
         function normalizeAttendanceStatus(value) {
             const status = String(value || '').toLowerCase();
-            if (status === 'present' || status === 'absent' || status === 'late' || status === 'leave') {
+            if (status === 'present' || status === 'absent' || status === 'late' || status === 'leave' || status === 'holiday') {
                 return status;
             }
             return 'present';
@@ -49191,13 +49853,16 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                         } else if (existingStatus === 'late') {
                             existingClass = 'existing-late';
                             existingLabel = '<span class="bulk-existing-tag">Lt</span>';
+                        } else if (existingStatus === 'holiday' || existingStatus === 'h') {
+                            existingClass = 'existing-holiday';
+                            existingLabel = '<span class="bulk-existing-tag">H</span>';
                         }
                     }
                 }
                 // Show remaining-status preview on unselected dates without existing attendance
                 if (hasActiveBulk && !selectedClass && !existingClass && defaultStatus) {
                     remainingClass = `remaining-${defaultStatus}`;
-                    const _rlMap = { present: 'P', absent: 'A', leave: 'L', late: 'Lt' };
+                    const _rlMap = { present: 'P', absent: 'A', leave: 'L', late: 'Lt', holiday: 'H' };
                     remainingLabel = `<span class="bulk-remaining-tag">${_rlMap[defaultStatus] || ''}</span>`;
                 }
                 dayCells.push(`<button type="button" class="bulk-day-btn ${weekendClass} ${selectedClass} ${statusClass} ${existingClass} ${remainingClass}" onclick="toggleBulkAttendanceDate('${date}')">${day}${existingLabel}${remainingLabel}</button>`);
@@ -50376,7 +51041,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             }
         }
 
-        function loadAttendanceTab() {
+        function loadAttendanceTab(preferredMonth = '') {
             ensureActiveStudentTabDefaultsForCurrentUser();
             if (currentUserRole === 'student') {
                 populateAttendanceStudentReportFilters(getCurrentMonthKey());
@@ -50391,6 +51056,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             if (!dateInput.value) {
                 dateInput.value = formatDateKey(new Date());
             }
+            const eaAttendanceSelectedMonth = preferredMonth || monthSelect.value;
             const currentMonth = dateInput.value.substring(0, 7);
             const months = db.getMonths();
             if (!months.includes(currentMonth)) months.unshift(currentMonth);
@@ -50398,6 +51064,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                 const label = new Date(m + '-01').toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
                 return `<option value="${m}">${label}</option>`;
             }).join('');
+            monthSelect.value = months.includes(eaAttendanceSelectedMonth) ? eaAttendanceSelectedMonth : currentMonth;
             if (!monthSelect.value) monthSelect.value = currentMonth;
             if (!months.includes(monthSelect.value)) monthSelect.value = currentMonth;
             const monthValue = monthSelect.value || currentMonth;
@@ -50461,6 +51128,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                                 <option value="absent" ${status === 'absent' ? 'selected' : ''}>Absent</option>
                                 <option value="late" ${status === 'late' ? 'selected' : ''}>Late</option>
                                 <option value="leave" ${status === 'leave' ? 'selected' : ''}>Leave</option>
+                                <option value="holiday" ${status === 'holiday' ? 'selected' : ''}>Holiday</option>
                             </select>
                         </td>
                         <td>
@@ -50496,6 +51164,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             if (value === 'present') return 'attendance-status-present';
             if (value === 'absent') return 'attendance-status-absent';
             if (value === 'leave') return 'attendance-status-leave';
+            if (value === 'holiday') return 'attendance-status-holiday';
             if (value === 'late') return 'attendance-status-late';
             return '';
         }
@@ -50504,7 +51173,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             if (!selectEl) return;
             const row = selectEl.closest('tr');
             if (!row) return;
-            row.classList.remove('attendance-status-present', 'attendance-status-absent', 'attendance-status-leave', 'attendance-status-late');
+            row.classList.remove('attendance-status-present', 'attendance-status-absent', 'attendance-status-leave', 'attendance-status-late', 'attendance-status-holiday');
             const statusClass = getAttendanceStatusClass(selectEl.value);
             if (statusClass) row.classList.add(statusClass);
         }
@@ -50739,7 +51408,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             }
             const monthSet = new Set(months);
 
-            const stat = { present: 0, absent: 0, late: 0, leave: 0, totalMarked: 0 };
+            const stat = { present: 0, absent: 0, late: 0, leave: 0, holiday: 0, totalMarked: 0 };
             const studentAttendance = getAttendanceRecordsForStudent(student, {
                 month: reportMonthFilter,
                 fromDate: reportDateFrom,
@@ -50753,9 +51422,10 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                 else if (record.status === 'absent') stat.absent += 1;
                 else if (record.status === 'late') stat.late += 1;
                 else if (record.status === 'leave') stat.leave += 1;
+                    else if (record.status === 'holiday') stat.holiday += 1;
             });
 
-            const denominator = stat.totalMarked || 1;
+            const denominator = (stat.totalMarked - stat.holiday) || 1;
             const presentLike = stat.present + stat.late;
             const pct = Math.round((presentLike / denominator) * 100);
             const pctClass = pct >= 85 ? 'att-pct-high' : (pct >= 60 ? 'att-pct-mid' : 'att-pct-low');
@@ -50770,6 +51440,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                     <td>${stat.absent}</td>
                     <td>${stat.late}</td>
                     <td>${stat.leave}</td>
+                    <td>${stat.holiday}</td>
                     <td class="${pctClass}">${pct}%</td>
                 </tr>
             `;
@@ -50795,7 +51466,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             students.forEach(student => {
                 const key = getStudentGroup(student) || 'UNGROUPED';
                 if (!groups[key]) {
-                    groups[key] = { group: key, students: 0, present: 0, absent: 0, late: 0, leave: 0, totalMarked: 0 };
+                    groups[key] = { group: key, students: 0, present: 0, absent: 0, late: 0, leave: 0, holiday: 0, totalMarked: 0 };
                 }
                 groups[key].students += 1;
             });
@@ -50812,12 +51483,13 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                 else if (record.status === 'absent') groups[key].absent += 1;
                 else if (record.status === 'late') groups[key].late += 1;
                 else if (record.status === 'leave') groups[key].leave += 1;
+                else if (record.status === 'holiday') groups[key].holiday += 1;
             });
 
             const tbody = document.getElementById('attendanceReportBody');
             const rows = Object.values(groups).sort((a, b) => String(a.group).localeCompare(String(b.group)));
             tbody.innerHTML = rows.map(row => {
-                const denominator = row.totalMarked || 1;
+                const denominator = (row.totalMarked - row.holiday) || 1;
                 const presentLike = row.present + row.late;
                 const pct = Math.round((presentLike / denominator) * 100);
                 return `
@@ -50829,11 +51501,12 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                         <td>${row.absent}</td>
                         <td>${row.late}</td>
                         <td>${row.leave}</td>
+                    <td>${row.holiday}</td>
                     </tr>
                 `;
             }).join('');
             if (!rows.length) {
-                tbody.innerHTML = `<tr><td colspan="7" class="text-center" style="padding: 30px;">No attendance data for selected filters</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="8" class="text-center" style="padding: 30px;">No attendance data for selected filters</td></tr>`;
             }
 
             const studentBody = document.getElementById('attendanceStudentReportBody');
@@ -50859,7 +51532,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             studentReportList = studentReportList.sort(compareRecordStudentsByRollSuffix);
 
             const studentStats = studentReportList.map(student => {
-                const stat = { present: 0, absent: 0, late: 0, leave: 0, totalMarked: 0 };
+                const stat = { present: 0, absent: 0, late: 0, leave: 0, holiday: 0, totalMarked: 0 };
                 const studentRecords = getAttendanceRecordsForStudent(student, {
                     month: reportMonthFilter,
                     fromDate: reportDateFrom,
@@ -50871,8 +51544,9 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                     else if (record.status === 'absent') stat.absent += 1;
                     else if (record.status === 'late') stat.late += 1;
                     else if (record.status === 'leave') stat.leave += 1;
+                    else if (record.status === 'holiday') stat.holiday += 1;
                 });
-                const denominator = stat.totalMarked || 1;
+                const denominator = (stat.totalMarked - stat.holiday) || 1;
                 const presentLike = stat.present + stat.late;
                 const pct = Math.round((presentLike / denominator) * 100);
                 return { student, stat, pct };
@@ -50889,12 +51563,13 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                     <td>${item.stat.absent}</td>
                     <td>${item.stat.late}</td>
                     <td>${item.stat.leave}</td>
+                    <td>${item.stat.holiday}</td>
                     <td class="${pctClass}">${item.pct}%</td>
                 </tr>
             `;
             }).join('');
             if (!studentStats.length) {
-                studentBody.innerHTML = `<tr><td colspan="9" class="text-center" style="padding: 30px;">No attendance data for selected filters</td></tr>`;
+                studentBody.innerHTML = `<tr><td colspan="10" class="text-center" style="padding: 30px;">No attendance data for selected filters</td></tr>`;
             }
         }
 
@@ -51002,7 +51677,8 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             const absent = attendance.filter(item => item.status === 'absent').length;
             const late = attendance.filter(item => item.status === 'late').length;
             const leave = attendance.filter(item => item.status === 'leave').length;
-            const attMarked = attendance.length;
+            const holiday = attendance.filter(item => item.status === 'holiday').length;
+            const attMarked = attendance.length - holiday;
             const attPct = attMarked ? Math.round(((present + late) / attMarked) * 100) : 0;
 
             const latestAttendanceRemark = attendance
@@ -51024,6 +51700,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                 <div class="profile-metric"><div class="label">Attendance %</div><div class="value">${attPct}%</div></div>
                 <div class="profile-metric"><div class="label">Present / Absent</div><div class="value">${present} / ${absent}</div></div>
                 <div class="profile-metric"><div class="label">Late / Leave</div><div class="value">${late} / ${leave}</div></div>
+                <div class="profile-metric"><div class="label">Holiday</div><div class="value">${holiday}</div></div>
                 <div class="profile-metric"><div class="label">Latest Attendance Remark</div><div class="value">${escapeHtml(safeProp(latestAttendanceRemark, 'remarks') || '-')}</div></div>
             `;
             loadProfilePostHistory(student.id);
@@ -61182,8 +61859,9 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                 let presentDays = 0;
                 if (studentAttMap) {
                     studentAttMap.forEach(record => {
-                        totalDays++;
                         const status = normalizeAttendanceStatus(record.status);
+                        if (status === 'holiday') return;
+                        totalDays++;
                         if (status === 'present' || status === 'late') {
                             presentDays++;
                         }

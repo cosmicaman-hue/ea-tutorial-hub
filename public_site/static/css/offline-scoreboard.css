@@ -8931,3 +8931,47 @@ body.light-mode #recordStudentsTable tr.penalty-recorded-row > td { background: 
             #excel-chess-champion-tab .chess-champion-bracket-match { animation: none !important; }
         }
 
+/* Holidays stay distinct from present, leave and absent in both themes. */
+#attendanceTable tbody tr.attendance-status-holiday td {
+    background: #164e6340 !important;
+    color: #a5f3fc !important;
+}
+#attendanceTable tbody tr.attendance-status-holiday select,
+#attendanceTable tbody tr.attendance-status-holiday input { color: #a5f3fc !important; }
+body.light-mode #attendanceTable tbody tr.attendance-status-holiday td,
+body.light-mode #attendanceTable tbody tr.attendance-status-holiday select,
+body.light-mode #attendanceTable tbody tr.attendance-status-holiday input { color: #155e75 !important; }
+.bulk-day-btn.existing-holiday,
+.bulk-day-btn.remaining-holiday { background:rgba(8,145,178,.25); border-color:#22d3ee; }
+.existing-holiday .bulk-existing-tag { background:#0891b2; color:#ecfeff; }
+
+/* EA_WORKSPACE_STYLES_BEGIN */
+.ea-nav-group { margin:4px 0; }
+.ea-nav-group > summary { cursor:pointer; padding:12px 14px; color:var(--text); font-weight:700; font-size:12px; letter-spacing:.04em; }
+.ea-nav-group > summary:focus-visible, .ea-advanced > summary:focus-visible { outline:2px solid #38bdf8; outline-offset:-2px; }
+.ea-nav-group .sidebar-nav-item { padding-left:22px; }
+.ea-event-archive > summary { cursor:pointer; padding:12px 18px; font-size:12px; color:var(--text); }
+.ea-nav-group[hidden], #eaHolidayCalendar[hidden], #eaPublishPanel[hidden], #eaEventSettings[hidden], .ea-advanced[hidden] { display:none!important; }
+.ea-season-active { border-left:3px solid #22c55e!important; }
+.ea-workspace-bar { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-bottom:18px; padding:12px; background:var(--bg-elevated); border:1px solid var(--border); border-radius:12px; color:var(--text); }
+.ea-workspace-bar > strong { margin-right:8px; }
+.ea-workspace-link { padding:8px 12px; background:transparent; color:var(--text); border:1px solid var(--border); border-radius:8px; cursor:pointer; min-height:40px; }
+.ea-workspace-link[aria-current="true"] { background:#2563eb; color:#fff; border-color:#2563eb; }
+.ea-workspace-bar input, .ea-workspace-bar select, .ea-workspace-card input, .ea-workspace-card select { padding:8px; background:var(--bg-elevated); color:var(--text); border:1px solid var(--border); border-radius:6px; max-width:100%; min-height:40px; }
+.ea-daily-context { display:flex; flex-wrap:wrap; gap:8px; width:100%; align-items:center; }
+.ea-daily-context > small { flex-basis:100%; }
+.ea-workspace-card { padding:18px; margin:16px 0; color:var(--text); background:var(--bg-elevated); border:1px solid var(--border); border-radius:12px; }
+.ea-workspace-card p { margin:12px 0; overflow-wrap:anywhere; }
+.ea-workspace-card > label { display:inline-flex; align-items:center; flex-wrap:wrap; gap:6px; margin:8px 12px 8px 0; }
+.ea-workspace-card button { margin:8px 8px 8px 0; }
+.ea-workspace-card summary, .ea-advanced > summary { cursor:pointer; padding:12px; font-weight:600; }
+.ea-inline-choice { gap:8px; }
+.ea-inline-choice input[type="checkbox"] { min-height:20px; }
+.ea-advanced { margin:12px 0; border:1px solid var(--border); border-radius:10px; }
+.ea-publish-stages { display:grid; grid-template-columns:minmax(120px,1fr) 3fr; gap:8px 16px; margin:14px 0; }
+.ea-publish-stages dt { font-weight:600; }
+.ea-publish-stages dd { margin:0; overflow-wrap:anywhere; }
+.ea-publish-error { color:#f87171; white-space:pre-wrap; }
+.ea-workspace-card code { display:block; overflow-wrap:anywhere; white-space:pre-wrap; padding:10px; }
+@media(max-width:600px) { .ea-daily-context > input, .ea-daily-context > select { width:100%; } .ea-publish-stages { grid-template-columns:1fr; } .ea-publish-stages dd { margin-bottom:8px; } }
+/* EA_WORKSPACE_STYLES_END */
