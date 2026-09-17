@@ -316,6 +316,7 @@
         body: JSON.stringify(state.adminCatalog),
       });
       state.adminCatalog = body.data;
+      eaLearningBridge.reset();
       state.catalog = await fetchJson(config.catalogUrl).then(function (response) {
         return response && response.data ? response.data : response;
       });
@@ -495,6 +496,7 @@
       const catData = await fetchJson(config.catalogUrl);
       state.catalog = catData && catData.data ? catData.data : catData;
       state.loading = false;
+      eaLearningBridge.reset();
       render();
     } catch (error) {
       state.loading = false;
@@ -509,5 +511,54 @@
       if (event.key === String(config.authStorageKey || 'ea_public_auth')) load();
     });
   }
+  // EA_LEARNING_BRIDGE_BEGIN
+/* Browse-only bridge embedded inside each learning module's existing closure. */
+function eaInstallLearningBridge(adapter) {
+  let dirty = false, baseline = '';
+  const reset = () => { dirty = false; baseline = JSON.stringify(adapter.adminCatalog() || null); };
+  ['input', 'change'].forEach(type => root.addEventListener(type, event => {
+    if (adapter.isEditor(event.target)) dirty = true;
+  }));
+  window.EA_WORKSPACE_LEARNING_APPLY = context => {
+    if (!adapter.ready()) return {ok:false, error:'Sign in and wait for the library catalog to load.'};
+    if (adapter.editing() || dirty || JSON.stringify(adapter.adminCatalog() || null) !== baseline) {
+      return {ok:false, error:'Save or reload the library editor before applying shared browse context.'};
+    }
+    const normalize = (value, prefix) => String(value || '').trim().toLowerCase().replace(prefix, '');
+    const klass = normalize(context.className, /^class\s*/);
+    const subject = normalize(context.subject, /^$/);
+    const group = normalize(context.group, /^group\s*/);
+    if (!klass) return {ok:false, error:'Choose a class first.'};
+    const matches = [];
+    const catalog = adapter.catalog();
+    (Array.isArray(catalog?.groups) ? catalog.groups : []).forEach(g => {
+      if (!g || group && group !== normalize(g.name, /^group\s*/) && group !== normalize(g.id, /^group\s*/)) return;
+      (Array.isArray(g.classes) ? g.classes : []).forEach(c => {
+        if (!c || klass !== normalize(c.name, /^class\s*/) && klass !== normalize(c.id, /^class\s*/)) return;
+        if (!subject) matches.push({group:g, klass:c, subject:null});
+        else (Array.isArray(c.subjects) ? c.subjects : []).forEach(s => {
+          if (s && subject === normalize(s.name, /^$/)) matches.push({group:g, klass:c, subject:s});
+        });
+      });
+    });
+    if (matches.length !== 1) return {ok:false, error:matches.length ? 'More than one catalog match. Specify the library group.' : 'Class or subject is unavailable in the published catalog. Existing selection was retained.'};
+    adapter.apply(matches[0]);
+    return {ok:true};
+  };
+  return {reset};
+}
+  // EA_LEARNING_BRIDGE_END
+  const eaLearningBridge = eaInstallLearningBridge({
+    catalog: () => state.catalog,
+    adminCatalog: () => state.adminCatalog,
+    ready: () => !state.loading && !!state.catalog && (config.mode !== 'public' || !config.requireAuthForNotes || isPublicAuthenticated()),
+    editing: () => !!root.querySelector('.sn-status.error'),
+    isEditor: target => !!target.closest('.sn-admin'),
+    apply: nodes => {
+      state.groupId = nodes.group.id; state.classId = nodes.klass.id;
+      state.subjectId = nodes.subject ? nodes.subject.id : ''; state.search = '';
+      state.readerNote = null; render();
+    }
+  });
   load();
 }());

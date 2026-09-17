@@ -184,7 +184,7 @@
         <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
         <link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@900&display=swap" rel="stylesheet">
     </noscript>
-    <link rel="stylesheet" href="/static/css/offline-scoreboard.css?v=10">
+    <link rel="stylesheet" href="/static/css/offline-scoreboard.css?v=13">
 
 <script>
     // System Performance Overhaul: Async localstorage debouncer (Per-Key Isolated)
@@ -6656,7 +6656,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                 </p>
 
                 <!-- CHANNEL SWITCHER -->
-                <div style="display: flex; max-width: 480px; margin: 18px auto 0; gap: 8px; background: rgba(15, 23, 42, 0.6); padding: 5px; border-radius: 12px; border: 1px solid var(--border);">
+                <div id="helpdeskChannels" style="display: flex; max-width: 480px; margin: 18px auto 0; gap: 8px; background: rgba(15, 23, 42, 0.6); padding: 5px; border-radius: 12px; border: 1px solid var(--border);">
                     <button type="button" id="tabChannelWhatsappBtn" onclick="switchHelpdeskChannel('whatsapp')" style="flex: 1; padding: 10px 14px; border-radius: 8px; font-size: 13px; font-weight: 700; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 7px; background: #25D366; color: white; transition: all 0.2s ease;">
                         <i class="fab fa-whatsapp" style="font-size: 15px;"></i> Instant WhatsApp Desk
                     </button>
@@ -19087,19 +19087,164 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             _switchTabImpl(tabName, evt);
         }
         // EA_WORKSPACES_BEGIN
+/* Phase 5: reversible entry-point retirement; all original forms stay mounted. */
+const EA_RETIREMENT_OPTIONS = ['fees'];
+const eaCompatibility = {mode:'workspaces', originalNav:null, groupedNav:null, wrapped:[], rendering:false};
+try {
+    const requested = new URLSearchParams(location.search).get('ea_ui');
+    let saved = null;
+    try { saved = localStorage.getItem('ea_interface_mode_v1'); } catch (_) {}
+    eaCompatibility.mode = ['legacy','workspaces'].includes(requested) ? requested
+        : ['legacy','workspaces'].includes(saved) ? saved : 'workspaces';
+} catch (_) {
+    try { if (new URLSearchParams(location.search).get('ea_ui') === 'legacy') eaCompatibility.mode='legacy'; } catch (_) {}
+}
+function eaCompatibilityEnabled() { return eaCompatibility.mode === 'workspaces'; }
+function eaRetiredEntries() {
+    try {
+        const saved=JSON.parse(localStorage.getItem('ea_archived_entry_points_v1'));
+        if (Array.isArray(saved)) return [...new Set(saved.filter(tab => EA_RETIREMENT_OPTIONS.includes(tab)))];
+    } catch (_) {}
+    return [];
+}
+function eaCompatibilityCaptureNav(nav) {
+    if (!eaCompatibility.originalNav) eaCompatibility.originalNav=Array.from(nav.childNodes);
+}
+function eaCompatibilityInit() {
+    document.getElementById('eaOrdersRolloutLink')?.remove();
+    let button=document.getElementById('eaInterfaceSwitch');
+    if (!button) {
+        const host=document.getElementById('globalSyncBar') || document.querySelector('.sidebar-nav')?.parentElement;
+        if (host) {
+            button=eaWorkspaceElement('button',undefined,'secondary ea-interface-switch');
+            button.id='eaInterfaceSwitch';button.type='button';button.dataset.allow='true';
+            button.addEventListener('click',() => eaCompatibilitySet(eaCompatibilityEnabled()?'legacy':'workspaces'));
+            host.append(button);
+        }
+    }
+    if (button) {
+        button.textContent=eaCompatibilityEnabled()?'Original interface':'Use workspaces';
+        button.title='Switch navigation without reloading or replacing open forms. Data architecture remains unchanged.';
+    }
+    if (!eaCompatibilityEnabled()) {
+        const card=document.getElementById('eaRetirementSettings');if(card)card.hidden=true;
+        return;
+    }
+    const settings=document.getElementById('settings-tab');
+    if (settings && !document.getElementById('eaRetirementSettings')) {
+        const card=eaWorkspaceElement('section',undefined,'card ea-workspace-card');card.id='eaRetirementSettings';
+        card.append(eaWorkspaceElement('h3','Archived module entry points'));
+        card.append(eaWorkspaceElement('p','Choose optional shortcuts to archive in this browser. Daily Work stays visible in its usual order. Every original form and save action remains available.'));
+        const selected=eaRetiredEntries();
+        EA_RETIREMENT_OPTIONS.forEach(tab => {
+            const label=eaWorkspaceElement('label',undefined,'ea-inline-choice'), input=eaWorkspaceElement('input');
+            input.type='checkbox';input.dataset.archiveTab=tab;input.checked=selected.includes(tab);
+            input.addEventListener('change',() => {
+                if (!eaWorkspaceAdmin()) {input.checked=eaRetiredEntries().includes(tab);return;}
+                const next=Array.from(card.querySelectorAll('[data-archive-tab]:checked')).map(el => el.dataset.archiveTab);
+                try {localStorage.setItem('ea_archived_entry_points_v1',JSON.stringify(next));}
+                catch (_) {input.checked=eaRetiredEntries().includes(tab);showAlert('This browser could not save the archive preference. Existing shortcuts were retained.','warning');return;}
+                eaWorkspaceRefresh();
+            });
+            label.append(input,document.createTextNode(eaWorkspaceLabel(tab)));card.append(label);
+        });
+        settings.prepend(card);
+    }
+    const card=document.getElementById('eaRetirementSettings');if(card)card.hidden=!eaWorkspaceAdmin() || !eaCompatibilityEnabled();
+}
+function eaCompatibilityLayout() {
+    const nav=document.querySelector('.sidebar-nav');
+    if (!nav || !eaCompatibility.originalNav || eaCompatibility.rendering) return;
+    const legacy=!eaCompatibilityEnabled();document.body.classList.toggle('ea-original-ui',legacy);
+    if (!nav.dataset.workspacesReady) return;
+    if (nav.dataset.interfaceMode===eaCompatibility.mode) return;
+    eaCompatibility.rendering=true;
+    try {
+        if (!eaCompatibility.groupedNav) eaCompatibility.groupedNav=Array.from(nav.childNodes);
+        if (legacy) {
+            nav.replaceChildren(...eaCompatibility.originalNav);
+            eaCompatibility.wrapped.forEach(({card,wrapper}) => {if(wrapper.contains(card))wrapper.replaceWith(card);});
+            EA_RETIREMENT_OPTIONS.forEach(tab => {const button=eaWorkspaceButton(tab);if(button)button.hidden=!eaWorkspaceAllowed(tab);});
+        } else {
+            const groups=eaCompatibility.groupedNav.filter(node => node.nodeType===1 && node.matches('.ea-nav-group'));
+            groups.forEach(group => {
+                const tabs=EA_WORKSPACES.find(w => w[0]===group.dataset.workspace)?.[2] || [];
+                tabs.forEach(tab => {
+                    const button=eaWorkspaceButton(tab) || eaCompatibility.originalNav.find(node => node.nodeType===1 && node.dataset.tab===tab);
+                    if(button){button.hidden=false;group.append(button);}
+                });
+                delete group.dataset.season;
+            });
+            nav.replaceChildren(...eaCompatibility.groupedNav);
+            eaCompatibility.wrapped.forEach(({card,wrapper}) => {if(!wrapper.contains(card)){card.before(wrapper);wrapper.append(card);}});
+        }
+        nav.dataset.interfaceMode=eaCompatibility.mode;
+    } finally {eaCompatibility.rendering=false;}
+}
+function eaCompatibilityArchive(tab) {
+    const nav=document.querySelector('.sidebar-nav');if(!nav)return;
+    const retired=eaRetiredEntries();let archive=nav.querySelector('.ea-retired-nav');
+    if(!archive){archive=eaWorkspaceElement('details',undefined,'ea-retired-nav');archive.append(eaWorkspaceElement('summary','Archived modules'));nav.append(archive);}
+    EA_RETIREMENT_OPTIONS.forEach(key => {
+        const button=eaWorkspaceButton(key);if(!button)return;
+        button.hidden=!eaWorkspaceAllowed(key);
+        const group=nav.querySelector(`[data-workspace="${EA_WORKSPACES.find(w => w[2].includes(key))?.[0]}"]`);
+        const destination=retired.includes(key)?archive:group;
+        if(destination && button.parentElement!==destination)destination.append(button);
+    });
+    EA_WORKSPACES.forEach(([key,,tabs]) => {
+        const group=nav.querySelector(`[data-workspace="${key}"]`);
+        if(group)group.hidden=!tabs.some(t => !retired.includes(t) && eaWorkspaceAllowed(t));
+    });
+    archive.hidden=!retired.some(eaWorkspaceAllowed);
+    if(retired.includes(tab)&&eaWorkspaceAllowed(tab))archive.open=true;
+}
+function eaCompatibilitySet(mode) {
+    if(!['legacy','workspaces'].includes(mode))return false;
+    if(mode===eaCompatibility.mode)return true;
+    if(eaDailyApplying || eaHolidayBusy) {showAlert('Finish the current context handoff or Holiday save before switching interfaces.','warning');return false;}
+    eaCompatibility.mode=mode;
+    if(mode==='legacy' && typeof eaLeadershipSelectionRestore==='function')eaLeadershipSelectionRestore();
+    if(mode==='workspaces' && getActiveTabName()==='leadership-selection' && typeof eaLeadershipSelectionLayout==='function')eaLeadershipSelectionLayout();
+    if(mode==='workspaces') {
+        const score=document.getElementById('add-score-tab');
+        if(score && ['scorePoints','scoreStars','scoreVetos','scoreNotes'].some(id => getElementValue(id)))score.dataset.workspaceDraft='true';
+        Object.keys(EA_CONTEXT_FORMS).forEach(tab => {
+            if(EA_CONTEXT_FORMS[tab].some(id => getElementValue(id))) {
+                eaConsolidated.dirty[tab]=true;
+                if(!(tab in eaConsolidated.baselines))eaConsolidated.baselines[tab]='';
+            }
+        });
+    }
+    try {localStorage.setItem('ea_interface_mode_v1',mode);} catch (_) {}
+    // Replace only our mode override; keep authentication, other query fields
+    // and the current tab hash. Avoid a reload and preserve mounted drafts.
+    try {
+        const url=new URL(location.href);url.searchParams.set('ea_ui',mode);
+        history.replaceState(history.state,'',url.href);
+    } catch (_) {}
+    eaResultsMonth='';eaDailyContext=null;
+    eaConsolidated.ticketAbort?.abort();eaConsolidated.ticketGeneration++;
+    eaConsolidated.tickets=[];eaConsolidated.ticketState='not_loaded';
+    eaConsolidated.inbox={type:'all',query:''};
+    document.querySelectorAll('.ea-consolidation').forEach(panel=>panel.remove());
+    eaCompatibilityLayout();eaWorkspaceRefresh();
+    showAlert(mode==='legacy'?'Original navigation restored. Open forms and data were retained.':'Workspaces restored. Review existing forms before saving.','info');return true;
+}
+
 /* EA workspaces: embedded in the three offline SPA copies for offline hosting.
  * Keep module permissions, saves, calculations and historical records separate.
  */
 const EA_WORKSPACES = [
     ['results', 'Results', ['scoreboard', 'ranking', 'group-scoreboard', 'party-standings']],
-    ['daily', 'Daily Work', ['attendance', 'notebooks', 'add-score']],
+    ['daily', 'Daily Work', ['attendance', 'add-score', 'daily-summary', 'notebooks']],
+    ['governance', 'Governance', ['office', 'gr', 'leadership', 'voting', 'leadership-selection', 'party']],
+    ['welfare', 'Resources & Welfare', ['resources', 'awf']],
     ['students', 'Student Progress', ['my-dashboard', 'students', 'profile', 'good-conduct']],
     ['learning', 'Learning', ['syllabus', 'excel-study-notes', 'excel-results']],
     ['requests', 'Requests & Notices', ['helpdesk', 'appeals', 'proposals', 'notifications']],
-    ['governance', 'Governance', ['office', 'gr', 'leadership', 'voting', 'leadership-selection', 'party']],
-    ['welfare', 'Resources & Welfare', ['resources', 'awf']],
     ['fees', 'Fees', ['fees']],
-    ['reports', 'Reporting', ['daily-summary', 'reports']],
+    ['reports', 'Reporting', ['reports']],
     ['information', 'Information', ['information', 'rules']],
     ['events', 'Events Archive', ['excel-mela', 'team-competition', 'excel-chess-champion']],
     ['admin', 'Administration', ['teachers', 'tools', 'settings']]
@@ -19131,7 +19276,9 @@ function eaWorkspaceElement(tag, text, className) {
 }
 function eaWorkspaceInit() {
     const nav = document.querySelector('.sidebar-nav');
-    if (!nav || nav.dataset.workspacesReady) return;
+    if (!nav) return;
+    eaCompatibilityCaptureNav(nav);
+    if (!eaCompatibilityEnabled() || nav.dataset.workspacesReady) return;
     nav.dataset.workspacesReady = 'true';
     nav.querySelectorAll('.sidebar-section-label').forEach(el => el.remove());
     EA_WORKSPACES.forEach(([key, label, tabs]) => {
@@ -19183,6 +19330,8 @@ function eaWorkspaceInit() {
         }
     });
     eaWorkspaceHolidayInit();
+    eaConsolidationInit();
+    eaCompatibilityLayout();
 }
 function eaWorkspaceWrapAdvanced(id, label) {
     const card = document.getElementById(id);
@@ -19190,9 +19339,15 @@ function eaWorkspaceWrapAdvanced(id, label) {
     const details = eaWorkspaceElement('details', undefined, 'ea-advanced');
     details.append(eaWorkspaceElement('summary', label));
     card.before(details); details.append(card);
+    eaCompatibility.wrapped.push({card,wrapper:details});
 }
 function eaWorkspaceRefresh(tab = getActiveTabName()) {
+    if (typeof eaHelpdeskRefreshMode === 'function') eaHelpdeskRefreshMode();
+    if (eaCompatibilityEnabled()) eaConsolidationIdentity();
     eaWorkspaceInit();
+    eaCompatibilityInit();
+    eaCompatibilityLayout();
+    if (!eaCompatibilityEnabled()) return;
     EA_WORKSPACES.forEach(([key, , tabs]) => {
         const group = document.querySelector(`.ea-nav-group[data-workspace="${key}"]`);
         if (!group) return;
@@ -19223,6 +19378,7 @@ function eaWorkspaceRefresh(tab = getActiveTabName()) {
             if (tabs.includes(tab) && active.length && !active.includes(tab)) archive.open = true;
         }
     });
+    eaCompatibilityArchive(tab);
     const eventSettings = document.getElementById('eaEventSettings');
     if (eventSettings) eventSettings.hidden = !eaWorkspaceAdmin();
     const advanced = document.getElementById('bulkPastAttendanceCard')?.closest('.ea-advanced');
@@ -19246,6 +19402,7 @@ function eaWorkspaceRefresh(tab = getActiveTabName()) {
     if (workspace[0] === 'results') eaWorkspaceResultsBar(bar, tab);
     if (workspace[0] === 'daily') eaWorkspaceDailyBar(bar);
     if (workspace[0] === 'admin' && eaWorkspaceAdmin()) eaWorkspacePublishPanel();
+    eaConsolidationRender(bar, tab, workspace[0]);
 }
 function eaWorkspaceResultsBar(bar, tab) {
     const label = eaWorkspaceElement('label', 'Month ');
@@ -19266,6 +19423,7 @@ function eaWorkspaceResultsBar(bar, tab) {
     label.append(input); bar.append(label);
 }
 function eaWorkspaceCapture(event) {
+    if (!eaCompatibilityEnabled()) return;
     const ids = ['monthSelector','rankingMonth','groupMonthFilter','partyStandingsMonthFilter'];
     if (ids.includes(event.target.id) && /^\d{4}-\d{2}$/.test(event.target.value)) {
         eaResultsMonth = event.target.value;
@@ -19334,7 +19492,7 @@ async function eaWorkspaceWait(predicate) {
 async function eaWorkspaceOpen(tab) {
     if (!eaWorkspaceAllowed(tab) || eaDailyApplying) return false;
     const daily = ['attendance','notebooks','add-score'].includes(tab);
-    const context = daily && eaDailyContext ? {...eaDailyContext} : null;
+    const context = eaCompatibilityEnabled() && daily && eaDailyContext ? {...eaDailyContext} : null;
     if (context && tab === 'notebooks' && !nbAllowContextChange()) return false;
     if (context && tab === 'add-score' && document.getElementById('add-score-tab').dataset.workspaceDraft === 'true') {
         if (!confirm('Changing Daily Work context will reload the score form. Discard unsaved score edits?')) return false;
@@ -19348,7 +19506,7 @@ async function eaWorkspaceOpen(tab) {
         await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
         if (getActiveTabName() !== tab || !eaWorkspaceAllowed(tab)) return false;
         if (context) await eaWorkspaceApplyDaily(tab, context);
-        if (['scoreboard','ranking','group-scoreboard','party-standings'].includes(tab) && eaResultsMonth) {
+        if (eaCompatibilityEnabled() && ['scoreboard','ranking','group-scoreboard','party-standings'].includes(tab) && eaResultsMonth) {
             const ids = {scoreboard:'monthSelector',ranking:'rankingMonth','group-scoreboard':'groupMonthFilter','party-standings':'partyStandingsMonthFilter'};
             const input = document.getElementById(ids[tab]);
             if (input && Array.from(input.options).some(o => o.value === eaResultsMonth)) {
@@ -19547,6 +19705,600 @@ async function eaWorkspaceHolidayApply() {
         return true;
     } catch (error) { showAlert('Could not complete holiday marking: ' + error.message, 'danger'); return false; }
     finally { eaHolidayBusy = false; }
+}
+
+/* Phase 4: shared context and read-only summaries. Native modules own all saves. */
+const EA_CONTEXT_FORMS = {
+    gr:['crManualGroup','crManualPost','crManualStudent','crManualElectedOn','crManualNote'],
+    leadership:['leadershipPost','leadershipStudent','leadershipElectedOn'],
+    voting:['candidatePost','candidateStudent'],
+    party:['partyMemberParty','partyMemberStudent','partyMemberDesignation','partyMemberElectedOn'],
+    'leadership-selection':['leadershipSelectionStudent1','leadershipSelectionStudent2','leadershipSelectionCandidateName']
+};
+const eaConsolidated = {governance:'', welfare:'', month:'', learning:{group:'',className:'',subject:''},
+    baselines:{}, dirty:{}, applying:false, inbox:{type:'all',query:''},
+    tickets:[], ticketIdentity:'', ticketState:'not_loaded', ticketGeneration:0, ticketAbort:null};
+
+function eaContextIdentity() {
+    return `${currentUserRole}|${typeof currentLoginId === 'undefined' ? '' : currentLoginId}|${SERVER_SYNC.enabled ? hasServerSession : 'local'}`;
+}
+function eaContextTrusted() {
+    return !SERVER_SYNC.enabled || hasServerSession;
+}
+function eaContextStaff() {
+    return eaContextTrusted() && ['admin','teacher'].includes(currentUserRole);
+}
+function eaContextSignature(tab) {
+    return JSON.stringify((EA_CONTEXT_FORMS[tab] || []).map(id => [id,getElementValue(id)]));
+}
+function eaConsolidationInit() {
+    document.addEventListener('change', eaConsolidationCapture);
+    document.addEventListener('input', eaConsolidationCapture);
+}
+function eaConsolidationCapture(event) {
+    if (eaConsolidated.applying || event.target.closest('.ea-consolidation')) return;
+    const tab = getActiveTabName();
+    if ((EA_CONTEXT_FORMS[tab] || []).includes(event.target.id)) eaConsolidated.dirty[tab] = true;
+    if (['rptMonth','tdsHistoryMonth'].includes(event.target.id) && /^\d{4}-\d{2}$/.test(event.target.value)) {
+        eaConsolidated.month = event.target.value;
+    }
+    if (event.target.id === 'profileStudent') eaWorkspaceRefresh(tab);
+}
+function eaContextAction(label, action) {
+    const button = eaWorkspaceElement('button', label, 'ea-workspace-link');
+    button.type = 'button'; button.dataset.allow = 'true';
+    button.addEventListener('click', action); return button;
+}
+function eaContextPanel(bar, title) {
+    const panel = eaWorkspaceElement('details', undefined, 'ea-consolidation');
+    panel.append(eaWorkspaceElement('summary',title)); bar.append(panel); return panel;
+}
+function eaContextStudentPicker(panel, key, callback) {
+    const search = eaWorkspaceElement('input'); search.type = 'search';
+    search.placeholder = 'Search name or roll'; search.setAttribute('aria-label', 'Find '+key+' student');
+    const select = eaWorkspaceElement('select'); select.setAttribute('aria-label', 'Shared '+key+' student');
+    const roster = (db.getStudents() || []).filter(s => s && s.id && s.active !== false);
+    const render = () => {
+        select.replaceChildren(new Option('Choose student…',''));
+        roster.filter(s => String(s.id) === eaConsolidated[key] || `${s.name} ${s.roll}`.toLowerCase().includes(search.value.toLowerCase()))
+            .forEach(s => select.add(new Option(`${s.roll} · ${s.base_name || s.name}`,String(s.id))));
+        select.value = eaConsolidated[key];
+    };
+    render(); search.addEventListener('input',render);
+    select.addEventListener('change',() => { eaConsolidated[key] = select.value; callback?.(); });
+    panel.append(search,select); return select;
+}
+function eaConsolidationIdentity() {
+    const identity = eaContextIdentity();
+    if (eaConsolidated.ticketIdentity !== identity) {
+        eaConsolidated.ticketAbort?.abort(); eaConsolidated.ticketGeneration++;
+        eaConsolidated.tickets = []; eaConsolidated.ticketState = 'not_loaded'; eaConsolidated.ticketIdentity = identity;
+        eaConsolidated.governance=''; eaConsolidated.welfare='';
+        eaConsolidated.inbox={type:'all',query:''};
+        document.querySelectorAll('.ea-consolidation').forEach(panel => panel.remove());
+    }
+}
+function eaConsolidationRender(bar, tab, area) {
+    eaConsolidationIdentity();
+    if (EA_CONTEXT_FORMS[tab] && !eaConsolidated.dirty[tab]) eaConsolidated.baselines[tab] = eaContextSignature(tab);
+    if (area === 'governance' && eaContextStaff()) eaGovernancePanel(bar,tab);
+    if (area === 'requests') eaRequestsPanel(bar,tab);
+    if (area === 'learning') eaLearningPanel(bar,tab);
+    if (area === 'reports' && eaContextStaff()) eaReportingPanel(bar,tab);
+    if (area === 'welfare' || tab === 'excel-mela') eaWelfarePanel(bar,tab);
+    if (tab === 'profile' && eaContextStaff()) eaProgressPanel(bar);
+    bar.querySelectorAll('.ea-consolidation input, .ea-consolidation select').forEach(input => input.dataset.allow='true');
+}
+function eaGovernancePanel(bar,tab) {
+    const panel = eaContextPanel(bar,'Shared student · appointments and history');
+    const history = eaWorkspaceElement('div');
+    const render = () => eaContextTimeline(history,eaConsolidated.governance,true);
+    eaContextStudentPicker(panel,'governance',render);
+    panel.append(eaWorkspaceElement('p','Choose the post/group in the original form, then use the selected student. Teacher approvals, eligibility and appointment saves remain in that form.'));
+    if (EA_CONTEXT_FORMS[tab]) panel.append(eaContextAction('Use student in this form',() => eaGovernanceApply(tab)));
+    panel.append(history); render();
+}
+function eaContextUsable(input,tab) {
+    if (!input || input.disabled || getActiveTabName() !== tab || !eaWorkspaceAllowed(tab)) return false;
+    for (let node=input; node && node!==document.body; node=node.parentElement) {
+        if (node.hidden || node.classList.contains('hidden') || getComputedStyle(node).display === 'none') return false;
+    }
+    return true;
+}
+function eaGovernanceApply(tab) {
+    if (!eaCompatibilityEnabled() || !eaContextStaff() || !eaWorkspaceAllowed(tab) || eaConsolidated.applying) return false;
+    const student = (db.getStudents() || []).find(s => s && String(s.id) === eaConsolidated.governance && s.active !== false);
+    if (!student) { showAlert('Choose an active student first.','warning'); return false; }
+    const ids = {gr:'crManualStudent',leadership:'leadershipStudent',voting:'candidateStudent',party:'partyMemberStudent',
+        'leadership-selection':'leadershipSelectionStudent1'};
+    const input = document.getElementById(ids[tab]);
+    if (!eaContextUsable(input,tab)) { showAlert('Open the relevant assignment or nomination form first.','warning'); return false; }
+    if (tab==='gr' && getElementValue('crManualGroup') !== getStudentGroup(student)) {
+        showAlert('Choose this student’s group in the GR form first.','warning'); return false;
+    }
+    if (tab==='leadership' && !getElementValue('leadershipPost') || tab==='voting' && !getElementValue('candidatePost')) {
+        showAlert('Choose the post in the original form first.','warning'); return false;
+    }
+    const option = Array.from(input.options).find(o => o.value === String(student.id) && !o.disabled);
+    if (!option || tab==='leadership-selection' && getElementValue('leadershipSelectionStudent2') === String(student.id)) {
+        showAlert('This student is not available for the selected post, party or pairing. The existing selection was retained.','warning'); return false;
+    }
+    if (input.value === String(student.id)) return true;
+    const dirty = eaConsolidated.dirty[tab] && eaContextSignature(tab) !== eaConsolidated.baselines[tab];
+    if (dirty && !confirm('Replace the student in this unfinished form? Review its post, date and note before saving.')) return false;
+    if (!eaContextStaff() || !eaContextUsable(input,tab)) return false;
+    eaConsolidated.applying=true;
+    try {
+        input.value=String(student.id); input.dispatchEvent(new Event('change',{bubbles:true}));
+        eaConsolidated.dirty[tab]=true;
+        showAlert('Student selected. Review the original form and use its save or approval action.','info'); return true;
+    } finally { eaConsolidated.applying=false; }
+}
+function eaContextTimeline(output,studentId,governanceOnly=false) {
+    output.replaceChildren();
+    const student=(db.getStudents() || []).find(s => s && String(s.id)===String(studentId));
+    if (!student || !eaContextStaff()) { output.append(eaWorkspaceElement('p','Select a student to see source records.')); return; }
+    const data=db.getData() || {}, rows=[]; let invalid=0;
+    const knownIds=new Set((db.getStudents() || []).filter(s => s && s.id).map(s => String(s.id)));
+    const knownRolls=new Set((db.getStudents() || []).filter(s => s && s.roll).map(s => normalizeAttendanceRoll(s.roll)));
+    const belongs=row => String(row.studentId || row.student_id || '')===String(student.id)
+        || row.roll && normalizeAttendanceRoll(row.roll)===normalizeAttendanceRoll(student.roll);
+    const sources=[['leadership','Leadership','leadership'],['group_crs','GR','gr'],['post_holder_history','Appointment history','office']];
+    if (!governanceOnly) sources.push(['scores','Score / notebook','add-score'],['attendance','Attendance','attendance']);
+    sources.forEach(([key,label,tab]) => {
+        if (!eaWorkspaceAllowed(tab)) return;
+        if (data[key] && !Array.isArray(data[key])) invalid++;
+        (Array.isArray(data[key]) ? data[key] : []).forEach(row => {
+            if (!row || typeof row!=='object' || !(row.studentId || row.student_id || row.roll)) { invalid++; return; }
+            const reference=row.studentId || row.student_id;
+            if (reference ? !knownIds.has(String(reference)) : !knownRolls.has(normalizeAttendanceRoll(row.roll))) { invalid++; return; }
+            if (!belongs(row)) return;
+            const date=String(row.date || row.elected_on || row.start_date || row.created_at || '');
+            const description=[row.post,row.status,row.notes || row.remarks,
+                key==='scores' ? `Points: ${row.points ?? 0}; stars: ${row.stars ?? 0}; VETOs: ${row.vetos ?? 0}` : ''].filter(Boolean).join(' · ');
+            rows.push({date,label,tab,id:row.id,description,actor:row.recordedBy || row.marked_by || row.actor_login_id || row.created_by || ''});
+        });
+    });
+    rows.sort((a,b) => b.date.localeCompare(a.date));
+    output.append(eaWorkspaceElement('p',`${rows.length} source records in the loaded snapshot. Original totals, award formulas and history remain in their source screens.`));
+    const list=eaWorkspaceElement('ol',undefined,'ea-source-list');
+    rows.slice(0,100).forEach(row => {
+        const item=eaWorkspaceElement('li');
+        item.append(eaWorkspaceElement('span',`${row.date || 'Date unavailable'} · ${row.label} · ${row.description}${row.actor ? ' · by '+row.actor : ''} · record ${row.id ?? 'unavailable'}`));
+        item.append(eaContextAction('Open source',() => eaWorkspaceOpen(row.tab))); list.append(item);
+    });
+    output.append(list);
+    if (rows.length>100) output.append(eaWorkspaceElement('p','Showing the latest 100. Open the source module for full history.'));
+    if (invalid) output.append(eaWorkspaceElement('p',`${invalid} malformed or orphaned records could not be displayed; they are retained in the source data.`));
+}
+function eaProgressPanel(bar) {
+    const panel=eaContextPanel(bar,'Student progress · source timeline');
+    const body=eaWorkspaceElement('div'); panel.append(body);
+    eaContextTimeline(body,getElementValue('profileStudent'));
+}
+function eaRequestRows() {
+    const data=db.getData() || {}, rows=[]; let invalid=0;
+    if (!eaContextTrusted()) return {rows,invalid};
+    const login=typeof currentLoginId==='undefined' ? '' : String(currentLoginId || '');
+    if (data.appeals && !Array.isArray(data.appeals)) invalid++;
+    if (data.proposals && !Array.isArray(data.proposals)) invalid++;
+    (Array.isArray(data.appeals) ? data.appeals : []).forEach(a => {
+        if (!a || typeof a!=='object') { invalid++; return; }
+        const own=!!login && a.created_by===login;
+        const visible=(currentUserRole==='student' && own) || ['admin','teacher'].includes(currentUserRole) && (own || a.target_role===currentUserRole || a.forwarded_to===currentUserRole);
+        if (visible) rows.push({type:'appeal',tab:'appeals',id:a.id,title:a.subject || 'Appeal',status:a.status || 'unknown',
+            created:a.created_at || '',updated:a.updated_at || a.created_at || '',actor:a.created_by || '',
+            detail:[a.message,a.recommendation,a.admin_decision,a.decision_reason].filter(Boolean).join(' · ')});
+    });
+    (Array.isArray(data.proposals) ? data.proposals : []).forEach(p => {
+        if (!p || typeof p!=='object') { invalid++; return; }
+        if (typeof _canCurrentUserAccessProposal==='function' && _canCurrentUserAccessProposal(p)) rows.push({
+            type:'proposal',tab:'proposals',id:p.id,title:p.title || 'Proposal',status:p.status || 'open',
+            created:p.created_at || '',updated:p.updated_at || p.created_at || '',actor:p.created_by || '',detail:''});
+    });
+    if (eaContextStaff() && eaConsolidated.ticketIdentity===eaContextIdentity()) eaConsolidated.tickets.forEach(t => {
+        if (!t || typeof t!=='object') { invalid++; return; }
+        rows.push({type:'helpdesk',tab:'helpdesk',id:t.id,title:t.subject || t.category || 'Helpdesk',status:t.status || 'PENDING',
+            created:t.submitted_at || t.created_at || '',updated:t.updated_at || t.submitted_at || t.created_at || '',actor:t.name || t.roll_no || t.roll || '',detail:t.message || ''});
+    });
+    rows.sort((a,b) => String(b.updated).localeCompare(String(a.updated))); return {rows,invalid};
+}
+function eaRequestsPanel(bar,tab) {
+    const panel=eaContextPanel(bar,'Requests inbox · source decisions stay separate');
+    const filters=eaWorkspaceElement('div',undefined,'ea-context-fields');
+    const type=eaWorkspaceElement('select'); type.setAttribute('aria-label','Request type');
+    ['all','appeal','proposal',...(eaContextStaff()?['helpdesk']:[])].forEach(t => type.add(new Option(t==='all'?'All request types':t,t)));
+    type.value=eaConsolidated.inbox.type; if (!type.value) type.value='all';
+    const search=eaWorkspaceElement('input'); search.type='search'; search.placeholder='Find title, actor or status'; search.value=eaConsolidated.inbox.query;
+    search.setAttribute('aria-label','Search Requests inbox');
+    const output=eaWorkspaceElement('div');
+    const render=() => {
+        const {rows,invalid}=eaRequestRows(); output.replaceChildren();
+        const filtered=rows.filter(r => (type.value==='all'||r.type===type.value) && `${r.title} ${r.actor} ${r.status} ${r.detail}`.toLowerCase().includes(search.value.toLowerCase()));
+        output.append(eaWorkspaceElement('p',`${filtered.length} visible requests. Local appeals/proposals use the loaded snapshot; Helpdesk uses the latest explicit server refresh (up to 200 tickets).`));
+        if (!eaContextTrusted()) output.append(eaWorkspaceElement('p','Sign in to see requests.'));
+        if (eaContextStaff()) output.append(eaWorkspaceElement('p','Helpdesk: '+eaConsolidated.ticketState.replaceAll('_',' ')));
+        filtered.slice(0,100).forEach(r => {
+            const item=eaWorkspaceElement('details',undefined,'ea-request-row');
+            item.append(eaWorkspaceElement('summary',`${r.type} · ${r.title} · ${r.status}`));
+            item.append(eaWorkspaceElement('p',`Created: ${r.created || 'unavailable'} · Updated: ${r.updated || 'unavailable'} · ${r.actor || 'actor unavailable'} · record ${r.id ?? 'unavailable'}${r.detail ? ' · '+r.detail : ''}`));
+            if (eaWorkspaceAllowed(r.tab)) item.append(eaContextAction('Open '+r.type,async () => {
+                if (!eaRequestRows().rows.some(current => current.type===r.type&&current.id===r.id)) return;
+                const opened=await eaWorkspaceOpen(r.tab);
+                if (opened && r.type==='proposal' && r.id && eaRequestRows().rows.some(current => current.type===r.type&&current.id===r.id) && typeof openProposalDetail==='function') openProposalDetail(Number(r.id));
+            }));
+            output.append(item);
+        });
+        if (filtered.length>100) output.append(eaWorkspaceElement('p','Showing the latest 100. Narrow the search or open the source module.'));
+        if (invalid && eaContextStaff()) output.append(eaWorkspaceElement('p',`${invalid} malformed source records were retained and could not be displayed.`));
+    };
+    const change=() => {eaConsolidated.inbox.type=type.value;eaConsolidated.inbox.query=search.value;render();};
+    type.addEventListener('change',change);search.addEventListener('input',change);filters.append(type,search);panel.append(filters);
+    if (eaContextStaff()) {
+        const refresh=eaContextAction('Refresh Helpdesk tickets',async () => {refresh.disabled=true;await eaRequestsRefresh();if(getActiveTabName()===tab)eaWorkspaceRefresh(tab);});
+        refresh.disabled=eaConsolidated.ticketState==='loading';panel.append(refresh);
+    }
+    panel.append(output);render();
+}
+async function eaRequestsRefresh() {
+    if (!eaCompatibilityEnabled() || !eaContextStaff() || !SERVER_SYNC.enabled || eaConsolidated.ticketState==='loading') return false;
+    const identity=eaContextIdentity(), generation=++eaConsolidated.ticketGeneration;
+    const abort=new AbortController();eaConsolidated.ticketAbort=abort;eaConsolidated.ticketState='loading';
+    const timer=setTimeout(() => abort.abort(),10000);
+    try {
+        const response=await eaFetch('/api/feedback',{method:'GET',credentials:'include',cache:'no-store',signal:abort.signal});
+        const payload=await response.json();
+        if (identity!==eaContextIdentity() || generation!==eaConsolidated.ticketGeneration || !eaContextStaff()) return false;
+        if (!response.ok || !payload.success || !Array.isArray(payload.messages)) throw new Error('Helpdesk could not be refreshed');
+        eaConsolidated.tickets=payload.messages;eaConsolidated.ticketIdentity=identity;eaConsolidated.ticketState='refreshed';return true;
+    } catch (error) {
+        if (identity===eaContextIdentity() && generation===eaConsolidated.ticketGeneration) {
+            eaConsolidated.tickets=[];eaConsolidated.ticketState='refresh_failed';
+        }
+        return false;
+    } finally {clearTimeout(timer);if(eaConsolidated.ticketAbort===abort)eaConsolidated.ticketAbort=null;}
+}
+function eaLearningPanel(bar,tab) {
+    const panel=eaContextPanel(bar,'Shared class / subject · browse published learning');
+    ['group','className','subject'].forEach(key => {
+        const label=eaWorkspaceElement('label',key==='group'?'Library group (optional) ':key==='className'?'Class ':'Subject (optional) ');
+        const input=eaWorkspaceElement('input');input.value=eaConsolidated.learning[key];input.maxLength=120;
+        input.addEventListener('input',() => eaConsolidated.learning[key]=input.value.trim());label.append(input);panel.append(label);
+    });
+    panel.append(eaWorkspaceElement('p','Choose a class and exact subject name. Syllabus keeps its selected board; libraries require an unambiguous match in their visible catalog. Editors and publication controls remain separate.'));
+    panel.append(eaContextAction('Apply browse context in this screen',() => eaLearningApply(tab)));
+}
+function eaLearningApply(tab) {
+    if (!eaCompatibilityEnabled() || !eaWorkspaceAllowed(tab) || getActiveTabName()!==tab || eaConsolidated.applying) return false;
+    const context={...eaConsolidated.learning};
+    if (!context.className) {showAlert('Enter a class first.','warning');return false;}
+    if (tab==='syllabus') {
+        const select=document.getElementById('syllabusClassFilter'), subject=document.getElementById('syllabusSubjectFilter');
+        const klass=context.className.replace(/^class\s*/i,'');
+        const board=getElementValue('syllabusBoardFilter');
+        const subjects=getSyllabusCatalogClassSubjects(board,klass);
+        const chosen=Object.keys(subjects || {}).find(s => s.toLowerCase()===context.subject.toLowerCase());
+        if (!Array.from(select?.options || []).some(o => o.value===klass) || context.subject&&!chosen) {
+            showAlert('Class or subject is unavailable on the selected syllabus board. Existing filters were retained.','warning');return false;
+        }
+        // The native class handler rebuilds attendance cards. Never carry a
+        // pending lecture or altered attendee selection into another class.
+        const pendingTopics=typeof selectedSyllabusTopics!=='undefined' && selectedSyllabusTopics.length;
+        const attendanceChanged=Array.from(document.querySelectorAll('#syllabusStudentList .syllabus-student-card')).some(card => !card.classList.contains('active'));
+        if (pendingTopics || attendanceChanged || getElementValue('syllabusNewTopic') || getElementValue('syllabusNewSubject')) {
+            showAlert('Save or clear the lecture and attendee selection before applying shared browse context.','warning');return false;
+        }
+        eaConsolidated.applying=true;
+        try {eaWorkspaceChange('syllabusClassFilter',klass);if(chosen)eaWorkspaceChange('syllabusSubjectFilter',chosen);return true;}
+        finally {eaConsolidated.applying=false;}
+    }
+    const frame=document.getElementById(tab==='excel-results'?'excelResultsFrame':'excelStudyNotesFrame');
+    if (!frame || frame.getAttribute('src')==='about:blank' || SERVER_SYNC.enabled&&!hasServerSession) {
+        showAlert('Sign in and wait for the protected library to load.','warning');return false;
+    }
+    try {
+        const bridge=frame.contentWindow?.EA_WORKSPACE_LEARNING_APPLY;
+        if (typeof bridge!=='function') throw new Error('The library is still loading or uses another origin. Use its own selectors.');
+        const result=bridge(context);
+        if (!result?.ok) throw new Error(result?.error || 'Learning context is unavailable.');return true;
+    } catch(error) {showAlert(error.message,'warning');return false;}
+}
+function eaReportingPanel(bar,tab) {
+    const panel=eaContextPanel(bar,'Shared report month · editors keep their own dates');
+    const label=eaWorkspaceElement('label','Month '), input=eaWorkspaceElement('input');input.type='month';
+    input.value=eaConsolidated.month || getElementValue(tab==='reports'?'rptMonth':'tdsHistoryMonth') || getCurrentMonthKey();
+    input.addEventListener('change',() => eaConsolidated.month=input.value);label.append(input);panel.append(label);
+    panel.append(eaWorkspaceElement('p','This applies to Reports or Daily Summary history only. Class/group filters, summary drafts and review remarks stay in their original screens.'));
+    panel.append(eaContextAction('Apply report month',() => {
+        if (!eaContextStaff() || !eaWorkspaceAllowed(tab) || getActiveTabName()!==tab) return;
+        try {eaWorkspaceChange(tab==='reports'?'rptMonth':'tdsHistoryMonth',input.value);eaConsolidated.month=input.value;}
+        catch(error){showAlert('That month is unavailable in this report.','warning');}
+    }));
+}
+function eaWelfarePanel(bar,tab) {
+    const panel=eaContextPanel(bar,'Resources, Mela & Welfare · separate transaction records');
+    ['resources','excel-mela','awf'].filter(eaWorkspaceAllowed).forEach(t => panel.append(eaContextAction(eaWorkspaceLabel(t),() => eaWorkspaceOpen(t))));
+    panel.append(eaWorkspaceElement('p','Resource requests, Mela purchases and welfare expenses keep their own approval and save actions. Fees remain a separate ledger.'));
+    if (eaContextStaff() && ['resources','excel-mela'].includes(tab)) {
+        eaContextStudentPicker(panel,'welfare');
+        panel.append(eaContextAction('Filter this student’s transactions',() => {
+            if (!eaContextStaff() || !eaWorkspaceAllowed(tab) || getActiveTabName()!==tab) return;
+            const id=tab==='resources'?'resourceTransactionsStudentFilter':'melaTxnStudentFilter';
+            try {
+                const student=(db.getStudents() || []).find(s => s && String(s.id)===eaConsolidated.welfare);
+                if(!student)throw new Error('Choose a student first.');
+                const filter=document.getElementById(id), options=Array.from(filter?.options || []);
+                const value=options.some(o => o.value===`id:${student.id}`) ? `id:${student.id}` : `roll:${normalizeRoll(student.roll)}`;
+                if(!options.some(o => o.value===value && !o.disabled))throw new Error('No transactions for this student match the current filters.');
+                eaWorkspaceChange(id,value);
+            }
+            catch(error){showAlert(error.message,'warning');}
+        }));
+    }
+}
+
+/* Original-screen communication: authenticated inbox refresh and thread chat. */
+const eaHelpdesk = {identity:'', generation:0, controller:null, busy:false, timer:0};
+function eaHelpdeskClearInbox() {
+    if(typeof _helpdeskCachedTickets!=='undefined')_helpdeskCachedTickets=[];
+    document.getElementById('helpdeskTicketsList')?.replaceChildren();
+    for(const id of ['helpdeskPendingBadge','helpdeskTabBadge']) {
+        const badge=document.getElementById(id);if(badge){badge.textContent='';badge.classList.add('hidden');}
+    }
+}
+function eaHelpdeskStaff() {
+    return ['admin','teacher'].includes(currentUserRole) && (!SERVER_SYNC.enabled || hasServerSession);
+}
+function eaHelpdeskInboxOnly() {
+    const surface = document.querySelector('meta[name="ea-client-surface"]')?.content;
+    return eaHelpdeskStaff() && surface !== 'public' && surface !== 'client' && !SERVER_SYNC.crossOrigin;
+}
+function eaHelpdeskRefreshMode() {
+    if(typeof eaChatIdentity==='function')eaChatIdentity();
+    if(eaChat.thread && !document.hidden && getActiveTabName()===(eaChat.thread.kind==='appeal'?'appeals':'proposals'))void eaChatRead();
+    const inbox = eaHelpdeskInboxOnly();
+    document.body.classList.toggle('ea-helpdesk-inbox', inbox);
+    const submit = document.getElementById('helpdeskSubmitCard'); if(submit)submit.hidden=inbox;
+    const channels = document.getElementById('helpdeskChannels'); if(channels)channels.hidden=inbox;
+    const title = document.querySelector('#helpdesk-tab h2');
+    const subtitle = title?.nextElementSibling;
+    for(const [el,text] of [[title,'Helpdesk inbox'],[subtitle,'Receive and review messages sent from student and parent devices.']]) {
+        if(!el)continue;
+        if(!el.dataset.originalCopy)el.dataset.originalCopy=el.textContent;
+        el.textContent=inbox?text:el.dataset.originalCopy;
+    }
+    const identity=eaContextIdentity();
+    if(identity!==eaHelpdesk.identity) {
+        eaHelpdesk.identity=identity;eaHelpdesk.generation++;
+        eaHelpdesk.controller?.abort();eaHelpdesk.controller=null;eaHelpdesk.busy=false;
+        eaHelpdeskClearInbox();
+        window.clearInterval(eaHelpdesk.timer);eaHelpdesk.timer=0;
+    }
+    if(eaHelpdeskStaff() && SERVER_SYNC.enabled && hasServerSession && !eaHelpdesk.timer) {
+        eaHelpdesk.timer=window.setInterval(() => {
+            if(!document.hidden && eaHelpdeskStaff() && hasServerSession)void eaHelpdeskLoad(false);
+        },20000);
+    }
+    const staff=document.getElementById('helpdeskStaffSection');if(staff)staff.style.display=eaHelpdeskStaff()?'block':'none';
+}
+async function eaHelpdeskLoad(force=false) {
+    if(!eaHelpdeskStaff() || !SERVER_SYNC.enabled || !hasServerSession || eaHelpdesk.busy)return false;
+    const list=document.getElementById('helpdeskTicketsList');if(!list)return false;
+    const identity=eaContextIdentity(), generation=++eaHelpdesk.generation;
+    const controller=new AbortController();eaHelpdesk.controller=controller;eaHelpdesk.busy=true;
+    const timeout=window.setTimeout(()=>controller.abort(),10000);
+    if(force)list.textContent='Refreshing messages…';
+    try {
+        const response=await eaFetch('/api/feedback',{method:'GET',credentials:'include',signal:controller.signal});
+        const payload=await response.json();
+        if(identity!==eaContextIdentity() || generation!==eaHelpdesk.generation || !eaHelpdeskStaff())return false;
+        if(!response.ok || !payload.success || !Array.isArray(payload.messages))throw Error(payload.error || 'Unable to load messages');
+        _helpdeskCachedTickets=payload.messages;renderHelpdeskMetrics();renderHelpdeskTicketsList();
+        const pending=payload.messages.filter(m=>m.status==='PENDING').length;
+        for(const id of ['helpdeskPendingBadge','helpdeskTabBadge']) {
+            const badge=document.getElementById(id);if(!badge)continue;
+            badge.textContent=pending?String(pending):'';badge.classList.toggle('hidden',!pending);
+        }
+        return true;
+    } catch(error) {
+        if(identity!==eaContextIdentity() || generation!==eaHelpdesk.generation)return false;
+        eaHelpdeskClearInbox();
+        list.textContent='Messages could not be refreshed. Check the backend connection and retry.';
+        return false;
+    } finally {
+        window.clearTimeout(timeout);
+        if(generation===eaHelpdesk.generation){eaHelpdesk.busy=false;eaHelpdesk.controller=null;}
+    }
+}
+document.addEventListener('visibilitychange',()=>{if(!document.hidden){eaHelpdeskRefreshMode();if(eaHelpdesk.timer)void eaHelpdeskLoad();}});
+window.addEventListener('pagehide',()=>{window.clearInterval(eaHelpdesk.timer);eaHelpdesk.timer=0;eaHelpdesk.generation++;eaHelpdesk.busy=false;eaHelpdesk.controller?.abort();});
+window.addEventListener('pageshow',event=>{if(event.persisted && !document.hidden){eaHelpdeskRefreshMode();if(eaHelpdesk.timer)void eaHelpdeskLoad();}});
+
+const eaChat={identity:'',thread:null,cursor:null,messages:new Map(),legacy:[],drafts:new Map(),controller:null,sendController:null,timer:0,reading:false,sending:false,generation:0};
+function eaChatIdentity() {
+    const identity=eaContextIdentity();
+    if(identity===eaChat.identity)return;
+    eaChat.identity=identity;eaChat.generation++;eaChat.controller?.abort();eaChat.sendController?.abort();
+    window.clearTimeout(eaChat.timer);eaChat.timer=0;eaChat.reading=false;eaChat.sending=false;
+    if(eaChat.thread){eaChat.thread.box.replaceChildren();if(eaChat.thread.input)eaChat.thread.input.value='';}
+    eaChat.thread=null;eaChat.cursor=null;eaChat.messages.clear();eaChat.legacy=[];eaChat.drafts.clear();
+    document.getElementById('eaAppealChat')?.remove();
+}
+function eaChatMessageId() {
+    if(typeof crypto.randomUUID==='function')return crypto.randomUUID();
+    const bytes=crypto.getRandomValues(new Uint8Array(16));bytes[6]=(bytes[6]&15)|64;bytes[8]=(bytes[8]&63)|128;
+    const hex=Array.from(bytes,b=>b.toString(16).padStart(2,'0')).join('');
+    return `${hex.slice(0,8)}-${hex.slice(8,12)}-${hex.slice(12,16)}-${hex.slice(16,20)}-${hex.slice(20)}`;
+}
+function eaChatOpen(kind,id) {
+    eaChatIdentity();id=Number(id);if(!['appeal','proposal'].includes(kind) || !Number.isSafeInteger(id) || id<1)return false;
+    const key=kind+':'+id;
+    if(eaChat.thread?.key===key){void eaChatRead();return true;}
+    if(eaChat.thread?.input)eaChat.drafts.set(eaChat.thread.key,{...eaChat.drafts.get(eaChat.thread.key),value:eaChat.thread.input.value});
+    eaChat.generation++;eaChat.controller?.abort();eaChat.sendController?.abort();window.clearTimeout(eaChat.timer);eaChat.reading=false;eaChat.sending=false;
+    let box,input,status;
+    if(kind==='proposal') {
+        box=document.getElementById('proposalChatMessages');input=document.getElementById('proposalChatInput');
+        if(!box || !input)return false;
+        status=document.getElementById('eaProposalChatStatus');
+        if(!status){status=eaWorkspaceElement('p',undefined,'ea-chat-status');status.id='eaProposalChatStatus';box.before(status);}
+    } else {
+        const host=document.getElementById('appeals-tab');if(!host)return false;
+        document.getElementById('eaAppealChat')?.remove();
+        const card=eaWorkspaceElement('section',undefined,'form-card ea-chat');card.id='eaAppealChat';
+        card.append(eaWorkspaceElement('h3','Appeal #'+id+' · Discussion'));
+        card.append(eaWorkspaceElement('p','Messages support this appeal. Decisions and score changes use the existing approval controls.'));
+        status=eaWorkspaceElement('p',undefined,'ea-chat-status');box=eaWorkspaceElement('div',undefined,'ea-chat-messages');
+        box.setAttribute('aria-label','Appeal discussion');
+        const form=eaWorkspaceElement('form',undefined,'ea-chat-composer');
+        input=eaWorkspaceElement('textarea');input.rows=2;input.maxLength=2000;input.dataset.allow='true';input.setAttribute('aria-label','Reply to appeal');
+        const send=eaWorkspaceElement('button','Send reply');send.type='submit';send.dataset.allow='true';
+        form.addEventListener('submit',event=>{event.preventDefault();void eaChatSend();});form.append(input,send);
+        card.append(status,box,form);host.append(card);
+    }
+    box.replaceChildren();box.classList.add('ea-chat-messages');status.setAttribute('role','status');
+    input.maxLength=2000;input.value=eaChat.drafts.get(key)?.value || '';
+    eaChat.thread={kind,id,key,box,input,status};eaChat.cursor=null;eaChat.messages.clear();eaChat.legacy=[];
+    status.textContent='Connecting to discussion…';void eaChatRead();return true;
+}
+function eaChatRender() {
+    const thread=eaChat.thread;if(!thread)return;
+    const wasNearEnd=thread.box.scrollHeight-thread.box.clientHeight-thread.box.scrollTop<80;
+    thread.box.replaceChildren();
+    if(eaChat.legacy.length)thread.box.append(eaWorkspaceElement('small','Earlier discussion'));
+    const rows=[...eaChat.legacy.map(row=>({actor_login_id:row.login_id,actor_role:row.role,body:row.message,created_at:row.created_at})),...eaChat.messages.values()];
+    rows.forEach(row=>{
+        const item=eaWorkspaceElement('article',undefined,'ea-chat-message');
+        item.append(eaWorkspaceElement('strong',`${row.actor_login_id || 'User'} · ${row.actor_role || ''}`));
+        item.append(eaWorkspaceElement('p',row.body || ''),eaWorkspaceElement('time',row.created_at || ''));
+        thread.box.append(item);
+    });
+    if(!rows.length)thread.box.append(eaWorkspaceElement('p','No replies yet. Start the discussion.'));
+    if(wasNearEnd)thread.box.scrollTop=thread.box.scrollHeight;
+}
+async function eaChatRead() {
+    if(!eaChat.thread || eaChat.reading)return false;
+    const thread=eaChat.thread,identity=eaChat.identity,generation=eaChat.generation;
+    if(!SERVER_SYNC.enabled || !hasServerSession){thread.status.textContent='Sign in and connect to the backend to use discussion.';return false;}
+    eaChat.reading=true;const controller=new AbortController();eaChat.controller=controller;
+    const timeout=window.setTimeout(()=>controller.abort(),10000);
+    let delay=5000;
+    try {
+        const query=eaChat.cursor===null?'':'?after='+eaChat.cursor;
+        const response=await eaFetch(`/scoreboard/request-chat/${thread.kind}/${thread.id}/messages${query}`,{credentials:'include',signal:controller.signal});
+        const payload=await response.json();
+        if(identity!==eaContextIdentity() || generation!==eaChat.generation)return false;
+        if(!response.ok || !payload.success) {
+            if([401,403,404].includes(response.status)){eaChat.messages.clear();eaChat.legacy=[];eaChat.cursor=null;thread.box.replaceChildren();delay=0;}
+            throw Error(payload.error || 'Discussion unavailable');
+        }
+        payload.messages.forEach(row=>eaChat.messages.set(row.message_id,row));
+        if(eaChat.cursor===null)eaChat.legacy=payload.legacy_messages || [];
+        eaChat.cursor=payload.cursor;eaChatRender();
+        thread.status.textContent='Live discussion · checks for new replies every 5 seconds';
+        if(payload.has_more)delay=0.1;
+        return true;
+    } catch(error) {
+        if(identity===eaContextIdentity() && generation===eaChat.generation)thread.status.textContent='Discussion unavailable. Your draft is retained; use Send to retry.';
+        return false;
+    } finally {
+        window.clearTimeout(timeout);
+        if(generation===eaChat.generation) {
+            eaChat.reading=false;eaChat.controller=null;window.clearTimeout(eaChat.timer);
+            if(delay)eaChat.timer=window.setTimeout(()=>{if(!document.hidden && getActiveTabName()===(thread.kind==='appeal'?'appeals':'proposals'))void eaChatRead();},delay===0.1?0:delay);
+        }
+    }
+}
+async function eaChatSend() {
+    const thread=eaChat.thread;if(!thread || eaChat.sending)return false;
+    const body=thread.input.value.trim();if(!body || body.length>2000)return false;
+    if(!SERVER_SYNC.enabled || !hasServerSession){thread.status.textContent='Sign in and connect before sending. Your draft is retained.';return false;}
+    const identity=eaContextIdentity(),generation=eaChat.generation;
+    if(identity!==eaChat.identity){eaChatIdentity();return false;}
+    const previous=eaChat.drafts.get(thread.key);
+    const draft=previous?.body===body?previous:{body,clientId:eaChatMessageId(),value:thread.input.value};
+    eaChat.drafts.set(thread.key,draft);eaChat.sending=true;
+    const controller=new AbortController(),timeout=window.setTimeout(()=>controller.abort(),10000);eaChat.sendController=controller;
+    thread.status.textContent='Sending…';
+    try {
+        const response=await eaFetch(`/scoreboard/request-chat/${thread.kind}/${thread.id}/messages`,{method:'POST',credentials:'include',signal:controller.signal,
+            headers:{'Content-Type':'application/json'},body:JSON.stringify({message:body,client_message_id:draft.clientId})});
+        const payload=await response.json();
+        if(identity!==eaContextIdentity() || generation!==eaChat.generation)return false;
+        if(!response.ok || !payload.success || typeof payload.message?.message_id!=='string')throw Error(payload.error || 'Send failed');
+        if(thread.input.value.trim()===body)thread.input.value='';
+        eaChat.drafts.delete(thread.key);thread.status.textContent='Reply saved to the backend.';
+        eaChat.messages.set(payload.message.message_id,payload.message);eaChatRender();void eaChatRead();return true;
+    } catch(error) {
+        if(identity===eaContextIdentity() && generation===eaChat.generation)thread.status.textContent='Reply was not confirmed. Your draft is retained; retry Send.';
+        return false;
+    } finally {window.clearTimeout(timeout);if(generation===eaChat.generation){eaChat.sending=false;eaChat.sendController=null;}}
+}
+document.addEventListener('visibilitychange',()=>{if(!document.hidden && eaChat.thread)void eaChatRead();});
+window.addEventListener('pagehide',()=>{window.clearTimeout(eaChat.timer);eaChat.timer=0;eaChat.generation++;eaChat.reading=false;eaChat.sending=false;eaChat.controller?.abort();eaChat.sendController?.abort();});
+
+/* Presentation only: retain native selection state, actions and form nodes. */
+let eaSelectionPresentation = null;
+function eaLeadershipSelectionLayout() {
+    if(!eaCompatibilityEnabled())return;
+    const host=document.getElementById('leadership-selection-tab');if(!host)return;
+    host.classList.add('ea-selection');
+    const cards=Array.from(host.children).filter(el=>el.classList.contains('form-card'));
+    const hero=cards[0];if(!hero)return;
+    hero.classList.add('ea-selection-hero');
+    const title=document.getElementById('leadershipSelectionHeroTitle');
+    if(title && title.textContent!=='Leadership selection'){
+        title.dataset.originalSelectionCopy=title.textContent;
+        if(title.textContent.trim()==='FOR LEADERSHIP SELECTION')title.textContent='Leadership selection';
+    }
+    const subtitle=document.getElementById('leadershipSelectionHeroSubtitle');
+    const compactCopy='Set up candidates, run the rounds, and review the winner for approval.';
+    if(subtitle && subtitle.textContent!==compactCopy){subtitle.dataset.originalSelectionCopy=subtitle.textContent;subtitle.textContent=compactCopy;}
+    document.getElementById('leadershipSelectionCurrentRoundInfo')?.parentElement.classList.add('ea-selection-panel');
+    document.getElementById('competeModeIndividual')?.closest('label')?.parentElement.parentElement.classList.add('ea-selection-mode');
+    if(!hero.querySelector('.ea-selection-steps')) {
+        const steps=eaWorkspaceElement('ol',undefined,'ea-selection-steps');steps.setAttribute('aria-label','Selection stages');
+        ['Candidates','Selection rounds','Final vote','Approval'].forEach(label=>steps.append(eaWorkspaceElement('li',label)));
+        hero.prepend(steps);
+    }
+    const grid=document.getElementById('leadershipSelectionTitleInput')?.closest('.form-grid');
+    if(grid && !hero.querySelector('.ea-selection-setup')) {
+        const setup=eaWorkspaceElement('details',undefined,'ea-selection-setup');
+        setup.append(eaWorkspaceElement('summary','Program settings & candidates'));
+        grid.before(setup);
+        setup.append(grid);
+        // Keep initial configuration visible when there are no candidates.
+        const state=typeof getLeadershipSelectionState==='function'?getLeadershipSelectionState():null;
+        setup.open=!state || !(state.candidates || []).length;
+    }
+    const actions=hero.querySelector('.form-buttons');
+    if(actions && !actions.querySelector('.ea-selection-action-group')) {
+        eaSelectionPresentation={actions,buttons:Array.from(actions.children),host,hero};
+        const sections=[['Candidates',['saveLeadershipSelectionSetup','importActiveStudentsForLeadershipSelection','addManualLeadershipSelectionCandidate','addLeadershipSelectionPairTeam']],
+            ['Run selection',['setLeadershipSelectionChallengeOutcome','eliminateLowestPerformingPairTeams','moveLeadershipSelectionRound','advanceLeadershipSelectionRound']],
+            ['Finish & approve',['conductLeadershipSelectionFinalVote','approveLeadershipSelectionWinner','saveLeadershipSelectionToHistory']],
+            ['History & tools',['downloadLeadershipSelectionGradientRankings','openLeadershipSelectionHistoryModal','resetLeadershipSelection']]];
+        sections.forEach(([label,functions])=>{
+            const group=eaWorkspaceElement(label==='History & tools'?'details':'section',undefined,'ea-selection-action-group');
+            group.append(eaWorkspaceElement(label==='History & tools'?'summary':'h4',label));
+            Array.from(actions.children).filter(el=>el.tagName==='BUTTON' && functions.some(name=>(el.getAttribute('onclick') || '').startsWith(name+'('))).forEach(button=>group.append(button));
+            if(group.querySelector('button'))actions.append(group);
+        });
+    }
+    if(cards[1])cards[1].classList.add('ea-selection-rounds');
+    if(cards[2])cards[2].classList.add('ea-selection-candidates');
+}
+function eaLeadershipSelectionRestore() {
+    const host=document.getElementById('leadership-selection-tab');if(!host)return;
+    host.querySelectorAll('[data-original-selection-copy]').forEach(el=>{el.textContent=el.dataset.originalSelectionCopy;delete el.dataset.originalSelectionCopy;});
+    host.querySelector('.ea-selection-steps')?.remove();
+    const setup=host.querySelector('.ea-selection-setup'),grid=setup?.querySelector('.form-grid');
+    if(grid)setup.replaceWith(grid);
+    if(eaSelectionPresentation) {
+        const {actions,buttons}=eaSelectionPresentation;actions.replaceChildren(...buttons);eaSelectionPresentation=null;
+    }
+    host.classList.remove('ea-selection');
+    host.querySelectorAll('.ea-selection-hero,.ea-selection-rounds,.ea-selection-candidates,.ea-selection-panel,.ea-selection-mode').forEach(el=>el.classList.remove('ea-selection-hero','ea-selection-rounds','ea-selection-candidates','ea-selection-panel','ea-selection-mode'));
 }
         // EA_WORKSPACES_END
 
@@ -38629,6 +39381,7 @@ async function eaWorkspaceHolidayApply() {
                     rankCard.classList.add('hidden');
                 }
             }
+            eaLeadershipSelectionLayout();
         }
 
         function loadLeadershipSelectionTab() {
@@ -42891,51 +43644,11 @@ async function eaWorkspaceHolidayApply() {
         }
 
         async function loadProposalMessages() {
-            const pid = parseInt(_activeProposalId, 10) || 0;
-            const box = document.getElementById('proposalChatMessages');
-            if (!box) return;
-            if (!pid) {
-                box.innerHTML = '<div class="text-center">Select a proposal.</div>';
-                return;
-            }
-            try {
-                const resp = await eaFetch(`/scoreboard/proposals/${pid}/messages`, { credentials: 'include', cache: 'no-store' });
-                const payload = await resp.json();
-                if (!resp.ok || !payload.success) throw new Error(payload.error || 'Load failed');
-                const rows = payload.messages || [];
-                box.innerHTML = rows.length
-                    ? rows.map(m => `<div style="padding:6px 8px;border:1px solid var(--border-color);border-radius:8px;">
-                        <div style="font-size:12px;color:var(--text-muted);">${_esc(m.login_id || '-')}${m.role ? ` (${_esc(m.role)})` : ''} • ${_fmtTs(m.created_at || '')}</div>
-                        <div>${_esc(m.message || '')}</div>
-                    </div>`).join('')
-                    : '<div class="text-center">No chat messages yet.</div>';
-                box.scrollTop = box.scrollHeight;
-            } catch (e) {
-                box.innerHTML = `<div class="text-center">${_esc(String(e.message || e))}</div>`;
-            }
+            return eaChatOpen('proposal', _activeProposalId);
         }
 
         async function sendProposalMessage() {
-            const pid = parseInt(_activeProposalId, 10) || 0;
-            if (!pid) return;
-            const input = document.getElementById('proposalChatInput');
-            const message = String(input?.value || '').trim();
-            if (!message) return;
-            try {
-                const resp = await eaFetch(`/scoreboard/proposals/${pid}/messages`, {
-                    method: 'POST',
-                    credentials: 'include',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ message })
-                });
-                const payload = await resp.json();
-                if (!resp.ok || !payload.success) throw new Error(payload.error || 'Send failed');
-                if (input) input.value = '';
-                await pullFromServer(false, true);
-                await loadProposalMessages();
-            } catch (e) {
-                showAlert(`Chat send failed: ${String(e.message || e)}`, 'danger');
-            }
+            return eaChatSend();
         }
 
         // ============================================================
@@ -42975,6 +43688,7 @@ async function eaWorkspaceHolidayApply() {
         }
 
         function openHelpdeskModal() {
+            if (eaHelpdeskInboxOnly()) { switchTab('helpdesk'); return; }
             openModal('helpdeskModal', { centerViewport: true });
             prefillHelpdeskUserFields('modal');
         }
@@ -43348,6 +44062,7 @@ async function eaWorkspaceHolidayApply() {
 
         // Tab Loader & Staff Functions
         function loadHelpdeskTab() {
+            eaHelpdeskRefreshMode();
             prefillHelpdeskUserFields('tab');
             const staffSection = document.getElementById('helpdeskStaffSection');
             const isStaff = (currentUserRole === 'admin' || currentUserRole === 'teacher');
@@ -43360,26 +44075,7 @@ async function eaWorkspaceHolidayApply() {
         }
 
         async function loadHelpdeskTickets(force = false) {
-            const listEl = document.getElementById('helpdeskTicketsList');
-            if (!listEl) return;
-            if (force) {
-                listEl.innerHTML = '<div style="text-align:center; color:var(--text-muted); padding:30px 10px;"><i class="fas fa-spinner fa-spin" style="font-size:20px; margin-bottom:8px;"></i><div>Refreshing tickets...</div></div>';
-            }
-
-            try {
-                const resp = await eaFetch('/api/feedback', { method: 'GET' });
-                const resData = await resp.json().catch(() => ({}));
-                if (resp.ok && resData.success && Array.isArray(resData.messages)) {
-                    _helpdeskCachedTickets = resData.messages;
-                    renderHelpdeskMetrics();
-                    renderHelpdeskTicketsList();
-                    updateHelpdeskBadges();
-                } else {
-                    listEl.innerHTML = '<div style="text-align:center; color:var(--text-muted); padding:20px;">' + _esc(resData.error || 'Unable to load tickets') + '</div>';
-                }
-            } catch (e) {
-                listEl.innerHTML = '<div style="text-align:center; color:var(--text-muted); padding:20px;">Cannot connect to helpdesk server. Please check connection.</div>';
-            }
+            return eaHelpdeskLoad(force);
         }
 
         function renderHelpdeskMetrics() {
@@ -49348,13 +50044,14 @@ async function eaWorkspaceHolidayApply() {
         }
 
         function renderAppealActions(appeal) {
-            const buttons = [];
+            const chatButton = `<button class="secondary" data-allow="true" onclick="eaChatOpen('appeal', ${Number(appeal.id)})">Discussion</button>`;
+            const buttons = [chatButton];
             if (
                 currentUserRole === 'admin' &&
                 appeal.type === 'score_adjustment' &&
                 (appeal.status === 'pending_admin' || appeal.status === 'recommended')
             ) {
-                return renderScoreAdjustmentActions(appeal);
+                return renderScoreAdjustmentActions(appeal) + ' ' + chatButton;
             }
             if (currentUserRole === 'teacher' && appeal.target_role === 'teacher' && appeal.status === 'pending_teacher') {
                 buttons.push(`<button class="secondary" onclick="teacherRecommendAppeal(${appeal.id}, true)" style="font-size: 12px;">Recommend</button>`);
@@ -63501,6 +64198,8 @@ async function eaWorkspaceHolidayApply() {
     var cleanupTimer = 0;
     var edgeFrame = 0;
     var edgeX = 0;
+    var revealGeneration = 0;
+    var keyboardNavigation = false;
     var raf = window.requestAnimationFrame || function(fn) { return window.setTimeout(fn, 16); };
 
     if (!sidebar) return;
@@ -63525,7 +64224,7 @@ async function eaWorkspaceHolidayApply() {
     function finishMotion(delay) {
         window.clearTimeout(cleanupTimer);
         cleanupTimer = window.setTimeout(function() {
-            body.classList.remove('sb-closing');
+            body.classList.remove('sb-closing', 'sb-instant');
             setWillChange(false);
         }, delay || 280);
     }
@@ -63554,11 +64253,12 @@ async function eaWorkspaceHolidayApply() {
     }
 
     function scheduleHoverCollapse() {
+        revealGeneration++;
         if (!body.classList.contains('sidebar-hover-reveal')) return;
         window.clearTimeout(hoverTimer);
         hoverTimer = window.setTimeout(function() {
             var active = document.activeElement;
-            if (sidebar.matches(':hover') || hoverZone.matches(':hover') || (active && sidebar.contains(active))) return;
+            if (sidebar.matches(':hover') || hoverZone.matches(':hover') || (keyboardNavigation && active && sidebar.contains(active))) return;
             hideHoverReveal();
         }, 220);
     }
@@ -63567,9 +64267,10 @@ async function eaWorkspaceHolidayApply() {
         if (isMobile() || !body.classList.contains('sidebar-collapsed')) return;
         window.clearTimeout(hoverTimer);
         if (body.classList.contains('sidebar-hover-reveal')) return;
+        var generation = revealGeneration;
         setWillChange(true);
         raf(function() {
-            if (!isMobile() && body.classList.contains('sidebar-collapsed')) {
+            if (generation === revealGeneration && !isMobile() && body.classList.contains('sidebar-collapsed')) {
                 body.classList.remove('sb-closing');
                 body.classList.add('sidebar-hover-reveal');
                 updateAria();
@@ -63580,6 +64281,7 @@ async function eaWorkspaceHolidayApply() {
 
     function collapseSidebar(persist) {
         if (isMobile()) return;
+        revealGeneration++;
         window.clearTimeout(hoverTimer);
         if (body.classList.contains('sidebar-collapsed') && !body.classList.contains('sidebar-hover-reveal')) {
             if (persist) writeCollapsed(true);
@@ -63596,6 +64298,7 @@ async function eaWorkspaceHolidayApply() {
     }
 
     function expandSidebar() {
+        revealGeneration++;
         window.clearTimeout(hoverTimer);
         window.clearTimeout(idleTimer);
         setWillChange(true);
@@ -63608,8 +64311,8 @@ async function eaWorkspaceHolidayApply() {
 
     function resetIdleTimer() {
         window.clearTimeout(idleTimer);
-        if (isMobile() || body.classList.contains('sidebar-collapsed')) return;
-        idleTimer = window.setTimeout(function() { collapseSidebar(true); }, 3500);
+        // An explicitly expanded sidebar stays open while the user works.
+        // Hover previews close on pointer/focus exit, without an idle race.
     }
 
     function openMobileSidebar() {
@@ -63671,22 +64374,15 @@ async function eaWorkspaceHolidayApply() {
     sidebar.addEventListener('focusout', scheduleHoverCollapse);
     function requestSidebarCloseAfterTab() {
         if (isMobile()) return;
+        if (!body.classList.contains('sidebar-collapsed')) return;
+        revealGeneration++;
+        window.clearTimeout(hoverTimer);
+        window.clearTimeout(idleTimer);
+        window.clearTimeout(cleanupTimer);
         window.clearTimeout(navigationCloseTimer);
-        // Collapse immediately — no debounce timer. A timer would get reset
-        // by rapid successive tab clicks and never fire, leaving the sidebar
-        // stuck open. The sb-instant class suppresses transitions so there is
-        // no margin-left reflow thrash while the tab content renders.
-        if (body.classList.contains('sidebar-collapsed') && !body.classList.contains('sidebar-hover-reveal')) return;
-        body.classList.add('sb-instant');
-        body.classList.remove('sidebar-hover-reveal');
-        body.classList.add('sidebar-collapsed');
-        writeCollapsed(true);
+        body.classList.remove('sidebar-hover-reveal', 'sb-closing', 'sb-instant');
+        setWillChange(false);
         updateAria();
-        raf(function() {
-            raf(function() {
-                body.classList.remove('sb-instant');
-            });
-        });
     }
 
     window.__eaRequestSidebarClose = requestSidebarCloseAfterTab;
@@ -63733,14 +64429,19 @@ async function eaWorkspaceHolidayApply() {
         });
     }
     sidebar.addEventListener('scroll', resetIdleTimer, { passive: true });
+    document.addEventListener('pointerdown', function() { keyboardNavigation = false; }, { passive: true });
+    document.addEventListener('keydown', function(event) {
+        if (event.key === 'Tab' || event.key.startsWith('Arrow')) keyboardNavigation = true;
+    });
 
     document.addEventListener('pointermove', function(event) {
         if ((event.pointerType && event.pointerType !== 'mouse') || isMobile() || !body.classList.contains('sidebar-collapsed')) return;
         edgeX = event.clientX;
         if (edgeX > 24 || edgeFrame) return;
+        var generation = revealGeneration;
         edgeFrame = raf(function() {
             edgeFrame = 0;
-            if (!isMobile() && body.classList.contains('sidebar-collapsed') && edgeX <= 24) revealSidebar();
+            if (generation === revealGeneration && !isMobile() && body.classList.contains('sidebar-collapsed') && edgeX <= 24) revealSidebar();
         });
     }, { passive: true });
 
@@ -63772,6 +64473,10 @@ async function eaWorkspaceHolidayApply() {
         if (event.key === 'Escape' && sidebar.classList.contains('mobile-open')) closeMobileSidebar();
     });
     window.addEventListener('resize', function() {
+        revealGeneration++;
+        window.clearTimeout(cleanupTimer);
+        body.classList.remove('sb-closing', 'sb-instant');
+        setWillChange(false);
         if (isMobile()) {
             window.clearTimeout(hoverTimer);
             window.clearTimeout(idleTimer);
@@ -63898,7 +64603,7 @@ async function eaWorkspaceHolidayApply() {
   override getAvailableStarsForMonth / getAvailableVetosForMonth.
   Falls back silently to local calculation when offline.
 ================================================================ -->
-<script>
+<script type="application/x-ea-incomplete" data-ea-status="incomplete-source-preserved">
 (function installServerAuthorityLayer() {
     'use strict';
 
@@ -64000,3 +64705,16 @@ async function eaWorkspaceHolidayApply() {
     window.adminRecordRollChange = async function adminRecordRollChange(studentId, newRoll, effectiveMonth, reason) {
         if (typeof SERVER_SYNC === 'undefined' || !SERVER_SYNC.enabled) {
             if (typeof showAlert === 'function') showAlert('Server connectio
+
+</script>
+<script>
+// The incomplete roll-change integration is preserved above for recovery.
+if (typeof window.adminRecordRollChange !== 'function') {
+    window.adminRecordRollChange = async function() {
+        if (typeof showAlert === 'function') showAlert('Roll changes are unavailable until the server integration is restored.', 'warning');
+        return false;
+    };
+}
+</script>
+</body>
+</html>

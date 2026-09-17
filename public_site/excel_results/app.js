@@ -1089,6 +1089,7 @@
         body: JSON.stringify(state.adminCatalog),
       });
       state.adminCatalog = data.data;
+      eaLearningBridge.reset();
       toast('Changes saved successfully! Public snapshot updated on local disk.');
       await loadPublic();
     } catch (err) {
@@ -1096,6 +1097,7 @@
         try {
           const latest = await fetchJson(cfg.adminCatalogUrl);
           state.adminCatalog = latest.data;
+          eaLearningBridge.reset();
           state.formError = 'Another admin saved changes first. Your editor was reloaded; review and save again.';
         } catch (reloadErr) {
           state.formError = err.message;
@@ -1289,6 +1291,7 @@
             body,
           });
           state.adminCatalog = data.data;
+          eaLearningBridge.reset();
           state.csvPreviewRows = null;
           state.csvFile = null;
           toast(`Imported ${data.imported} result records${data.skipped ? `; skipped ${data.skipped} duplicates` : ''}.`);
@@ -1313,6 +1316,7 @@
             body: text,
           });
           state.adminCatalog = data.data;
+          eaLearningBridge.reset();
           toast('Database catalog restored successfully!');
           render();
         } catch (err) {
@@ -1443,6 +1447,7 @@
       state.error = err.message;
     } finally {
       state.loading = false;
+      eaLearningBridge.reset();
       render();
     }
   }
@@ -1460,5 +1465,58 @@
     });
   }
 
+  // EA_LEARNING_BRIDGE_BEGIN
+/* Browse-only bridge embedded inside each learning module's existing closure. */
+function eaInstallLearningBridge(adapter) {
+  let dirty = false, baseline = '';
+  const reset = () => { dirty = false; baseline = JSON.stringify(adapter.adminCatalog() || null); };
+  ['input', 'change'].forEach(type => root.addEventListener(type, event => {
+    if (adapter.isEditor(event.target)) dirty = true;
+  }));
+  window.EA_WORKSPACE_LEARNING_APPLY = context => {
+    if (!adapter.ready()) return {ok:false, error:'Sign in and wait for the library catalog to load.'};
+    if (adapter.editing() || dirty || JSON.stringify(adapter.adminCatalog() || null) !== baseline) {
+      return {ok:false, error:'Save or reload the library editor before applying shared browse context.'};
+    }
+    const normalize = (value, prefix) => String(value || '').trim().toLowerCase().replace(prefix, '');
+    const klass = normalize(context.className, /^class\s*/);
+    const subject = normalize(context.subject, /^$/);
+    const group = normalize(context.group, /^group\s*/);
+    if (!klass) return {ok:false, error:'Choose a class first.'};
+    const matches = [];
+    const catalog = adapter.catalog();
+    (Array.isArray(catalog?.groups) ? catalog.groups : []).forEach(g => {
+      if (!g || group && group !== normalize(g.name, /^group\s*/) && group !== normalize(g.id, /^group\s*/)) return;
+      (Array.isArray(g.classes) ? g.classes : []).forEach(c => {
+        if (!c || klass !== normalize(c.name, /^class\s*/) && klass !== normalize(c.id, /^class\s*/)) return;
+        if (!subject) matches.push({group:g, klass:c, subject:null});
+        else (Array.isArray(c.subjects) ? c.subjects : []).forEach(s => {
+          if (s && subject === normalize(s.name, /^$/)) matches.push({group:g, klass:c, subject:s});
+        });
+      });
+    });
+    if (matches.length !== 1) return {ok:false, error:matches.length ? 'More than one catalog match. Specify the library group.' : 'Class or subject is unavailable in the published catalog. Existing selection was retained.'};
+    adapter.apply(matches[0]);
+    return {ok:true};
+  };
+  return {reset};
+}
+  // EA_LEARNING_BRIDGE_END
+  const eaLearningBridge = eaInstallLearningBridge({
+    catalog: () => state.catalog,
+    adminCatalog: () => state.adminCatalog,
+    ready: () => !state.loading && !state.error && !!state.catalog && (!cfg.requireAuthForResults || publicLoggedIn()),
+    editing: () => state.route.view === 'admin',
+    isEditor: target => state.route.view === 'admin' && root.contains(target),
+    apply: nodes => {
+      if (state.route.view === 'results') {
+        state.resultFilters = {...state.resultFilters, group:nodes.group.id,
+          className:nodes.klass.id, subject:nodes.subject ? nodes.subject.id : ''};
+        state.page = 1; render(); return;
+      }
+      state.query = ''; state.tagFilter = ''; state.previewPaper = null;
+      go('/papers/' + [nodes.group.id, nodes.klass.id, ...(nodes.subject ? [nodes.subject.id] : [])].map(encodeURIComponent).join('/'));
+    }
+  });
   loadAll();
 })();
