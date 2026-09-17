@@ -20300,6 +20300,35 @@ function eaLeadershipSelectionRestore() {
     host.classList.remove('ea-selection');
     host.querySelectorAll('.ea-selection-hero,.ea-selection-rounds,.ea-selection-candidates,.ea-selection-panel,.ea-selection-mode').forEach(el=>el.classList.remove('ea-selection-hero','ea-selection-rounds','ea-selection-candidates','ea-selection-panel','ea-selection-mode'));
 }
+
+/* Recovered from the complete HEAD helper; balance overrides stay inert. */
+window.adminRecordRollChange = async function(studentId, newRoll, effectiveMonth, reason) {
+    if(currentUserRole!=='admin' || !SERVER_SYNC.enabled || !hasServerSession || SERVER_SYNC.crossOrigin ||
+       document.querySelector('meta[name="ea-client-surface"]')?.content!=='lan') {
+        showAlert('Use a signed-in LAN admin session to record roll changes.', 'warning');return false;
+    }
+    const id=Number(studentId), roll=String(newRoll || '').trim().toUpperCase(), month=String(effectiveMonth || '').trim();
+    if(!Number.isSafeInteger(id) || id<1 || !/^EA\d{2}[A-Z]\d{2}$/.test(roll) || !/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) {
+        showAlert('Select a student, a valid roll and effective month.', 'warning');return false;
+    }
+    const identity=eaContextIdentity(),controller=new AbortController();
+    const timeout=window.setTimeout(()=>controller.abort(),15000);
+    try {
+        const response=await eaFetch('/scoreboard/record-roll-change',{method:'POST',credentials:'include',
+            headers:{'Content-Type':'application/json'},signal:controller.signal,
+            body:JSON.stringify({student_id:id,new_roll:roll,effective_month:month,reason:reason || 'admin_update'})});
+        const payload=await response.json();
+        if(identity!==eaContextIdentity())return false;
+        if(!response.ok || payload.success!==true || payload.student_id!==id || payload.new_roll!==roll || payload.effective_month!==month) {
+            showAlert(payload.error || 'The server did not confirm this roll change.', 'danger');return false;
+        }
+        showAlert(`Roll changed: ${payload.old_roll} → ${payload.new_roll} from ${month}.`, 'success');
+        return true; // The existing form performs the visible authoritative pull.
+    } catch(error) {
+        if(identity===eaContextIdentity())showAlert('Roll change could not be confirmed. Refresh the roster and roll history before retrying.', 'warning');
+        return false;
+    } finally {window.clearTimeout(timeout);}
+};
         // EA_WORKSPACES_END
 
         function _switchTabImpl(tabName, evt) {
