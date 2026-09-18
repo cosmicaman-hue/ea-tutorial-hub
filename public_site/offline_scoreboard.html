@@ -19089,6 +19089,30 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
         // EA_WORKSPACES_BEGIN
 /* Phase 5: reversible entry-point retirement; all original forms stay mounted. */
 const EA_RETIREMENT_OPTIONS = ['fees'];
+// A filtered public view can initialize an empty cache. Existing work stays guarded.
+function eaCanLoadFreshPublicSnapshot(remote, local, defaults) {
+    // The original client represents a guest as student + no session/login ID.
+    if (hasServerSession || String(currentLoginId || '').trim()
+        || !['guest','student'].includes(currentUserRole) || remote?.sync_scope !== 'anonymous-public'
+        || !Array.isArray(remote.allowed_months)
+        || !remote.allowed_months.every(month => /^\d{4}-(0[1-9]|1[0-2])$/.test(month))) return false;
+    const empty = Object.entries(local || {}).every(([key,value]) => {
+        if (key === 'updated_at') return true;
+        // Startup migrations set these flags even before the first data download.
+        if (key === '_app_schema_version' && Number.isInteger(value) && value <= 15) return true;
+        if (key === '_force_authoritative_pull_once' && typeof value === 'boolean') return true;
+        if (key === 'server_version' && value === 0) return true;
+        if (key in defaults && JSON.stringify(value) === JSON.stringify(defaults[key])) return true;
+        const isEmpty = value == null || value === '' || (Array.isArray(value) && value.length === 0)
+            || (typeof value === 'object' && !Array.isArray(value) && Object.keys(value).length === 0);
+        if (!isEmpty) console.debug('[EA] Public initialization retained existing cache field:', key);
+        return isEmpty;
+    });
+    if (!empty) return false;
+    const expectedHistory = {...remote,
+        locked_months:(remote.locked_months || []).filter(month => remote.allowed_months.includes(month))};
+    return !hasSuspiciousLockedHistoryLoss(expectedHistory);
+}
 const eaCompatibility = {mode:'workspaces', originalNav:null, groupedNav:null, wrapped:[], rendering:false};
 try {
     const requested = new URLSearchParams(location.search).get('ea_ui');
@@ -20329,6 +20353,119 @@ window.adminRecordRollChange = async function(studentId, newRoll, effectiveMonth
         return false;
     } finally {window.clearTimeout(timeout);}
 };
+
+/* Existing notebook form: version checks, identity-bound retries and receipts. */
+window.eaNotebookCommands = (() => {
+    const versions = new Map(), pending = new Map(), legacySelectors = new Set();
+    let activeIdentity = '';
+    // SHA-256 is needed here because LAN HTTP has no crypto.subtle.
+    function fingerprint(text) {
+        const bytes = new TextEncoder().encode(text), length = bytes.length;
+        const words = new Uint32Array(((length + 9 + 63) >> 6) * 16);
+        for (let i = 0; i < length; i++) words[i >> 2] |= bytes[i] << (24 - (i % 4) * 8);
+        words[length >> 2] |= 0x80 << (24 - (length % 4) * 8);
+        words[words.length - 1] = length * 8;
+        const constants = [0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2];
+        const state = [0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19];
+        const rotate = (x, n) => (x >>> n) | (x << (32 - n));
+        for (let block = 0; block < words.length; block += 16) {
+            const w = new Uint32Array(64);
+            w.set(words.subarray(block, block + 16));
+            for (let i = 16; i < 64; i++) {
+                const x = w[i - 15], y = w[i - 2];
+                w[i] = w[i - 16] + (rotate(x,7)^rotate(x,18)^(x>>>3)) + w[i - 7] + (rotate(y,17)^rotate(y,19)^(y>>>10));
+            }
+            let [a,b,c,d,e,f,g,h] = state;
+            for (let i = 0; i < 64; i++) {
+                const t1 = (h + (rotate(e,6)^rotate(e,11)^rotate(e,25)) + ((e&f)^(~e&g)) + constants[i] + w[i]) | 0;
+                const t2 = ((rotate(a,2)^rotate(a,13)^rotate(a,22)) + ((a&b)^(a&c)^(b&c))) | 0;
+                h=g; g=f; f=e; e=(d+t1)|0; d=c; c=b; b=a; a=(t1+t2)|0;
+            }
+            [a,b,c,d,e,f,g,h].forEach((value,i) => state[i] = (state[i] + value) >>> 0);
+        }
+        return state.map(value => value.toString(16).padStart(8,'0')).join('');
+    }
+    function selector(roll, date, type) { return JSON.stringify([String(roll),String(date),String(type)]); }
+    function identity() {
+        const value = eaContextIdentity();
+        if (value !== activeIdentity) { versions.clear(); pending.clear(); legacySelectors.clear(); activeIdentity = value; }
+        return value;
+    }
+    function load(key) {
+        if (pending.has(key)) return pending.get(key);
+        try { return JSON.parse(sessionStorage.getItem(key)); } catch (_) { return null; }
+    }
+    function store(key, value) {
+        pending.set(key, value);
+        try { sessionStorage.setItem(key, JSON.stringify(value)); } catch (_) {}
+    }
+    function remove(key) {
+        pending.delete(key);
+        try { sessionStorage.removeItem(key); } catch (_) {}
+    }
+    function nonce() {
+        const bytes = new Uint8Array(16);
+        crypto.getRandomValues(bytes);
+        return 'nb-' + Array.from(bytes, value => value.toString(16).padStart(2,'0')).join('');
+    }
+    async function fetch(url, options, fetcher) {
+        if (document.querySelector('meta[name="ea-client-surface"]')?.content !== 'lan' ||
+            !hasServerSession || !['admin','teacher'].includes(currentUserRole)) return fetcher(url, options);
+        const endpoint = new URL(url, location.href), method = String(options.method || 'GET').toUpperCase();
+        const captured = identity();
+        let key = null, target = null;
+        if (method === 'POST' && endpoint.pathname === '/notebooks/save') {
+            const payload = JSON.parse(options.body);
+            target = selector(payload.roll, payload.date, payload.type || 'school');
+            // During coordinated activation/rollback, a verified older prefill
+            // response retains the existing route contract until restart.
+            if (!legacySelectors.has(target)) {
+                key = 'ea.nb.command.v1:' + captured + ':' + fingerprint(JSON.stringify(payload));
+                let entry = load(key);
+                if (!entry || !/^nb-[0-9a-f]{32}$/.test(entry.id) || !Number.isSafeInteger(entry.version) || entry.version < 0) {
+                    const version = payload.expected_version ?? versions.get(target);
+                    if (!Number.isSafeInteger(version) || version < 0) throw new Error('Refresh the notebook check before saving. Your entries remain here.');
+                    entry = {id: nonce(), version};
+                    store(key, entry);
+                }
+                payload.expected_version = entry.version;
+                const headers = new Headers(options.headers);
+                headers.set('Content-Type', 'application/json');
+                headers.set('Idempotency-Key', entry.id);
+                // eaFetch merges plain header maps with its authentication headers.
+                options = {...options, headers: Object.fromEntries(headers.entries()), body: JSON.stringify(payload)};
+            }
+        }
+        const controller = new AbortController(), previous = options.signal;
+        const abort = () => controller.abort();
+        previous?.addEventListener('abort', abort, {once:true});
+        if (previous?.aborted) controller.abort();
+        const timeout = setTimeout(abort, 15000);
+        try {
+            const response = await fetcher(url, {...options, signal: controller.signal});
+            if (captured !== identity()) throw new Error('Session changed; refresh the notebook check before retrying.');
+            if ((response.ok || response.status === 409) && typeof response.clone === 'function') {
+                const data = await response.clone().json();
+                if (captured !== identity()) throw new Error('Session changed; refresh the notebook check before retrying.');
+                if (key && response.status === 409 && !data.command_id) {
+                    remove(key); versions.delete(target);
+                }
+                if (method === 'GET' && endpoint.pathname === '/notebooks/api/check') {
+                    const selected = selector(endpoint.searchParams.get('roll'), endpoint.searchParams.get('date'), endpoint.searchParams.get('type') || 'school');
+                    if (Number.isSafeInteger(data.command_version) && data.command_version >= 0) {
+                        versions.set(selected, data.command_version); legacySelectors.delete(selected);
+                    } else if ('check' in data) { legacySelectors.add(selected); }
+                }
+                if (key && data.success === true && data.command_id && Number.isSafeInteger(data.command_version)) {
+                    versions.set(target, data.command_version); remove(key);
+                }
+            }
+            return response;
+        } finally { clearTimeout(timeout); previous?.removeEventListener('abort', abort); }
+    }
+    return {fetch, fingerprint};
+})();
+function eaNotebookFetch(url, options, fetcher) { return window.eaNotebookCommands.fetch(url, options, fetcher); }
         // EA_WORKSPACES_END
 
         function _switchTabImpl(tabName, evt) {
@@ -22855,11 +22992,11 @@ window.adminRecordRollChange = async function(studentId, newRoll, effectiveMonth
 
             try {
                 const loginUrl = SERVER_SYNC.backendUrl + '/auth/api-login';
-                const resp = await fetch(loginUrl, {
+                const resp = await fetchWithTimeout(loginUrl, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ login_id: loginId, password: password })
-                });
+                }, 12000);
                 const data = await resp.json();
                 if (data && data.success) {
                     localStorage.setItem('ea_login_id', data.login_id);
@@ -24653,7 +24790,8 @@ window.adminRecordRollChange = async function(studentId, newRoll, effectiveMonth
                 return false;
             }
             const localData = db.getData() || {};
-            if (hasSuspiciousLockedHistoryLoss(serverData) && !hasSuspiciousLockedHistoryLoss(localData)) {
+            if (hasSuspiciousLockedHistoryLoss(serverData) && !hasSuspiciousLockedHistoryLoss(localData)
+                && !eaCanLoadFreshPublicSnapshot(serverData, localData, db.getDefaultData())) {
                 showAlert('Rejected remote snapshot because locked historical scores are missing. Local data retained.', 'warning');
                 return false;
             }
@@ -31230,7 +31368,7 @@ window.adminRecordRollChange = async function(studentId, newRoll, effectiveMonth
         function nbApiFetch(url, opts) {
             opts = opts || {};
             const defaults = { headers: { 'Content-Type': 'application/json' }, credentials: 'include' };
-            return eaFetch(url, Object.assign(defaults, opts)).then(async function (r) {
+            return eaNotebookFetch(url, Object.assign(defaults, opts), eaFetch).then(async function (r) {
                 const data = await r.json();
                 if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
                 return data;
