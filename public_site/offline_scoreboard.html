@@ -19256,6 +19256,170 @@ function eaCompatibilitySet(mode) {
     showAlert(mode==='legacy'?'Original navigation restored. Open forms and data were retained.':'Workspaces restored. Review existing forms before saving.','info');return true;
 }
 
+/* Consolidated Admin channel for Cloudflare student profile requests. */
+let eaStudentRequestRows = [];
+let eaStudentRequestCsrf = '';
+let eaStudentRequestSelected = '';
+let eaStudentRequestPoll = 0;
+
+function eaStudentRequestsAdmin() {
+    return String(currentUserRole || '').toLowerCase() === 'admin' && (!SERVER_SYNC.enabled || hasServerSession);
+}
+function eaStudentRequestsEscape(value) {
+    const node = document.createElement('span'); node.textContent = String(value == null ? '' : value); return node.innerHTML;
+}
+function eaStudentRequestsInit() {
+    if (document.getElementById('student-requests-tab')) return;
+    const helpdeskSide = document.querySelector('.sidebar-nav-item[data-tab="helpdesk"]');
+    if (helpdeskSide) {
+        const button = document.createElement('button');
+        button.className = 'sidebar-nav-item'; button.dataset.tab = 'student-requests';
+        button.setAttribute('onclick', "switchTab('student-requests')");
+        button.title = 'Student Requests'; button.style.display = 'none';
+        button.innerHTML = '<i class="fas fa-inbox" style="color:#a78bfa"></i><span class="sidebar-link-text">Student Requests</span><span id="studentRequestsSideBadge" class="sidebar-badge hidden"></span>';
+        helpdeskSide.before(button);
+    }
+    const helpdeskTop = document.getElementById('tabHelpdeskBtn');
+    if (helpdeskTop) {
+        const button = document.createElement('button');
+        button.className = 'tab-button'; button.dataset.studentRequestsTop = 'true';
+        button.setAttribute('onclick', "switchTab('student-requests')");
+        button.style.setProperty('--tab-icon', '#a78bfa'); button.style.display = 'none';
+        button.innerHTML = '<i class="fas fa-inbox"></i> Student Requests <span id="studentRequestsTopBadge" class="badge hidden"></span>';
+        helpdeskTop.before(button);
+    }
+    const helpdeskPanel = document.getElementById('helpdesk-tab');
+    if (helpdeskPanel) {
+        const panel = document.createElement('div'); panel.id = 'student-requests-tab'; panel.className = 'tab-content hidden';
+        panel.innerHTML = '<section class="card ea-student-requests-shell">'
+            + '<div class="ea-student-requests-head"><div><p class="ea-request-kicker">Cloud intake · LAN review</p><h2>Student Requests</h2><p>Missing-score, correction and transfer requests in one durable channel. Approval does not itself change a score.</p></div>'
+            + '<div class="ea-request-actions"><button type="button" class="secondary" id="eaStudentRequestRefresh">Refresh</button><button type="button" class="primary" id="eaStudentRequestSync">Sync Cloud</button></div></div>'
+            + '<div id="eaStudentRequestStatus" class="ea-request-status" role="status"></div>'
+            + '<div class="ea-student-requests-grid"><aside><label>Status <select id="eaStudentRequestFilter"><option value="">All</option><option value="awaiting_admin">Awaiting Admin</option><option value="in_review">In review</option><option value="needs_information">Needs information</option><option value="approved_processing">Approved processing</option><option value="completed">Completed</option><option value="declined">Declined</option></select></label><div id="eaStudentRequestList" class="ea-request-list"></div></aside><main id="eaStudentRequestDetail" class="ea-request-detail"><div class="ea-request-empty">Select a request to review its exact day, target and conversation.</div></main></div>'
+            + '</section>';
+        helpdeskPanel.before(panel);
+        panel.querySelector('#eaStudentRequestRefresh').addEventListener('click', () => loadStudentRequestsTab(true));
+        panel.querySelector('#eaStudentRequestSync').addEventListener('click', eaStudentRequestsSync);
+        panel.querySelector('#eaStudentRequestFilter').addEventListener('change', eaStudentRequestsRenderList);
+    }
+    _tabDomCache = null;
+    eaStudentRequestsRefreshVisibility();
+}
+function eaStudentRequestsRefreshVisibility() {
+    const visible = eaStudentRequestsAdmin();
+    document.querySelectorAll('[data-tab="student-requests"], [data-student-requests-top]').forEach(node => { node.style.display = visible ? '' : 'none'; });
+    if (!visible) return;
+    clearTimeout(eaStudentRequestPoll);
+    eaStudentRequestPoll = setTimeout(() => eaStudentRequestsPollUnread(), 1500);
+}
+async function eaStudentRequestsFetch(url, options = {}) {
+    const fetcher = typeof eaFetch === 'function' ? eaFetch : fetch;
+    const response = await fetcher(url, Object.assign({credentials:'include',cache:'no-store'}, options));
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || data.success !== true) throw new Error(data.error || `HTTP ${response.status}`);
+    return data;
+}
+function eaStudentRequestsSetStatus(message, tone = '') {
+    const node = document.getElementById('eaStudentRequestStatus'); if (!node) return;
+    node.textContent = message || ''; node.dataset.tone = tone;
+}
+function eaStudentRequestsUpdateBadge(unread) {
+    ['studentRequestsSideBadge','studentRequestsTopBadge'].forEach(id => {
+        const badge = document.getElementById(id); if (!badge) return;
+        badge.textContent = unread > 99 ? '99+' : String(unread || ''); badge.classList.toggle('hidden', !unread);
+    });
+}
+async function eaStudentRequestsPollUnread() {
+    if (!eaStudentRequestsAdmin() || document.hidden) return;
+    try {
+        const data = await eaStudentRequestsFetch('/scoreboard/api/student-requests?limit=100');
+        eaStudentRequestCsrf = data.csrf_token || eaStudentRequestCsrf;
+        eaStudentRequestsUpdateBadge(Number(data.unread || 0));
+        if (getActiveTabName() === 'student-requests') { eaStudentRequestRows = data.requests || []; eaStudentRequestsRenderList(); }
+    } catch (_) {}
+    clearTimeout(eaStudentRequestPoll);
+    eaStudentRequestPoll = setTimeout(eaStudentRequestsPollUnread, 30000);
+}
+async function loadStudentRequestsTab(force = false) {
+    if (!eaStudentRequestsAdmin()) return;
+    eaStudentRequestsSetStatus('Loading requests…');
+    try {
+        const data = await eaStudentRequestsFetch('/scoreboard/api/student-requests?limit=200');
+        eaStudentRequestRows = data.requests || []; eaStudentRequestCsrf = data.csrf_token || '';
+        eaStudentRequestsUpdateBadge(Number(data.unread || 0)); eaStudentRequestsRenderList();
+        eaStudentRequestsSetStatus(`${eaStudentRequestRows.length} request${eaStudentRequestRows.length === 1 ? '' : 's'} available.`);
+        if (eaStudentRequestSelected && eaStudentRequestRows.some(row => row.request_id === eaStudentRequestSelected)) await eaStudentRequestsOpen(eaStudentRequestSelected);
+    } catch (error) {
+        eaStudentRequestsSetStatus(error.message === 'not_found' ? 'Student Requests is not enabled for this release.' : `Could not load requests: ${error.message}`, 'error');
+    }
+}
+function eaStudentRequestsRenderList() {
+    const host = document.getElementById('eaStudentRequestList'), select = document.getElementById('eaStudentRequestFilter');
+    if (!host) return;
+    const rows = eaStudentRequestRows.filter(row => !select?.value || row.status === select.value);
+    host.innerHTML = rows.length ? rows.map(row => '<button type="button" class="ea-request-row' + (row.request_id === eaStudentRequestSelected ? ' selected' : '') + '" data-request-id="' + eaStudentRequestsEscape(row.request_id) + '"><span><strong>' + eaStudentRequestsEscape(row.kind.replaceAll('_',' ')) + '</strong><small>' + eaStudentRequestsEscape(row.target_date) + ' · Student ' + eaStudentRequestsEscape(row.student_id) + '</small></span><em data-status="' + eaStudentRequestsEscape(row.status) + '">' + eaStudentRequestsEscape(row.status.replaceAll('_',' ')) + '</em><p>' + eaStudentRequestsEscape(row.message) + '</p></button>').join('') : '<div class="ea-request-empty">No requests match this filter.</div>';
+    host.querySelectorAll('[data-request-id]').forEach(button => button.addEventListener('click', () => eaStudentRequestsOpen(button.dataset.requestId)));
+}
+async function eaStudentRequestsOpen(requestId) {
+    eaStudentRequestSelected = requestId; eaStudentRequestsRenderList();
+    const host = document.getElementById('eaStudentRequestDetail'); if (!host) return;
+    host.innerHTML = '<div class="ea-request-empty">Loading conversation…</div>';
+    try {
+        const data = await eaStudentRequestsFetch('/scoreboard/api/student-requests/' + encodeURIComponent(requestId));
+        const item = data.request, events = item.events || [];
+        const closed = ['completed','declined','withdrawn'].includes(item.status);
+        host.innerHTML = '<header><p class="ea-request-kicker">' + eaStudentRequestsEscape(item.kind.replaceAll('_',' ')) + '</p><h3>' + eaStudentRequestsEscape(item.target_date) + '</h3><span class="ea-request-chip">' + eaStudentRequestsEscape(item.status.replaceAll('_',' ')) + '</span></header>'
+          + '<dl><div><dt>Student ID</dt><dd>' + eaStudentRequestsEscape(item.student_id) + '</dd></div><div><dt>Entry target</dt><dd>' + eaStudentRequestsEscape(item.target_entry_ref || 'Day-level request') + '</dd></div><div><dt>Context</dt><dd>' + eaStudentRequestsEscape(item.context_version) + '</dd></div><div><dt>Claimed points</dt><dd>' + eaStudentRequestsEscape(item.claimed_points == null ? 'Not specified' : item.claimed_points) + '</dd></div></dl>'
+          + '<blockquote>' + eaStudentRequestsEscape(item.message) + '</blockquote>'
+          + '<section class="ea-request-timeline"><h4>Conversation and decisions</h4>' + events.map(event => '<article><b>' + eaStudentRequestsEscape(event.event_type.replaceAll('_',' ')) + '</b><small>' + eaStudentRequestsEscape(event.actor_id || event.actor_type) + ' · ' + eaStudentRequestsEscape(event.created_at) + '</small><p>' + eaStudentRequestsEscape(event.payload?.message || '') + '</p><em>' + eaStudentRequestsEscape(event.delivery_status === 'pending' ? 'Waiting for cloud delivery' : '') + '</em></article>').join('') + '</section>'
+          + (closed ? '<p class="ea-request-closed">This request is closed.</p>' : '<form id="eaStudentRequestReply"><label>Reply or decision reason<textarea id="eaStudentRequestMessage" rows="3" maxlength="2000"></textarea></label><div class="ea-request-decision"><button type="button" data-event="review_started">Start review</button><button type="button" data-event="message_added">Reply</button><button type="button" data-event="needs_information">Need information</button><button type="button" data-event="approved_for_processing">Approve for processing</button><button type="button" data-event="declined" class="danger">Decline</button></div><p>“Approve for processing” records review approval. It does not change the ledger by itself.</p></form>'
+          + (item.status === 'approved_processing' && ['missing_score','incorrect_entry'].includes(item.kind) ? '<section class="ea-request-effect"><h4>Apply reviewed score command</h4><label>' + (item.kind === 'incorrect_entry' ? 'Replacement points' : 'Points to add') + '<input id="eaStudentRequestPoints" type="number" step="0.01" min="-10000" max="10000"></label><label>Admin reason<textarea id="eaStudentRequestEffectReason" maxlength="500"></textarea></label><button type="button" id="eaStudentRequestApplyScore">Apply with receipt</button><p>The command revalidates student, month and entry digest, is idempotent across retries, and returns an effect receipt.</p></section>' : ''));
+        if (item.status === 'approved_processing' && item.kind === 'transfer_request') {
+            host.insertAdjacentHTML('beforeend','<section class="ea-request-effect"><h4>Apply reviewed transfer</h4><p>The command rechecks both students, current balances, transaction and 24-hour limits, then writes debit and credit under one durable command.</p><button type="button" id="eaStudentRequestApplyTransfer">Apply transfer with receipt</button></section>');
+        }
+        host.querySelectorAll('[data-event]').forEach(button => button.addEventListener('click', () => eaStudentRequestsEvent(item.request_id, button.dataset.event)));
+        host.querySelector('#eaStudentRequestApplyScore')?.addEventListener('click', () => eaStudentRequestsApplyScore(item.request_id));
+        host.querySelector('#eaStudentRequestApplyTransfer')?.addEventListener('click', () => eaStudentRequestsApplyTransfer(item.request_id));
+    } catch (error) { host.innerHTML = '<div class="ea-request-empty">Could not load this request: ' + eaStudentRequestsEscape(error.message) + '</div>'; }
+}
+function eaStudentRequestsNonce() {
+    const bytes = crypto.getRandomValues(new Uint8Array(16)); return Array.from(bytes, value => value.toString(16).padStart(2,'0')).join('');
+}
+async function eaStudentRequestsEvent(requestId, eventType) {
+    const message = String(document.getElementById('eaStudentRequestMessage')?.value || '').trim();
+    if (['message_added','needs_information','declined'].includes(eventType) && !message) { eaStudentRequestsSetStatus('Add a reply or reason first.', 'error'); return; }
+    try {
+        await eaStudentRequestsFetch('/scoreboard/api/student-requests/' + encodeURIComponent(requestId) + '/events', {method:'POST',headers:{'Content-Type':'application/json','X-CSRFToken':eaStudentRequestCsrf,'Idempotency-Key':'sr-' + eaStudentRequestsNonce()},body:JSON.stringify({event_type:eventType,payload:{message}})});
+        eaStudentRequestsSetStatus('Decision saved to the durable delivery outbox.'); await loadStudentRequestsTab(true);
+    } catch (error) { eaStudentRequestsSetStatus('Could not save decision: ' + error.message, 'error'); }
+}
+async function eaStudentRequestsSync() {
+    try {
+        eaStudentRequestsSetStatus('Synchronizing cloud requests…');
+        await eaStudentRequestsFetch('/scoreboard/api/student-requests/sync', {method:'POST',headers:{'X-CSRFToken':eaStudentRequestCsrf}});
+        eaStudentRequestsSetStatus('Cloud synchronization complete.'); await loadStudentRequestsTab(true);
+    } catch (error) { eaStudentRequestsSetStatus('Sync did not complete: ' + error.message, 'error'); }
+}
+async function eaStudentRequestsApplyScore(requestId) {
+    const points = Number(document.getElementById('eaStudentRequestPoints')?.value);
+    const reason = String(document.getElementById('eaStudentRequestEffectReason')?.value || '').trim();
+    if (!Number.isFinite(points) || !reason) { eaStudentRequestsSetStatus('Enter reviewed points and an Admin reason.', 'error'); return; }
+    try {
+        const data = await eaStudentRequestsFetch('/scoreboard/api/student-requests/' + encodeURIComponent(requestId) + '/score-command', {method:'POST',headers:{'Content-Type':'application/json','X-CSRFToken':eaStudentRequestCsrf,'Idempotency-Key':'score-' + eaStudentRequestsNonce()},body:JSON.stringify({points,reason})});
+        eaStudentRequestsSetStatus(data.effect_receipt ? 'Score applied and effect receipt recorded.' : 'Score command accepted for repair.');
+        await loadStudentRequestsTab(true);
+    } catch (error) { eaStudentRequestsSetStatus('Score command was not applied: ' + error.message, 'error'); }
+}
+async function eaStudentRequestsApplyTransfer(requestId) {
+    try {
+        const data = await eaStudentRequestsFetch('/scoreboard/api/student-requests/' + encodeURIComponent(requestId) + '/transfer-command', {method:'POST',headers:{'X-CSRFToken':eaStudentRequestCsrf,'Idempotency-Key':'transfer-' + eaStudentRequestsNonce()}});
+        eaStudentRequestsSetStatus(data.effect_receipt ? 'Transfer applied and effect receipt recorded.' : 'Transfer accepted for repair.');
+        await loadStudentRequestsTab(true);
+    } catch (error) { eaStudentRequestsSetStatus('Transfer was not applied: ' + error.message, 'error'); }
+}
+
+eaStudentRequestsInit();
+
 /* EA workspaces: embedded in the three offline SPA copies for offline hosting.
  * Keep module permissions, saves, calculations and historical records separate.
  */
@@ -19266,7 +19430,7 @@ const EA_WORKSPACES = [
     ['welfare', 'Resources & Welfare', ['resources', 'awf']],
     ['students', 'Student Progress', ['my-dashboard', 'students', 'profile', 'good-conduct']],
     ['learning', 'Learning', ['syllabus', 'excel-study-notes', 'excel-results']],
-    ['requests', 'Requests & Notices', ['helpdesk', 'appeals', 'proposals', 'notifications']],
+    ['requests', 'Requests & Notices', ['student-requests', 'helpdesk', 'appeals', 'proposals', 'notifications']],
     ['fees', 'Fees', ['fees']],
     ['reports', 'Reporting', ['reports']],
     ['information', 'Information', ['information', 'rules']],
@@ -19366,6 +19530,7 @@ function eaWorkspaceWrapAdvanced(id, label) {
     eaCompatibility.wrapped.push({card,wrapper:details});
 }
 function eaWorkspaceRefresh(tab = getActiveTabName()) {
+    if (typeof eaStudentRequestsRefreshVisibility === 'function') eaStudentRequestsRefreshVisibility();
     if (typeof eaHelpdeskRefreshMode === 'function') eaHelpdeskRefreshMode();
     if (eaCompatibilityEnabled()) eaConsolidationIdentity();
     eaWorkspaceInit();
@@ -20579,6 +20744,7 @@ function eaNotebookFetch(url, options, fetcher) { return window.eaNotebookComman
                     'awf':                   loadAwfTab,
                     'notebooks':             loadNotebooksTab,
                     'helpdesk':              loadHelpdeskTab,
+                    'student-requests':       loadStudentRequestsTab,
                 };
             }
             const _renderer = _tabDomCache.renderers[tabName];
@@ -22453,7 +22619,7 @@ function eaNotebookFetch(url, options, fetcher) { return window.eaNotebookComman
             // Tabs visible to everyone (students, teachers, admins)
             if (['scoreboard', 'group-scoreboard', 'information', 'rules', 'syllabus', 'excel-results', 'excel-study-notes',
                  'resources', 'excel-mela', 'team-competition', 'excel-chess-champion', 'awf', 'good-conduct',
-                 'appeals', 'proposals', 'party-standings', 'helpdesk'].includes(tabName)) return true;
+                 'appeals', 'proposals', 'party-standings', 'helpdesk', 'student-requests'].includes(tabName)) return true;
             // Student-only tabs
             if (tabName === 'my-dashboard') return isStudent;
             // Teacher + Admin tabs
@@ -22500,6 +22666,7 @@ function eaNotebookFetch(url, options, fetcher) { return window.eaNotebookComman
             setTabVisibility('proposals', true);
             setTabVisibility('party-standings', true);
             setTabVisibility('helpdesk', true);
+            setTabVisibility('student-requests', isAdmin);
 
             // Student-only tabs
             setTabVisibility('my-dashboard', isStudent);

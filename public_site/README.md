@@ -10,7 +10,12 @@ This folder contains public files for static hosting on Cloudflare Pages.
 - `static/css/offline-scoreboard.css` - SPA stylesheet
 - `excel_results/` - Excel Results SPA (`catalog.json`, papers, `app.js`) managed from the LAN admin tab; see `excel_results/README.md`
 - `excel_study_notes/` - published-only PDF Study Notes catalog, reader assets, and files managed from the LAN admin tab
+- `profile/` - secure My Profile client; it stores only CSRF and notification cursors in session storage
 - `_headers` - cache-control rules (keeps `scores.json`, `credentials.json`, Excel Results, Study Notes, and SPA assets fresh on Cloudflare)
+
+The repository-root `functions/api/portal/[[path]].js` is the allowlisted Pages
+Function gateway. Bind it to the separately deployed portal Worker as the
+`PORTAL_API` service binding. It deliberately cannot proxy connector endpoints.
 
 ## Client-side login gate
 
@@ -118,3 +123,7 @@ This fallback only commits/pushes existing `public_site` files. It does not rege
 - Build output directory: `public_site`
 
 Keep admin/LAN app private; host only this folder publicly.
+
+The My Profile tab is a separate authenticated service. It does not use
+`credentials.json`; its opaque session cookie is issued by the portal Worker,
+and D1 stores only sanitized per-student projections and request conversations.

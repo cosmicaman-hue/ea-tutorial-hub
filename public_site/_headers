@@ -16,6 +16,18 @@
 /offline_scoreboard.html
   Cache-Control: no-cache, must-revalidate, max-age=0
 
+/api/portal/*
+  Cache-Control: private, no-store, max-age=0
+  Pragma: no-cache
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: no-referrer
+
+/profile/app.js
+  Cache-Control: no-cache, must-revalidate, max-age=0
+
+/profile/styles.css
+  Cache-Control: public, max-age=3600, must-revalidate
+
 /excel_results/catalog.json
   Cache-Control: no-store, no-cache, must-revalidate, max-age=0
   Pragma: no-cache

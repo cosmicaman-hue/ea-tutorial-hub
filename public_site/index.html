@@ -13,6 +13,7 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <link rel="stylesheet" href="./excel_results/styles.css">
     <link rel="stylesheet" href="./excel_study_notes/styles.css">
+    <link rel="stylesheet" href="./profile/styles.css">
     <style>
         :root {
             --bg: #faf8f3;
@@ -1469,6 +1470,7 @@
         </div>
         <nav class="tabs" id="mainTabsNav" aria-label="Primary navigation">
             <button id="tabHome" class="tab-btn active" type="button"><i class="fas fa-house"></i> Home</button>
+            <button id="tabMyProfile" class="tab-btn" type="button"><i class="fas fa-user-circle"></i> My Profile</button>
             <button id="tabScoreboard" class="tab-btn" type="button"><i class="fas fa-table-columns"></i> Scoreboard</button>
             <button id="tabRanking" class="tab-btn" type="button"><i class="fas fa-trophy"></i> Ranking</button>
             <button id="tabParties" class="tab-btn" type="button"><i class="fas fa-scale-balanced"></i> Parties</button>
@@ -1588,6 +1590,10 @@
                 <p>Where Every Child's Potential Becomes Reality</p>
                 <a href="#scoreboardPanel" class="cta-button" id="goScoreboard">🔐 Login to View Scoreboard</a>
             </div>
+        </section>
+
+        <section id="myProfilePanel" class="panel panel-shell" aria-label="My Profile">
+            <div id="myProfileRoot" class="profile-app" aria-live="polite"></div>
         </section>
 
         <section id="scoreboardPanel" class="panel panel-shell">
@@ -2072,6 +2078,7 @@
         const SCORES_URL = './scores.json';
 
         const tabHome = document.getElementById('tabHome');
+        const tabMyProfile = document.getElementById('tabMyProfile');
         const tabScoreboard = document.getElementById('tabScoreboard');
         const tabRanking = document.getElementById('tabRanking');
         const tabParties = document.getElementById('tabParties');
@@ -2086,6 +2093,7 @@
         const closeHelpdeskModalBtn = document.getElementById('closeHelpdeskModalBtn');
 
         const homePanel = document.getElementById('homePanel');
+        const myProfilePanel = document.getElementById('myProfilePanel');
         const scoreboardPanel = document.getElementById('scoreboardPanel');
         const rankingPanel = document.getElementById('rankingPanel');
         const partiesPanel = document.getElementById('partiesPanel');
@@ -2979,6 +2987,7 @@ function renderInfo(data) {
         function setActiveTab(tabKey) {
             activeTab = tabKey;
             const isHome = tabKey === 'home';
+            const isMyProfile = tabKey === 'my-profile';
             const isScoreboard = tabKey === 'scoreboard';
             const isRanking = tabKey === 'ranking';
             const isParties = tabKey === 'parties';
@@ -2987,6 +2996,7 @@ function renderInfo(data) {
             const isExcelStudyNotes = tabKey === 'excel-study-notes';
             const isHelpdesk = tabKey === 'helpdesk';
             tabHome.classList.toggle('active', isHome);
+            tabMyProfile.classList.toggle('active', isMyProfile);
             tabScoreboard.classList.toggle('active', isScoreboard);
             tabRanking.classList.toggle('active', isRanking);
             tabParties.classList.toggle('active', isParties);
@@ -2996,6 +3006,7 @@ function renderInfo(data) {
             tabInfo.classList.toggle('active', tabKey === 'info');
             if (tabHelpdesk) tabHelpdesk.classList.toggle('active', isHelpdesk);
             homePanel.classList.toggle('active', isHome);
+            myProfilePanel.classList.toggle('active', isMyProfile);
             scoreboardPanel.classList.toggle('active', isScoreboard);
             rankingPanel.classList.toggle('active', isRanking);
             partiesPanel.classList.toggle('active', isParties);
@@ -3006,6 +3017,7 @@ function renderInfo(data) {
             if (helpdeskPanel) helpdeskPanel.classList.toggle('active', isHelpdesk);
             const activeTabBtn = document.getElementById({
                 'home': 'tabHome',
+                'my-profile': 'tabMyProfile',
                 'scoreboard': 'tabScoreboard',
                 'ranking': 'tabRanking',
                 'parties': 'tabParties',
@@ -3381,6 +3393,11 @@ function renderInfo(data) {
         }
 
         tabHome.addEventListener('click', () => setActiveTab('home'));
+        tabMyProfile.addEventListener('click', () => {
+            setActiveTab('my-profile');
+            if (location.hash !== '#my-profile') location.hash = '#my-profile';
+            window.EA_PROFILE_APP?.open();
+        });
         tabScoreboard.addEventListener('click', () => {
             if (!isLoggedIn()) { openLoginModal(); return; }
             setActiveTab('scoreboard');
@@ -3426,7 +3443,10 @@ function renderInfo(data) {
         // ── Init & Hash Routing ──
         function handleHash() {
             const h = String(location.hash || '').toLowerCase();
-            if (h.indexOf('#er') === 0 || h.indexOf('#excel-results') === 0) {
+            if (h === '#my-profile') {
+                setActiveTab('my-profile');
+                window.EA_PROFILE_APP?.open();
+            } else if (h.indexOf('#er') === 0 || h.indexOf('#excel-results') === 0) {
                 setActiveTab('excel-results');
                 if (!isLoggedIn() && h.indexOf('#er/results') === 0) openLoginModal();
             } else if (h.indexOf('#sn') === 0 || h.indexOf('#excel-study-notes') === 0) {
@@ -3526,5 +3546,6 @@ function renderInfo(data) {
         };
     </script>
     <script src="./excel_study_notes/app.js"></script>
+    <script src="./profile/app.js"></script>
 </body>
 </html>
