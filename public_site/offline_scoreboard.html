@@ -19295,12 +19295,17 @@ function eaStudentRequestsInit() {
             + '<div class="ea-student-requests-head"><div><p class="ea-request-kicker">Cloud intake · LAN review</p><h2>Student Requests</h2><p>Missing-score, correction and transfer requests in one durable channel. Approval does not itself change a score.</p></div>'
             + '<div class="ea-request-actions"><button type="button" class="secondary" id="eaStudentRequestRefresh">Refresh</button><button type="button" class="primary" id="eaStudentRequestSync">Sync Cloud</button></div></div>'
             + '<div id="eaStudentRequestStatus" class="ea-request-status" role="status"></div>'
+            + '<section class="ea-portal-activation" aria-labelledby="eaPortalActivationTitle"><div><p class="ea-request-kicker">Student portal access</p><h3 id="eaPortalActivationTitle">Portal Activation</h3><p>Enter the student’s current roll/login ID. The one-use code is shown only once and expires after 24 hours.</p></div>'
+            + '<form id="eaPortalActivationForm" class="ea-portal-activation-form"><label>Student roll / login ID<input id="eaPortalActivationLogin" name="login_id" type="text" maxlength="100" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="EA26A01" required></label><button type="submit" class="primary" id="eaPortalActivationIssue">Issue activation code</button></form>'
+            + '<div id="eaPortalActivationResult" class="ea-portal-activation-result hidden" aria-live="polite"><div><strong id="eaPortalActivationIdentity"></strong><small id="eaPortalActivationExpiry"></small></div><label>One-use activation code<input id="eaPortalActivationToken" type="text" readonly autocomplete="off" aria-label="One-use activation code"></label><button type="button" class="secondary" id="eaPortalActivationCopy">Copy code</button></div></section>'
             + '<div class="ea-student-requests-grid"><aside><label>Status <select id="eaStudentRequestFilter"><option value="">All</option><option value="awaiting_admin">Awaiting Admin</option><option value="in_review">In review</option><option value="needs_information">Needs information</option><option value="approved_processing">Approved processing</option><option value="completed">Completed</option><option value="declined">Declined</option></select></label><div id="eaStudentRequestList" class="ea-request-list"></div></aside><main id="eaStudentRequestDetail" class="ea-request-detail"><div class="ea-request-empty">Select a request to review its exact day, target and conversation.</div></main></div>'
             + '</section>';
         helpdeskPanel.before(panel);
         panel.querySelector('#eaStudentRequestRefresh').addEventListener('click', () => loadStudentRequestsTab(true));
         panel.querySelector('#eaStudentRequestSync').addEventListener('click', eaStudentRequestsSync);
         panel.querySelector('#eaStudentRequestFilter').addEventListener('change', eaStudentRequestsRenderList);
+        panel.querySelector('#eaPortalActivationForm').addEventListener('submit', eaPortalActivationIssue);
+        panel.querySelector('#eaPortalActivationCopy').addEventListener('click', eaPortalActivationCopy);
     }
     _tabDomCache = null;
     eaStudentRequestsRefreshVisibility();
@@ -19384,6 +19389,56 @@ async function eaStudentRequestsOpen(requestId) {
 }
 function eaStudentRequestsNonce() {
     const bytes = crypto.getRandomValues(new Uint8Array(16)); return Array.from(bytes, value => value.toString(16).padStart(2,'0')).join('');
+}
+function eaPortalActivationClear() {
+    const result = document.getElementById('eaPortalActivationResult');
+    const token = document.getElementById('eaPortalActivationToken');
+    const identity = document.getElementById('eaPortalActivationIdentity');
+    const expiry = document.getElementById('eaPortalActivationExpiry');
+    if (token) token.value = '';
+    if (identity) identity.textContent = '';
+    if (expiry) expiry.textContent = '';
+    result?.classList.add('hidden');
+}
+async function eaPortalActivationIssue(event) {
+    event?.preventDefault();
+    const loginInput = document.getElementById('eaPortalActivationLogin');
+    const button = document.getElementById('eaPortalActivationIssue');
+    const loginId = String(loginInput?.value || '').trim().toUpperCase();
+    eaPortalActivationClear();
+    if (!loginId) { eaStudentRequestsSetStatus('Enter the student’s current roll/login ID.', 'error'); return; }
+    if (!eaStudentRequestCsrf) await loadStudentRequestsTab(true);
+    if (!eaStudentRequestCsrf) { eaStudentRequestsSetStatus('The secure Admin session could not be verified. Refresh and retry.', 'error'); return; }
+    if (button) button.disabled = true;
+    try {
+        const data = await eaStudentRequestsFetch('/scoreboard/api/portal-admin/cloud-activations', {
+            method:'POST', headers:{'Content-Type':'application/json','X-CSRFToken':eaStudentRequestCsrf},
+            body:JSON.stringify({login_id:loginId}),
+        });
+        const token = document.getElementById('eaPortalActivationToken');
+        const identity = document.getElementById('eaPortalActivationIdentity');
+        const expiry = document.getElementById('eaPortalActivationExpiry');
+        if (token) token.value = String(data.activation_token || '');
+        if (identity) identity.textContent = `${data.login_id || loginId} · Student ${data.student_id || ''}`;
+        if (expiry) {
+            const parsed = new Date(data.expires_at);
+            expiry.textContent = `Expires ${Number.isNaN(parsed.getTime()) ? data.expires_at : parsed.toLocaleString()}`;
+        }
+        document.getElementById('eaPortalActivationResult')?.classList.remove('hidden');
+        eaStudentRequestsSetStatus('Activation code issued. Copy it now; it is shown only once.');
+    } catch (error) {
+        const message = error.message === 'not_found' ? 'Portal activation is not enabled for this release.' : error.message;
+        eaStudentRequestsSetStatus('Could not issue activation code: ' + message, 'error');
+    } finally { if (button) button.disabled = false; }
+}
+async function eaPortalActivationCopy() {
+    const input = document.getElementById('eaPortalActivationToken');
+    if (!input?.value) return;
+    try {
+        if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(input.value);
+        else { input.focus(); input.select(); if (!document.execCommand('copy')) throw new Error('copy_failed'); }
+        eaStudentRequestsSetStatus('Activation code copied. Give it only to the named student.');
+    } catch (_) { eaStudentRequestsSetStatus('Copy was blocked by the browser. Select the code and copy it manually.', 'error'); }
 }
 async function eaStudentRequestsEvent(requestId, eventType) {
     const message = String(document.getElementById('eaStudentRequestMessage')?.value || '').trim();
