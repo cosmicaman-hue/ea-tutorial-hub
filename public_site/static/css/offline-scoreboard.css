@@ -8960,6 +8960,21 @@ body.light-mode #attendanceTable tbody tr.attendance-status-holiday input { colo
 .ea-workspace-bar input, .ea-workspace-bar select, .ea-workspace-card input, .ea-workspace-card select { padding:8px; background:var(--bg-elevated); color:var(--text); border:1px solid var(--border); border-radius:6px; max-width:100%; min-height:40px; }
 .ea-daily-context { display:flex; flex-wrap:wrap; gap:8px; width:100%; align-items:center; }
 .ea-daily-context > small { flex-basis:100%; }
+.ea-save-state { margin-left:auto; display:inline-flex; align-items:center; gap:6px; min-height:32px; padding:6px 10px; border:1px solid var(--border); border-radius:999px; color:var(--text-muted); font-size:12px; font-weight:700; }
+.ea-save-state::before { content:''; width:8px; height:8px; border-radius:50%; background:#94a3b8; }
+.ea-save-state[data-state="saving"]::before { background:#38bdf8; box-shadow:0 0 0 4px rgba(56,189,248,.13); }
+.ea-save-state[data-state="unsaved"]::before,.ea-save-state[data-state="pending"]::before { background:#f59e0b; }
+.ea-save-state[data-state="confirmed"]::before { background:#22c55e; }
+.ea-save-state[data-state="failed"]::before { background:#ef4444; }
+.ea-command-preview { margin-top:12px; padding:14px; border:1px solid var(--border); border-radius:10px; background:rgba(15,23,42,.18); color:var(--text); }
+.ea-command-preview strong { display:block; margin-bottom:8px; }
+.ea-command-preview details { margin-top:8px; max-height:320px; overflow:auto; }
+.ea-command-preview details p { margin:6px 0; padding:6px 8px; border-left:3px solid rgba(56,189,248,.45); font-size:12px; }
+.ea-plan-warning { color:#f59e0b; }
+.ea-bulk-options { display:flex; flex-direction:column; justify-content:center; gap:8px; }
+.ea-bulk-options label { display:flex; align-items:center; gap:8px; min-height:36px; }
+.ea-bulk-options input { width:20px; height:20px; }
+#attendance-tab button,#attendance-tab select,#attendance-tab input { min-height:44px; }
 .ea-workspace-card { padding:18px; margin:16px 0; color:var(--text); background:var(--bg-elevated); border:1px solid var(--border); border-radius:12px; }
 .ea-workspace-card p { margin:12px 0; overflow-wrap:anywhere; }
 .ea-workspace-card > label { display:inline-flex; align-items:center; flex-wrap:wrap; gap:6px; margin:8px 12px 8px 0; }
@@ -8968,12 +8983,15 @@ body.light-mode #attendanceTable tbody tr.attendance-status-holiday input { colo
 .ea-inline-choice { gap:8px; }
 .ea-inline-choice input[type="checkbox"] { min-height:20px; }
 .ea-advanced { margin:12px 0; border:1px solid var(--border); border-radius:10px; }
+.ea-advanced > summary { display:flex; align-items:center; min-height:44px; background:rgba(100,116,139,.06); border-radius:10px; }
+.ea-advanced[open] > summary { border-bottom:1px solid var(--border); border-radius:10px 10px 0 0; }
+.ea-advanced > .form-card, .ea-advanced > [id$="Module"] { margin:0!important; border:0!important; box-shadow:none!important; border-radius:0 0 10px 10px!important; }
 .ea-publish-stages { display:grid; grid-template-columns:minmax(120px,1fr) 3fr; gap:8px 16px; margin:14px 0; }
 .ea-publish-stages dt { font-weight:600; }
 .ea-publish-stages dd { margin:0; overflow-wrap:anywhere; }
 .ea-publish-error { color:#f87171; white-space:pre-wrap; }
 .ea-workspace-card code { display:block; overflow-wrap:anywhere; white-space:pre-wrap; padding:10px; }
-@media(max-width:600px) { .ea-daily-context > input, .ea-daily-context > select { width:100%; } .ea-publish-stages { grid-template-columns:1fr; } .ea-publish-stages dd { margin-bottom:8px; } }
+@media(max-width:600px) { .ea-daily-context > input, .ea-daily-context > select { width:100%; } .ea-save-state { width:100%; margin-left:0; justify-content:center; } .ea-command-preview details { max-height:240px; } .ea-publish-stages { grid-template-columns:1fr; } .ea-publish-stages dd { margin-bottom:8px; } }
 .ea-consolidation { flex-basis:100%; border-top:1px solid var(--border); padding-top:8px; }
 .ea-consolidation > summary { cursor:pointer; padding:8px 0; font-weight:600; }
 .ea-consolidation p { margin:10px 0; overflow-wrap:anywhere; }
@@ -9024,6 +9042,34 @@ body.light-mode .ea-selection #leadershipSelectionStatusLine { color:#4f46e5!imp
 .ea-chat-composer { display:flex; align-items:flex-end; gap:10px; margin-top:14px; }
 .ea-chat-composer textarea { flex:1; min-width:0; padding:10px; border:1px solid var(--border); background:var(--bg-elevated); color:var(--text); border-radius:8px; }
 @media(max-width:600px) { .ea-chat-composer { flex-direction:column; align-items:stretch; } }
+/* Daily Work uses one visual rhythm and touch target size across legacy modules. */
+#add-score-tab .form-card,#attendance-tab .form-card,#daily-summary-tab .form-card,#notebooks-tab .nb-card { border-radius:14px; border-color:var(--border)!important; box-shadow:0 8px 28px rgba(15,23,42,.07); }
+#add-score-tab input,#add-score-tab select,#add-score-tab textarea,
+#daily-summary-tab input,#daily-summary-tab select,#daily-summary-tab textarea,
+#notebooks-tab input,#notebooks-tab select,#notebooks-tab textarea { min-height:44px; border-radius:8px; }
+#add-score-tab button,#daily-summary-tab button,#notebooks-tab button { min-height:44px; }
+#recordStudentsTable thead th { position:sticky; top:0; z-index:2; background:var(--bg-elevated); box-shadow:0 1px 0 var(--border); }
+#recordStudentsTable .score-input { min-width:82px; }
+#recordStudentsTable .score-save-btn { min-width:44px; min-height:44px; }
+#daily-summary-tab .tds-section { border-color:var(--border)!important; }
+#daily-summary-tab .tds-row { padding:10px; border:1px solid var(--border); border-radius:10px; background:rgba(100,116,139,.04); }
+#daily-summary-tab .tds-image-card { border-color:var(--border)!important; background:var(--bg-elevated)!important; }
+#notebooks-tab .nb-tabs { border-color:var(--border)!important; }
+#notebooks-tab .nb-tab { color:var(--text-muted)!important; }
+#notebooks-tab .nb-tab.active { color:#6366f1!important; }
+#notebooks-tab .nb-table { background:var(--bg-elevated)!important; box-shadow:0 8px 24px rgba(15,23,42,.08)!important; }
+#notebooks-tab .nb-table td { color:var(--text)!important; border-color:var(--border)!important; }
+#notebooks-tab .nb-table tbody tr:nth-child(even) td { background:rgba(100,116,139,.045)!important; }
+#notebooks-tab .nb-table tbody tr:hover td { background:rgba(99,102,241,.075)!important; }
+#add-score-tab :focus-visible,#attendance-tab :focus-visible,#daily-summary-tab :focus-visible,#notebooks-tab :focus-visible { outline:3px solid rgba(56,189,248,.65); outline-offset:2px; }
+@media(max-width:760px) {
+  #recordStudentsTable { min-width:940px; }
+  #add-score-tab .table-container,#attendance-tab .table-container,#daily-summary-tab .table-container { overflow-x:auto; overscroll-behavior-inline:contain; }
+  #daily-summary-tab .tds-row { grid-template-columns:1fr!important; }
+  #daily-summary-tab .form-buttons,#add-score-tab .form-buttons { display:grid; grid-template-columns:1fr; gap:8px; }
+  #notebooks-tab .nb-tabs { scroll-snap-type:x proximity; }
+  #notebooks-tab .nb-tab { scroll-snap-align:start; }
+}
 .sidebar-badge, .badge[data-student-requests] { background:#ef4444;color:#fff;border-radius:999px;font-size:10px;font-weight:800;padding:2px 6px;margin-left:auto; }
 .ea-student-requests-shell { min-height:65vh; }
 .ea-student-requests-head { display:flex;justify-content:space-between;gap:18px;align-items:flex-start;margin-bottom:16px; }

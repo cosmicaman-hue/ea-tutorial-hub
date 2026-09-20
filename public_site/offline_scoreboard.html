@@ -2155,7 +2155,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                         <input type="date" id="scoreDate" required>
                     </div>
                     <div class="form-group">
-                        <label>Points *</label>
+                        <label>Score change (+/-) *</label>
                         <input type="number" id="scorePoints" min="-100" max="100" required placeholder="0">
                     </div>
                     <div class="form-group">
@@ -2278,7 +2278,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                     </div>
                 </div>
                 <p id="scoreHint" style="color: var(--text-muted); font-size: 12px; margin-top: 10px;">
-                    Tip: Saving a score for the same student and date will update the existing entry.
+                    Enter a change, not the final total. The server shows Current + Change = New in confirmations and rejects stale edits.
                 </p>
             </div>
 
@@ -6953,8 +6953,8 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
             </div>
 
             <div class="form-card" id="bulkPastAttendanceCard">
-                <h3><i class="fas fa-calendar-alt"></i> Bulk Past Attendance (Rapid)</h3>
-                <p class="section-subtitle">Separate module for fast previous-month marking. Select dates to mark and apply in one click.</p>
+                <h3><i class="fas fa-calendar-alt"></i> Bulk Attendance</h3>
+                <p class="section-subtitle">Preview the exact server-side change plan before applying it. Existing records are preserved by default.</p>
                 <div class="form-grid">
                     <div class="form-group">
                         <label>Target Month</label>
@@ -7025,7 +7025,15 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                         <input type="text" id="bulkAttendanceRemarks" placeholder="Optional comments">
                     </div>
                     <div class="form-group">
-                        <label>Remaining Dates Status</label>
+                        <label>Unselected Dates</label>
+                        <select id="bulkAttendanceMode" onchange="renderBulkAttendanceCalendar(); renderBulkAttendanceDates();">
+                            <option value="preserve" selected>Preserve existing / leave unmarked</option>
+                            <option value="fill_unmarked">Fill unmarked dates only</option>
+                            <option value="replace_all">Replace all eligible dates</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Fill / Replacement Status</label>
                         <select id="bulkAttendanceDefaultStatus" onchange="renderBulkAttendanceCalendar(); renderBulkAttendanceDates();">
                             <option value="present" selected>Present</option>
                             <option value="absent">Absent</option>
@@ -7033,6 +7041,10 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                             <option value="holiday">Holiday</option>
                             <option value="late">Late</option>
                         </select>
+                    </div>
+                    <div class="form-group ea-bulk-options">
+                        <label><input type="checkbox" id="bulkAttendanceIncludeWeekends"> Include unselected weekends</label>
+                        <label><input type="checkbox" id="bulkAttendanceIncludeFuture"> Include unselected future dates</label>
                     </div>
                 </div>
                 <div class="form-buttons" style="margin-bottom: 8px;">
@@ -7043,10 +7055,12 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                 <div id="bulkAttendanceCalendar" class="bulk-calendar"></div>
                 <div class="form-buttons">
                     <button class="secondary" onclick="clearBulkAttendanceDates()">Clear Dates</button>
-                    <button onclick="applyBulkPastAttendance()">Apply Bulk Attendance</button>
+                    <button class="secondary" id="bulkAttendancePreviewButton" onclick="eaDailyBulkAttendancePreview()">Preview Changes</button>
+                    <button id="bulkAttendanceApply" onclick="applyBulkPastAttendance()" disabled>Confirm &amp; Apply</button>
                 </div>
                 <div id="bulkDateList" class="bulk-date-list"></div>
-                <p class="section-subtitle" style="margin-top: 8px;">Logic: selected dates are set to chosen status; all remaining dates of that month are set to selected remaining status.</p>
+                <div id="bulkAttendancePreview" class="ea-command-preview" role="status" aria-live="polite">Choose dates, then preview the change plan.</div>
+                <p class="section-subtitle" style="margin-top: 8px;">Selected dates use their assigned status. Unselected dates remain untouched unless you explicitly choose a fill or replacement mode.</p>
             </div>
 
             <div class="form-card" id="attendanceGroupReportCard">
@@ -19498,6 +19512,11 @@ let eaDailyApplying = false;
 let eaHolidayBusy = false;
 let eaHolidayPreview = null;
 let eaPublishAttempt = null; // Session-only; do not store private server errors on shared browsers.
+let eaDailyAttendanceBusy = false;
+let eaBulkServerPreview = null;
+let eaDailySummaryBusy = false;
+let eaDailySummaryDraftTimer = null;
+let eaDailyScoreBusy = false;
 
 function eaWorkspaceAllowed(tab) {
     return isTabAccessibleForCurrentRole(tab);
@@ -19561,8 +19580,11 @@ function eaWorkspaceInit() {
         card.append(subjectBtn); settings.prepend(card);
     }
     eaWorkspaceWrapAdvanced('bulkPastAttendanceCard', 'Advanced: retrospective bulk attendance');
+    eaWorkspaceWrapAdvanced('starTransferModule', 'Advanced: star transfer');
     eaWorkspaceWrapAdvanced('pointsStarConversionModule', 'Advanced: points to stars');
     eaWorkspaceWrapAdvanced('starVetoConversionModule', 'Advanced: stars to VETO');
+    eaWorkspaceWrapAdvanced('pointsTransferModule', 'Advanced: points transfer');
+    eaWorkspaceWrapAdvanced('recordScorePenaltyCard', 'Advanced: group and individual penalties');
     document.addEventListener('change', eaWorkspaceCapture);
     document.addEventListener('input', event => {
         if (event.target.closest('#add-score-tab') && !event.target.closest('.ea-workspace-bar')) {
@@ -19572,6 +19594,9 @@ function eaWorkspaceInit() {
             }
         }
     });
+    eaDailyInstallNavigationGuards();
+    eaDailyBulkAttendanceInit();
+    eaDailySummaryInit();
     eaWorkspaceHolidayInit();
     eaConsolidationInit();
     eaCompatibilityLayout();
@@ -19708,8 +19733,20 @@ function eaWorkspaceDailyBar(bar) {
     date.setAttribute('aria-label', 'Daily Work date'); date.value = eaDailyContext?.date || formatDateKey(new Date());
     const remember = () => { eaDailyContext = {studentId:select.value, date:date.value}; };
     select.addEventListener('change', remember); date.addEventListener('change', remember);
-    const hint = eaWorkspaceElement('small', 'Choose student/date, then open a Daily Work screen above. Each screen saves separately.');
-    fields.append(search, select, date, hint); bar.append(fields);
+    const summaryOnly = getActiveTabName() === 'daily-summary';
+    const hint = eaWorkspaceElement('small', summaryOnly
+        ? 'Daily Summary shares the work date; class remains specific to the summary.'
+        : 'Choose student/date, then open a Daily Work screen above. Each screen saves separately.');
+    if (!summaryOnly) fields.append(search, select);
+    fields.append(date, hint);
+    const status = eaWorkspaceElement('span', 'Ready', 'ea-save-state');
+    status.id = 'eaDailySaveState'; status.dataset.state = 'idle';
+    status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite');
+    fields.append(status); bar.append(fields);
+    if (summaryOnly && eaDailyReadSummaryDraft()) {
+        const restore = eaWorkspaceElement('button', 'Restore local draft', 'btn btn-secondary');
+        restore.type = 'button'; restore.addEventListener('click', eaDailyRestoreSummaryDraft); fields.append(restore);
+    }
     if (getActiveTabName() === 'attendance') {
         const discard = eaWorkspaceElement('button', 'Discard attendance draft', 'btn btn-secondary');
         discard.type = 'button'; discard.addEventListener('click', eaWorkspaceDiscardAttendance);
@@ -19735,7 +19772,7 @@ async function eaWorkspaceWait(predicate) {
 }
 async function eaWorkspaceOpen(tab) {
     if (!eaWorkspaceAllowed(tab) || eaDailyApplying) return false;
-    const daily = ['attendance','notebooks','add-score'].includes(tab);
+    const daily = ['attendance','notebooks','add-score','daily-summary'].includes(tab);
     const context = eaCompatibilityEnabled() && daily && eaDailyContext ? {...eaDailyContext} : null;
     if (context && tab === 'notebooks' && !nbAllowContextChange()) return false;
     if (context && tab === 'add-score' && document.getElementById('add-score-tab').dataset.workspaceDraft === 'true') {
@@ -19813,6 +19850,9 @@ async function eaWorkspaceApplyDaily(tab, context) {
             await eaWorkspaceWait(() => !nbLoading);
         }
         eaWorkspaceChange('nbEntryDate', context.date);
+    } else if (tab === 'daily-summary') {
+        eaWorkspaceChange('tdsDate', context.date);
+        tdsOnDateOrClassChange();
     }
 }
 function eaWorkspacePublishPanel() {
@@ -19846,6 +19886,601 @@ function eaWorkspacePublishPanel() {
 function eaWorkspacePublishResult(payload) {
     eaPublishAttempt = {...payload, attempted_at:new Date().toISOString()};
     eaWorkspacePublishPanel();
+}
+
+function eaDailySetSaveState(state, text) {
+    const el = document.getElementById('eaDailySaveState');
+    if (!el) return;
+    el.dataset.state = state || 'idle';
+    el.textContent = text || 'Ready';
+}
+function eaDailyCommandId(prefix = 'daily') {
+    const suffix = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    return `${prefix}:${suffix}`;
+}
+function eaDailyApiUrl(path) {
+    const base = getCurrentSyncBaseUrl() || getPrimarySyncBaseUrl() || '';
+    return buildSyncUrl(base, path);
+}
+async function eaDailyFetchJson(path, payload) {
+    let response;
+    try {
+        response = await fetchWithTimeout(eaDailyApiUrl(path), {
+            method: 'POST',
+            headers: {'Content-Type':'application/json', ...eaAuthHeaders()},
+            credentials: 'include',
+            body: JSON.stringify(payload)
+        }, 45000);
+    } catch (error) {
+        const wrapped = new Error('The server could not be reached. Your draft is still available.');
+        wrapped.code = 'network_unavailable'; throw wrapped;
+    }
+    let body = {};
+    try { body = await response.json(); } catch (_) {}
+    if (!response.ok || !body.success) {
+        const error = new Error(body.error || `Daily Work command failed (HTTP ${response.status}).`);
+        error.code = body.code || `http_${response.status}`; error.status = response.status; error.payload = body;
+        throw error;
+    }
+    return body;
+}
+function eaDailyAttendanceIdentity(row) {
+    return [row?.id, row?.created_at, row?.studentId, row?.date, normalizeAttendanceRoll(row?.roll || '')]
+        .map(value => String(value ?? '')).join('\u001f');
+}
+function eaDailyApplyCanonicalAttendance(response) {
+    const rows = Array.isArray(response?.changed) ? response.changed : [];
+    const data = db.getData(); data.attendance = Array.isArray(data.attendance) ? data.attendance : [];
+    rows.forEach(row => {
+        const identity = eaDailyAttendanceIdentity(row);
+        const index = data.attendance.findIndex(item => eaDailyAttendanceIdentity(item) === identity);
+        if (index >= 0) data.attendance[index] = {...row};
+        else data.attendance.push({...row});
+    });
+    if (Number(response?.server_version) > 0) data.server_version = Number(response.server_version);
+    if (response?.updated_at) { data.server_updated_at = response.updated_at; data.updated_at = response.updated_at; }
+    if (rows.length || response?.duplicate) {
+        db.saveData(data, {allowTeacher:true, system:true, skipSync:true, preserveTimestamp:true, skipBackup:true});
+    }
+    return rows;
+}
+async function eaDailyPreviewAttendance(payload) {
+    if (!SERVER_SYNC.enabled) {
+        const error = new Error('Attendance commands require a connection to the authoritative server.');
+        error.code = 'offline'; throw error;
+    }
+    const result = await eaDailyFetchJson('/scoreboard/attendance/commands/preview', payload);
+    return result.plan;
+}
+async function eaDailyCommitAttendance(payload, plan, options = {}) {
+    const command = {
+        ...payload,
+        command_id: options.commandId || eaDailyCommandId(options.prefix || 'attendance'),
+        base_version: plan.server_version,
+        preview_token: plan.preview_token,
+        confirm_replace_all: options.confirmReplaceAll === true,
+        confirm_locked: options.confirmLocked === true
+    };
+    const result = await eaDailyFetchJson('/scoreboard/attendance/commands', command);
+    eaDailyApplyCanonicalAttendance(result);
+    return result;
+}
+function eaDailyAttendanceDraftQueueKey() {
+    return `ea_attendance_pending_review:${String(currentLoginId || currentUserRole || 'unknown')}`;
+}
+function eaDailyQueueAttendanceDraft(payload) {
+    try {
+        localStorage.setItem(eaDailyAttendanceDraftQueueKey(), JSON.stringify({payload, queued_at:new Date().toISOString()}));
+    } catch (_) {}
+    eaDailySetSaveState('pending', 'Draft queued · review when online');
+}
+function eaDailyClearAttendanceDraftQueue() {
+    try { localStorage.removeItem(eaDailyAttendanceDraftQueueKey()); } catch (_) {}
+}
+function eaDailyBulkPayload() {
+    const month = getElementValue('bulkAttendanceMonth');
+    const studentId = parseInt(getElementValue('bulkAttendanceStudent'), 10);
+    const remarks = String(getElementValue('bulkAttendanceRemarks') || '').trim();
+    const changes = [];
+    [1,2,3].forEach(slot => {
+        const status = getBulkSelectionStatus(slot);
+        if (!status) return;
+        bulkAttendanceSelectionDates[slot].forEach(date => changes.push({date,status,remarks}));
+    });
+    changes.sort((a,b) => a.date.localeCompare(b.date));
+    return {
+        student_id: studentId,
+        month,
+        mode: getElementValue('bulkAttendanceMode') || 'preserve',
+        default_status: getElementValue('bulkAttendanceDefaultStatus') || 'present',
+        default_remarks: remarks,
+        include_weekends: !!document.getElementById('bulkAttendanceIncludeWeekends')?.checked,
+        include_future: !!document.getElementById('bulkAttendanceIncludeFuture')?.checked,
+        changes
+    };
+}
+function eaDailyInvalidateBulkPreview() {
+    eaBulkServerPreview = null;
+    const output = document.getElementById('bulkAttendancePreview');
+    if (output) output.textContent = 'Settings changed. Preview again before applying.';
+    const apply = document.getElementById('bulkAttendanceApply'); if (apply) apply.disabled = true;
+}
+function eaDailyRenderBulkPreview(plan) {
+    const output = document.getElementById('bulkAttendancePreview');
+    if (!output) return;
+    const counts = plan.counts || {}, total = Number(counts.create || 0) + Number(counts.update || 0);
+    output.replaceChildren();
+    output.append(eaWorkspaceElement('strong', `${counts.create || 0} new · ${counts.update || 0} updates · ${counts.unchanged || 0} unchanged`));
+    (plan.warnings || []).forEach(message => output.append(eaWorkspaceElement('p', message, 'ea-plan-warning')));
+    const details = eaWorkspaceElement('details'); details.append(eaWorkspaceElement('summary', 'Review proposed dates'));
+    (plan.rows || []).slice(0, 62).forEach(row => details.append(eaWorkspaceElement(
+        'p', `${row.date} · ${row.previous_status || 'unmarked'} → ${row.status}${row.remarks ? ' · ' + row.remarks : ''}`
+    )));
+    output.append(details);
+    const apply = document.getElementById('bulkAttendanceApply');
+    if (apply) apply.disabled = !total || Number(counts.conflict || 0) > 0;
+}
+async function eaDailyBulkAttendancePreview() {
+    if (eaDailyAttendanceBusy || !eaWorkspaceAdmin()) return false;
+    const payload = eaDailyBulkPayload();
+    if (!payload.month || !payload.student_id || !payload.changes.length) {
+        showAlert('Choose a month, student, status, and at least one date.', 'warning'); return false;
+    }
+    eaDailyAttendanceBusy = true; eaDailySetSaveState('saving', 'Previewing attendance…');
+    const previewButton = document.getElementById('bulkAttendancePreviewButton'); if (previewButton) previewButton.disabled = true;
+    try {
+        const plan = await eaDailyPreviewAttendance(payload);
+        eaBulkServerPreview = {payload, plan}; eaDailyRenderBulkPreview(plan);
+        eaDailySetSaveState('unsaved', 'Preview ready · not saved'); return true;
+    } catch (error) {
+        eaBulkServerPreview = null; eaDailySetSaveState('failed', 'Preview failed');
+        showAlert(error.message, 'danger'); return false;
+    } finally { eaDailyAttendanceBusy = false; if (previewButton) previewButton.disabled = false; }
+}
+async function eaDailyBulkAttendanceApply() {
+    if (eaDailyAttendanceBusy || !eaWorkspaceAdmin()) return false;
+    const payload = eaDailyBulkPayload();
+    if (!eaBulkServerPreview || JSON.stringify(payload) !== JSON.stringify(eaBulkServerPreview.payload)) {
+        showAlert('Preview the current Bulk Attendance settings before applying.', 'warning');
+        return eaDailyBulkAttendancePreview();
+    }
+    const plan = eaBulkServerPreview.plan, counts = plan.counts || {};
+    const changed = Number(counts.create || 0) + Number(counts.update || 0);
+    if (!changed || Number(counts.conflict || 0)) {
+        showAlert('There are no safe attendance changes to apply.', 'warning'); return false;
+    }
+    const destructive = payload.mode === 'replace_all';
+    const message = `${destructive ? 'Replace' : 'Apply'} ${changed} attendance change(s) for ${plan.student?.roll || 'this student'}?`;
+    if (!confirm(message)) return false;
+    eaDailyAttendanceBusy = true; eaDailySetSaveState('saving', 'Saving attendance…');
+    const button = document.getElementById('bulkAttendanceApply'); if (button) button.disabled = true;
+    try {
+        const response = await eaDailyCommitAttendance(payload, plan, {
+            prefix:'bulk-attendance', confirmReplaceAll:destructive, confirmLocked:plan.locked
+        });
+        eaBulkServerPreview = null; clearBulkAttendanceDates(); loadAttendanceTab(payload.month);
+        loadAttendanceReport(); loadScoreboard();
+        eaDailySetSaveState('confirmed', `Confirmed · ${response.changed?.length || 0} row(s)`);
+        const output = document.getElementById('bulkAttendancePreview');
+        if (output) output.textContent = `Server confirmed ${response.changed?.length || 0} attendance row(s).`;
+        showAlert(`Bulk attendance confirmed by the server (${response.changed?.length || 0} changed).`, 'success');
+        return true;
+    } catch (error) {
+        eaDailySetSaveState('failed', 'Not saved · review required');
+        if (error.payload?.plan) { eaBulkServerPreview = {payload,plan:error.payload.plan}; eaDailyRenderBulkPreview(error.payload.plan); }
+        showAlert(error.message, 'danger'); return false;
+    } finally { eaDailyAttendanceBusy = false; if (button && eaBulkServerPreview) button.disabled = false; }
+}
+async function eaDailySaveAttendanceCommand() {
+    if (eaDailyAttendanceBusy || currentUserRole === 'student') return false;
+    const date = getElementValue('attendanceDate');
+    const month = getElementValue('attendanceMonth') || String(date || '').slice(0,7);
+    if (!date || !teacherValidateCurrentMonth(date, month, 'Attendance marking') || !isMonthAllowedForCurrentUser(month)) return false;
+    const entries = Array.from(document.querySelectorAll('[data-attendance-student]')).map(select => {
+        const studentId = parseInt(select.getAttribute('data-attendance-student'), 10);
+        const remarks = document.querySelector(`[data-attendance-remarks="${studentId}"]`);
+        return {student_id:studentId,date,status:normalizeAttendanceStatus(select.value),remarks:String(remarks?.value || '').trim()};
+    }).filter(row => row.student_id > 0);
+    if (!entries.length) { showAlert('No students are available for this attendance date.', 'warning'); return false; }
+    const payload = {month,entries};
+    const buttons = Array.from(document.querySelectorAll('[onclick="saveAttendance()"]'));
+    eaDailyAttendanceBusy = true; buttons.forEach(button => button.disabled = true); eaDailySetSaveState('saving', 'Saving attendance…');
+    try {
+        const plan = await eaDailyPreviewAttendance(payload);
+        if (Number(plan.counts?.conflict || 0)) throw new Error('Attendance contains identity conflicts. No rows were changed.');
+        if (!Number(plan.counts?.create || 0) && !Number(plan.counts?.update || 0)) {
+            resetAttendanceDraft(date, month); eaDailyClearAttendanceDraftQueue(); loadAttendanceTab(month);
+            eaDailySetSaveState('confirmed', 'No changes · server current'); showAlert('No attendance changes to save.', 'info'); return true;
+        }
+        const response = await eaDailyCommitAttendance(payload, plan, {prefix:'day-attendance',confirmLocked:plan.locked});
+        resetAttendanceDraft(date, month); eaDailyClearAttendanceDraftQueue(); loadAttendanceTab(month);
+        loadAttendanceReport(); loadScoreboard();
+        eaDailySetSaveState('confirmed', `Confirmed · ${response.changed?.length || 0} row(s)`);
+        showAlert(`Attendance confirmed for ${response.changed?.length || 0} student(s).`, 'success'); return true;
+    } catch (error) {
+        if (error.code === 'offline' || error.code === 'network_unavailable') {
+            eaDailyQueueAttendanceDraft(payload);
+            showAlert('Server not updated. The attendance draft is retained for review when online.', 'warning');
+        } else {
+            eaDailySetSaveState('failed', 'Not saved · draft retained'); showAlert(error.message, 'danger');
+        }
+        return false;
+    } finally { eaDailyAttendanceBusy = false; buttons.forEach(button => button.disabled = false); }
+}
+function eaDailyInstallNavigationGuards() {
+    if (document.documentElement.dataset.eaDailyGuards) return;
+    document.documentElement.dataset.eaDailyGuards = 'true';
+    document.addEventListener('focusin', event => {
+        const target = event.target;
+        if (target?.matches?.('#attendanceDate,#attendanceMonth,#scoreDate,#scoreMonth,#tdsDate,#tdsClassScope')) {
+            target.dataset.eaPriorValue = target.value;
+        }
+    }, true);
+    document.addEventListener('change', event => {
+        const target = event.target;
+        if (eaDailyApplying || !target?.matches?.('#attendanceDate,#attendanceMonth,#scoreDate,#scoreMonth,#tdsDate,#tdsClassScope')) return;
+        const prior = target.dataset.eaPriorValue;
+        const attendanceDirty = target.id.startsWith('attendance') && Object.keys(attendanceDraftState.rows || {}).length;
+        const scoreDirty = target.id.startsWith('score') && document.getElementById('add-score-tab')?.dataset.workspaceDraft === 'true';
+        const summaryDirty = target.id.startsWith('tds') && document.getElementById('daily-summary-tab')?.dataset.workspaceDraft === 'true';
+        if ((attendanceDirty || scoreDirty || summaryDirty) && prior !== undefined && !confirm('Change context and discard the unsaved Daily Work draft?')) {
+            target.value = prior; event.preventDefault(); event.stopImmediatePropagation();
+        }
+    }, true);
+}
+function eaDailyBulkAttendanceInit() {
+    const card = document.getElementById('bulkPastAttendanceCard');
+    if (!card || card.dataset.safeCommandsReady) return;
+    card.dataset.safeCommandsReady = 'true';
+    card.addEventListener('input', eaDailyInvalidateBulkPreview);
+    card.addEventListener('change', eaDailyInvalidateBulkPreview);
+}
+function eaDailySummaryDraftKey() {
+    return `ea_daily_summary_draft:${String(currentLoginId || currentUserRole || 'unknown')}`;
+}
+function eaDailyReadSummaryDraft() {
+    try { return JSON.parse(localStorage.getItem(eaDailySummaryDraftKey()) || 'null'); } catch (_) { return null; }
+}
+function eaDailyPersistSummaryDraft() {
+    if (currentUserRole !== 'teacher' || typeof tdsCollectForm !== 'function') return;
+    try {
+        const row = tdsCollectForm();
+        localStorage.setItem(eaDailySummaryDraftKey(), JSON.stringify({row,saved_at:new Date().toISOString()}));
+        document.getElementById('daily-summary-tab').dataset.workspaceDraft = 'true';
+        eaDailySetSaveState('unsaved', 'Local draft · not submitted');
+    } catch (_) {}
+}
+function eaDailyScheduleSummaryDraft() {
+    clearTimeout(eaDailySummaryDraftTimer);
+    eaDailySummaryDraftTimer = setTimeout(eaDailyPersistSummaryDraft, 500);
+}
+function eaDailyClearSummaryDraft() {
+    clearTimeout(eaDailySummaryDraftTimer);
+    try { localStorage.removeItem(eaDailySummaryDraftKey()); } catch (_) {}
+    const host = document.getElementById('daily-summary-tab'); if (host) host.dataset.workspaceDraft = '';
+}
+function eaDailyRestoreSummaryDraft() {
+    const draft = eaDailyReadSummaryDraft();
+    if (!draft?.row || typeof tdsFillForm !== 'function') return false;
+    tdsFillForm(draft.row);
+    const host = document.getElementById('daily-summary-tab'); if (host) host.dataset.workspaceDraft = 'true';
+    eaDailySetSaveState('unsaved', `Local draft · ${String(draft.saved_at || '').replace('T',' ').slice(0,16)}`);
+    showAlert('Local Daily Summary draft restored. Review it before saving.', 'info'); return true;
+}
+function eaDailyApplySummaryResponse(response) {
+    const data = db.getData();
+    if (!Array.isArray(data.teacher_daily_summaries)) data.teacher_daily_summaries = [];
+    (response.summaries || []).forEach(row => {
+        const index = data.teacher_daily_summaries.findIndex(item => String(item.id) === String(row.id));
+        if (index >= 0) data.teacher_daily_summaries[index] = {...row};
+        else data.teacher_daily_summaries.push({...row});
+    });
+    if (Number(response.server_version) > 0) data.server_version = Number(response.server_version);
+    if (response.updated_at) { data.server_updated_at = response.updated_at; data.updated_at = response.updated_at; }
+    db.saveData(data, {allowTeacher:true,system:true,skipSync:true,preserveTimestamp:true,skipBackup:true});
+    return response.summaries || [];
+}
+async function eaDailyCommitSummaryRows(rows, prefix) {
+    if (!SERVER_SYNC.enabled) throw new Error('Daily Summary requires a connection to the authoritative server. Your local draft is retained.');
+    const payload = {
+        command_id:eaDailyCommandId(prefix || 'daily-summary'),
+        base_version:Number(db.getData().server_version || 0),
+        summaries:rows
+    };
+    const response = await eaDailyFetchJson('/scoreboard/daily-summary/commands', payload);
+    eaDailyApplySummaryResponse(response); return response;
+}
+
+function eaDailyScoreProjection(row) {
+    if (!row || typeof row !== 'object') return null;
+    return {
+        id: row.id ?? null,
+        points: parseInt(row.points, 10) || 0,
+        stars: parseInt(row.stars, 10) || 0,
+        vetos: parseInt(row.vetos, 10) || 0,
+        notes: String(row.notes || ''),
+        updated_at: String(row.updated_at || '')
+    };
+}
+function eaDailyScorePendingKey(studentId, date) {
+    return `ea_score_command:${String(currentLoginId || currentUserRole || 'unknown')}:${studentId}:${date}`;
+}
+function eaDailyScorePending(studentId, date, descriptor, createPayload) {
+    const key = eaDailyScorePendingKey(studentId, date);
+    let saved = null;
+    try { saved = JSON.parse(sessionStorage.getItem(key) || 'null'); } catch (_) {}
+    const signature = JSON.stringify(descriptor);
+    if (saved?.signature === signature && saved?.payload?.command_id) return {key,payload:saved.payload};
+    const payload = createPayload();
+    try { sessionStorage.setItem(key, JSON.stringify({signature,payload})); } catch (_) {}
+    return {key,payload};
+}
+function eaDailyApplyScoreResponse(response, target = null) {
+    const data = db.getData();
+    if (!Array.isArray(data.scores)) data.scores = [];
+    if (response?.deleted && target) {
+        data.scores = data.scores.filter(item => !(
+            Number(item?.studentId) === Number(target.student_id)
+            && String(item?.date || '') === String(target.date || '')
+        ));
+    }
+    const row = response?.score;
+    if (row) {
+        let index = data.scores.findIndex(item => String(item?.id ?? '') === String(row.id ?? ''));
+        if (index < 0) index = data.scores.findIndex(item =>
+            Number(item?.studentId) === Number(row.studentId) && String(item?.date || '') === String(row.date || ''));
+        if (index >= 0) data.scores[index] = {...row}; else data.scores.push({...row});
+    }
+    if (response?.student) {
+        if (!Array.isArray(data.students)) data.students = [];
+        const index = data.students.findIndex(item => Number(item?.id) === Number(response.student.id));
+        if (index >= 0) data.students[index] = {...response.student};
+    }
+    if (response?.appeal) {
+        if (!Array.isArray(data.appeals)) data.appeals = [];
+        const index = data.appeals.findIndex(item => String(item?.id) === String(response.appeal.id));
+        if (index >= 0) data.appeals[index] = {...response.appeal}; else data.appeals.push({...response.appeal});
+    }
+    if (Number(response?.server_version) > 0) data.server_version = Number(response.server_version);
+    if (response?.updated_at) { data.server_updated_at = response.updated_at; data.updated_at = response.updated_at; }
+    db.saveData(data, {allowTeacher:true,system:true,skipSync:true,preserveTimestamp:true,skipBackup:true});
+    return row;
+}
+async function eaDailyCommitScoreChange(change) {
+    if (!SERVER_SYNC.enabled) {
+        const error = new Error('Score changes require a connection to the authoritative server. Your inputs are retained.');
+        error.code = 'offline'; throw error;
+    }
+    const current = db.getScore(change.student_id, change.date) || null;
+    const descriptor = {
+        student_id:change.student_id,date:change.date,month:change.month,
+        delta_points:change.delta_points,delta_stars:change.delta_stars,delta_vetos:change.delta_vetos,
+        note:change.note || '',star_reason:change.star_reason || '',veto_reason:change.veto_reason || '',
+        star_usage_mode:change.star_usage_mode || ''
+    };
+    const pending = eaDailyScorePending(change.student_id, change.date, descriptor, () => ({
+        ...descriptor,
+        command_id:eaDailyCommandId('score'),
+        base_version:Number(db.getData().server_version || 0),
+        expected_current:eaDailyScoreProjection(current)
+    }));
+    try {
+        const response = await eaDailyFetchJson('/scoreboard/score/commands', pending.payload);
+        eaDailyApplyScoreResponse(response, change);
+        try { sessionStorage.removeItem(pending.key); } catch (_) {}
+        return response;
+    } catch (error) {
+        if (error.status === 409 && !['advanced_veto_required'].includes(error.code)) {
+            try { sessionStorage.removeItem(pending.key); } catch (_) {}
+        }
+        throw error;
+    }
+}
+async function eaDailyDeleteScoreCommand(studentId, date, month) {
+    if (!SERVER_SYNC.enabled) throw new Error('Score deletion requires a connection to the authoritative server.');
+    const current = db.getScore(studentId,date);
+    if (!current) throw new Error('No score exists for this student and date.');
+    const descriptor = {operation:'delete',student_id:studentId,date,month,reason:'Deleted from Daily Work'};
+    const pending = eaDailyScorePending(studentId,date,descriptor,()=>({
+        ...descriptor,command_id:eaDailyCommandId('score-delete'),
+        base_version:Number(db.getData().server_version || 0),expected_current:eaDailyScoreProjection(current)
+    }));
+    try {
+        const response=await eaDailyFetchJson('/scoreboard/score/commands',pending.payload);
+        eaDailyApplyScoreResponse(response,descriptor);
+        try{sessionStorage.removeItem(pending.key);}catch(_){}
+        return response;
+    } catch(error) {
+        if(error.status===409){try{sessionStorage.removeItem(pending.key);}catch(_){}}
+        throw error;
+    }
+}
+function eaDailyScoreValues(pointsRaw, starsRaw, vetosRaw) {
+    const pointsEmpty = String(pointsRaw ?? '').trim() === '';
+    const starsEmpty = String(starsRaw ?? '').trim() === '';
+    const vetosEmpty = String(vetosRaw ?? '').trim() === '';
+    const points = pointsEmpty ? 0 : parseInt(pointsRaw, 10);
+    const stars = starsEmpty ? 0 : parseTokenAdjustment(starsRaw, '*');
+    const vetos = vetosEmpty ? 0 : parseTokenAdjustment(vetosRaw, 'V');
+    if ([points,stars,vetos].some(Number.isNaN)) throw new Error('Enter valid score, star, and VETO changes.');
+    if (points === 0 && stars === 0 && vetos === 0) throw new Error('Enter a non-zero score, star, or VETO change.');
+    if (vetos < 0) {
+        const error = new Error('VETO use affects multiple records and is paused here until its dedicated atomic command is enabled. No data was changed.');
+        error.code = 'advanced_veto_required'; throw error;
+    }
+    return {points,stars,vetos};
+}
+async function eaDailyPrepareScoreChange(studentId, date, month, values, notes) {
+    if (!studentId || !/^\d{4}-\d{2}-\d{2}$/.test(date) || month !== date.slice(0,7)) {
+        throw new Error('Choose a student and a valid date. The month must match the date.');
+    }
+    if (!isMonthAllowedForCurrentUser(month) || !canMutateRecordScoreMonth(month) ||
+        !teacherValidateCurrentMonth(date, month, 'Score entry')) {
+        throw new Error('You cannot modify this score month.');
+    }
+    if (values.stars > 0 && !String(notes.starReason || '').trim()) {
+        throw new Error('Enter a reason when adding stars.');
+    }
+    if (values.stars !== 0) {
+        const validation = validateStarAvailability(studentId, values.stars, month);
+        if (!validation.valid) throw new Error(validation.message);
+    }
+    const existing = db.getScore(studentId, date);
+    const current = existing ? (parseInt(existing.points,10) || 0) : 0;
+    const next = current + values.points;
+    if (existing && current !== 0 && next === 0 && !confirm(`Zero out the saved score ${current}?\n\nCurrent: ${current}, Change: ${values.points}, New: 0.`)) {
+        throw Object.assign(new Error('Score change cancelled.'), {code:'cancelled'});
+    }
+    if (values.points < 0 && next < current && !confirm(`Reduce this score?\n\nCurrent: ${current}, Change: ${values.points}, New: ${next}.`)) {
+        throw Object.assign(new Error('Score change cancelled.'), {code:'cancelled'});
+    }
+    let usageMode = '';
+    if (currentUserRole === 'admin' && values.stars < 0) {
+        usageMode = promptStarUsageMode(Math.abs(values.stars));
+        if (!usageMode) throw Object.assign(new Error('Star use cancelled.'), {code:'cancelled'});
+    }
+    return {
+        student_id:studentId,date,month,
+        delta_points:values.points,delta_stars:values.stars,delta_vetos:values.vetos,
+        note:String(notes.note || '').trim(),star_reason:String(notes.starReason || '').trim(),
+        veto_reason:String(notes.vetoReason || '').trim(),star_usage_mode:usageMode
+    };
+}
+async function eaDailySaveRecordScoreRow(studentId, triggerEl = null, options = {}) {
+    if (eaDailyScoreBusy) return false;
+    const row = triggerEl?.closest?.('tr');
+    const inputs = row?.querySelectorAll?.('input.score-input');
+    if (!row || !inputs || inputs.length < 5) return false;
+    try {
+        const values = eaDailyScoreValues(inputs[0].value,inputs[1].value,inputs[3].value);
+        const date = getElementValue('scoreDate'); const month = date ? date.slice(0,7) : '';
+        const change = await eaDailyPrepareScoreChange(studentId,date,month,values,{
+            starReason:inputs[2].value,vetoReason:inputs[4].value
+        });
+        eaDailyScoreBusy = true; row.querySelectorAll('button,input').forEach(el => el.disabled = true);
+        eaDailySetSaveState('saving','Saving score…');
+        const response = await eaDailyCommitScoreChange(change);
+        inputs.forEach(input => { input.value=''; input.classList.remove('filled'); });
+        clearRecordScoreDraft(studentId);
+        const host=document.getElementById('add-score-tab');
+        if(host) host.dataset.workspaceDraft=Object.keys(recordScoreDraftState.rows || {}).length ? 'true' : '';
+        loadRecordStudentTable(); scheduleScoreboardRefresh(); updateAppealsTabNotification();
+        eaDailySetSaveState('confirmed', response.appeal ? 'Score confirmed · token request pending' : 'Score · server confirmed');
+        showAlert(response.appeal ? 'Points confirmed. Star/VETO change sent to Admin.' : 'Score change confirmed by the server.', response.appeal ? 'warning' : 'success');
+        return true;
+    } catch (error) {
+        if (error.code !== 'cancelled') { eaDailySetSaveState('failed','Score not saved · inputs retained'); showAlert(error.message,'danger'); }
+        return false;
+    } finally {
+        eaDailyScoreBusy = false; row?.querySelectorAll?.('button,input').forEach(el => el.disabled = false);
+    }
+}
+async function eaDailySaveScoreForm() {
+    if (eaDailyScoreBusy) return false;
+    const studentId=parseInt(getElementValue('scoreStudent'),10), date=getElementValue('scoreDate');
+    const month=date ? date.slice(0,7) : '';
+    try {
+        const values=eaDailyScoreValues(getElementValue('scorePoints'),getElementValue('scoreStars'),getElementValue('scoreVetos'));
+        const note=getElementValue('scoreNotes');
+        const change=await eaDailyPrepareScoreChange(studentId,date,month,values,{note,starReason:note,vetoReason:note});
+        eaDailyScoreBusy=true; eaDailySetSaveState('saving','Saving score…');
+        const response=await eaDailyCommitScoreChange(change);
+        clearScoreForm(); loadRecordStudentTable(); scheduleScoreboardRefresh(); updateAppealsTabNotification();
+        eaDailySetSaveState('confirmed',response.appeal?'Score confirmed · token request pending':'Score · server confirmed');
+        showAlert(response.appeal?'Points confirmed. Star/VETO change sent to Admin.':'Score change confirmed by the server.',response.appeal?'warning':'success');
+        return true;
+    } catch(error) {
+        if(error.code!=='cancelled'){eaDailySetSaveState('failed','Score not saved · inputs retained');showAlert(error.message,'danger');}
+        return false;
+    } finally { eaDailyScoreBusy=false; }
+}
+async function eaDailyDeleteScore() {
+    if(eaDailyScoreBusy)return false;
+    const studentId=parseInt(getElementValue('scoreStudent'),10),date=getElementValue('scoreDate');
+    const existing=studentId&&date?db.getScore(studentId,date):null;
+    if(!existing){showAlert('Select a student/date with a saved score.','warning');return false;}
+    const month=String(existing.month||date.slice(0,7));
+    if(!canMutateRecordScoreMonth(month)||!teacherValidateCurrentMonth(date,month,'Score deletion'))return false;
+    if(!confirm(`Delete the saved score for ${date}? An audit tombstone will be retained.`))return false;
+    eaDailyScoreBusy=true;eaDailySetSaveState('saving','Deleting score…');
+    try{
+        await eaDailyDeleteScoreCommand(studentId,date,month);
+        clearScoreForm();loadRecordStudentTable();scheduleScoreboardRefresh();
+        eaDailySetSaveState('confirmed','Deletion · server confirmed');showAlert('Score deleted; audit history retained.','success');return true;
+    }catch(error){eaDailySetSaveState('failed','Score not deleted');showAlert(error.message,'danger');return false;}
+    finally{eaDailyScoreBusy=false;}
+}
+async function eaDailySaveSummaryCommand(status) {
+    if (eaDailySummaryBusy || currentUserRole !== 'teacher') return false;
+    const row = tdsCollectForm();
+    if (row.status === 'acknowledged') {
+        showAlert('This summary is marked For Perusal. Ask Admin to request revision before editing.', 'warning'); return false;
+    }
+    row.status = status === 'submitted' ? 'submitted' : 'draft';
+    eaDailySummaryBusy = true; eaDailySetSaveState('saving', row.status === 'submitted' ? 'Submitting summary…' : 'Saving draft…');
+    try {
+        const response = await eaDailyCommitSummaryRows([row], 'daily-summary-save');
+        const saved = response.summaries?.[0]; if (saved) { _tdsCurrentId = saved.id; tdsFillForm(saved); }
+        eaDailyClearSummaryDraft(); tdsPopulateHistoryMonth(); tdsRenderHistory(); tdsRenderInbox();
+        eaDailySetSaveState('confirmed', row.status === 'submitted' ? 'Submitted · server confirmed' : 'Draft · server confirmed');
+        showAlert(row.status === 'submitted' ? 'Daily summary submitted and confirmed.' : 'Daily summary draft confirmed.', 'success');
+        return true;
+    } catch (error) {
+        eaDailyPersistSummaryDraft(); eaDailySetSaveState('failed', 'Not saved · local draft retained');
+        showAlert(error.message, 'danger'); return false;
+    } finally { eaDailySummaryBusy = false; }
+}
+async function eaDailyAdminSummaryCommand(status) {
+    if (eaDailySummaryBusy || currentUserRole !== 'admin' || !['acknowledged','needs_revision'].includes(status)) return false;
+    const existing = tdsGetSummaries().find(row => String(row.id) === String(_tdsCurrentId));
+    const text = String(getElementValue('tdsAdminRemarkInput') || '').trim();
+    if (!existing) { showAlert('Open a submitted summary first.', 'warning'); return false; }
+    if (!text) { showAlert('Please enter a remark.', 'warning'); return false; }
+    const row = tdsNormalizeRow(existing); row.status = status;
+    row.admin_remarks = Array.isArray(row.admin_remarks) ? row.admin_remarks.slice() : [];
+    row.admin_remarks.push({id:tdsNewRemarkId(),by:currentLoginId || 'Admin',at:new Date().toISOString(),text,
+        status_set:status,tone:tdsNormalizeTone(_tdsRemarkTone,status),teacher_ack_at:''});
+    eaDailySummaryBusy = true; eaDailySetSaveState('saving', 'Saving review…');
+    try {
+        const response = await eaDailyCommitSummaryRows([row], 'daily-summary-review');
+        const saved = response.summaries?.[0]; if (saved) tdsFillForm(saved);
+        tdsRenderHistory(); tdsRenderInbox(); setElementValue('tdsAdminRemarkInput','');
+        eaDailySetSaveState('confirmed', 'Review · server confirmed');
+        showAlert(status === 'acknowledged' ? 'Marked For Perusal.' : 'Revision requested.', 'success'); return true;
+    } catch (error) { eaDailySetSaveState('failed', 'Review not saved'); showAlert(error.message,'danger'); return false; }
+    finally { eaDailySummaryBusy = false; }
+}
+async function eaDailyAckSummaryRemarks(event) {
+    if (event) { try { event.preventDefault(); event.stopPropagation(); } catch (_) {} }
+    if (eaDailySummaryBusy || !['teacher','admin'].includes(currentUserRole)) return false;
+    const pending = tdsCollectPendingRemarks();
+    if (!pending.length) { document.getElementById('tdsRemarksModal')?.classList.add('hidden'); return true; }
+    const keys = new Set((_tdsPendingRemarkIds?.length ? _tdsPendingRemarkIds : pending.map(item => item.match_key)));
+    const rows = tdsGetSummaries().filter(row => (row.admin_remarks || []).some(remark =>
+        !String(remark?.teacher_ack_at || '').trim() && keys.has(tdsRemarkMatchKey(row.id, remark))
+    )).map(row => ({...row,admin_remarks:(row.admin_remarks || []).map(remark =>
+        keys.has(tdsRemarkMatchKey(row.id, remark)) ? {...remark,teacher_ack_at:new Date().toISOString()} : remark
+    )}));
+    if (!rows.length) return false;
+    eaDailySummaryBusy = true; eaDailySetSaveState('saving','Confirming remarks…');
+    try {
+        await eaDailyCommitSummaryRows(rows,'daily-summary-ack');
+        document.getElementById('tdsRemarksModal')?.classList.add('hidden'); _tdsPendingRemarkIds = [];
+        if (_tdsCurrentId) { const open=tdsGetSummaries().find(row=>String(row.id)===String(_tdsCurrentId)); if(open)tdsFillForm(open); }
+        tdsRenderHistory(); eaDailySetSaveState('confirmed','Remarks noted · confirmed'); showAlert('Admin remarks noted. Thank you.','success'); return true;
+    } catch (error) { eaDailySetSaveState('failed','Remarks not confirmed'); showAlert(error.message,'danger'); return false; }
+    finally { eaDailySummaryBusy = false; }
+}
+function eaDailySummaryInit() {
+    const host = document.getElementById('daily-summary-tab');
+    if (!host || host.dataset.safeCommandsReady) return;
+    host.dataset.safeCommandsReady = 'true';
+    host.addEventListener('input', event => {
+        if (currentUserRole === 'teacher' && !event.target.closest('.ea-workspace-bar')) eaDailyScheduleSummaryDraft();
+    });
+    host.addEventListener('change', event => {
+        if (currentUserRole === 'teacher' && !event.target.closest('.ea-workspace-bar')) eaDailyScheduleSummaryDraft();
+    });
 }
 function eaWorkspaceHolidayInit() {
     const host = document.getElementById('attendance-tab');
@@ -19934,20 +20569,22 @@ async function eaWorkspaceHolidayApply() {
     eaHolidayBusy = true;
     const button = document.getElementById('eaHolidayApply'); button.disabled = true;
     try {
-        const changed = db.upsertAttendanceBatch(plan.rows, {skipSync:true});
-        if (!changed.length) throw new Error('No holiday changes were saved.');
-        let pushed = true;
-        if (SERVER_SYNC.enabled && changed.length) {
-            const ids = new Set(changed.map(r => String(r.studentId)));
-            const students = db.getStudents().filter(s => ids.has(String(s.id))).map(s => ({id:s.id,roll:normalizeAttendanceRoll(s.roll)})).filter(s => s.roll);
-            pushed = await pushAttendancePatchReliable({attendance:changed,students}, changed);
-        }
+        const payload = {month:plan.from.slice(0,7),entries:plan.rows.map(row => ({
+            student_id:row.studentId,date:row.date,status:row.status,remarks:row.remarks,
+            ...(row.holiday_previous_mark ? {holiday_previous_mark:row.holiday_previous_mark} : {})
+        }))};
+        const serverPlan = await eaDailyPreviewAttendance(payload);
+        if (Number(serverPlan.counts?.conflict || 0)) throw new Error('Holiday attendance contains identity conflicts. No rows were changed.');
+        const result = await eaDailyCommitAttendance(payload, serverPlan, {
+            prefix:'holiday-attendance',confirmLocked:serverPlan.locked
+        });
         eaHolidayPreview = null;
-        document.getElementById('eaHolidayPreview').textContent = `${changed.length} holiday marks saved locally.${pushed ? '' : ' Server sync is pending and will retry.'}`;
+        document.getElementById('eaHolidayPreview').textContent = `${result.changed?.length || 0} holiday marks confirmed by the server.`;
         loadAttendanceTab(); loadAttendanceReport(); loadScoreboard();
-        showAlert(pushed ? 'Holiday marks saved.' : 'Holiday marks saved locally; server sync pending.', pushed ? 'success' : 'warning');
+        eaDailySetSaveState('confirmed', `Confirmed · ${result.changed?.length || 0} holiday row(s)`);
+        showAlert('Holiday marks confirmed by the server.', 'success');
         return true;
-    } catch (error) { showAlert('Could not complete holiday marking: ' + error.message, 'danger'); return false; }
+    } catch (error) { eaDailySetSaveState('failed', 'Holiday save failed'); showAlert('Could not complete holiday marking: ' + error.message, 'danger'); return false; }
     finally { eaHolidayBusy = false; }
 }
 
@@ -20655,6 +21292,23 @@ window.eaNotebookCommands = (() => {
                 // eaFetch merges plain header maps with its authentication headers.
                 options = {...options, headers: Object.fromEntries(headers.entries()), body: JSON.stringify(payload)};
             }
+        } else if (method === 'DELETE' && /^\/notebooks\/api\/records\/\d+$/.test(endpoint.pathname)) {
+            const payload = options.body ? JSON.parse(options.body) : {};
+            const recordId = endpoint.pathname.split('/').pop();
+            target = 'delete:' + recordId;
+            if (!Number.isSafeInteger(payload.expected_version) || payload.expected_version < 0) {
+                throw new Error('Refresh the notebook record before deleting it.');
+            }
+            key = 'ea.nb.delete.v1:' + captured + ':' + recordId + ':' + payload.expected_version;
+            let entry = load(key);
+            if (!entry || !/^nb-[0-9a-f]{32}$/.test(entry.id)) {
+                entry = {id: nonce(), version: payload.expected_version};
+                store(key, entry);
+            }
+            const headers = new Headers(options.headers);
+            headers.set('Content-Type', 'application/json');
+            headers.set('Idempotency-Key', entry.id);
+            options = {...options, headers: Object.fromEntries(headers.entries()), body: JSON.stringify(payload)};
         }
         const controller = new AbortController(), previous = options.signal;
         const abort = () => controller.abort();
@@ -30210,10 +30864,9 @@ function eaNotebookFetch(url, options, fetcher) { return window.eaNotebookComman
         }
 
         function refreshRecordScoreTabFromSync() {
-            if (hasActiveRecordScoreEdit()) return;
+            if (hasActiveRecordScoreEdit() || document.getElementById('add-score-tab')?.dataset.workspaceDraft === 'true') return;
             const previous = {
-                date: getElementValue('scoreDate'),
-                month: getElementValue('scoreMonth'),
+                date: getElementValue('scoreDate'), month: getElementValue('scoreMonth'),
                 status: getElementValue('scoreStatusFilter') || 'active',
                 group: getElementValue('scoreGroupFilter') || 'all',
                 groupList: getElementValue('scoreGroupFilterList') || 'all',
@@ -30221,57 +30874,21 @@ function eaNotebookFetch(url, options, fetcher) { return window.eaNotebookComman
                 classList: getElementValue('scoreClassFilterList') || '',
                 studentId: getElementValue('scoreStudent') || ''
             };
-            ensureRecordScoreDraftContext(previous.date, previous.month);
-            document.querySelectorAll('#recordStudentsBody tr[data-student-id]').forEach(row => {
-                const studentId = parseInt(row.getAttribute('data-student-id'), 10);
-                if (!studentId) return;
-                const inputs = row.querySelectorAll('input.score-input');
-                if (!inputs || inputs.length < 5) return;
-                setRecordScoreDraft(studentId, {
-                    points: inputs[0].value,
-                    stars: inputs[1].value,
-                    starReason: inputs[2].value,
-                    vetos: inputs[3].value,
-                    vetoReason: inputs[4].value
-                });
-            });
-
-            if (!previous.date) {
-                const today = formatDateKey(new Date());
-                setElementValue('scoreDate', today);
-                previous.date = today;
-            }
-            if (!previous.month) {
-                const month = previous.date ? previous.date.substring(0, 7) : getCurrentMonthKey();
-                setElementValue('scoreMonth', month);
-                previous.month = month;
-            }
-            // Keep Student List month picker in sync
+            if (!previous.date) previous.date = formatDateKey(new Date());
+            if (!previous.month) previous.month = previous.date.substring(0, 7);
+            setElementValue('scoreDate', previous.date); setElementValue('scoreMonth', previous.month);
             setSelectValueIfExists('recordScoreMonthPicker', previous.month, '');
-
-            setElementValue('scoreStatusFilter', previous.status);
-            populateScoreGroupFilter();
+            setElementValue('scoreStatusFilter', previous.status); populateScoreGroupFilter();
             setSelectValueIfExists('scoreGroupFilter', previous.group, 'all');
             setSelectValueIfExists('scoreGroupFilterList', previous.groupList || previous.group, 'all');
             setSelectValueIfExists('scoreClassFilter', previous.classValue, '');
             setSelectValueIfExists('scoreClassFilterList', previous.classList || previous.classValue, '');
-
-            updateScoreStudentOptions(true);
-            setSelectValueIfExists('scoreStudent', previous.studentId, '');
+            updateScoreStudentOptions(true); setSelectValueIfExists('scoreStudent', previous.studentId, '');
             loadExistingScore();
         }
 
         function refreshAttendanceTabFromSync() {
             if (hasActiveAttendanceEdit()) return;
-            const date = getElementValue('attendanceDate') || formatDateKey(new Date());
-            const month = getElementValue('attendanceMonth') || date.substring(0, 7);
-            ensureAttendanceDraftContext(date, month);
-            document.querySelectorAll('[data-attendance-student]').forEach(select => {
-                const studentId = parseInt(select.getAttribute('data-attendance-student'), 10);
-                if (!studentId) return;
-                const remarksInput = document.querySelector(`[data-attendance-remarks="${studentId}"]`);
-                setAttendanceDraft(studentId, select.value, remarksInput ? String(remarksInput.value || '') : undefined);
-            });
             loadAttendanceTab();
         }
 
@@ -30393,6 +31010,9 @@ function eaNotebookFetch(url, options, fetcher) { return window.eaNotebookComman
         }
 
         async function saveRecordScoreRow(studentId, triggerEl = null, options = {}) {
+            if (typeof eaDailySaveRecordScoreRow !== 'function') { showAlert('Safe score commands are unavailable. Nothing was saved.', 'danger'); return false; }
+            return eaDailySaveRecordScoreRow(studentId, triggerEl, options);
+            /* Legacy local-first implementation retained below as inert recovery evidence. */
             const row = triggerEl ? triggerEl.closest('tr') : null;
             if (!row) return;
             const currentInputs = row.querySelectorAll('input.score-input');
@@ -30718,6 +31338,9 @@ function eaNotebookFetch(url, options, fetcher) { return window.eaNotebookComman
         }
 
         async function saveScore() {
+            if (typeof eaDailySaveScoreForm !== 'function') { showAlert('Safe score commands are unavailable. Nothing was saved.', 'danger'); return false; }
+            return eaDailySaveScoreForm();
+            /* Legacy local-first implementation retained below as inert recovery evidence. */
             const studentId = parseInt(document.getElementById('scoreStudent').value);
             const date = document.getElementById('scoreDate').value;
             const pointsInput = document.getElementById('scorePoints').value;
@@ -32316,17 +32939,24 @@ function eaNotebookFetch(url, options, fetcher) { return window.eaNotebookComman
         }
 
         async function nbDeleteRecord(recordId) {
-            if (!confirm('Delete this notebook check record? This cannot be undone.')) return;
+            if (!confirm('Delete this notebook check and its scoreboard effect?')) return;
             try {
-                const data = await nbApiFetch('/notebooks/api/records/' + recordId, { method: 'DELETE' });
+                const detail = await nbApiFetch('/notebooks/api/records/' + recordId);
+                if (!detail.check || !Number.isSafeInteger(detail.command_version)) {
+                    throw new Error('Refresh the notebook record before deleting it.');
+                }
+                const data = await nbApiFetch('/notebooks/api/records/' + recordId, {
+                    method: 'DELETE',
+                    body: JSON.stringify({expected_version: detail.command_version})
+                });
                 if (data.success) {
-                    nbShowAlert('Record deleted.', 'success');
+                    nbShowAlert('Record and scoreboard effect deleted.', 'success');
                     nbLoadRecords();
                 } else {
                     nbShowAlert(data.error || 'Delete failed', 'error');
                 }
             } catch (e) {
-                nbShowAlert('Network error: ' + e.message, 'error');
+                nbShowAlert('Delete not completed: ' + e.message, 'error');
             }
         }
 
@@ -33164,6 +33794,9 @@ function eaNotebookFetch(url, options, fetcher) { return window.eaNotebookComman
         }
 
         function deleteScore() {
+            if (typeof eaDailyDeleteScore !== 'function') { showAlert('Safe score deletion is unavailable. Nothing was deleted.', 'danger'); return false; }
+            return eaDailyDeleteScore();
+            /* Legacy local-first implementation retained below as inert recovery evidence. */
             const studentId = parseInt(document.getElementById('scoreStudent').value);
             const date = document.getElementById('scoreDate').value;
             if (!studentId || !date) {
@@ -33909,7 +34542,7 @@ function eaNotebookFetch(url, options, fetcher) { return window.eaNotebookComman
             document.getElementById('scoreMonth').value = _today.substring(0, 7);
             document.getElementById('scoreNotes').value = '';
             if (document.getElementById('scoreHint')) {
-                document.getElementById('scoreHint').textContent = 'Tip: Saving a score for the same student and date will update the existing entry.';
+                document.getElementById('scoreHint').textContent = 'Enter a change, not the final total. The server shows Current + Change = New in confirmations and rejects stale edits.';
             }
             refreshStarTransferModule(false);
             refreshPointsTransferModule(false);
@@ -50902,6 +51535,7 @@ function eaNotebookFetch(url, options, fetcher) { return window.eaNotebookComman
                 dayCells.push('<div></div>');
             }
             const defaultStatus = getElementValue('bulkAttendanceDefaultStatus') || 'present';
+            const bulkMode = getElementValue('bulkAttendanceMode') || 'preserve';
             const slot1Status = getBulkSelectionStatus(1);
             const hasActiveBulk = !!slot1Status;
             for (let day = 1; day <= days; day += 1) {
@@ -50946,17 +51580,17 @@ function eaNotebookFetch(url, options, fetcher) { return window.eaNotebookComman
                     }
                 }
                 // Show remaining-status preview on unselected dates without existing attendance
-                if (hasActiveBulk && !selectedClass && !existingClass && defaultStatus) {
+                if (hasActiveBulk && !selectedClass && defaultStatus && ((bulkMode === 'fill_unmarked' && !existingClass) || bulkMode === 'replace_all')) {
                     remainingClass = `remaining-${defaultStatus}`;
                     const _rlMap = { present: 'P', absent: 'A', leave: 'L', late: 'Lt', holiday: 'H' };
                     remainingLabel = `<span class="bulk-remaining-tag">${_rlMap[defaultStatus] || ''}</span>`;
                 }
-                dayCells.push(`<button type="button" class="bulk-day-btn ${weekendClass} ${selectedClass} ${statusClass} ${existingClass} ${remainingClass}" onclick="toggleBulkAttendanceDate('${date}')">${day}${existingLabel}${remainingLabel}</button>`);
+                dayCells.push(`<button type="button" class="bulk-day-btn ${weekendClass} ${selectedClass} ${statusClass} ${existingClass} ${remainingClass}" aria-pressed="${selectedClass ? 'true' : 'false'}" aria-label="${date}${selectedClass ? ', selected' : ''}" onclick="toggleBulkAttendanceDate('${date}')">${day}${existingLabel}${remainingLabel}</button>`);
             }
             // Build legend if a student is selected
             let legendHtml = '';
             if (selectedStudentId) {
-                const remainingSwatch = hasActiveBulk
+                const remainingSwatch = hasActiveBulk && bulkMode !== 'preserve'
                     ? `<span class="bulk-legend-item"><span class="bulk-legend-swatch remaining-${defaultStatus}"></span> Remaining (${defaultStatus})</span>`
                     : '';
                 legendHtml = `<div class="bulk-calendar-legend">
@@ -50996,6 +51630,7 @@ function eaNotebookFetch(url, options, fetcher) { return window.eaNotebookComman
         }
 
         function clearBulkAttendanceDates() {
+            if (typeof eaDailyInvalidateBulkPreview === 'function') eaDailyInvalidateBulkPreview();
             [1, 2, 3].forEach(slot => bulkAttendanceSelectionDates[slot].clear());
             renderBulkAttendanceCalendar();
             renderBulkAttendanceDates();
@@ -51008,6 +51643,12 @@ function eaNotebookFetch(url, options, fetcher) { return window.eaNotebookComman
         }
 
         async function applyBulkPastAttendance() {
+            if (typeof eaDailyBulkAttendanceApply !== 'function') {
+                showAlert('Safe Bulk Attendance commands are unavailable. Nothing was saved.', 'danger');
+                return false;
+            }
+            return eaDailyBulkAttendanceApply();
+            /* Legacy local-first implementation retained below as inert recovery evidence. */
             if (currentUserRole === 'teacher') {
                 showAlert('Bulk past attendance is Admin-only. Teachers can mark attendance day-wise for the current month.', 'warning');
                 return;
@@ -51715,6 +52356,7 @@ function eaNotebookFetch(url, options, fetcher) { return window.eaNotebookComman
         }
 
         function tdsAckPendingRemarks(event) {
+            if (typeof eaDailyAckSummaryRemarks === 'function') return eaDailyAckSummaryRemarks(event);
             if (event) {
                 try { event.preventDefault(); event.stopPropagation(); } catch (_) {}
             }
@@ -51941,6 +52583,7 @@ function eaNotebookFetch(url, options, fetcher) { return window.eaNotebookComman
         }
 
         function tdsSaveSummary(status) {
+            if (typeof eaDailySaveSummaryCommand === 'function') return eaDailySaveSummaryCommand(status);
             if (currentUserRole !== 'teacher' && currentUserRole !== 'admin') {
                 showAlert('Only teacher/admin can save daily summaries.', 'warning');
                 return;
@@ -51967,6 +52610,7 @@ function eaNotebookFetch(url, options, fetcher) { return window.eaNotebookComman
         }
 
         function tdsAdminSetStatus(status) {
+            if (typeof eaDailyAdminSummaryCommand === 'function') return eaDailyAdminSummaryCommand(status);
             if (currentUserRole !== 'admin') return;
             if (!['acknowledged', 'needs_revision'].includes(status)) return;
             const existing = tdsGetSummaries().find(r => String(r.id) === String(_tdsCurrentId));
@@ -52199,7 +52843,8 @@ function eaNotebookFetch(url, options, fetcher) { return window.eaNotebookComman
                 const record = _attRecordMap.get(sid) || (roll ? _attRecordMap.get('roll:' + roll) : null);
                 const draft = getAttendanceDraft(student.id);
                 const status = normalizeAttendanceStatus(safeProp(draft, 'status') || safeProp(record, 'status') || 'present');
-                const remarks = escapeHtml(String(safeProp(draft, 'remarks') || safeProp(record, 'remarks') || ''));
+                const remarks = escapeHtml(String(draft && Object.prototype.hasOwnProperty.call(draft, 'remarks')
+                    ? draft.remarks : (safeProp(record, 'remarks') || '')));
                 const markedClass = record ? 'attendance-marked-row' : '';
                 const controlClass = record ? 'attendance-marked' : '';
                 return `
@@ -52376,6 +53021,12 @@ function eaNotebookFetch(url, options, fetcher) { return window.eaNotebookComman
         }
 
         async function saveAttendance() {
+            if (typeof eaDailySaveAttendanceCommand !== 'function') {
+                showAlert('Safe Attendance commands are unavailable. Your draft was not cleared.', 'danger');
+                return false;
+            }
+            return eaDailySaveAttendanceCommand();
+            /* Legacy local-first implementation retained below as inert recovery evidence. */
             if (currentUserRole === 'student') {
                 showAlert('Students can only view attendance reports', 'warning');
                 return;

@@ -1,7 +1,7 @@
 {
   "version": 1,
-  "revision": 13,
-  "updated_at": "2026-09-11T06:13:53Z",
+  "revision": 17,
+  "updated_at": "2026-09-20T12:58:17Z",
   "groups": [
     {
       "id": "grp-a610e04369",
@@ -186,7 +186,74 @@
           "id": "cls-01a523b95d",
           "name": "Class 10",
           "sort_order": 1,
-          "subjects": []
+          "subjects": [
+            {
+              "id": "sub-39f9b2e827",
+              "name": "Phyics",
+              "sort_order": 0,
+              "notes": []
+            },
+            {
+              "id": "sub-5035df180d",
+              "name": "Chemistry",
+              "sort_order": 1,
+              "notes": []
+            },
+            {
+              "id": "sub-a8e6fe3a8f",
+              "name": "Biology",
+              "sort_order": 2,
+              "notes": []
+            },
+            {
+              "id": "sub-27f06700ac",
+              "name": "English Literature",
+              "sort_order": 3,
+              "notes": []
+            },
+            {
+              "id": "sub-f53dc63f8a",
+              "name": "Hindi Sahitya",
+              "sort_order": 4,
+              "notes": []
+            },
+            {
+              "id": "sub-2b0b428f97",
+              "name": "English Grammar",
+              "sort_order": 5,
+              "notes": []
+            },
+            {
+              "id": "sub-a8733ae597",
+              "name": "Hindi Grammar",
+              "sort_order": 6,
+              "notes": []
+            },
+            {
+              "id": "sub-18a2118a3c",
+              "name": "History",
+              "sort_order": 7,
+              "notes": []
+            },
+            {
+              "id": "sub-5fee0dead5",
+              "name": "Political Science",
+              "sort_order": 8,
+              "notes": []
+            },
+            {
+              "id": "sub-25a35c430d",
+              "name": "Geography",
+              "sort_order": 9,
+              "notes": []
+            },
+            {
+              "id": "sub-d6a37184c6",
+              "name": "Economics",
+              "sort_order": 10,
+              "notes": []
+            }
+          ]
         }
       ]
     },
@@ -198,8 +265,106 @@
       "classes": [
         {
           "id": "cls-481f6d7c8a",
-          "name": "Class 11",
+          "name": "Class 11 (Science)",
           "sort_order": 0,
+          "subjects": [
+            {
+              "id": "sub-8ffec20f20",
+              "name": "Physics",
+              "sort_order": 0,
+              "notes": [
+                {
+                  "id": "note-2ae17876b7",
+                  "title": "Laws of Motion",
+                  "description": "",
+                  "tags": [],
+                  "file_type": "pdf",
+                  "original_name": "Class_11_Physics_Laws_of_Motion_Detailed_Notes.pdf",
+                  "storage_key": "note-2ae17876b7-b83c58103c89.pdf",
+                  "size_bytes": 151958,
+                  "date_added": "2026-09-20T12:36:45Z"
+                }
+              ]
+            },
+            {
+              "id": "sub-92cda987d7",
+              "name": "Chemistry",
+              "sort_order": 1,
+              "notes": []
+            },
+            {
+              "id": "sub-44af9ea05d",
+              "name": "Biology",
+              "sort_order": 2,
+              "notes": []
+            },
+            {
+              "id": "sub-e5268b07b7",
+              "name": "Mathematics",
+              "sort_order": 3,
+              "notes": []
+            },
+            {
+              "id": "sub-77f1b264db",
+              "name": "English",
+              "sort_order": 4,
+              "notes": []
+            },
+            {
+              "id": "sub-560337142f",
+              "name": "Computer Science",
+              "sort_order": 5,
+              "notes": []
+            },
+            {
+              "id": "sub-d87f525e37",
+              "name": "Information Practices",
+              "sort_order": 6,
+              "notes": []
+            }
+          ]
+        },
+        {
+          "id": "cls-ff4aeeaa4a",
+          "name": "Class 11 (Arts)",
+          "sort_order": 1,
+          "subjects": [
+            {
+              "id": "sub-4c7095c03b",
+              "name": "History",
+              "sort_order": 0,
+              "notes": []
+            },
+            {
+              "id": "sub-28cfc117ee",
+              "name": "Geography",
+              "sort_order": 1,
+              "notes": []
+            },
+            {
+              "id": "sub-19617818fc",
+              "name": "Political Science",
+              "sort_order": 2,
+              "notes": []
+            },
+            {
+              "id": "sub-4207c063c8",
+              "name": "Economics",
+              "sort_order": 3,
+              "notes": []
+            },
+            {
+              "id": "sub-84f5f08bcb",
+              "name": "English Literature",
+              "sort_order": 4,
+              "notes": []
+            }
+          ]
+        },
+        {
+          "id": "cls-b2063d612c",
+          "name": "Class 12",
+          "sort_order": 2,
           "subjects": []
         }
       ]
