@@ -1,7 +1,7 @@
 {
   "version": 1,
-  "revision": 18,
-  "updated_at": "2026-09-20T13:00:48Z",
+  "revision": 19,
+  "updated_at": "2026-09-20T13:06:47Z",
   "groups": [
     {
       "id": "grp-a610e04369",
@@ -273,6 +273,28 @@
               "name": "Physics",
               "sort_order": 0,
               "notes": [
+                {
+                  "id": "note-823c44d605",
+                  "title": "Concepts of Physics by HC Verma- Vol 1",
+                  "description": "Detailed explanatory concepts of modern physics in simple language",
+                  "tags": [],
+                  "file_type": "pdf",
+                  "original_name": "concepts_of_physics_by_h.c._verma_volume_1.pdf",
+                  "storage_key": "note-823c44d605-a6fafe3e57e9.pdf",
+                  "size_bytes": 4840403,
+                  "date_added": "2026-09-20T13:04:23Z"
+                },
+                {
+                  "id": "note-69f919d0c8",
+                  "title": "Concepts of Physics by HC Verma- Vol 2",
+                  "description": "Detailed explanatory concepts of modern physics in simple language",
+                  "tags": [],
+                  "file_type": "pdf",
+                  "original_name": "concepts_of_physics_by_h.c._verma_volume_2.pdf",
+                  "storage_key": "note-69f919d0c8-df0bee12694d.pdf",
+                  "size_bytes": 5239740,
+                  "date_added": "2026-09-20T13:04:50Z"
+                },
                 {
                   "id": "note-2ae17876b7",
                   "title": "Laws of Motion",

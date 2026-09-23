@@ -184,7 +184,7 @@
         <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
         <link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@900&display=swap" rel="stylesheet">
     </noscript>
-    <link rel="stylesheet" href="/static/css/offline-scoreboard.css?v=13">
+    <link rel="stylesheet" href="/static/css/offline-scoreboard.css?v=15">
 
 <script>
     // System Performance Overhaul: Async localstorage debouncer (Per-Key Isolated)
@@ -1996,19 +1996,22 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                 </div>
             </div>
 
+            <div id="scoreboardAdvisory" class="ea-results-advisory" role="status" aria-live="polite"></div>
+            <div id="resultsProjectionStatus" class="ea-results-meta" role="status" aria-live="polite">Local calculation</div>
+
             <div class="stats-grid">
                 <div class="stat-card stat-card-compact">
-                    <h4>Total Students</h4>
+                    <h4>Students Shown</h4>
                     <div class="value" id="totalStudents">0</div>
                 </div>
                 <div class="stat-card stat-card-compact">
-                    <h4>Current Month</h4>
+                    <h4>Selected Month</h4>
                     <div class="value" id="currentMonth">-</div>
                 </div>
                 <div id="leaderSummaryCard" class="unified-card leader-card">
                     <div class="card-header">
                         <div class="card-icon">👑</div>
-                        <div class="card-label">LEADER</div>
+                        <div class="card-label" id="leaderSummaryLabel">CURRENT LEADER</div>
                     </div>
                     <div class="card-name-wrapper">
                         <div id="leaderSummaryName" class="card-name leader-name-color leader-summary-name summary-card-shell" style="position:relative;z-index:10;">-</div>
@@ -2017,7 +2020,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                 <div id="topScorerCard" class="unified-card top-scorer-card">
                     <div class="card-header">
                         <div class="card-icon">🏆</div>
-                        <div class="card-label">TOP SCORER</div>
+                        <div class="card-label" id="topScorerLabel">TOP SCORER</div>
                     </div>
                     <div class="card-name-wrapper">
                         <div id="topScorer" class="card-name top-scorer-name-color top-scorer-name summary-card-shell" style="position:relative;z-index:10;">-</div>
@@ -4539,6 +4542,16 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                         <span>Gathering the month’s totals…</span>
                     </div>
                 </div>
+                <section id="groupScoreboardStudents" class="group-scoreboard-students hidden" aria-live="polite" aria-labelledby="groupScoreboardStudentsTitle">
+                    <header>
+                        <div>
+                            <span class="group-scoreboard-caption-kicker">Student roster</span>
+                            <h3 id="groupScoreboardStudentsTitle">Group members</h3>
+                        </div>
+                        <button type="button" class="group-scoreboard-close" onclick="toggleGroupScoreboardStudents('')" aria-label="Close student roster">×</button>
+                    </header>
+                    <div id="groupScoreboardStudentsBody" class="group-scoreboard-student-list" role="list"></div>
+                </section>
             </section>
         </div>
 
@@ -4550,6 +4563,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                     <select id="partyStandingsMonthFilter" onchange="renderPartyStandings()"></select>
                 </div>
             </div>
+            <div id="partyStandingsNotice" class="ea-results-advisory" role="status" aria-live="polite"></div>
             <div class="scoreboard-wrapper">
                 <div class="scoreboard-scroll">
                     <table class="scoreboard" id="partyStandingsTable">
@@ -18419,7 +18433,13 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                         }
                     });
                     const attendancePenalties = attendancePenaltyMap.get(parseInt(student.id, 10)) || {};
-                    Object.entries(attendancePenalties).forEach(([date, penalty]) => {
+                    const _profileData = student && student.profile_data && typeof student.profile_data === 'object'
+                        ? student.profile_data : {};
+                    const _gcbImmune = !!(student && (student.gcb || _profileData.gcb || _profileData.good_conduct_badge));
+                    // The Good Conduct contract explicitly exempts attendance penalties.
+                    // Keep the attendance record itself intact; only the score projection
+                    // omits its absent/late deduction.
+                    if (!_gcbImmune) Object.entries(attendancePenalties).forEach(([date, penalty]) => {
                         pointsByDate[date] = (pointsByDate[date] || 0) + (parseInt(penalty, 10) || 0);
                         hasEntryByDate[date] = true;
                         const existingNote = String(notesByDate[date] || '').trim();
@@ -19489,6 +19509,278 @@ async function eaStudentRequestsApplyTransfer(requestId) {
 
 eaStudentRequestsInit();
 
+/* Pure Results workspace helpers for the original Flask/HTML client.
+ *
+ * These functions never read or write the ledger, localStorage, or the DOM.
+ * Renderers pass plain rows in and receive new view-model objects back. This
+ * keeps filtering, ranking, group aggregation, and historical membership
+ * decisions testable without moving the original client to another frontend.
+ */
+(function installEAResults(global) {
+    'use strict';
+
+    const CONTRACT_VERSION = 'results-view-model-2026-09-v1';
+    const RANKING_POLICY = 'stable-ordinal-v1';
+
+    function text(value) {
+        return String(value == null ? '' : value).trim();
+    }
+
+    function upper(value) {
+        return text(value).toUpperCase();
+    }
+
+    function monthKey(value) {
+        const match = text(value).match(/^(\d{4})-(0[1-9]|1[0-2])/);
+        return match ? `${match[1]}-${match[2]}` : '';
+    }
+
+    function studentName(student) {
+        return text(student && (student.base_name || student.name || student.raw_name));
+    }
+
+    function studentGroup(student) {
+        const explicit = upper(student && (student.__month_group || student.group));
+        if (explicit) return explicit;
+        const roll = upper(student && (student.__month_roll || student.roll));
+        const match = roll.match(/^EA\d{2}([A-Z])/);
+        return match ? match[1] : 'UNGROUPED';
+    }
+
+    function score(value) {
+        const number = Number(value);
+        return Number.isFinite(number) ? number : 0;
+    }
+
+    function integer(value) {
+        const number = parseInt(value, 10);
+        return Number.isFinite(number) ? number : 0;
+    }
+
+    function nextDay(value, month) {
+        const parts = text(value).split('-').map(Number);
+        if (parts.length !== 3 || !parts.every(Number.isFinite)) return '';
+        const date = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2] + 1));
+        const result = date.toISOString().slice(0, 10);
+        return result.startsWith(month + '-') ? result : '';
+    }
+
+    function calculateMonth(scores, attendance, options = {}) {
+        const month = monthKey(options.month);
+        if (!month) return { formulaVersion: 'legacy-scoreboard-2026-09-v1', officialTotal: 0, dailyTotals: {} };
+        const historical = month < '2026-02';
+        const points = new Map(), stars = new Map(), vetos = new Map();
+        const normalUsage = new Map(), disciplinaryUsage = new Map();
+        let importedTotal = 0, hasImportedTotal = false;
+        (Array.isArray(scores) ? scores : []).forEach(row => {
+            if (!row || typeof row !== 'object') return;
+            const note = text(row.notes).toLowerCase();
+            const date = text(row.date);
+            if (historical) {
+                const totalRow = note.startsWith('excel_total_score') || note.startsWith('excel_total_from_dates');
+                const dailyRow = note.startsWith('excel_daily_score');
+                const starRow = note.startsWith('excel_star_usage');
+                if (!totalRow && !dailyRow && !starRow) return;
+                if (totalRow) { importedTotal += score(row.points); hasImportedTotal = true; return; }
+            }
+            if (!date.startsWith(month + '-')) return;
+            points.set(date, (points.get(date) || 0) + score(row.points));
+            const starDelta = integer(row.stars);
+            stars.set(date, (stars.get(date) || 0) + starDelta);
+            vetos.set(date, (vetos.get(date) || 0) + integer(row.vetos));
+            const normal = Math.max(0, integer(row.star_usage_normal));
+            const disciplinary = Math.max(0, integer(row.star_usage_disciplinary));
+            if (normal || disciplinary) {
+                normalUsage.set(date, (normalUsage.get(date) || 0) + normal);
+                disciplinaryUsage.set(date, (disciplinaryUsage.get(date) || 0) + disciplinary);
+            } else if (starDelta < 0 && !(row.star_transfer_out || row.star_transfer_in || note.includes('[star transfer'))) {
+                const target = note.includes('disciplinary') ? disciplinaryUsage : normalUsage;
+                target.set(date, (target.get(date) || 0) + Math.abs(starDelta));
+            }
+        });
+        if (!options.gcbImmune) {
+            const latest = new Map();
+            (Array.isArray(attendance) ? attendance : []).forEach(row => {
+                if (!row || typeof row !== 'object' || !text(row.date).startsWith(month + '-')) return;
+                const date = text(row.date);
+                const prior = latest.get(date);
+                const stamp = text(row.updated_at || row.created_at);
+                const priorStamp = text(prior && (prior.updated_at || prior.created_at));
+                if (!prior || stamp >= priorStamp) latest.set(date, row);
+            });
+            latest.forEach((row, date) => {
+                const status = text(row.status).toLowerCase();
+                const effect = status === 'absent' ? -20 : status === 'late' ? -5 : 0;
+                if (effect) points.set(date, (points.get(date) || 0) + effect);
+            });
+        }
+        const erased = new Set(), halved = new Map(), bonuses = new Map();
+        new Set([...points.keys(), ...stars.keys()]).forEach(date => {
+            const raw = points.get(date) || 0;
+            const normal = normalUsage.get(date) || 0;
+            const disciplinary = disciplinaryUsage.get(date) || 0;
+            if (!historical && normal > 0) {
+                if (raw < 0) erased.add(date);
+                if (raw > -50) {
+                    const target = nextDay(date, month) || date;
+                    bonuses.set(target, (bonuses.get(target) || 0) + 100 * normal);
+                }
+            } else if (!historical && disciplinary > 0 && raw < 0) {
+                let value = raw;
+                for (let index = 0; index < disciplinary; index += 1) value = Math.floor(value / 2);
+                halved.set(date, value);
+            }
+        });
+        const dailyTotals = {};
+        new Set([...points.keys(), ...bonuses.keys()]).forEach(date => {
+            let value = points.get(date) || 0;
+            if (erased.has(date)) value = 0;
+            else if (halved.has(date)) value = halved.get(date);
+            value += bonuses.get(date) || 0;
+            if ((vetos.get(date) || 0) < 0) value = 0;
+            dailyTotals[date] = Math.round(value * 100) / 100;
+        });
+        let total = Object.values(dailyTotals).reduce((sum, value) => sum + value, 0) + importedTotal;
+        if (!historical && options.awfActive) total -= 75;
+        if (historical && hasImportedTotal) total = importedTotal;
+        return {
+            formulaVersion: 'legacy-scoreboard-2026-09-v1',
+            officialTotal: Math.round(total * 100) / 100,
+            dailyTotals,
+        };
+    }
+
+    function assignOrdinalRanks(rows) {
+        return (Array.isArray(rows) ? rows : [])
+            .filter(row => row && row.student)
+            .map((row, index) => ({ ...row, overallRank: index + 1 }));
+    }
+
+    function filterRows(rows, filters = {}) {
+        const classValue = text(filters.classValue);
+        const groupValue = upper(filters.groupValue || 'all');
+        const query = text(filters.query).toLowerCase();
+        const status = text(filters.status || 'all').toLowerCase();
+        return (Array.isArray(rows) ? rows : []).filter(row => {
+            const student = row && row.student;
+            if (!student) return false;
+            if (classValue && text(student.class) !== classValue) return false;
+            if (groupValue && groupValue !== 'ALL' && studentGroup(student) !== groupValue) return false;
+            if (query) {
+                const haystack = `${studentName(student)} ${text(student.roll)}`.toLowerCase();
+                if (!haystack.includes(query)) return false;
+            }
+            if (status !== 'all') {
+                const active = student.active !== false;
+                if (status === 'active' && !active) return false;
+                if (status !== 'active' && active) return false;
+            }
+            return true;
+        });
+    }
+
+    function addScopeRanks(rows) {
+        return (Array.isArray(rows) ? rows : []).map((row, index) => ({
+            ...row,
+            scopeRank: index + 1,
+        }));
+    }
+
+    function aggregateGroups(rows) {
+        const groups = new Map();
+        (Array.isArray(rows) ? rows : []).forEach(row => {
+            if (!row || !row.student) return;
+            const group = studentGroup(row.student);
+            const current = groups.get(group) || {
+                group,
+                total: 0,
+                memberCount: 0,
+                positiveTotal: 0,
+                negativeTotal: 0,
+            };
+            const total = score(row.total);
+            current.total += total;
+            current.memberCount += 1;
+            if (total > 0) current.positiveTotal += total;
+            if (total < 0) current.negativeTotal += total;
+            groups.set(group, current);
+        });
+        return Array.from(groups.values())
+            .map(row => ({ ...row, average: row.memberCount ? Math.round((row.total / row.memberCount) * 100) / 100 : 0 }))
+            .sort((a, b) => (b.total - a.total) || a.group.localeCompare(b.group))
+            .map((row, index) => ({ ...row, rank: index + 1 }));
+    }
+
+    function ownGroup(rows, roll) {
+        const target = upper(roll);
+        if (!target) return '';
+        const row = (Array.isArray(rows) ? rows : []).find(item =>
+            item && item.student && upper(item.student.roll) === target
+        );
+        return row ? studentGroup(row.student) : '';
+    }
+
+    function membershipState(member, selectedMonth, currentMonth) {
+        const selected = monthKey(selectedMonth);
+        const current = monthKey(currentMonth);
+        const joined = monthKey(member && (
+            member.elected_on || member.joined_on || member.start_date || member.assigned_on || member.created_at
+        ));
+        const ended = monthKey(member && (
+            member.ended_on || member.resigned_on || member.deactivated_on || member.suspended_on || member.end_date
+        ));
+        const status = text(member && member.status).toLowerCase() || 'active';
+        if (!selected) return { active: false, ambiguous: true, reason: 'invalid_month' };
+        if (joined && selected < joined) return { active: false, ambiguous: false, reason: 'not_joined' };
+        if (ended && selected >= ended) return { active: false, ambiguous: false, reason: 'ended' };
+        if (selected === current && status !== 'active') {
+            return { active: false, ambiguous: false, reason: 'currently_inactive' };
+        }
+        if (status !== 'active' && !ended) {
+            // Preserve historical membership rather than erasing it. The UI and
+            // backend surface this ambiguity until an explicit end month exists.
+            return { active: true, ambiguous: true, reason: 'missing_end_month' };
+        }
+        return { active: true, ambiguous: false, reason: 'active' };
+    }
+
+    function visibleCount(rows) {
+        return (Array.isArray(rows) ? rows : []).reduce((count, row) => count + (row && row.student ? 1 : 0), 0);
+    }
+
+    function rankRangeLabel(startRank, length) {
+        const start = Math.max(1, Number(startRank) || 1);
+        const size = Math.max(0, Number(length) || 0);
+        if (!size) return '';
+        return size === 1 ? `Rank ${start}` : `Ranks ${start}\u2013${start + size - 1}`;
+    }
+
+    function reducedMotion() {
+        try {
+            return !!(global.matchMedia && global.matchMedia('(prefers-reduced-motion: reduce)').matches);
+        } catch (_) {
+            return false;
+        }
+    }
+
+    global.EAResults = Object.freeze({
+        CONTRACT_VERSION,
+        RANKING_POLICY,
+        addScopeRanks,
+        aggregateGroups,
+        assignOrdinalRanks,
+        calculateMonth,
+        filterRows,
+        membershipState,
+        monthKey,
+        ownGroup,
+        rankRangeLabel,
+        reducedMotion,
+        studentGroup,
+        visibleCount,
+    });
+})(typeof window !== 'undefined' ? window : globalThis);
+
 /* EA workspaces: embedded in the three offline SPA copies for offline hosting.
  * Keep module permissions, saves, calculations and historical records separate.
  */
@@ -19507,6 +19799,7 @@ const EA_WORKSPACES = [
     ['admin', 'Administration', ['teachers', 'tools', 'settings']]
 ];
 let eaResultsMonth = '';
+const eaResultsProjectionCache = new Map();
 let eaDailyContext = null;
 let eaDailyApplying = false;
 let eaHolidayBusy = false;
@@ -19674,22 +19967,119 @@ function eaWorkspaceRefresh(tab = getActiveTabName()) {
     eaConsolidationRender(bar, tab, workspace[0]);
 }
 function eaWorkspaceResultsBar(bar, tab) {
-    const label = eaWorkspaceElement('label', 'Month ');
-    const input = eaWorkspaceElement('input'); input.type = 'month'; input.dataset.allow = 'true';
     const ids = {scoreboard:'monthSelector', ranking:'rankingMonth', 'group-scoreboard':'groupMonthFilter', 'party-standings':'partyStandingsMonthFilter'};
-    input.value = getElementValue(ids[tab]) || eaResultsMonth || getCurrentMonthKey();
-    input.setAttribute('aria-label', 'Shared Results month');
-    input.addEventListener('change', () => {
-        if (!input.value) return;
-        const select = document.getElementById(ids[tab]);
-        if (!select || !Array.from(select.options).some(o => o.value === input.value)) {
-            showAlert('This month is not available in this Results view.', 'warning');
-            input.value = eaResultsMonth || getElementValue(ids[tab]); return;
-        }
-        eaResultsMonth = input.value;
-        select.value = input.value; select.dispatchEvent(new Event('change', {bubbles:true}));
-    });
-    label.append(input); bar.append(label);
+    const selected = getElementValue(ids[tab]) || eaResultsMonth || getCurrentMonthKey();
+    if (selected) eaResultsMonth = selected;
+    const context = eaWorkspaceElement('span', `Period ${selected || 'not selected'}`);
+    context.className = 'ea-results-context';
+    context.dataset.resultsPeriod = selected || '';
+    context.title = 'Use the period selector inside the active Results module. The selection follows you between Results views.';
+    bar.append(context);
+    const refresh = eaWorkspaceElement('button', 'Refresh results');
+    refresh.type = 'button';
+    refresh.className = 'ea-workspace-link ea-results-refresh';
+    refresh.dataset.allow = 'true';
+    refresh.addEventListener('click', () => refreshActiveTabFromSync({ passive: false }));
+    bar.append(refresh);
+}
+
+async function eaResultsValidateProjection(month, clientRows) {
+    const status = document.getElementById('resultsProjectionStatus');
+    if (!status || !/^\d{4}-\d{2}$/.test(String(month || ''))) return false;
+    if (!SERVER_SYNC.enabled || !hasServerSession || typeof eaFetch !== 'function') {
+        status.textContent = 'Offline calculation · server validation unavailable';
+        status.dataset.state = 'offline';
+        return false;
+    }
+    const ledger = db.getData ? db.getData() : {};
+    const revision = String(ledger.server_version || ledger.server_updated_at || ledger.updated_at || 'local');
+    const cacheKey = `${month}|${revision}|${currentUserRole}|${currentLoginId || ''}`;
+    if (eaResultsProjectionCache.has(cacheKey)) {
+        const cached = eaResultsProjectionCache.get(cacheKey);
+        status.textContent = cached.text;
+        status.dataset.state = cached.state;
+        return cached.state === 'verified';
+    }
+    status.textContent = 'Validating this month against the server read model…';
+    status.dataset.state = 'checking';
+    try {
+        const response = await eaFetch(`/scoreboard/results-snapshot?month=${encodeURIComponent(month)}`, {
+            method: 'GET', cache: 'no-cache', credentials: 'include'
+        }, 8000);
+        const payload = await response.json();
+        if (!response.ok || !payload.success || !payload.data) throw new Error(payload.error || `HTTP ${response.status}`);
+        const serverRows = Array.isArray(payload.data.students) ? payload.data.students : [];
+        const clientById = new Map((Array.isArray(clientRows) ? clientRows : []).map(row => [String(row && row.student && row.student.id || ''), Number(row && row.total) || 0]));
+        const mismatches = serverRows.filter(row => {
+            const sid = String(row && row.student && row.student.id || '');
+            return !clientById.has(sid) || Math.abs((Number(row.total) || 0) - clientById.get(sid)) > 0.001;
+        });
+        const warningCount = Array.isArray(payload.data.warnings) ? payload.data.warnings.length : 0;
+        const state = mismatches.length ? 'warning' : 'verified';
+        const text = mismatches.length
+            ? `${mismatches.length} total${mismatches.length === 1 ? '' : 's'} need calculation review · ${payload.data.formula_version}`
+            : `Server-validated · ${payload.data.formula_version}${warningCount ? ` · ${warningCount} data warning${warningCount === 1 ? '' : 's'}` : ''}`;
+        eaResultsProjectionCache.clear();
+        eaResultsProjectionCache.set(cacheKey, { state, text });
+        status.textContent = text;
+        status.dataset.state = state;
+        return !mismatches.length;
+    } catch (error) {
+        status.textContent = `Local calculation retained · validation unavailable (${String(error.message || error)})`;
+        status.dataset.state = 'warning';
+        return false;
+    }
+}
+
+function eaResultsCloseStudentDetail() {
+    const modal = document.getElementById('eaResultsStudentDetail');
+    if (modal) modal.remove();
+}
+
+function eaResultsOpenStudentDetail(event, studentId, month) {
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+    const sid = parseInt(studentId, 10);
+    const monthKey = String(month || '');
+    const rankedRows = window.EAResults
+        ? EAResults.assignOrdinalRanks(db.getMonthlyScoreboard(monthKey) || [])
+        : (db.getMonthlyScoreboard(monthKey) || []).map((item, index) => ({ ...item, overallRank: index + 1 }));
+    const row = rankedRows.find(item =>
+        item && item.student && parseInt(item.student.id, 10) === sid
+    );
+    if (!row) {
+        showAlert('This student’s monthly detail is unavailable.', 'warning');
+        return false;
+    }
+    eaResultsCloseStudentDetail();
+    const modal = document.createElement('div');
+    modal.id = 'eaResultsStudentDetail';
+    modal.className = 'modal active centered-viewport ea-results-detail-modal';
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-modal', 'true');
+    modal.setAttribute('aria-labelledby', 'eaResultsDetailTitle');
+    const student = row.student || {};
+    const dates = Array.isArray(row.dates) ? row.dates : [];
+    const daily = Array.isArray(row.dailyScores) ? row.dailyScores : [];
+    const titles = Array.isArray(row.dailyTitles) ? row.dailyTitles : [];
+    const details = dates.map((date, index) => {
+        const value = Number(daily[index]) || 0;
+        const note = String(titles[index] || '').trim();
+        const tone = value > 0 ? 'positive' : value < 0 ? 'negative' : 'neutral';
+        return `<li class="${tone}"><time datetime="${escapeHtml(date)}">${escapeHtml(formatDateMonthDayLabel(date))}</time><strong>${escapeHtml(value)}</strong>${note ? `<span>${escapeHtml(note)}</span>` : ''}</li>`;
+    }).join('');
+    modal.innerHTML = `<div class="modal-content ea-results-detail-card">
+        <div class="modal-header"><div><small>Monthly score detail</small><h2 id="eaResultsDetailTitle">${escapeHtml(student.base_name || student.name || 'Student')}</h2><p>${escapeHtml(formatRollDisplay(student.roll) || '')} · ${escapeHtml(monthKey)} · Overall rank ${escapeHtml(row.overallRank || '—')}</p></div><button type="button" class="secondary" aria-label="Close score detail" onclick="eaResultsCloseStudentDetail()">Close</button></div>
+        <div class="ea-results-detail-total"><span>Total score</span><strong>${escapeHtml(row.total)}</strong></div>
+        <ol class="ea-results-detail-list">${details || '<li class="neutral"><span>No daily entries for this month.</span></li>'}</ol>
+    </div>`;
+    modal.addEventListener('click', click => { if (click.target === modal) eaResultsCloseStudentDetail(); });
+    document.body.appendChild(modal);
+    const close = modal.querySelector('button');
+    if (close) close.focus();
+    return true;
 }
 function eaWorkspaceCapture(event) {
     if (!eaCompatibilityEnabled()) return;
@@ -20310,6 +20700,14 @@ function eaDailyScoreValues(pointsRaw, starsRaw, vetosRaw) {
     }
     return {points,stars,vetos};
 }
+function isLeadershipAssignmentOccupied(item) {
+    if (!item) return false;
+    return !!(
+        parseInt(item.studentId, 10) ||
+        String(item.holder || '').trim() ||
+        (typeof normalizeRoll === 'function' ? normalizeRoll(item.roll || '') : String(item.roll || '').trim())
+    );
+}
 async function eaDailyPrepareScoreChange(studentId, date, month, values, notes) {
     if (!studentId || !/^\d{4}-\d{2}-\d{2}$/.test(date) || month !== date.slice(0,7)) {
         throw new Error('Choose a student and a valid date. The month must match the date.');
@@ -20346,6 +20744,84 @@ async function eaDailyPrepareScoreChange(studentId, date, month, values, notes) 
         veto_reason:String(notes.vetoReason || '').trim(),star_usage_mode:usageMode
     };
 }
+function eaDailyPatchRecordScoreRow(row, studentId, date, month, score, options = {}) {
+    if (!row || !score) return false;
+    const inputs = Array.from(row.querySelectorAll('input.score-input'));
+    const activeIndex = inputs.indexOf(document.activeElement);
+    const requestedIndex = Number.isInteger(options.focusIndex) ? options.focusIndex : activeIndex;
+    const scrollHost = row.closest('.scoreboard-scroll, .table-container');
+    const windowX = window.scrollX;
+    const windowY = window.scrollY;
+    const hostLeft = scrollHost ? scrollHost.scrollLeft : 0;
+    const hostTop = scrollHost ? scrollHost.scrollTop : 0;
+    const points = parseInt(score.points, 10) || 0;
+    const stars = parseInt(score.stars, 10) || 0;
+    const vetos = parseInt(score.vetos, 10) || 0;
+
+    inputs.forEach(input => {
+        input.value = '';
+        input.classList.remove('filled');
+    });
+    if (inputs[0]) inputs[0].placeholder = '+/- to adjust';
+    if (inputs[1]) inputs[1].placeholder = '+/- stars';
+    if (inputs[2]) inputs[2].placeholder = 'Reason for +stars';
+    if (inputs[3]) inputs[3].placeholder = '+/- VETOs';
+
+    const pointsWrapper = inputs[0]?.closest('.score-input-wrapper');
+    if (pointsWrapper) {
+        let badge = pointsWrapper.querySelector('.stored-score-badge');
+        if (!badge) {
+            badge = document.createElement('span');
+            badge.className = 'stored-score-badge';
+            pointsWrapper.insertBefore(badge, inputs[0]);
+        }
+        badge.textContent = String(points);
+        badge.title = 'Stored score for this date — Click for history';
+        badge.onclick = () => showScoreHistory(studentId, date);
+    }
+
+    const updateTokenBadge = (input, selector, className, value, label) => {
+        const wrapper = input?.closest('.score-input-wrapper');
+        if (!wrapper) return;
+        let badge = wrapper.querySelector(selector);
+        if (value) {
+            if (!badge) {
+                badge = document.createElement('span');
+                badge.className = className;
+                wrapper.insertBefore(badge, input);
+            }
+            badge.textContent = String(value);
+            badge.title = `Stored: ${value} ${label}`;
+        } else if (badge) {
+            badge.remove();
+        }
+    };
+    updateTokenBadge(inputs[1], '.stored-star-badge', 'stored-star-badge', stars, 'star(s)');
+    updateTokenBadge(inputs[3], '.stored-veto-badge', 'stored-veto-badge', vetos, 'VETO(s)');
+
+    row.classList.add('score-recorded-row');
+    row.removeAttribute('aria-busy');
+    const voteCell = row.querySelector('[data-col="record-vote-power"]');
+    const starsCell = row.querySelector('[data-col="record-stars"]');
+    const vetosCell = row.querySelector('[data-col="record-vetos"]');
+    if (voteCell) voteCell.textContent = String(computeVotePower(getStudentMonthTotal(studentId, month)));
+    if (starsCell) starsCell.textContent = String(getStudentMonthStarAwardTotal(studentId, month));
+    if (vetosCell) vetosCell.textContent = String(getStudentMonthVetoAwardTotal(studentId, month));
+
+    requestAnimationFrame(() => {
+        if (scrollHost) {
+            scrollHost.scrollLeft = hostLeft;
+            scrollHost.scrollTop = hostTop;
+        }
+        window.scrollTo(windowX, windowY);
+        const focusInput = requestedIndex >= 0 ? inputs[requestedIndex] : null;
+        if (focusInput && focusInput.isConnected) {
+            try { focusInput.focus({preventScroll:true}); } catch (_) { focusInput.focus(); }
+            focusInput.select();
+        }
+    });
+    return true;
+}
 async function eaDailySaveRecordScoreRow(studentId, triggerEl = null, options = {}) {
     if (eaDailyScoreBusy) return false;
     const row = triggerEl?.closest?.('tr');
@@ -20357,14 +20833,14 @@ async function eaDailySaveRecordScoreRow(studentId, triggerEl = null, options = 
         const change = await eaDailyPrepareScoreChange(studentId,date,month,values,{
             starReason:inputs[2].value,vetoReason:inputs[4].value
         });
-        eaDailyScoreBusy = true; row.querySelectorAll('button,input').forEach(el => el.disabled = true);
+        eaDailyScoreBusy = true; row.setAttribute('aria-busy', 'true'); row.querySelectorAll('button,input').forEach(el => el.disabled = true);
         eaDailySetSaveState('saving','Saving score…');
         const response = await eaDailyCommitScoreChange(change);
-        inputs.forEach(input => { input.value=''; input.classList.remove('filled'); });
         clearRecordScoreDraft(studentId);
         const host=document.getElementById('add-score-tab');
         if(host) host.dataset.workspaceDraft=Object.keys(recordScoreDraftState.rows || {}).length ? 'true' : '';
-        loadRecordStudentTable(); scheduleScoreboardRefresh(); updateAppealsTabNotification();
+        eaDailyPatchRecordScoreRow(row, studentId, date, month, response.score, options);
+        scheduleScoreboardRefresh(); updateAppealsTabNotification();
         eaDailySetSaveState('confirmed', response.appeal ? 'Score confirmed · token request pending' : 'Score · server confirmed');
         showAlert(response.appeal ? 'Points confirmed. Star/VETO change sent to Admin.' : 'Score change confirmed by the server.', response.appeal ? 'warning' : 'success');
         return true;
@@ -20372,7 +20848,7 @@ async function eaDailySaveRecordScoreRow(studentId, triggerEl = null, options = 
         if (error.code !== 'cancelled') { eaDailySetSaveState('failed','Score not saved · inputs retained'); showAlert(error.message,'danger'); }
         return false;
     } finally {
-        eaDailyScoreBusy = false; row?.querySelectorAll?.('button,input').forEach(el => el.disabled = false);
+        eaDailyScoreBusy = false; row?.removeAttribute?.('aria-busy'); row?.querySelectorAll?.('button,input').forEach(el => el.disabled = false);
     }
 }
 async function eaDailySaveScoreForm() {
@@ -20385,7 +20861,10 @@ async function eaDailySaveScoreForm() {
         const change=await eaDailyPrepareScoreChange(studentId,date,month,values,{note,starReason:note,vetoReason:note});
         eaDailyScoreBusy=true; eaDailySetSaveState('saving','Saving score…');
         const response=await eaDailyCommitScoreChange(change);
-        clearScoreForm(); loadRecordStudentTable(); scheduleScoreboardRefresh(); updateAppealsTabNotification();
+        clearScoreForm();
+        const row = document.querySelector(`#recordStudentsBody tr[data-student-id="${studentId}"]`);
+        eaDailyPatchRecordScoreRow(row, studentId, date, month, response.score);
+        scheduleScoreboardRefresh(); updateAppealsTabNotification();
         eaDailySetSaveState('confirmed',response.appeal?'Score confirmed · token request pending':'Score · server confirmed');
         showAlert(response.appeal?'Points confirmed. Star/VETO change sent to Admin.':'Score change confirmed by the server.',response.appeal?'warning':'success');
         return true;
@@ -21599,12 +22078,12 @@ function eaNotebookFetch(url, options, fetcher) { return window.eaNotebookComman
             if (passive) {
                 window.__EA_SUPPRESS_TABLE_ANIM_UNTIL = Date.now() + 1800;
             }
-            // Passive sync (auto/background) should not cause heavy full-tab re-renders
-            // on every snapshot. Keep always-fresh behavior for core live tabs only.
             if (passive) {
                 if (tabName === 'scoreboard') loadScoreboard();
+                else if (tabName === 'ranking') initRankingForm();
+                else if (tabName === 'group-scoreboard') loadGroupScoreboard();
+                else if (tabName === 'party-standings') loadPartyStandings();
                 else if (tabName === 'add-score') {
-                    // Mobile: avoid periodic DOM rebuild while user scrolls long student list.
                     if (!isMobileViewport()) refreshRecordScoreTabFromSync();
                 }
                 else if (tabName === 'attendance') refreshAttendanceTabFromSync();
@@ -21619,6 +22098,7 @@ function eaNotebookFetch(url, options, fetcher) { return window.eaNotebookComman
                 else if (tabName === 'syllabus') loadSyllabusTab();
                 else if (tabName === 'ranking') initRankingForm();
                 else if (tabName === 'group-scoreboard') loadGroupScoreboard();
+                else if (tabName === 'party-standings') loadPartyStandings();
                 else if (tabName === 'excel-chess-champion') loadChessChampionTab();
                 else if (tabName === 'gr') loadCRTab();
                 else if (tabName === 'teachers') loadTeachersTab();
@@ -21633,16 +22113,9 @@ function eaNotebookFetch(url, options, fetcher) { return window.eaNotebookComman
                 else if (tabName === 'leadership') { loadLeadership(); loadElectionPostsManager(); populateLeadershipPostSelect(); }
                 else if (tabName === 'leadership-selection') loadLeadershipSelectionTab();
             }
-            // When not on scoreboard, silently refresh it in background so penalty
-            // and score changes are reflected immediately when the user switches to it.
-            if (!passive && tabName !== 'scoreboard' && !document.hidden) {
-                setTimeout(loadScoreboard, 400);
-            }
             updateAppealsTabNotification();
             updateNotificationsTabNotification();
-            if (!passive) {
-                autoAdjustTableFonts();
-            }
+            if (!passive) autoAdjustTableFonts();
         }
 
         let activeTabRefreshTimer = null;
@@ -25266,8 +25739,8 @@ function eaNotebookFetch(url, options, fetcher) { return window.eaNotebookComman
             return Array.from(merged.values());
         }
 
-        // Merge parties: match by code or id, union members by id (never lose a member to a
-        // stale snapshot). On conflicting member ids, newer updated_at/elected_on wins.
+        // Merge party member histories by member id. Intentional removal is represented by
+        // status=ended, so a stale active copy cannot revive the tenure.
         function mergePartyMembersSuperset(localMembers, remoteMembers) {
             const merged = new Map();
             const stampOf = (m) => parseSyncStamp(m && (m.updated_at || m.ended_on || m.elected_on || m.created_at) || '');
@@ -25283,6 +25756,19 @@ function eaNotebookFetch(url, options, fetcher) { return window.eaNotebookComman
                     }
                     const existing = merged.get(key);
                     if (!existing) { merged.set(key, { ...member }); return; }
+                    const prevStatus = String(existing.status || '').trim().toLowerCase();
+                    const newStatus = String(member.status || '').trim().toLowerCase();
+                    // Ended is an immutable tombstone for this member id. A
+                    // later tenure must use a fresh id, so clock skew cannot
+                    // revive the historical row.
+                    if (prevStatus === 'ended' && newStatus !== 'ended') {
+                        merged.set(key, { ...member, ...existing, status: 'ended' });
+                        return;
+                    }
+                    if (newStatus === 'ended' && prevStatus !== 'ended') {
+                        merged.set(key, { ...existing, ...member, status: 'ended' });
+                        return;
+                    }
                     const existingStamp = stampOf(existing);
                     const nextStamp = stampOf(member);
                     if (nextStamp > existingStamp) {
@@ -25290,8 +25776,6 @@ function eaNotebookFetch(url, options, fetcher) { return window.eaNotebookComman
                     } else if (existingStamp > nextStamp) {
                         merged.set(key, { ...member, ...existing });
                     } else {
-                        const prevStatus = String(existing.status || '').trim().toLowerCase();
-                        const newStatus = String(member.status || '').trim().toLowerCase();
                         if ((newStatus === 'ended' || newStatus === 'suspended') && prevStatus === 'active') {
                             merged.set(key, { ...existing, ...member, status: newStatus });
                         } else if ((prevStatus === 'ended' || prevStatus === 'suspended') && newStatus === 'active') {
@@ -25309,20 +25793,54 @@ function eaNotebookFetch(url, options, fetcher) { return window.eaNotebookComman
             return Array.from(merged.values());
         }
 
-        function mergePartiesSuperset(localParties, remoteParties) {
+        function partySyncKey(party) {
+            if (!party || typeof party !== 'object') return '';
+            if (party.id !== null && party.id !== undefined && String(party.id).trim()) {
+                return `id:${String(party.id).trim()}`;
+            }
+            const code = String(party.code || '').trim().toUpperCase();
+            return code ? `code:${code}` : '';
+        }
+
+        function partyRecordStamp(party) {
+            if (!party || typeof party !== 'object') return 0;
+            return Math.max(
+                parseSyncStamp(party.updated_at || ''),
+                parseSyncStamp(party.created_at || '')
+            );
+        }
+
+        function mergePartiesSuperset(localParties, remoteParties, preferRemote = false) {
+            // A clean server pull is authoritative. The server preserves history and
+            // materializes removals as explicit ended tombstones.
+            if (preferRemote) {
+                const authoritative = new Map();
+                (Array.isArray(remoteParties) ? remoteParties : []).forEach(party => {
+                    const key = partySyncKey(party);
+                    if (!key) return;
+                    authoritative.set(key, {
+                        ...party,
+                        members: Array.isArray(party.members) ? party.members.map(member => ({ ...member })) : []
+                    });
+                });
+                return Array.from(authoritative.values());
+            }
             const merged = new Map();
-            const keyOf = (p) => String(p.code || '').trim().toUpperCase() || String(p.id || '');
             const add = (arr) => {
                 (Array.isArray(arr) ? arr : []).forEach(p => {
-                    const key = keyOf(p);
+                    const key = partySyncKey(p);
                     if (!key) return;
                     const existing = merged.get(key);
                     if (!existing) { merged.set(key, { ...p }); return; }
                     const existingMembers = Array.isArray(existing.members) ? existing.members : [];
                     const newMembers = Array.isArray(p.members) ? p.members : [];
-                    // Never overwrite non-empty members with empty; otherwise union by member id.
-                    if (existingMembers.length > 0 && newMembers.length === 0) {
-                        merged.set(key, { ...existing, ...p, members: existingMembers });
+                    const existingStamp = partyRecordStamp(existing);
+                    const nextStamp = partyRecordStamp(p);
+                    const mergedMembers = mergePartyMembersSuperset(existingMembers, newMembers);
+                    if (nextStamp > existingStamp) {
+                        merged.set(key, { ...existing, ...p, members: mergedMembers });
+                    } else if (existingStamp > nextStamp) {
+                        merged.set(key, { ...p, ...existing, members: mergedMembers });
                     } else {
                         merged.set(key, {
                             ...existing,
@@ -25684,6 +26202,7 @@ function eaNotebookFetch(url, options, fetcher) { return window.eaNotebookComman
             const _localUpdatedStamp = parseSyncStamp(localData.updated_at || '');
             const _localServerStamp = parseSyncStamp(localData.server_updated_at || '');
             const _localHasUnsyncedChanges = _localUpdatedStamp > _localServerStamp;
+            const _preferRemoteParties = authoritativeReplace || !_localHasUnsyncedChanges;
             let mergedData;
             if (authoritativeReplace) {
                 const baseline = (db && typeof db.getDefaultData === 'function') ? db.getDefaultData() : {};
@@ -25699,7 +26218,7 @@ function eaNotebookFetch(url, options, fetcher) { return window.eaNotebookComman
                     leadership: mergeLeadershipSuperset(localData.leadership || [], serverData.leadership || [], mergeDeletedLeadershipSuperset(localData.deleted_leadership || [], serverData.deleted_leadership || [])),
                     group_crs: mergeGroupCRsSuperset(localData.group_crs || [], serverData.group_crs || []),
                     class_reps: mergeClassRepsSuperset(localData.class_reps || [], serverData.class_reps || []),
-                    parties: mergePartiesSuperset(localData.parties || [], serverData.parties || []),
+                    parties: mergePartiesSuperset(localData.parties || [], serverData.parties || [], _preferRemoteParties),
                     post_holder_history: mergePostHolderHistorySuperset(localData.post_holder_history || [], serverData.post_holder_history || []),
                     postholder_tickets: mergePostholderTickets(localData.postholder_tickets || {}, serverData.postholder_tickets || {}),
                     postholder_ticket_log: mergePostholderTicketLog(localData.postholder_ticket_log || [], serverData.postholder_ticket_log || []),
@@ -25738,7 +26257,7 @@ function eaNotebookFetch(url, options, fetcher) { return window.eaNotebookComman
                     leadership: mergeLeadershipSuperset(localData.leadership || [], serverData.leadership || [], mergeDeletedLeadershipSuperset(localData.deleted_leadership || [], serverData.deleted_leadership || [])),
                     group_crs: mergeGroupCRsSuperset(localData.group_crs || [], serverData.group_crs || []),
                     class_reps: mergeClassRepsSuperset(localData.class_reps || [], serverData.class_reps || []),
-                    parties: mergePartiesSuperset(localData.parties || [], serverData.parties || []),
+                    parties: mergePartiesSuperset(localData.parties || [], serverData.parties || [], _preferRemoteParties),
                     resource_cabinet: mergeResourceCabinetSuperset(localData.resource_cabinet || [], serverData.resource_cabinet || []),
                     resource_requests: mergeResourceRequestsSuperset(localData.resource_requests || [], serverData.resource_requests || []),
                     resource_transactions: mergeResourceTransactionsSuperset(localData.resource_transactions || [], serverData.resource_transactions || []),
@@ -28131,179 +28650,7 @@ function eaNotebookFetch(url, options, fetcher) { return window.eaNotebookComman
             }).join('');
 
             loadMonthScoreboard(currentMonth);
-            // Defer secondary renders to next animation frame so the main scoreboard
-            // paints first without layout thrashing from the group scoreboard render.
-            if (document.getElementById('groupMonthFilter')) {
-                eaScheduleRender(() => loadGroupScoreboard());
-            }
         }
-
-        /**
-         * Auto-suspend a post-holder after 72h of rank/VETO breach.
-         * Only executes when an admin session is active.
-         * @param {number} sid          - student ID
-         * @param {string|null} preferTable - 'leadership'|'group_crs'|'class_reps'|null (null = all)
-         * @param {string} reason       - human-readable reason stored in suspend_reason field
-         * @param {number} penaltyPoints - negative score deducted today (e.g. -200 for Leader)
-         */
-        function _autoSuspendPostHolder(sid, preferTable, reason, penaltyPoints) {
-            if (currentUserRole !== 'admin') return;
-            const data = db.getData();
-            let changed = false;
-            // Track whether any suspended entry is still within its normal tenure
-            // (penalty is waived if the holder has already served their full term).
-            let withinNormalTenure = false;
-
-            // Normal tenure in months per table/role:
-            // Leadership — Leader (L): 2 months; Co-Leader/LoP/others: 1 month
-            // group_crs / class_reps: 1 month
-            function _normalMonths(tbl, entry) {
-                if (tbl !== 'leadership') return 1; // all CR types: 1 month
-                // Co-Leader is 1 month; Leader, LoP, and every other leadership role is 2 months
-                const pn = String(entry.postName || entry.title || entry.post || '').toUpperCase();
-                if (pn.includes('CO-LEADER') || pn.includes('CO LEADER') || pn.includes('(COL)')) return 1;
-                return 2;
-            }
-
-            function _isExtended(tbl, entry) {
-                const raw = entry.assigned_on || entry.start_date || entry.startDate || entry.from;
-                if (!raw) return false;
-                const d = new Date(raw);
-                if (isNaN(d.getTime())) return false;
-                const today = new Date();
-                const elapsed = (today.getFullYear() - d.getFullYear()) * 12
-                              + (today.getMonth() - d.getMonth());
-                return elapsed >= _normalMonths(tbl, entry);
-            }
-
-            const tables = preferTable
-                ? [preferTable, ...['leadership', 'group_crs', 'class_reps'].filter(t => t !== preferTable)]
-                : ['leadership', 'group_crs', 'class_reps'];
-            tables.forEach(tbl => {
-                (data[tbl] || []).forEach(entry => {
-                    if (parseInt(entry.studentId, 10) === sid &&
-                            normalizePostHolderStatus(entry.status || 'active') === 'active') {
-                        entry.status = 'suspended';
-                        entry.suspended_on = formatDateKey(new Date());
-                        entry.suspend_reason = reason || 'Auto-suspended by system';
-                        changed = true;
-                        if (!_isExtended(tbl, entry)) withinNormalTenure = true;
-                    }
-                });
-            });
-            if (changed) {
-                // Penalty applies ONLY when suspended within normal tenure (not on extended service)
-                if (penaltyPoints && penaltyPoints < 0 && withinNormalTenure) {
-                    const _today = formatDateKey(new Date());
-                    const _monthKey = _today.substring(0, 7);
-                    // Accumulate penalty onto today's existing score (do NOT replace it).
-                    const _prevScore = db.getScore(sid, _today);
-                    const _prevPts = _prevScore ? (parseInt(_prevScore.points, 10) || 0) : 0;
-                    db.addScore({
-                        id: _prevScore ? _prevScore.id : generateUniqueId(),
-                        studentId: sid,
-                        date: _today,
-                        month: _monthKey,
-                        points: _prevPts + penaltyPoints,
-                        stars: _prevScore ? (parseInt(_prevScore.stars, 10) || 0) : 0,
-                        vetos: _prevScore ? (parseInt(_prevScore.vetos, 10) || 0) : 0,
-                        notes: (_prevScore && _prevScore.notes ? _prevScore.notes + ' | ' : '') + `[Auto-suspension penalty] ${reason}`,
-                        recordedBy: 'system',
-                        _newHistoryEntry: {
-                            delta: penaltyPoints,
-                            total: _prevPts + penaltyPoints,
-                            actor: 'system',
-                            role: 'system',
-                            timestamp: new Date().toISOString(),
-                            note: `[Auto-suspension penalty] ${reason}`
-                        }
-                    });
-                }
-                savePostHolderData(data);
-                const student = (db.getStudents() || []).find(s => parseInt(s.id, 10) === sid);
-                const name = student ? (student.name || `Student #${sid}`) : `Student #${sid}`;
-                const penaltyMsg = (penaltyPoints && withinNormalTenure)
-                    ? ` (${penaltyPoints} pts deducted)` : ' (no penalty — extended tenure)';
-                showAlert(`Auto-suspended: ${name} — ${reason}${penaltyMsg}`, 'warning');
-            }
-        }
-
-        // ─── Auto-Suspend Exemption Helpers ──────────────────────────────────────
-        // Returns { type: 'waived' } or { type: 'veto_shield' } if an active post record
-        // for this student has either an admin waiver or a VETO shield active.
-        // Called inside the 72h enforcement block before deciding whether to suspend.
-        function _getAutoSuspendExemption(sid) {
-            const data = db.getData();
-            for (const tbl of ['leadership', 'group_crs', 'class_reps']) {
-                for (const entry of (data[tbl] || [])) {
-                    if (parseInt(entry.studentId, 10) !== sid) continue;
-                    if (normalizePostHolderStatus(entry.status || 'active') !== 'active') continue;
-                    if (entry.auto_suspend_waived) return { type: 'waived' };
-                    if (entry.veto_shield_active) return { type: 'veto_shield' };
-                }
-            }
-            // Check party president members
-            for (const party of (data.parties || [])) {
-                for (const member of (party.members || [])) {
-                    if (parseInt(member.studentId, 10) !== sid) continue;
-                    if (normalizePostHolderStatus(member.status || 'active') !== 'active') continue;
-                    if (!isPartyPresidentDesignation(member.designation)) continue;
-                    if (member.auto_suspend_waived) return { type: 'waived' };
-                    if (member.veto_shield_active) return { type: 'veto_shield' };
-                }
-            }
-            return null;
-        }
-
-        // Handles an active exemption: waiver just clears the clock; VETO shield is consumed
-        // (one-time use) and then the clock is cleared. Neither path suspends the holder.
-        function _consumeAutoSuspendExemption(sid, exemptionType, wKey) {
-            const student = (db.getStudents() || []).find(s => parseInt(s.id, 10) === sid);
-            const name = student ? (student.base_name || student.name || `Student #${sid}`) : `Student #${sid}`;
-            if (exemptionType === 'waived') {
-                localStorage.removeItem(wKey);
-                showAlert(`Auto-suspension waived for ${name} — admin waiver is active.`, 'info');
-            } else if (exemptionType === 'veto_shield') {
-                // Consume the shield (one-time use) and clear the warning clock
-                const data = db.getData();
-                let consumed = false;
-                for (const tbl of ['leadership', 'group_crs', 'class_reps']) {
-                    for (const entry of (data[tbl] || [])) {
-                        if (parseInt(entry.studentId, 10) === sid && entry.veto_shield_active) {
-                            entry.veto_shield_active = false;
-                            consumed = true;
-                            break;
-                        }
-                    }
-                    if (consumed) break;
-                }
-                if (!consumed) {
-                    for (const party of (data.parties || [])) {
-                        for (const member of (party.members || [])) {
-                            if (parseInt(member.studentId, 10) === sid && member.veto_shield_active) {
-                                member.veto_shield_active = false;
-                                consumed = true;
-                                break;
-                            }
-                        }
-                        if (consumed) break;
-                    }
-                }
-                if (consumed) {
-                    localStorage.removeItem(wKey);
-                    // Persist only the flag change — no full post-holder resync needed
-                    suspendedPostHolderCache.key = '';
-                    suspendedPostHolderCache.ids = new Set();
-                    votePowerSuspendedPostHolderCache.key = '';
-                    votePowerSuspendedPostHolderCache.ids = new Set();
-                    roleDisplayCache.key = '';
-                    roleDisplayCache.ctx = null;
-                    db.saveData(data);
-                    showAlert(`VETO Shield activated — auto-suspension blocked for ${name}. Shield has been consumed.`, 'success');
-                }
-            }
-        }
-        // ─────────────────────────────────────────────────────────────────────────
 
         function loadMonthScoreboard(month, filterOnly) {
             try {
@@ -28331,8 +28678,17 @@ function eaNotebookFetch(url, options, fetcher) { return window.eaNotebookComman
                     return true;
                 });
             }
-            const allDates = (scoreboard.length && Array.isArray(scoreboard[0].dates))
-                ? scoreboard[0].dates.slice()
+            // Ranking is established exactly once, before any search/scope/privacy
+            // filters. Every Results view can now distinguish official overall rank
+            // from rank within the current screen filter.
+            scoreboard = (window.EAResults && EAResults.assignOrdinalRanks)
+                ? EAResults.assignOrdinalRanks(scoreboard)
+                : scoreboard.map((row, index) => ({ ...row, overallRank: index + 1 }));
+            const officialScoreboard = scoreboard.slice();
+            const officialStudentCount = officialScoreboard.length;
+            if (!filterOnly && typeof eaResultsValidateProjection === 'function') void eaResultsValidateProjection(month, officialScoreboard);
+            const allDates = (officialScoreboard.length && Array.isArray(officialScoreboard[0].dates))
+                ? officialScoreboard[0].dates.slice()
                 : [...new Set(db.getScoresForMonth(month).map(s => normalizeDateKey(s.date)).filter(Boolean))].sort();
             const dateWindowIndices = getVisibleDateWindowIndices(allDates, month);
             const dates = dateWindowIndices.map(index => allDates[index]).filter(Boolean);
@@ -28363,6 +28719,10 @@ function eaNotebookFetch(url, options, fetcher) { return window.eaNotebookComman
                     return true;
                 });
             }
+            scoreboard = (window.EAResults && EAResults.addScopeRanks)
+                ? EAResults.addScopeRanks(scoreboard)
+                : scoreboard.map((row, index) => ({ ...row, scopeRank: index + 1 }));
+            const filteredStudentCount = scoreboard.length;
 
             // Student privacy: top 20 shown + own row appended if below rank 20
             let _myExtraRow = null;
@@ -28370,7 +28730,7 @@ function eaNotebookFetch(url, options, fetcher) { return window.eaNotebookComman
                 const _myIdx = scoreboard.findIndex(r =>
                     r.student && String(r.student.roll || '').trim().toUpperCase() === String(currentStudentRoll).trim().toUpperCase());
                 if (_myIdx >= 20) {
-                    _myExtraRow = { row: scoreboard[_myIdx], rank: _myIdx + 1, total: scoreboard.length };
+                    _myExtraRow = { row: scoreboard[_myIdx], rank: scoreboard[_myIdx].overallRank || (_myIdx + 1), total: officialStudentCount };
                     scoreboard = [...scoreboard.slice(0, 20), null, scoreboard[_myIdx]];
                 } else {
                     scoreboard = scoreboard.slice(0, Math.max(20, _myIdx >= 0 ? _myIdx + 1 : 0));
@@ -28420,8 +28780,12 @@ function eaNotebookFetch(url, options, fetcher) { return window.eaNotebookComman
 
             // Update stats
             document.getElementById('currentMonth').textContent = new Date(month + '-01').toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-            document.getElementById('totalStudents').textContent = scoreboard.length;
+            document.getElementById('totalStudents').textContent = filteredStudentCount === officialStudentCount
+                ? String(officialStudentCount)
+                : `${filteredStudentCount} of ${officialStudentCount}`;
             const leaderSummaryEl = document.getElementById('leaderSummaryName');
+            const leaderSummaryLabel = document.getElementById('leaderSummaryLabel');
+            if (leaderSummaryLabel) leaderSummaryLabel.textContent = 'CURRENT LEADER';
             if (leaderSummaryEl) {
                 const leaderEntry = (db.getLeadership() || []).find(item =>
                     isLeaderPostLabel(item && item.post) && normalizePostHolderStatus(item.status || 'active') === 'active'
@@ -28435,14 +28799,19 @@ function eaNotebookFetch(url, options, fetcher) { return window.eaNotebookComman
                 }
             }
             const topEl = document.getElementById('topScorer');
-            if (scoreboard.length > 0) {
+            const topScorerLabel = document.getElementById('topScorerLabel');
+            const firstVisibleRow = scoreboard.find(row => row && row.student) || null;
+            if (topScorerLabel) {
+                topScorerLabel.textContent = filteredStudentCount === officialStudentCount ? 'TOP SCORER' : 'TOP IN CURRENT VIEW';
+            }
+            if (firstVisibleRow) {
                 if (topEl) {
                     const monthKey = String(month || '').trim();
-                    topEl.innerHTML = renderSummaryCardStudent(scoreboard[0].student, monthKey, 'top');
+                    topEl.innerHTML = renderSummaryCardStudent(firstVisibleRow.student, monthKey, 'top');
                 }
                 // Inject cracker spark particles into the top scorer card
                 const sparksEl = document.getElementById('tsSparksContainer');
-                if (sparksEl && !sparksEl._sparksReady) {
+                if (sparksEl && !sparksEl._sparksReady && !(window.EAResults && EAResults.reducedMotion())) {
                     sparksEl._sparksReady = true;
                     const SPARK_COLORS = ['#fbbf24','#f87171','#a78bfa','#34d399','#60a5fa','#fb923c','#f472b6','#ffffff'];
                     const sparks = Array.from({length: 18}, (_, i) => {
@@ -28462,10 +28831,14 @@ function eaNotebookFetch(url, options, fetcher) { return window.eaNotebookComman
                 topEl.textContent = '-';
             }
 
-            // ── Post-holder rank / VETO status detection (current month only) ──────────
+            // ── Post-holder rank / VETO advisory (current month only) ────────────────
+            // Results rendering is strictly read-only. It may highlight policy risks,
+            // but it never starts device-local clocks, consumes shields, writes scores,
+            // or changes governance state.
             const _isCurrentMonth = (month === getCurrentMonthKey());
             const _leaderIds       = new Set();   // students holding the LEADER post
             const _depletedHolders = new Set();   // post-holders with veto_count ≤ 0
+            const _resultsAdvisories = [];
             if (_isCurrentMonth) {
                 const _chkDate = formatDateKey(new Date());
                 const _rdc = buildRoleDisplayContext(_chkDate);
@@ -28480,105 +28853,26 @@ function eaNotebookFetch(url, options, fetcher) { return window.eaNotebookComman
                     if (_s && (parseInt(_s.veto_count, 10) || 0) <= 0) _depletedHolders.add(sid);
                 });
 
-                // ── 72-hour auto-suspend enforcement (effective from 2026-02-23) ──────
-                // Timestamps are stored in localStorage; actual suspension only by admin.
-                const _EFFECT_FROM_MS = new Date('2026-02-23T00:00:00').getTime();
-                const _NOW_MS = Date.now();
-                const _72H_MS = 72 * 60 * 60 * 1000;
-
-                // Leader rank check: must stay in Top 10; 72h grace → suspend (-200 pts)
-                // An admin waiver or active VETO shield blocks the suspension.
-                scoreboard.forEach((row, idx) => {
+                // Use the official unfiltered rank. Filtering the screen must never
+                // change the policy assessment.
+                officialScoreboard.forEach((row, idx) => {
                     const sid = parseInt(row.student.id, 10);
                     if (!_leaderIds.has(sid)) return;
-                    const rank = idx + 1;
-                    const wKey = `ea_rank_warn_${sid}`;
+                    const rank = row.overallRank || idx + 1;
                     if (rank > 10) {
-                        const stored = localStorage.getItem(wKey);
-                        if (!stored) {
-                            // First detection — start the 72h clock
-                            localStorage.setItem(wKey, String(_NOW_MS));
-                        } else {
-                            const warnSince = parseInt(stored, 10);
-                            if (warnSince >= _EFFECT_FROM_MS && (_NOW_MS - warnSince) >= _72H_MS) {
-                                const _exemption = _getAutoSuspendExemption(sid);
-                                if (_exemption) {
-                                    // Waiver or VETO shield active — block suspension
-                                    _consumeAutoSuspendExemption(sid, _exemption.type, wKey);
-                                    _leaderIds.delete(sid);
-                                } else {
-                                    _autoSuspendPostHolder(sid, 'leadership',
-                                        'Rank dropped below Top 10 for 72+ hours', -200);
-                                    localStorage.removeItem(wKey);
-                                    _leaderIds.delete(sid); // no longer shows alert after suspension
-                                }
-                            }
-                        }
-                    } else {
-                        localStorage.removeItem(wKey); // recovered — cancel the clock
+                        _resultsAdvisories.push(`${row.student.base_name || row.student.name || 'Leader'} is overall rank ${rank}; review the leadership policy in Governance.`);
                     }
                 });
-
-                // VETO depletion does NOT trigger auto-suspension or penalties.
-                // Clean up any stale veto-warn keys that may have been set previously.
-                _rdc.officeHolderIds.forEach(sid => {
-                    localStorage.removeItem(`ea_veto_warn_${sid}`);
-                });
-                // ─────────────────────────────────────────────────────────────────────
-
-                // ── Auto-resume suspended post-holders when vote power ≥ 0 ──────────
-                // Runs every time the scoreboard loads (current month + admin only).
-                // If a suspended holder's current month total gives vote power ≥ 0,
-                // their post is automatically reinstated without admin intervention.
-                {
-                    const _arData = db.getData();
-                    const _arResumed = [];
-                    const _arDate = formatDateKey(new Date());
-                    const _arReason = 'Auto-resumed: vote power restored to 0 or positive';
-
-                    // Helper: check + resume a single entry
-                    function _tryResumeEntry(entry) {
-                        if (normalizePostHolderStatus(entry.status || 'active') !== 'suspended') return;
-                        const _sid = parseInt(entry.studentId, 10) || 0;
-                        if (!_sid) return;
-                        const _monthTotal = getStudentMonthTotal(_sid, month);
-                        const _vp = computeVotePower(_monthTotal);
-                        if (_vp >= 0) {
-                            entry.status = 'active';
-                            entry.auto_suspend_waived = true;
-                            entry.resumed_on = _arDate;
-                            entry.resume_reason = _arReason;
-                            _arResumed.push(entry.postName || entry.post || entry.title || entry.designation || 'Post');
-                        }
-                    }
-
-                    ['leadership', 'group_crs', 'class_reps'].forEach(tbl => {
-                        (_arData[tbl] || []).forEach(entry => _tryResumeEntry(entry));
-                    });
-                    (_arData.parties || []).forEach(party => {
-                        (party.members || []).forEach(member => {
-                            if (!isPartyPresidentDesignation(member.designation)) return;
-                            let _msid = parseInt(member.studentId, 10);
-                            if (!_msid && member.roll) {
-                                _msid = (new Map((_arData.students || []).map(s =>
-                                    [normalizeRoll(s.roll), parseInt(s.id, 10)]))).get(normalizeRoll(member.roll)) || 0;
-                            }
-                            if (!_msid) return;
-                            // Attach studentId so _tryResumeEntry can read it
-                            const _origId = member.studentId;
-                            member.studentId = _msid;
-                            _tryResumeEntry(member);
-                            member.studentId = _origId || _msid;
-                        });
-                    });
-
-                    if (_arResumed.length > 0) {
-                        savePostHolderData(_arData);
-                        refreshAllPostHolderViews();
-                        showAlert(`Post auto-resumed (vote power restored): ${_arResumed.join(', ')}`, 'success');
-                    }
+                if (_depletedHolders.size) {
+                    _resultsAdvisories.push(`${_depletedHolders.size} office holder${_depletedHolders.size === 1 ? '' : 's'} have no remaining VETOs; review only—no automatic action was taken.`);
                 }
-                // ─────────────────────────────────────────────────────────────────────
+            }
+            const _advisoryEl = document.getElementById('scoreboardAdvisory');
+            if (_advisoryEl) {
+                _advisoryEl.dataset.visible = _resultsAdvisories.length ? 'true' : 'false';
+                _advisoryEl.innerHTML = _resultsAdvisories.length
+                    ? `<strong>Governance review</strong><br>${_resultsAdvisories.map(item => escapeHtml(item)).join('<br>')}`
+                    : '';
             }
             // ─────────────────────────────────────────────────────────────────────────
 
@@ -28629,13 +28923,20 @@ function eaNotebookFetch(url, options, fetcher) { return window.eaNotebookComman
                 }).join('');
 
                 const medals = ['gold', 'silver', 'bronze'];
-                const medal = idx < 3 ? `<span class="medal ${medals[idx]} ${blinkClass}">${idx + 1}</span>` : `<span style="display: inline-block; width: 32px; text-align: center; font-weight: bold;">${idx + 1}</span>`;
+                const _officialRank = parseInt(row.overallRank, 10) || (idx + 1);
+                const _scopeRank = parseInt(row.scopeRank, 10) || (idx + 1);
+                const _rankTitle = _officialRank === _scopeRank
+                    ? `Overall rank ${_officialRank}`
+                    : `Overall rank ${_officialRank}; rank ${_scopeRank} in current view`;
+                const medal = _officialRank <= 3
+                    ? `<span class="medal ${medals[_officialRank - 1]} ${blinkClass}" title="${escapeHtml(_rankTitle)}">${_officialRank}</span>`
+                    : `<span style="display: inline-block; width: 32px; text-align: center; font-weight: bold;" title="${escapeHtml(_rankTitle)}">${_officialRank}</span>`;
 
                 // Row alert classes
                 const _sid  = parseInt(row.student.id, 10);
-                const _rank = idx + 1;
+                const _rank = _officialRank;
                 const _isLeaderRow = _leaderIds.has(_sid);
-                let rowClass = idx === 0 ? 'top-scorer-row' : '';
+                let rowClass = _officialRank === 1 ? 'top-scorer-row' : '';
                 if (_isLeaderRow && _rank > 14) {
                     rowClass += ' leader-rank-critical';
                 } else if (_isLeaderRow && _rank > 9) {
@@ -28651,7 +28952,7 @@ function eaNotebookFetch(url, options, fetcher) { return window.eaNotebookComman
                 return `<tr class="${rowClass}">
                     <td class="sticky-left rank-cell ${blinkClass}">${medal}</td>
                     <td class="sticky-left sticky-left-1"><strong>${escapeHtml(formatRollDisplay(row.student.roll))}</strong></td>
-                    <td class="sticky-left sticky-left-2">${renderStudentName(row.student, month)}</td>
+                    <td class="sticky-left sticky-left-2">${renderStudentName(row.student, month)}<button type="button" class="ea-results-row-detail" aria-label="Open daily score detail for ${escapeHtml(row.student.base_name || row.student.name || 'student')}" onclick="eaResultsOpenStudentDetail(event, ${_sid}, '${escapeJsInlineString(month)}')"><i class="fas fa-list" aria-hidden="true"></i></button></td>
                     <td class="sticky-left sticky-left-3">${escapeHtml(coalesce(row.student.class, ''))}</td>
                     <td class="sticky-left sticky-left-4" data-col="fees">${escapeHtml(coalesce(row.student.fees, '-'))}</td>
                     ${scores}
@@ -36961,11 +37262,18 @@ function eaNotebookFetch(url, options, fetcher) { return window.eaNotebookComman
         function initRankingForm() {
             const months = db.getMonths();
             const rankingMonth = document.getElementById('rankingMonth');
+            if (!rankingMonth) return;
+            const preferred = eaResultsMonth || rankingMonth.value || months[0] || '';
             rankingMonth.innerHTML = '<option value="">Select Month...</option>' +
                 months.map(m => {
                     const date = new Date(m + '-01');
                     return `<option value="${m}">${date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</option>`;
                 }).join('');
+            rankingMonth.value = months.includes(preferred) ? preferred : (months[0] || '');
+            if (rankingMonth.value) {
+                eaResultsMonth = rankingMonth.value;
+                loadRankings();
+            }
         }
 
         // ── Ranking tab: tier + flavor tag scheme ───────────────────────────
@@ -37008,7 +37316,8 @@ function eaNotebookFetch(url, options, fetcher) { return window.eaNotebookComman
             return escapeHtml((parts[0] && parts[0][0]) || '?').toUpperCase();
         }
 
-        const RANKING_ANIMATION_INTERVAL_MS = 5000;
+        // Ranking motion is user-triggered after the first restrained reveal.
+        const RANKING_ANIMATION_INTERVAL_MS = 0;
         let _rankingAnimationLoop = null;
         let _rankingFireworksTimeout = null;
 
@@ -37039,11 +37348,7 @@ function eaNotebookFetch(url, options, fetcher) { return window.eaNotebookComman
 
         function startRankingAnimationLoop() {
             stopRankingAnimationLoop();
-            if (!isRankingTabVisible()) return;
-            _rankingAnimationLoop = setInterval(() => {
-                if (isRankingTabVisible()) replayRankingAnimations();
-                else stopRankingAnimationLoop();
-            }, RANKING_ANIMATION_INTERVAL_MS);
+            return;
         }
 
         function scheduleRankingFireworks(delay = 400) {
@@ -37112,7 +37417,9 @@ function eaNotebookFetch(url, options, fetcher) { return window.eaNotebookComman
                 const tag = getRankingGroupTag(gIdx);
                 const startRank = 4 + gIdx * groupSize;
                 const endRank = startRank + group.length - 1;
-                const tierLabel = tag.tier || `Ranks ${startRank}–${endRank}`;
+                const tierLabel = (window.EAResults && EAResults.rankRangeLabel)
+                    ? EAResults.rankRangeLabel(startRank, group.length)
+                    : `Ranks ${startRank}–${endRank}`;
 
                 const cards = group.map((row, cIdx) => {
                     const rank = startRank + cIdx;
@@ -37269,7 +37576,8 @@ function eaNotebookFetch(url, options, fetcher) { return window.eaNotebookComman
             const month = getElementValue('groupMonthFilter');
             const scorecardGrid = document.getElementById('groupScoreboardBody');
             const monthLabel = document.getElementById('groupScoreboardMonthLabel');
-            const selectedGroup = getElementValue('groupFilterSelect') || 'all';
+            const groupSelect = document.getElementById('groupFilterSelect');
+            let selectedGroup = getElementValue('groupFilterSelect') || 'all';
             if (!month || !scorecardGrid) return;
 
             if (monthLabel) {
@@ -37280,72 +37588,113 @@ function eaNotebookFetch(url, options, fetcher) { return window.eaNotebookComman
             }
 
             let rows = db.getMonthlyScoreboard(month) || [];
-            if (selectedGroup !== 'all') {
-                rows = rows.filter(row => getStudentGroup(row.student) === selectedGroup);
-            }
-
-            // Filter for students - show only their own group
             if (currentUserRole === 'student' && currentStudentRoll) {
-                rows = rows.filter(row => {
-                    const rollMatch = row && row.student && row.student.roll &&
-                                    String(row.student.roll).trim().toUpperCase() ===
-                                    String(currentStudentRoll).trim().toUpperCase();
-                    return rollMatch;
-                });
+                const own = window.EAResults ? EAResults.ownGroup(rows, currentStudentRoll) : '';
+                selectedGroup = own || '__none__';
+                if (groupSelect) {
+                    groupSelect.value = own || 'all';
+                    groupSelect.disabled = true;
+                    groupSelect.title = own ? `Showing your Group ${own}` : 'Your group could not be resolved for this month';
+                }
+            } else if (groupSelect) {
+                groupSelect.disabled = false;
+                groupSelect.title = '';
+            }
+            if (selectedGroup !== 'all') {
+                rows = selectedGroup === '__none__' ? [] : rows.filter(row => getStudentGroup(row.student) === selectedGroup);
             }
 
-            const groups = {};
-            rows.forEach(row => {
-                const key = getStudentGroup(row.student) || 'UNGROUPED';
-                if (!groups[key]) {
-                    groups[key] = { group: key, total: 0 };
-                }
-                const score = Number(row.total);
-                groups[key].total += Number.isFinite(score) ? score : 0;
-            });
-
-            const ranked = Object.values(groups).sort((a, b) => {
-                const scoreDiff = Number(b.total) - Number(a.total);
-                if (scoreDiff !== 0) return scoreDiff;
-                const groupDiff = getGroupSortRank(a.group) - getGroupSortRank(b.group);
-                if (groupDiff !== 0) return groupDiff;
-                return String(a.group || '').localeCompare(String(b.group || ''));
-            });
-
+            const ranked = window.EAResults ? EAResults.aggregateGroups(rows) : [];
+            const detailState = window.__eaGroupScoreboardDetail || { group: '', month: '', rows: [] };
+            detailState.month = month;
+            detailState.rows = rows.slice();
+            const availableGroups = new Set(ranked.map(row => String(row.group || 'UNGROUPED').trim().toUpperCase()));
+            if (detailState.group && !availableGroups.has(detailState.group)) detailState.group = '';
+            window.__eaGroupScoreboardDetail = detailState;
             scorecardGrid.innerHTML = ranked.length ? ranked.map((row, idx) => {
                 const group = String(row.group || 'UNGROUPED').trim().toUpperCase();
                 const groupTitle = group === 'UNGROUPED' ? 'Ungrouped' : `Group ${group}`;
                 const score = Number.isFinite(Number(row.total)) ? Number(row.total) : 0;
-                const rank = String(idx + 1).padStart(2, '0');
+                const rank = String(row.rank || idx + 1).padStart(2, '0');
                 const rankClass = idx < 3 ? `is-rank-${idx + 1}` : '';
                 const delay = Math.min(idx, 8) * 65;
+                const expanded = detailState.group === group;
                 return `
-                    <article class="group-scorecard ${getGroupRowClass(group)} ${rankClass}" role="listitem" style="--scorecard-delay:${delay}ms">
+                    <article class="group-scorecard ${getGroupRowClass(group)} ${rankClass}${expanded ? ' is-selected' : ''}" role="button" tabindex="0" data-group="${escapeHtml(group)}" style="--scorecard-delay:${delay}ms" aria-expanded="${expanded ? 'true' : 'false'}" aria-controls="groupScoreboardStudents" aria-label="${escapeHtml(groupTitle)}, rank ${row.rank || idx + 1}, ${score} points. Show all students." onclick="toggleGroupScoreboardStudents(this.dataset.group)" onkeydown="handleGroupScoreboardCardKey(event, this.dataset.group)">
                         <div class="group-scorecard-topline">
-                            <div class="group-scorecard-rank">
-                                <span>Rank</span>
-                                <strong>${rank}</strong>
-                            </div>
+                            <div class="group-scorecard-rank"><span>Rank</span><strong>${rank}</strong></div>
                             <div class="group-scorecard-sigil" aria-hidden="true">${escapeHtml(group === 'UNGROUPED' ? '?' : group.charAt(0))}</div>
                         </div>
                         <div class="group-scorecard-content">
                             <span class="group-scorecard-overline">Group total</span>
                             <h3>${escapeHtml(groupTitle)}</h3>
-                            <div class="group-scorecard-score">
-                                <strong>${score}</strong>
-                                <span>Points</span>
+                            <div class="group-scorecard-score"><strong>${score}</strong><span>Points</span></div>
+                            <div class="group-scorecard-meta">
+                                <span>${row.memberCount} eligible member${row.memberCount === 1 ? '' : 's'}</span>
+                                <span>Average ${row.average}</span>
+                                <span>Positive ${row.positiveTotal}</span>
+                                <span>Negative ${row.negativeTotal}</span>
                             </div>
                         </div>
                         <div class="group-scorecard-footer" aria-hidden="true"><span></span></div>
-                    </article>
-                `;
+                    </article>`;
             }).join('') : `
                 <div class="group-scorecard-empty" role="status">
                     <i class="fas fa-moon" aria-hidden="true"></i>
                     <strong>No totals for this period</strong>
                     <span>Try another period or widen the group focus.</span>
-                </div>
-            `;
+                </div>`;
+            renderGroupScoreboardStudents();
+        }
+
+        function handleGroupScoreboardCardKey(event, group) {
+            if (event.key !== 'Enter' && event.key !== ' ') return;
+            event.preventDefault();
+            toggleGroupScoreboardStudents(group);
+        }
+
+        function toggleGroupScoreboardStudents(group) {
+            const detailState = window.__eaGroupScoreboardDetail || { group: '', month: '', rows: [] };
+            const normalized = String(group || '').trim().toUpperCase();
+            detailState.group = normalized && detailState.group !== normalized ? normalized : '';
+            window.__eaGroupScoreboardDetail = detailState;
+            renderGroupScoreboardStudents();
+        }
+
+        function renderGroupScoreboardStudents() {
+            const detailState = window.__eaGroupScoreboardDetail || { group: '', month: '', rows: [] };
+            const host = document.getElementById('groupScoreboardStudents');
+            const body = document.getElementById('groupScoreboardStudentsBody');
+            const title = document.getElementById('groupScoreboardStudentsTitle');
+            const group = String(detailState.group || '').trim().toUpperCase();
+            document.querySelectorAll('#groupScoreboardBody .group-scorecard').forEach(card => {
+                const selected = !!group && String(card.dataset.group || '').toUpperCase() === group;
+                card.classList.toggle('is-selected', selected);
+                card.setAttribute('aria-expanded', selected ? 'true' : 'false');
+            });
+            if (!host || !body || !group) {
+                if (host) host.classList.add('hidden');
+                return;
+            }
+            const rows = (detailState.rows || [])
+                .filter(row => String(getStudentGroup(row.student) || 'UNGROUPED').trim().toUpperCase() === group)
+                .sort((a, b) => (Number(b.total) || 0) - (Number(a.total) || 0) ||
+                    String(safeProp(a.student, 'roll') || '').localeCompare(String(safeProp(b.student, 'roll') || ''), undefined, {numeric:true}));
+            const groupTitle = group === 'UNGROUPED' ? 'Ungrouped students' : `Group ${group} students`;
+            host.className = `group-scoreboard-students ${getGroupRowClass(group)}`;
+            if (title) title.textContent = `${groupTitle} · ${rows.length}`;
+            body.innerHTML = rows.length ? rows.map((row, index) => {
+                const student = row.student || {};
+                const name = student.base_name || student.name || 'Unnamed student';
+                const roll = formatRollDisplay(student.roll || '') || '—';
+                const className = student.class || '—';
+                const total = Number.isFinite(Number(row.total)) ? Number(row.total) : 0;
+                return `<article class="group-scoreboard-student" role="listitem">
+                    <span class="group-scoreboard-student-rank">${String(index + 1).padStart(2, '0')}</span>
+                    <div><strong>${escapeHtml(name)}</strong><small>${escapeHtml(roll)} · Class ${escapeHtml(className)}</small></div>
+                    <span class="group-scoreboard-student-score"><strong>${total}</strong><small>points</small></span>
+                </article>`;
+            }).join('') : '<div class="group-scoreboard-student-empty">No students are available for this group and period.</div>';
         }
 
         function loadPartyStandings() {
@@ -37366,126 +37715,105 @@ function eaNotebookFetch(url, options, fetcher) { return window.eaNotebookComman
             const month = getElementValue('partyStandingsMonthFilter');
             const tbody = document.getElementById('partyStandingsBody');
             const rosterBody = document.getElementById('partyStandingsRosterBody');
+            const notice = document.getElementById('partyStandingsNotice');
             if (!month || !tbody) return;
 
             const data = db.getData();
             const parties = data.parties || [];
             const students = db.getStudents ? db.getStudents() : (data.students || []);
             const sb = db.getMonthlyScoreboard(month);
+            const currentMonth = getCurrentMonthKey();
             const studentMap = new Map(students.map(s => [parseInt(s.id, 10), s]));
+            const studentByRoll = new Map(students.map(s => [normalizeRoll(s.roll), s]));
             const scoreboardMap = new Map();
             (sb || []).forEach(r => {
                 const sid = r && r.student ? parseInt(r.student.id, 10) : 0;
                 if (sid) scoreboardMap.set(sid, r);
             });
 
+            let ambiguousMemberships = 0;
             const rows = [];
             parties.forEach(party => {
-                // Only count members whose member.status is active AND whose underlying
-                // student is not explicitly deactivated for the selected standings month —
-                // deactivated students must not inflate the count or appear in the roster.
-                // Uses the lenient isStudentExplicitlyDeactivated (not isStudentActiveForMonth)
-                // so recently-added members are not wrongly hidden by roll-change handling.
-                const activeMembers = (party.members || []).filter(m => {
-                    if (normalizePostHolderStatus(m.status || '') !== 'active') return false;
-                    const sid = parseInt(m.studentId, 10);
-                    const student = studentMap.get(sid);
-                    return !!(student && !isStudentExplicitlyDeactivated(student, month));
+                const activeMembers = [];
+                (party.members || []).forEach(member => {
+                    const state = window.EAResults
+                        ? EAResults.membershipState(member, month, currentMonth)
+                        : { active: normalizePostHolderStatus(member.status || '') === 'active', ambiguous: false };
+                    if (!state.active) return;
+                    const sid = parseInt(member.studentId, 10);
+                    const student = studentMap.get(sid) || studentByRoll.get(normalizeRoll(member.roll));
+                    if (!student || !isStudentVisibleForMonth(student, month)) return;
+                    if (state.ambiguous) ambiguousMemberships += 1;
+                    activeMembers.push({ member, student, state });
                 });
                 let totalScore = 0;
                 let votePower = 0;
-                let memberCount = 0;
-                activeMembers.forEach(m => {
-                    const sid = parseInt(m.studentId, 10);
-                    const student = studentMap.get(sid);
-                    if (!student) return;
-                    memberCount++;
+                activeMembers.forEach(item => {
+                    const sid = parseInt(item.student.id, 10);
                     const sbRow = scoreboardMap.get(sid);
-                    if (sbRow) {
-                        totalScore += sbRow.total || 0;
-                    }
-                    // Vote power is per-student and has a base floor of 1 — do NOT gate on
-                    // sbRow, otherwise a party whose active members have no scores this
-                    // month shows 0 vote power even though every member is worth >= 1.
-                    // Pass the selected standings month so vote power reflects that month
-                    // instead of a stale cached total from a different month's render.
-                    votePower += getStudentVotePower(student, month);
+                    if (sbRow) totalScore += Number(sbRow.total) || 0;
+                    votePower += getStudentVotePower(item.student, month);
                 });
+                const memberCount = activeMembers.length;
                 rows.push({
-                    party: party,
-                    activeMembers: activeMembers,
-                    memberCount: memberCount,
-                    totalScore: totalScore,
-                    votePower: votePower,
-                    avgScore: memberCount ? Math.round(totalScore / memberCount) : 0
+                    party,
+                    activeMembers,
+                    memberCount,
+                    totalScore,
+                    votePower,
+                    avgScore: memberCount ? Math.round((totalScore / memberCount) * 100) / 100 : 0
                 });
             });
 
-            rows.sort((a, b) => b.totalScore - a.totalScore);
+            rows.sort((a, b) => (b.totalScore - a.totalScore) || String(a.party.code || '').localeCompare(String(b.party.code || '')));
+            rows.forEach((row, index) => { row.rank = index + 1; });
+            if (notice) {
+                notice.dataset.visible = ambiguousMemberships ? 'true' : 'false';
+                notice.innerHTML = ambiguousMemberships
+                    ? `<strong>Membership history needs review</strong><br>${ambiguousMemberships} historical membership${ambiguousMemberships === 1 ? '' : 's'} lack an explicit end month. They are preserved for this historical view rather than silently removed.`
+                    : '';
+            }
 
             if (!rows.length) {
                 tbody.innerHTML = `<tr><td colspan="6" class="text-center" style="padding: 30px;">No parties found</td></tr>`;
             } else {
-                const summaryRows = rows.map((row, idx) => `
+                const summaryRows = rows.map(row => `
                     <tr>
-                        <td class="rank-cell">${idx + 1}</td>
+                        <td class="rank-cell">${row.rank}</td>
                         <td>${renderPartyChip(row.party.code, { large: true })}</td>
                         <td>${row.memberCount}</td>
                         <td class="total-cell">${row.totalScore}</td>
                         <td>${row.avgScore}</td>
                         <td class="vote-cell">${row.votePower}</td>
-                    </tr>
-                `).join('');
+                    </tr>`).join('');
                 const totalMembers = rows.reduce((sum, r) => sum + r.memberCount, 0);
                 const totalScoreAll = rows.reduce((sum, r) => sum + r.totalScore, 0);
                 const totalVotePower = rows.reduce((sum, r) => sum + r.votePower, 0);
                 tbody.innerHTML = summaryRows + `
-                    <tr>
-                        <td></td>
-                        <td><strong>Total</strong></td>
-                        <td>${totalMembers}</td>
-                        <td class="total-cell"><strong>${totalScoreAll}</strong></td>
-                        <td></td>
-                        <td class="vote-cell"><strong>${totalVotePower}</strong></td>
-                    </tr>`;
+                    <tr><td></td><td><strong>Total</strong></td><td>${totalMembers}</td>
+                    <td class="total-cell"><strong>${totalScoreAll}</strong></td><td></td>
+                    <td class="vote-cell"><strong>${totalVotePower}</strong></td></tr>`;
             }
 
             if (rosterBody) {
-                const partyRankMap = new Map(rows.map((r, idx) => [r.party, idx]));
                 const _rosterRows = [];
-                rows.forEach(row => {
-                    // row.activeMembers already excludes deactivated students for this month.
-                    row.activeMembers.forEach(m => {
-                        const sid = parseInt(m.studentId, 10);
-                        const student = studentMap.get(sid);
-                        if (!student) return;
-                        const sbRow = scoreboardMap.get(sid);
-                        const role = m.designation === 'president' ? 'President' : m.designation === 'deputy_president' ? 'Deputy President' : 'Member';
-                        _rosterRows.push({
-                            party: row.party,
-                            student: student,
-                            sbRow: sbRow,
-                            role: role
-                        });
-                    });
-                });
-                _rosterRows.sort((a, b) => {
-                    const pa = partyRankMap.get(a.party);
-                    const pb = partyRankMap.get(b.party);
-                    if (pa !== pb) return pa - pb;
-                    return (b.sbRow ? b.sbRow.total : 0) - (a.sbRow ? a.sbRow.total : 0);
-                });
+                rows.forEach(row => row.activeMembers.forEach(item => {
+                    const sbRow = scoreboardMap.get(parseInt(item.student.id, 10));
+                    const designation = String(item.member.designation || '').toLowerCase();
+                    const role = designation === 'president' ? 'President' : designation === 'deputy_president' ? 'Deputy President' : 'Member';
+                    _rosterRows.push({ party: row.party, partyRank: row.rank, student: item.student, sbRow, role, ambiguous: item.state.ambiguous });
+                }));
+                _rosterRows.sort((a, b) => (a.partyRank - b.partyRank) || ((b.sbRow ? b.sbRow.total : 0) - (a.sbRow ? a.sbRow.total : 0)));
                 rosterBody.innerHTML = _rosterRows.length
                     ? _rosterRows.map(r => `
                         <tr>
                             <td>${renderPartyChip(r.party.code)}</td>
                             <td>${escapeHtml(formatRollDisplay(r.student.roll) || '-')}</td>
-                            <td>${escapeHtml(r.student.base_name || r.student.name || '')}</td>
-                            <td>${r.student.class || '-'}</td>
+                            <td>${escapeHtml(r.student.base_name || r.student.name || '')}${r.ambiguous ? ' <span title="End month missing">*</span>' : ''}</td>
+                            <td>${escapeHtml(r.student.class || '-')}</td>
                             <td class="total-cell">${r.sbRow ? r.sbRow.total : '—'}</td>
                             <td style="color:var(--text-muted);font-size:12px">${r.role}</td>
-                        </tr>
-                    `).join('')
+                        </tr>`).join('')
                     : `<tr><td colspan="6" class="text-center" style="padding: 30px;">No party members found</td></tr>`;
             }
 
@@ -42399,11 +42727,29 @@ function eaNotebookFetch(url, options, fetcher) { return window.eaNotebookComman
                     showAlert('This student is already in the party', 'danger');
                     return;
                 }
-                member.studentId = studentId;
-                member.designation = designation;
-                member.elected_on = electedOn;
-                member.status = normalizePostHolderStatus(member.status || 'active');
-                member.updated_at = new Date().toISOString();
+                const _memberNow = new Date().toISOString();
+                if (_prevPartyMemberSid !== studentId) {
+                    // A different student is a new tenure, not an edit to the old
+                    // person's historical identity. End the old row and create a
+                    // fresh member id so sync cannot cross the two students.
+                    member.status = 'ended';
+                    member.ended_on = _memberNow.slice(0, 10);
+                    member.updated_at = _memberNow;
+                    members.push({
+                        id: generateUniqueId(),
+                        studentId,
+                        designation,
+                        elected_on: electedOn,
+                        status: 'active',
+                        created_at: _memberNow,
+                        updated_at: _memberNow
+                    });
+                } else {
+                    member.designation = designation;
+                    member.elected_on = electedOn;
+                    member.status = normalizePostHolderStatus(member.status || 'active');
+                    member.updated_at = _memberNow;
+                }
                 _pendingNotice = { msg: 'Party member updated', type: 'success' };
             } else {
                 if (existingMember) {
@@ -42475,8 +42821,14 @@ function eaNotebookFetch(url, options, fetcher) { return window.eaNotebookComman
                 { mode: 'confirm', type: 'warning', title: 'Remove member', okLabel: 'Remove', cancelLabel: 'Cancel' }
             );
             if (!confirmed) return;
-            party.members = (party.members || []).filter(m => m.id !== memberId);
-            db.updateParty(party.id, { members: party.members });
+            if (!member) return;
+            const nowIso = new Date().toISOString();
+            // Keep an explicit tombstone so stale browsers/peers cannot resurrect
+            // the membership and the tenure remains auditable.
+            member.status = 'ended';
+            member.ended_on = nowIso.slice(0, 10);
+            member.updated_at = nowIso;
+            db.updateParty(party.id, { members: party.members || [] });
             loadParties();
             loadPartyMembers();
             loadOfficeHolders();
@@ -42604,17 +42956,14 @@ function eaNotebookFetch(url, options, fetcher) { return window.eaNotebookComman
             const posts = db.getLeadership().filter(post => {
                 if (!post) return false;
                 const status = normalizePostHolderStatus(post.status || '');
-                const hasAssignment = !!(
-                    String(post.holder || '').trim() ||
-                    String(post.roll || '').trim() ||
-                    String(post.elected_on || '').trim()
-                );
+                const hasAssignment = isLeadershipAssignmentOccupied(post);
                 if (hasAssignment) return true;
                 return status === 'active' || status === 'suspended' || status === 'ended';
             });
             const tbody = document.getElementById('leadershipBody');
             const electedOnInput = document.getElementById('leadershipElectedOn');
             populateLeadershipStudentOptions();
+            if (!tbody) return;
             if (electedOnInput) {
                 const today = new Date().toISOString().split('T')[0];
                 if (!electedOnInput.value) {
@@ -42627,10 +42976,10 @@ function eaNotebookFetch(url, options, fetcher) { return window.eaNotebookComman
                 const electedDate = post.elected_on ? formatDateLabel(post.elected_on) : '-';
                 return `
                     <tr>
-                        <td>${post.post}</td>
-                        <td>${post.holder || '-'}</td>
-                        <td>${formatRollDisplay(post.roll || '') || '-'}</td>
-                        <td>${electedDate}</td>
+                        <td>${escapeHtml(post.post || '-')}</td>
+                        <td>${escapeHtml(post.holder || '-')}</td>
+                        <td>${escapeHtml(formatRollDisplay(post.roll || '') || '-')}</td>
+                        <td>${escapeHtml(electedDate)}</td>
                         <td>
                             <button class="secondary" onclick="editLeadership(${post.id})" style="font-size: 12px;">Edit</button>
                             <button class="secondary" onclick="deleteLeadership(${post.id})" style="font-size: 12px; color: #fbbf24;" title="${normalizePostHolderStatus(post.status) === 'active' ? 'End tenure — keeps history' : 'Permanently remove'}">
@@ -42672,10 +43021,14 @@ function eaNotebookFetch(url, options, fetcher) { return window.eaNotebookComman
             }
 
             const allPosts = db.getLeadership();
-            const isDuplicate = !editingLeadershipId && allPosts.some(item => 
-                String(item.post || '').trim().toLowerCase() === String(post || '').trim().toLowerCase() &&
-                normalizePostHolderStatus(item.status) === 'active'
-            );
+            const editingKey = editingLeadershipId ? String(editingLeadershipId) : '';
+            const isDuplicate = allPosts.some(item => {
+                if (editingKey && String(item.id) === editingKey) return false;
+                const status = normalizePostHolderStatus(item.status);
+                return String(item.post || '').trim().toLowerCase() === String(post || '').trim().toLowerCase() &&
+                    isLeadershipAssignmentOccupied(item) &&
+                    (status === 'active' || status === 'suspended');
+            });
             if (isDuplicate) {
                 showAlert('A leadership post with this name is already assigned. Edit or delete the existing post first.', 'warning');
                 return;
@@ -42909,8 +43262,16 @@ function eaNotebookFetch(url, options, fetcher) { return window.eaNotebookComman
             editingLeadershipId = postId;
             const postSelect = document.getElementById('leadershipPost');
             const nextPost = post && post.post ? String(post.post).trim() : '';
+            if (!postSelect) return;
             const hasOption = Array.from(postSelect.options).some(option => option.value === nextPost);
-            postSelect.value = hasOption ? nextPost : 'LEADER (L)';
+            if (nextPost && !hasOption) {
+                const legacyOption = document.createElement('option');
+                legacyOption.value = nextPost;
+                legacyOption.textContent = `${nextPost} (existing post)`;
+                legacyOption.dataset.legacyPost = 'true';
+                postSelect.appendChild(legacyOption);
+            }
+            postSelect.value = nextPost;
             const resolvedStudent = resolveLeadershipStudent(post);
             populateLeadershipStudentOptions(resolvedStudent ? resolvedStudent.id : '');
             const studentSelect = document.getElementById('leadershipStudent');
@@ -43783,117 +44144,14 @@ function eaNotebookFetch(url, options, fetcher) { return window.eaNotebookComman
         // block fires, it checks this flag first and skips suspension.
         // Also clears any active 72h warning clocks when the waiver is granted.
         function toggleAutoSuspendWaiver(postId, table) {
-            if (normalizeUserRole(currentUserRole) !== 'admin') { showAlert('Only Admin can manage auto-suspend waivers.', 'warning'); return; }
-            const data = db.getData();
-            let entry = null;
-            if (table === 'leadership') {
-                entry = (data.leadership || []).find(e => e.id === postId);
-            } else if (table === 'group_crs') {
-                entry = (data.group_crs || []).find(e => e.id === postId);
-            } else if (table === 'class_reps') {
-                entry = (data.class_reps || []).find(e => e.id === postId);
-            } else if (table === 'party') {
-                const party = (data.parties || []).find(p => p.id === postId);
-                if (party) entry = (party.members || []).find(m => isPartyPresidentDesignation(m.designation));
-            }
-            if (!entry) { showAlert('Post record not found.', 'danger'); return; }
-            const newState = !entry.auto_suspend_waived;
-            entry.auto_suspend_waived = newState;
-            entry.updated_at = new Date().toISOString();
-            if (newState) {
-                // Granting waiver: clear any active 72h warning clocks for this student
-                const sid = parseInt(entry.studentId, 10);
-                if (sid) {
-                    localStorage.removeItem(`ea_rank_warn_${sid}`);
-                    localStorage.removeItem(`ea_veto_warn_${sid}`);
-                }
-            }
-            savePostHolderData(data);
+            showAlert('Automatic post-holder enforcement is paused. No waiver or governance record was changed.', 'warning');
+            return false;
         }
 
-        // ── VETO Shield: Post holder spends 1 VETO power to block the next auto-suspension ──
-        // Costs 1 veto_count from the student. The shield is a one-time protection:
-        // when the 72h enforcement triggers, _consumeAutoSuspendExemption clears the flag.
-        // Admin can also deactivate the shield (no cost refunded).
         async function toggleVetoShield(postId, table, studentId) {
-            if (normalizeUserRole(currentUserRole) !== 'admin') { showAlert('Only Admin can manage VETO shields.', 'warning'); return; }
-            const data = db.getData();
-            let entry = null;
-            if (table === 'leadership') {
-                entry = (data.leadership || []).find(e => e.id === postId);
-            } else if (table === 'group_crs') {
-                entry = (data.group_crs || []).find(e => e.id === postId);
-            } else if (table === 'class_reps') {
-                entry = (data.class_reps || []).find(e => e.id === postId);
-            } else if (table === 'party') {
-                const party = (data.parties || []).find(p => p.id === postId);
-                if (party) entry = (party.members || []).find(m => isPartyPresidentDesignation(m.designation));
-            }
-            if (!entry) { showAlert('Post record not found.', 'danger'); return; }
-
-            if (entry.veto_shield_active) {
-                // Deactivate — no VETO refunded, admin override
-                if (!confirm('Remove VETO Shield? The holder will no longer be protected from auto-suspension.\nNote: the VETO spent to activate it is not refunded.')) return;
-                entry.veto_shield_active = false;
-                entry.updated_at = new Date().toISOString();
-                savePostHolderData(data);
-                return;
-            }
-
-            // Activate — costs 1 VETO from the student
-            const sid = parseInt(studentId, 10);
-            const student = (data.students || []).find(s => parseInt(s.id, 10) === sid);
-            if (!student) { showAlert('Student not found for this post.', 'danger'); return; }
-            const balance = getStudentVetoBalance(sid, getCurrentMonthKey());
-            const currentVetos = balance.total;
-            if (currentVetos <= 0) {
-                showAlert(`${student.base_name || student.name} has no VETO power left (${currentVetos}).`, 'warning');
-                return;
-            }
-            if (!confirm(
-                `Activate VETO Shield for ${student.base_name || student.name}?\n\n` +
-                `This uses 1 of their VETO power tokens.\n` +
-                `The shield will block the NEXT auto-suspension trigger once, then it is consumed.\n\n` +
-                `Current VETOs: ${currentVetos}  →  ${currentVetos - 1} after activation.`
-            )) return;
-
-            const _vetoSource = await promptVetoSourceChoice(sid, 1, getCurrentMonthKey());
-            if (!_vetoSource) { showAlert('VETO Shield activation cancelled — no source chosen.', 'info'); return; }
-            spendStudentVetoPower(student, 1, _vetoSource);
-            entry.veto_shield_active = true;
-            const _shieldDate = new Date().toISOString().split('T')[0];
-            entry.veto_shield_used_on = _shieldDate;
-            entry.updated_at = new Date().toISOString();
-            // Clear active warning clocks — gives a fresh grace window after the shield
-            localStorage.removeItem(`ea_rank_warn_${sid}`);
-            localStorage.removeItem(`ea_veto_warn_${sid}`);
-            // Record the VETO expenditure as a score entry so it appears on the scoreboard
-            // that day (shows 'V' cell with reason, exactly like a regular VETO use).
-            // We write directly into data.scores so savePostHolderData saves it in one shot.
-            if (!data.scores) data.scores = [];
-            const _existingScore = data.scores.find(s => s.studentId === sid && s.date === _shieldDate);
-            const _shieldNote = '[VETO Shield] Auto-suspend blocked by VETO power';
-            if (_existingScore) {
-                _existingScore.vetos = (parseInt(_existingScore.vetos, 10) || 0) - 1;
-                _existingScore.notes = (_existingScore.notes ? _existingScore.notes + ' | ' : '') + _shieldNote;
-                _existingScore.updated_at = new Date().toISOString();
-            } else {
-                data.scores.push({
-                    id: generateUniqueId(),
-                    studentId: sid,
-                    date: _shieldDate,
-                    month: _shieldDate.substring(0, 7),
-                    points: 0,
-                    stars: 0,
-                    vetos: -1,
-                    notes: _shieldNote,
-                    recordedBy: 'system',
-                    updated_at: new Date().toISOString()
-                });
-            }
-            savePostHolderData(data);
+            showAlert('VETO Shield purchases are paused while automatic enforcement is disabled. No VETO was spent.', 'warning');
+            return false;
         }
-        // ─────────────────────────────────────────────────────────────────────────
 
         function toggleClassRepSuspension(repId) {
             if (!(currentUserRole === 'admin' || currentUserRole === 'teacher')) return;
@@ -56013,6 +56271,8 @@ function eaNotebookFetch(url, options, fetcher) { return window.eaNotebookComman
         function renderTicketManagementPanel() {
             const data = db.getData();
             const tickets = data.postholder_tickets || {};
+            const studentsById = new Map((data.students || []).map(student => [parseInt(student.id, 10), student]));
+            const getStudentById = studentId => studentsById.get(parseInt(studentId, 10)) || null;
             const balBody = document.getElementById('ticketBalancesBody');
             if (!balBody) return;
             const allSids = Object.keys(tickets).map(k => parseInt(k, 10)).filter(s => s > 0);
@@ -56023,7 +56283,7 @@ function eaNotebookFetch(url, options, fetcher) { return window.eaNotebookComman
                     const t = tickets[String(sid)];
                     const half = parseInt(t.half_tickets, 10) || 0;
                     const erase = parseInt(t.erase_tickets, 10) || 0;
-                    const student = db.getStudent(sid);
+                    const student = getStudentById(sid);
                     const name = student ? renderStudentName(student) : 'Unknown (' + sid + ')';
                     const roll = student ? formatRollDisplay(student.roll || '') : '—';
                     const role = getTicketRoleForStudent(sid, data);
@@ -56045,7 +56305,7 @@ function eaNotebookFetch(url, options, fetcher) { return window.eaNotebookComman
                     const fromSel = document.getElementById('ticketTransferFrom');
                     const toSel = document.getElementById('ticketTransferTo');
                     const opts = allSids.map(sid => {
-                        const student = db.getStudent(sid);
+                        const student = getStudentById(sid);
                         const nm = student ? (student.base_name || student.name || 'Unknown') : 'Unknown (' + sid + ')';
                         const t = tickets[String(sid)];
                         return '<option value="' + sid + '">' + escapeHtml(nm) + ' (H:' + (parseInt(t.half_tickets,10)||0) + ' E:' + (parseInt(t.erase_tickets,10)||0) + ')</option>';
@@ -56067,9 +56327,12 @@ function eaNotebookFetch(url, options, fetcher) { return window.eaNotebookComman
                     const recent = log.slice(-20).reverse();
                     logBody.innerHTML = recent.map(e => {
                         const ts = e.timestamp ? new Date(e.timestamp).toLocaleString() : '—';
-                        const fromName = e.from_sid ? (db.getStudent(e.from_sid) || {}).name || ('#' + e.from_sid) : '—';
-                        const toName = e.to_sid ? (db.getStudent(e.to_sid) || {}).name || ('#' + e.to_sid) : '—';
-                        const targetName = e.student_id ? (db.getStudent(e.student_id) || {}).name || ('#' + e.student_id) : '—';
+                        const fromStudent = e.from_sid ? getStudentById(e.from_sid) : null;
+                        const toStudent = e.to_sid ? getStudentById(e.to_sid) : null;
+                        const targetStudent = e.student_id ? getStudentById(e.student_id) : null;
+                        const fromName = e.from_sid ? (fromStudent && (fromStudent.base_name || fromStudent.name)) || ('#' + e.from_sid) : '—';
+                        const toName = e.to_sid ? (toStudent && (toStudent.base_name || toStudent.name)) || ('#' + e.to_sid) : '—';
+                        const targetName = e.student_id ? (targetStudent && (targetStudent.base_name || targetStudent.name)) || ('#' + e.student_id) : '—';
                         return '<tr>' +
                             '<td style="font-size:12px;">' + escapeHtml(ts) + '</td>' +
                             '<td>' + escapeHtml(e.type || '—') + '</td>' +
