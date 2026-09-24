@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
-    <meta name="theme-color" content="#1a4d2e">
+    <meta name="theme-color" content="#f5efe5">
     <title>Excel Academy</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Arvo:wght@400;700&display=swap" rel="stylesheet">
@@ -16,17 +16,18 @@
     <link rel="stylesheet" href="./profile/styles.css">
     <style>
         :root {
-            --bg: #faf8f3;
-            --surface: #ffffff;
-            --surface-2: #f4f0e8;
-            --text: #243447;
-            --muted: #5f6b7a;
+            color-scheme: light;
+            --bg: #f5efe5;
+            --surface: #fffaf2;
+            --surface-2: #eee4d5;
+            --text: #28241e;
+            --muted: #62594e;
             --primary: #1a4d2e;
             --secondary: #f7931e;
             --accent: #c4314b;
             --gold: #d4af37;
-            --line: rgba(36,52,71,.12);
-            --shadow: 0 14px 34px rgba(26, 77, 46, .10);
+            --line: #d2c3ae;
+            --shadow: 0 14px 34px rgba(74, 54, 29, .12);
             --gradient-hero: linear-gradient(135deg, var(--primary) 0%, #0d2818 55%, #163d24 100%);
             --gradient-accent: linear-gradient(90deg, var(--primary), var(--gold), var(--secondary));
         }
@@ -36,8 +37,8 @@
             margin: 0;
             font-family: "Lora", Georgia, serif;
             background:
-                radial-gradient(circle at top, rgba(26,77,46,.10), transparent 35%),
-                linear-gradient(180deg, #fdfbf7 0%, var(--bg) 100%);
+                radial-gradient(900px 600px at 12% 0%, rgba(210,169,105,.11), transparent 65%),
+                linear-gradient(145deg, #f8f2e8 0%, var(--bg) 100%);
             color: var(--text);
             overflow-x: hidden;
         }
@@ -708,11 +709,11 @@
             width: auto !important; border-radius: 999px !important; padding: 0 15px !important;
             height: 36px;
             font-size: 13px !important; font-weight: 600; gap: 6px; display: inline-flex !important;
-            align-items: center; text-decoration: none; background: var(--secondary); color: white;
+            align-items: center; text-decoration: none; background: #8d5214; color: white;
             border-color: transparent; box-shadow: 0 4px 12px rgba(247,147,30,.3);
             white-space: nowrap;
         }
-        .login-link:hover { background: var(--gold) !important; color: white !important; box-shadow: 0 6px 16px rgba(212,175,55,.4); }
+        .login-link:hover { background: var(--gold) !important; color: #241a0a !important; box-shadow: 0 6px 16px rgba(212,175,55,.4); }
         .login-link:active { transform: scale(0.96); }
         @media (max-width: 520px) {
             #zoomOut, #zoomIn { display: none !important; }
@@ -722,8 +723,9 @@
 
         /* ── AMOLED DARK THEME ── */
         body.dark {
+            color-scheme: dark;
             --bg: #000000; --surface: #0a0a0a; --surface-2: #111111;
-            --text: #f1f5f9; --muted: #94a3b8;
+            --text: #f4f1e9; --muted: #b9b2a6;
             --primary: #22c55e; --secondary: #fb923c; --accent: #f43f5e;
             --gold: #fbbf24; --line: rgba(255,255,255,.09);
             --shadow: 0 14px 40px rgba(34,197,94,.10);
@@ -749,7 +751,7 @@
             background: var(--primary); color: #000; border-color: transparent;
             box-shadow: 0 0 16px rgba(34,197,94,.45);
         }
-        body.dark .login-link { background: var(--secondary); color: white; }
+        body.dark .login-link { background: var(--secondary); color: #241a0a; }
         body.dark .hero {
             background: linear-gradient(135deg, #071a0e 0%, #000 100%);
             border: 1px solid rgba(34,197,94,.18);
@@ -3519,6 +3521,7 @@ function renderInfo(data) {
         const themeBtn = document.getElementById('themeToggle');
         function applyTheme() {
             document.body.classList.toggle('dark', isDark);
+            document.querySelector('meta[name="theme-color"]').content = isDark ? '#000000' : '#f5efe5';
             themeBtn.textContent = isDark ? '☀️' : '🌙';
             localStorage.setItem('ea_theme', isDark ? 'dark' : 'light');
         }

@@ -174,7 +174,7 @@
     }
     </script>
     <link rel="manifest" href="manifest.webmanifest">
-    <meta name="theme-color" content="#0b1020">
+    <meta name="theme-color" content="#000000">
     <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
     <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin>
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -184,7 +184,7 @@
         <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
         <link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@900&display=swap" rel="stylesheet">
     </noscript>
-    <link rel="stylesheet" href="/static/css/offline-scoreboard.css?v=15">
+    <link rel="stylesheet" href="/static/css/offline-scoreboard.css?v=16">
 
 <script>
     // System Performance Overhaul: Async localstorage debouncer (Per-Key Isolated)
@@ -16383,6 +16383,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                     resource_cabinet: [],
                     resource_requests: [],
                     resource_transactions: [],
+                    deleted_resource_transactions: [],
                     resource_advantage_deductions: [],
                     syllabus_catalog: {},
                     syllabus_tracking: [],
@@ -16481,6 +16482,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                 if (!data.resource_cabinet) data.resource_cabinet = [];
                 if (!data.resource_requests) data.resource_requests = [];
                 if (!data.resource_transactions) data.resource_transactions = [];
+                if (!Array.isArray(data.deleted_resource_transactions)) data.deleted_resource_transactions = [];
                 if (!Array.isArray(data.resource_advantage_deductions)) data.resource_advantage_deductions = [];
                 if (!data.syllabus_catalog || typeof data.syllabus_catalog !== 'object') data.syllabus_catalog = {};
                 if (!data.syllabus_tracking) data.syllabus_tracking = [];
@@ -16624,6 +16626,8 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                     created_at: String(txn && txn.created_at || '').trim(),
                     updated_at: String(txn && txn.updated_at || '').trim()
                 })).filter(t => t.id);
+                data.deleted_resource_transactions = mergeDeletedResourceTransactions([], data.deleted_resource_transactions);
+                data.resource_transactions = excludeDeletedResourceTransactions(data.resource_transactions, data.deleted_resource_transactions);
                 data.resource_advantage_deductions = (Array.isArray(data.resource_advantage_deductions) ? data.resource_advantage_deductions : []).map(d => ({
                     ...d,
                     id: parseInt(d && d.id, 10) || 0,
@@ -19358,6 +19362,12 @@ async function eaStudentRequestsFetch(url, options = {}) {
     if (!response.ok || data.success !== true) throw new Error(data.error || `HTTP ${response.status}`);
     return data;
 }
+async function eaPortalActivationEnsureCsrf() {
+    if (eaStudentRequestCsrf) return eaStudentRequestCsrf;
+    const data = await eaStudentRequestsFetch('/scoreboard/api/portal-admin/bootstrap');
+    eaStudentRequestCsrf = data.csrf_token || '';
+    return eaStudentRequestCsrf;
+}
 function eaStudentRequestsSetStatus(message, tone = '') {
     const node = document.getElementById('eaStudentRequestStatus'); if (!node) return;
     node.textContent = message || ''; node.dataset.tone = tone;
@@ -19441,10 +19451,10 @@ async function eaPortalActivationIssue(event) {
     const loginId = String(loginInput?.value || '').trim().toUpperCase();
     eaPortalActivationClear();
     if (!loginId) { eaStudentRequestsSetStatus('Enter the student’s current roll/login ID.', 'error'); return; }
-    if (!eaStudentRequestCsrf) await loadStudentRequestsTab(true);
-    if (!eaStudentRequestCsrf) { eaStudentRequestsSetStatus('The secure Admin session could not be verified. Refresh and retry.', 'error'); return; }
     if (button) button.disabled = true;
     try {
+        await eaPortalActivationEnsureCsrf();
+        if (!eaStudentRequestCsrf) throw new Error('secure_admin_session_unavailable');
         const data = await eaStudentRequestsFetch('/scoreboard/api/portal-admin/cloud-activations', {
             method:'POST', headers:{'Content-Type':'application/json','X-CSRFToken':eaStudentRequestCsrf},
             body:JSON.stringify({login_id:loginId}),
@@ -25246,6 +25256,14 @@ function eaNotebookFetch(url, options, fetcher) { return window.eaNotebookComman
             const mergePair = (a, b) => {
                 const aa = normalize(a) || a;
                 const bb = normalize(b) || b;
+                const localDecision = String(aa && aa.status || '').trim().toLowerCase();
+                const serverDecision = String(bb && bb.status || '').trim().toLowerCase();
+                // During a pull, b is the server record. Do not let a local
+                // future timestamp replace an incompatible final decision.
+                if ((['approved', 'fulfilled'].includes(localDecision) && serverDecision === 'rejected') ||
+                    (localDecision === 'rejected' && ['approved', 'fulfilled'].includes(serverDecision))) {
+                    return { ...bb };
+                }
                 const ar = resourceStatusRank(aa && aa.status);
                 const br = resourceStatusRank(bb && bb.status);
                 const aStamp = parseSyncStamp(String(aa && (aa.updated_at || aa.created_at) || ''));
@@ -25287,6 +25305,24 @@ function eaNotebookFetch(url, options, fetcher) { return window.eaNotebookComman
             (Array.isArray(existingRequests) ? existingRequests : []).forEach(add);
             (Array.isArray(incomingRequests) ? incomingRequests : []).forEach(add);
             return Array.from(merged.values());
+        }
+
+        function mergeDeletedResourceTransactions(existingRows, incomingRows) {
+            const byId = new Map();
+            [existingRows, incomingRows].forEach(rows => {
+                (Array.isArray(rows) ? rows : []).forEach(row => {
+                    const id = parseInt(row && row.id, 10) || 0;
+                    if (id > 0 && row && row.deleted_at && !byId.has(id)) byId.set(id, { ...row, id });
+                });
+            });
+            return Array.from(byId.values());
+        }
+
+        function excludeDeletedResourceTransactions(rows, deletionRows) {
+            const deletedIds = new Set((Array.isArray(deletionRows) ? deletionRows : [])
+                .filter(row => row && row.deleted_at)
+                .map(row => parseInt(row.id, 10) || 0));
+            return (Array.isArray(rows) ? rows : []).filter(row => row && !deletedIds.has(parseInt(row.id, 10) || 0));
         }
 
         function mergeResourceTransactionsSuperset(existingRows, incomingRows) {
@@ -26220,6 +26256,7 @@ function eaNotebookFetch(url, options, fetcher) { return window.eaNotebookComman
                     class_reps: mergeClassRepsSuperset(localData.class_reps || [], serverData.class_reps || []),
                     parties: mergePartiesSuperset(localData.parties || [], serverData.parties || [], _preferRemoteParties),
                     post_holder_history: mergePostHolderHistorySuperset(localData.post_holder_history || [], serverData.post_holder_history || []),
+                    deleted_resource_transactions: mergeDeletedResourceTransactions(localData.deleted_resource_transactions || [], serverData.deleted_resource_transactions || []),
                     postholder_tickets: mergePostholderTickets(localData.postholder_tickets || {}, serverData.postholder_tickets || {}),
                     postholder_ticket_log: mergePostholderTicketLog(localData.postholder_ticket_log || [], serverData.postholder_ticket_log || []),
                     chess_champion: mergeChessChampionStatesForSync(localData.chess_champion, serverData.chess_champion, preferServerConflicts || authoritativeReplace),
@@ -26261,6 +26298,7 @@ function eaNotebookFetch(url, options, fetcher) { return window.eaNotebookComman
                     resource_cabinet: mergeResourceCabinetSuperset(localData.resource_cabinet || [], serverData.resource_cabinet || []),
                     resource_requests: mergeResourceRequestsSuperset(localData.resource_requests || [], serverData.resource_requests || []),
                     resource_transactions: mergeResourceTransactionsSuperset(localData.resource_transactions || [], serverData.resource_transactions || []),
+                    deleted_resource_transactions: mergeDeletedResourceTransactions(localData.deleted_resource_transactions || [], serverData.deleted_resource_transactions || []),
                     syllabus_catalog: mergeSyllabusCatalogForSync(localData.syllabus_catalog || {}, serverData.syllabus_catalog || {}),
                     syllabus_tracking: mergeSyllabusTrackingForSync(localData.syllabus_tracking || [], serverData.syllabus_tracking || []),
                     teacher_daily_summaries: mergeTeacherDailySummariesForSync(localData.teacher_daily_summaries || [], serverData.teacher_daily_summaries || []),
@@ -26288,6 +26326,9 @@ function eaNotebookFetch(url, options, fetcher) { return window.eaNotebookComman
                         : (serverData.public_information || [])
                 };
             }
+            mergedData.resource_transactions = excludeDeletedResourceTransactions(
+                mergedData.resource_transactions, mergedData.deleted_resource_transactions
+            );
             applyAllowedMonthScope(mergedData);
             db.saveData(mergedData, { system: true, skipSync: true, preserveTimestamp: true, skipBackup: true, allowHistoricalWrite: true });
             if (currentUserRole === 'admin' || currentUserRole === 'teacher') {
@@ -36427,6 +36468,8 @@ function eaNotebookFetch(url, options, fetcher) { return window.eaNotebookComman
 
 
         function syncThemeButton() {
+            const themeColor = document.querySelector('meta[name="theme-color"]');
+            if (themeColor) themeColor.content = document.body.classList.contains('light-mode') ? '#f5efe5' : '#000000';
             const btn = document.getElementById('themeToggleBtn');
             if (!btn) return;
             const isLight = document.body.classList.contains('light-mode');
@@ -55389,7 +55432,46 @@ function eaNotebookFetch(url, options, fetcher) { return window.eaNotebookComman
 
         function getResourceTransactions() {
             const data = db.getData() || {};
-            return Array.isArray(data.resource_transactions) ? data.resource_transactions : [];
+            return excludeDeletedResourceTransactions(data.resource_transactions, data.deleted_resource_transactions);
+        }
+
+        // Admin financial changes are sent before touching the local ledger.
+        // A normal background push may queue/retry a conflict and therefore cannot
+        // serve as confirmation that an approval, edit, or settlement was saved.
+        async function postResourcePatchConfirmed(patch) {
+            const baseUrl = getCurrentSyncBaseUrl() || getPrimarySyncBaseUrl();
+            if (!SERVER_SYNC.enabled || !baseUrl) {
+                return { ok: false, error: 'Connect to the server before changing a transaction.' };
+            }
+            try {
+                const url = buildSyncUrl(baseUrl, '/scoreboard/resource-transaction-patch');
+                const tokenResponse = await fetchWithTimeout(url, {
+                    cache: 'no-store', credentials: 'include', headers: eaAuthHeaders()
+                }, 12000);
+                if (!tokenResponse.ok) {
+                    return { ok: false, error: `Secure server session unavailable (HTTP ${tokenResponse.status}).` };
+                }
+                const tokenData = await tokenResponse.json();
+                if (!tokenData.csrf_token) {
+                    return { ok: false, error: 'Secure server session required. Sign in again.' };
+                }
+                const response = await fetchWithTimeout(url, {
+                    method: 'POST', credentials: 'include',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': tokenData.csrf_token, ...eaAuthHeaders() },
+                    body: JSON.stringify({ data: patch, op_id: createSyncOpId() })
+                }, 45000);
+                const result = await response.json().catch(() => ({}));
+                if (!response.ok || result.success !== true) {
+                    const csrfMessage = response.status === 400 && !result.error
+                        ? 'Secure session could not be verified. Open Resources on the server and sign in again.'
+                        : '';
+                    return { ok: false, error: result.error || csrfMessage || `Server rejected the change (HTTP ${response.status}).` };
+                }
+                _saveServerETag('');
+                return { ok: true, server_version: Number(result.server_version || 0) };
+            } catch (error) {
+                return { ok: false, error: 'Server confirmation was lost. Refresh before retrying.' };
+            }
         }
 
         // Identify transactions that originated from the Excel Mela tab.
@@ -55458,6 +55540,9 @@ function eaNotebookFetch(url, options, fetcher) { return window.eaNotebookComman
                     }
                 });
             });
+            data.resource_transactions = excludeDeletedResourceTransactions(
+                data.resource_transactions, data.deleted_resource_transactions
+            );
             data.updated_at = new Date().toISOString();
             db.saveData(data, currentUserRole === 'teacher' ? { allowTeacher: true } : {});
             // Sync resource patch directly so roster-guarded full snapshot uploads
@@ -57713,28 +57798,44 @@ function eaNotebookFetch(url, options, fetcher) { return window.eaNotebookComman
             );
             if (!confirmed) return;
 
-            pushUndoSnapshot('Reverse advantage deduction');
+            if (!SERVER_SYNC.enabled) {
+                showAlert('Connect to the server before reversing an advantage deduction.', 'warning');
+                return;
+            }
             const nowIso = new Date().toISOString();
             const idx = deductions.findIndex(d => parseInt(d.transaction_id, 10) === txnId && !d.reversed);
             if (idx < 0) { showAlert('Deduction already reversed or not found.', 'warning'); return; }
-            data.resource_advantage_deductions[idx] = {
-                ...data.resource_advantage_deductions[idx],
+            const reversedDeduction = {
+                ...deductions[idx],
                 reversed: true,
                 reversed_at: nowIso,
                 reversed_by: String(currentLoginId || 'Admin').trim()
             };
-            db.saveData(data);
-            if (SERVER_SYNC.enabled) pushToServer(db.getData(), { silent: true }).catch(() => {});
+            const accepted = await postResourcePatchConfirmed({ resource_advantage_deductions: [reversedDeduction] });
+            if (!accepted.ok) {
+                showAlert(accepted.error, 'warning');
+                return;
+            }
+            _saveServerETag('');
+            const pulled = await pullFromServer(false, true);
+            const verified = pulled && (db.getData().resource_advantage_deductions || []).some(item =>
+                parseInt(item && item.id, 10) === parseInt(reversedDeduction.id, 10) &&
+                item.reversed === true && String(item.reversed_at || '') === nowIso
+            );
+            if (!verified) {
+                showAlert('Server accepted the reversal, but read-back could not be confirmed. Refresh before retrying.', 'warning');
+                return;
+            }
             refreshCrossTabTransactionViews();
             showAlert(`Advantage deduction reversed — ${ded.points_deducted} pts restored to ${studentName}'s tally.`, 'success');
         }
 
-        // ── Transaction Delete ────────────────────────────────────────────────────
+        // ── Transaction correction ────────────────────────────────────────────────
+        const _resourceDeletionInFlight = new Set();
         async function adminDeleteResourceTransaction(transactionId, _triggerBtn = null, evt = null) {
             if (currentUserRole !== 'admin') return;
-            const _anchorRect = _eventAnchorRect(_triggerBtn, evt);
             const txnId = parseInt(transactionId, 10) || 0;
-            if (!txnId) return;
+            if (!txnId || _resourceDeletionInFlight.has(txnId)) return;
             const data = db.getData();
             const txn = (data.resource_transactions || []).find(t => parseInt(t && t.id, 10) === txnId);
             if (!txn) { showAlert('Transaction not found.', 'warning'); return; }
@@ -57746,24 +57847,81 @@ function eaNotebookFetch(url, options, fetcher) { return window.eaNotebookComman
             const charged = Math.max(0, parseFloat(txn.cash_charged) || parseFloat(txn.total_cost) || 0);
             const modeLabel = mode === 'cash_purchase' ? `Cash Purchase — ₹${Math.round(charged)}` : `Points Redemption`;
 
-            const confirmed = await openConfirmModal('Delete Transaction',
+            const confirmed = await openConfirmModal('Remove Transaction',
                 `<div class="confirm-details">
                     <div class="row"><div class="k">Transaction ID</div><div class="v">${txnId}</div></div>
                     <div class="row"><div class="k">Student</div><div class="v">${escapeHtml(studentName)}</div></div>
                     <div class="row"><div class="k">Item</div><div class="v">${escapeHtml(String(txn.item_name || '-'))}</div></div>
                     <div class="row"><div class="k">Type</div><div class="v">${escapeHtml(modeLabel)}</div></div>
-                    <p style="margin-top:10px;color:#f87171;font-size:12px;font-weight:600;">⚠ This permanently removes the transaction record. The associated request will remain as-is. This cannot be undone.</p>
+                    <label for="resourceTxnDeleteReason" style="display:block;margin-top:12px">Reason for correction</label>
+                    <input id="resourceTxnDeleteReason" type="text" maxlength="200" placeholder="For example: duplicate entry" style="width:100%;margin-top:5px">
+                    <p style="margin-top:10px;color:#fbbf24;font-size:12px;font-weight:600;">The transaction leaves active totals. Its original details, reason, time, and admin identity stay in the audit record. The associated request, stock, and separate score entries remain as-is.</p>
                 </div>`,
                 { wide: true, centerViewport: true }
             );
             if (!confirmed) return;
-
-            pushUndoSnapshot('Delete resource transaction');
-            data.resource_transactions = (data.resource_transactions || []).filter(t => parseInt(t && t.id, 10) !== txnId);
-            db.saveData(data);
-            if (SERVER_SYNC.enabled) pushToServer(db.getData(), { silent: true }).catch(() => {});
-            refreshCrossTabTransactionViews();
-            showAlert('Transaction deleted.', 'success');
+            const reason = String((document.getElementById('resourceTxnDeleteReason') || {}).value || '').trim();
+            if (reason.length < 3) {
+                showAlert('Enter a correction reason of at least 3 characters.', 'warning');
+                return;
+            }
+            const baseUrl = getCurrentSyncBaseUrl() || getPrimarySyncBaseUrl();
+            if (!SERVER_SYNC.enabled || !baseUrl) {
+                showAlert('Connect to the server before removing a transaction.', 'warning');
+                return;
+            }
+            const url = buildSyncUrl(baseUrl, `/scoreboard/resource-transactions/${txnId}/deletion`);
+            _resourceDeletionInFlight.add(txnId);
+            if (_triggerBtn) _triggerBtn.disabled = true;
+            try {
+                const readStatus = async () => {
+                    const response = await fetchWithTimeout(url, {
+                        cache: 'no-store', credentials: 'include', headers: eaAuthHeaders()
+                    }, 12000);
+                    if (!response.ok) throw new Error(`Server status check failed (HTTP ${response.status}).`);
+                    return response.json();
+                };
+                const before = await readStatus();
+                if (!before.deleted) {
+                    if (!before.csrf_token) throw new Error('Secure server session required. Sign in again.');
+                    const response = await fetchWithTimeout(url, {
+                        method: 'POST', credentials: 'include',
+                        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': before.csrf_token, ...eaAuthHeaders() },
+                        body: JSON.stringify({ reason, op_id: createSyncOpId() })
+                    }, 45000);
+                    if (!response.ok) {
+                        const failure = await response.json().catch(() => ({}));
+                        const csrfMessage = response.status === 400 && !failure.error
+                            ? 'Secure session could not be verified. Open Resources on the server and sign in again.'
+                            : '';
+                        throw new Error(failure.error || csrfMessage || `Server rejected the correction (HTTP ${response.status}).`);
+                    }
+                }
+                const verified = await readStatus();
+                const deletion = verified && verified.deletion;
+                if (!verified.deleted || !deletion || parseInt(deletion.id, 10) !== txnId ||
+                    parseInt(deletion.transaction && deletion.transaction.id, 10) !== txnId) {
+                    throw new Error('Server correction could not be verified. Refresh before retrying.');
+                }
+                const fresh = db.getData();
+                fresh.deleted_resource_transactions = mergeDeletedResourceTransactions(
+                    fresh.deleted_resource_transactions || [], [deletion]
+                );
+                fresh.resource_transactions = excludeDeletedResourceTransactions(
+                    fresh.resource_transactions || [], fresh.deleted_resource_transactions
+                );
+                fresh.server_version = Math.max(Number(fresh.server_version || 0), Number(verified.server_version || 0));
+                db.saveData(fresh, { system: true, skipSync: true, preserveTimestamp: true, skipBackup: true });
+                _saveServerETag('');
+                refreshCrossTabTransactionViews();
+                schedulePullFromServer(false, 100, true);
+                showAlert('Transaction removed. The correction is verified on the server and recorded for audit.', 'success');
+            } catch (error) {
+                showAlert(String(error && error.message || 'Could not verify the correction. Refresh and try again.'), 'warning');
+            } finally {
+                _resourceDeletionInFlight.delete(txnId);
+                if (_triggerBtn) _triggerBtn.disabled = false;
+            }
         }
 
         // ── Transaction Edit ──────────────────────────────────────────────────────
@@ -57845,9 +58003,13 @@ function eaNotebookFetch(url, options, fetcher) { return window.eaNotebookComman
             }
         }
 
-        function saveTxnEdit() {
+        async function saveTxnEdit() {
             if (currentUserRole !== 'admin') return;
             if (!_txnEditId) return;
+            if (!SERVER_SYNC.enabled) {
+                showAlert('Connect to the server before editing a transaction.', 'warning');
+                return;
+            }
             const data = db.getData();
             const idx = (data.resource_transactions || []).findIndex(t => parseInt(t && t.id, 10) === _txnEditId);
             if (idx < 0) { showAlert('Transaction not found.', 'warning'); closeTxnEditModal(); return; }
@@ -57864,6 +58026,7 @@ function eaNotebookFetch(url, options, fetcher) { return window.eaNotebookComman
                 const paid = Math.max(0, parseFloat(paidEl2 && paidEl2.value) || 0);
                 const due = Math.max(0, charged - paid);
                 const ret = Math.max(0, paid - charged);
+                updates.cash_charged = charged;
                 updates.cash_paid = paid;
                 updates.cash_due = due;
                 updates.cash_return_due = ret;
@@ -57872,10 +58035,21 @@ function eaNotebookFetch(url, options, fetcher) { return window.eaNotebookComman
             const pendingEl = document.getElementById('txnEditPendingSettlement');
             updates.pending_settlement = pendingEl ? pendingEl.checked : txn.pending_settlement;
 
-            pushUndoSnapshot('Edit resource transaction');
-            data.resource_transactions[idx] = { ...txn, ...updates };
-            db.saveData(data);
-            if (SERVER_SYNC.enabled) pushToServer(db.getData(), { silent: true }).catch(() => {});
+            const updatedTxn = { ...txn, ...updates };
+            const accepted = await postResourcePatchConfirmed({ resource_transactions: [updatedTxn] });
+            if (!accepted.ok) {
+                showAlert(accepted.error, 'warning');
+                return;
+            }
+            _saveServerETag('');
+            const pulled = await pullFromServer(false, true);
+            const verified = pulled && getResourceTransactions().some(t =>
+                parseInt(t && t.id, 10) === _txnEditId && String(t.updated_at || '') === nowIso
+            );
+            if (!verified) {
+                showAlert('Server accepted the edit, but read-back could not be confirmed. Refresh before retrying.', 'warning');
+                return;
+            }
             closeTxnEditModal();
             refreshCrossTabTransactionViews();
             showAlert('Transaction updated.', 'success');
@@ -57960,6 +58134,10 @@ function eaNotebookFetch(url, options, fetcher) { return window.eaNotebookComman
 
         async function adminSettleResourceTransaction(txnId, _triggerBtn = null, evt = null) {
             if (currentUserRole !== 'admin') return;
+            if (!SERVER_SYNC.enabled) {
+                showAlert('Connect to the server before settling a transaction.', 'warning');
+                return;
+            }
             const _anchorRect = _eventAnchorRect(_triggerBtn, evt);
             const id = parseInt(txnId, 10) || 0;
             if (!id) return;
@@ -58035,7 +58213,20 @@ function eaNotebookFetch(url, options, fetcher) { return window.eaNotebookComman
                 updatedTxn.cash_return = Math.max(0, parseFloat(txn.cash_return) || 0) + cashReturn;
                 updatedTxn.cash_return_due = 0;
             }
-            applyResourcePatchLocally({ resource_transactions: [updatedTxn] });
+            const accepted = await postResourcePatchConfirmed({ resource_transactions: [updatedTxn] });
+            if (!accepted.ok) {
+                showAlert(accepted.error, 'warning');
+                return;
+            }
+            _saveServerETag('');
+            const pulled = await pullFromServer(false, true);
+            const verified = pulled && getResourceTransactions().some(t =>
+                parseInt(t && t.id, 10) === id && String(t.updated_at || '') === nowIso && !t.pending_settlement
+            );
+            if (!verified) {
+                showAlert('Server accepted the settlement, but read-back could not be confirmed. Refresh before retrying.', 'warning');
+                return;
+            }
             refreshCrossTabTransactionViews();
             showAlert('Transaction settled successfully!', 'success');
         }
@@ -58482,6 +58673,10 @@ function eaNotebookFetch(url, options, fetcher) { return window.eaNotebookComman
                 ? _triggerBtn.getBoundingClientRect() : null;
             const rid = parseInt(requestId, 10) || 0;
             if (!rid) return;
+            if (!SERVER_SYNC.enabled) {
+                showAlert('Connect to the server before approving a resource request.', 'warning');
+                return;
+            }
             const _restoreApproveBtn = _btnSetLoading(_triggerBtn);
             const req = getResourceRequests().find(r => parseInt(r && r.id, 10) === rid) || null;
             if (!req) { _restoreApproveBtn(); return; }
@@ -58648,8 +58843,6 @@ function eaNotebookFetch(url, options, fetcher) { return window.eaNotebookComman
             const cashDue = mode === 'cash_purchase' ? Math.max(0, balFinal.pending) : 0;
             const cashReturnDue = mode === 'cash_purchase' ? Math.max(0, balFinal.return_due) : 0;
 
-            pushUndoSnapshot('Approve resource request');
-
             const updatedReq = { ...req, status: 'approved', admin_decision: 'approved', admin_remark: remark, approved_at: nowIso, approved_by_login_id: String(currentLoginId || 'Admin').trim(), updated_at: nowIso };
             const updatedCabinet = { ...cabinetItem, total_held: Math.max(0, (parseInt(cabinetItem.total_held, 10) || 0) - qty), updated_at: nowIso };
 
@@ -58704,11 +58897,25 @@ function eaNotebookFetch(url, options, fetcher) { return window.eaNotebookComman
                 }];
             }
 
-            applyResourcePatchLocally(patch);
+            // Submit the complete approval once. The server serializes the request
+            // and rejects a second transaction for the same request ID.
+            const accepted = await postResourcePatchConfirmed(patch);
+            if (!accepted.ok) {
+                _restoreApproveBtn();
+                showAlert(accepted.error, 'warning');
+                return;
+            }
+            _saveServerETag('');
+            const pulled = await pullFromServer(false, true);
+            const verified = pulled && getResourceTransactions().some(t =>
+                parseInt(t && t.id, 10) === txnId && parseInt(t && t.request_id, 10) === rid
+            );
             _restoreApproveBtn();
+            if (!verified) {
+                showAlert('Server accepted the approval, but read-back could not be confirmed. Refresh before retrying.', 'warning');
+                return;
+            }
             loadResourcesTab();
-            // Approving creates a transaction (possibly a pending-settlement cash
-            // purchase) that affects Excel Mela dues — refresh the Mela views too.
             filterMelaStudents();
             renderMelaTransactionsList();
             showAlert(`Request approved${useAdvantage ? ` — ${advantagePointsDeducted} pts deducted for half-price advantage` : ''}`, 'success');
@@ -58732,11 +58939,26 @@ function eaNotebookFetch(url, options, fetcher) { return window.eaNotebookComman
                 rejected_by_login_id: String(currentLoginId || 'Admin').trim(),
                 updated_at: nowIso
             };
-            pushUndoSnapshot('Reject resource request');
-            applyResourcePatchLocally({ resource_requests: [updatedReq] });
+            const accepted = await postResourcePatchConfirmed({ resource_requests: [updatedReq] });
+            if (!accepted.ok) {
+                _restoreRejectBtn();
+                showAlert(accepted.error, 'warning');
+                return;
+            }
+            _saveServerETag('');
+            const pulled = await pullFromServer(false, true);
+            const verified = pulled && getResourceRequests().some(row =>
+                parseInt(row && row.id, 10) === rid &&
+                String(row.status || '').toLowerCase() === 'rejected' &&
+                String(row.updated_at || '') === nowIso
+            );
             _restoreRejectBtn();
+            if (!verified) {
+                showAlert('Server accepted the rejection, but read-back could not be confirmed. Refresh before retrying.', 'warning');
+                return;
+            }
             renderResourceRequests();
-            showAlert('Request rejected. Press Ctrl+Z to undo.', 'info');
+            showAlert('Request rejected and verified on the server.', 'success');
         }
 
         function loadResourcesTab() {

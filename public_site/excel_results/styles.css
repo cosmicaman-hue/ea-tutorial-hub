@@ -4,15 +4,15 @@
    ========================================================================== */
 
 #excelResultsRoot {
-  --er-bg: #faf8f3;
-  --er-surface: #ffffff;
-  --er-surface-2: #f4f0e8;
-  --er-surface-card: rgba(255, 255, 255, 0.95);
-  --er-text: #1e293b;
-  --er-text-secondary: #475569;
-  --er-muted: #64748b;
-  --er-line: rgba(36, 52, 71, 0.12);
-  --er-line-light: rgba(36, 52, 71, 0.06);
+  --er-bg: #f5efe5;
+  --er-surface: #fffaf2;
+  --er-surface-2: #eee4d5;
+  --er-surface-card: rgba(255, 250, 242, 0.96);
+  --er-text: #28241e;
+  --er-text-secondary: #51493e;
+  --er-muted: #62594e;
+  --er-line: #d2c3ae;
+  --er-line-light: #e5d9c8;
   --er-primary: #1a4d2e;
   --er-primary-hover: #133a23;
   --er-gold: #d4af37;
@@ -68,14 +68,14 @@
 body.dark #excelResultsRoot,
 body.er-lan.dark #excelResultsRoot {
   --er-bg: #000000;
-  --er-surface: #0a0e17;
-  --er-surface-2: #111827;
-  --er-surface-card: rgba(15, 23, 42, 0.85);
-  --er-text: #f1f5f9;
-  --er-text-secondary: #cbd5e1;
-  --er-muted: #94a3b8;
-  --er-line: rgba(255, 255, 255, 0.12);
-  --er-line-light: rgba(255, 255, 255, 0.06);
+  --er-surface: #0b0b0a;
+  --er-surface-2: #171613;
+  --er-surface-card: rgba(11, 11, 10, 0.96);
+  --er-text: #f4f1e9;
+  --er-text-secondary: #d6cec1;
+  --er-muted: #b9b2a6;
+  --er-line: #39352e;
+  --er-line-light: #292620;
   --er-primary: #22c55e;
   --er-primary-hover: #16a34a;
   --er-gold: #fbbf24;
@@ -104,7 +104,7 @@ body.er-lan.dark #excelResultsRoot {
 
 body.er-lan {
   margin: 0;
-  background: #faf8f3;
+  background: linear-gradient(145deg, #f8f2e8, #efe6d8);
   min-height: 100vh;
 }
 body.er-lan.dark {
@@ -133,7 +133,7 @@ body.er-lan.dark {
 }
 
 body.dark .er-hero {
-  background: linear-gradient(135deg, #071c10 0%, #020804 55%, #0d2818 100%);
+  background: #000;
   border-color: rgba(34, 197, 94, 0.25);
   box-shadow: 0 0 40px rgba(34, 197, 94, 0.10);
 }
@@ -841,6 +841,10 @@ body.dark .er-paper-card {
 body.dark .er-btn.ghost {
   background: var(--er-surface-2);
 }
+body.dark .er-btn:not(.ghost):not(.danger),
+body.dark .er-admin-tab-btn.active { color: #171613; }
+body.dark .er-btn.secondary:hover,
+body.dark .er-btn.results-btn:hover { color: #ffffff; }
 
 .er-btn.danger {
   background: #dc2626;
