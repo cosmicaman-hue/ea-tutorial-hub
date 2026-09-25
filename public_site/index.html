@@ -107,7 +107,8 @@
             overflow-x: auto;
             overflow-y: hidden;
             -webkit-overflow-scrolling: touch;
-            scrollbar-width: none;
+            scrollbar-width: thin;
+            scrollbar-color: var(--muted) transparent;
             padding: 6px max(12px, env(safe-area-inset-right)) 6px max(12px, env(safe-area-inset-left));
             gap: 5px;
             scroll-behavior: smooth;
@@ -116,13 +117,14 @@
         @media (min-width: 960px) {
             .tabs {
                 justify-content: center;
-                max-width: 1200px;
-                margin: 0 auto;
+                flex-wrap: wrap;
+                overflow: visible;
                 padding: 7px 16px;
                 gap: 6px;
             }
         }
-        .tabs::-webkit-scrollbar { display: none; }
+        .tabs::-webkit-scrollbar { height: 6px; }
+        .tabs::-webkit-scrollbar-thumb { background: var(--muted); border-radius: 999px; }
         .tab-btn {
             flex: 0 0 auto;
             display: inline-flex;
