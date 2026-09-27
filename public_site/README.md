@@ -127,3 +127,8 @@ Keep admin/LAN app private; host only this folder publicly.
 The My Profile tab is a separate authenticated service. It does not use
 `credentials.json`; its opaque session cookie is issued by the portal Worker,
 and D1 stores only sanitized per-student projections and request conversations.
+Students use an Admin-issued one-use code for first setup or to reset a forgotten
+password. The sign-in screen's **Forgot password?** path explains how to obtain
+a new code. A reset signs out older devices and opens the profile with the new
+password. Admin can review Cloudflare student usage and block or unblock an
+account in the LAN Student Requests tab.

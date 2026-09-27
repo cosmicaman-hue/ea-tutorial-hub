@@ -184,7 +184,7 @@
         <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
         <link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@900&display=swap" rel="stylesheet">
     </noscript>
-    <link rel="stylesheet" href="/static/css/offline-scoreboard.css?v=16">
+    <link rel="stylesheet" href="/static/css/offline-scoreboard.css?v=34">
 
 <script>
     // System Performance Overhaul: Async localstorage debouncer (Per-Key Isolated)
@@ -1813,7 +1813,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                 <i class="fas fa-upload"></i> Force Publish
             </button>
             <button id="globalRefreshBtn" class="secondary" data-allow="true"
-                onclick="pullFromServer(true, true)"
+                onclick="refreshScoreboardFromServer()"
                 style="padding:7px 14px;font-size:13px;display:none"
                 title="Pull latest data from server">
                 <i class="fas fa-sync-alt"></i> Refresh
@@ -4480,6 +4480,11 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                 </div>
             </div>
 
+            <div class="ranking-stage-intro">
+                <span>EXCEL ACADEMY · MONTHLY HONOURS</span>
+                <h2>The Top Three</h2>
+                <p>One podium. Three places. Every point earned.</p>
+            </div>
             <div id="rankingContainer" class="ranking-container">
                 <div id="rankingContent" class="ranking-content">
                     <div class="ranking-placeholder">
@@ -4490,6 +4495,44 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                 <canvas id="rankingFireworksCanvas" class="ranking-fireworks-canvas"></canvas>
             </div>
         </div>
+
+<script>
+(function () {
+    function keepRankingPodiumOnly() {
+        const content = document.getElementById('rankingContent');
+        const replay = document.querySelector('#rankingReplayGroup button');
+        if (!content) return;
+        function shapePodium() {
+            content.querySelectorAll('.ranking-group').forEach(group => group.remove());
+            const podium = content.querySelector('.ranking-podium');
+            if (!podium) return;
+            podium.querySelectorAll('.podium-platform').forEach(platform => {
+                if (platform.querySelector('.rank-emblem-number')) return;
+                const number = platform.textContent.trim();
+                const digit = document.createElement('span');
+                digit.className = 'rank-emblem-number';
+                digit.textContent = number;
+                platform.replaceChildren(digit);
+            });
+        }
+        new MutationObserver(shapePodium).observe(content, { childList: true });
+        replay?.addEventListener('click', () => {
+            const podium = content.querySelector('.ranking-podium');
+            if (!podium) return;
+            const animated = podium.querySelectorAll('.podium-slot, .rank-emblem-number');
+            animated.forEach(element => { element.style.animation = 'none'; });
+            void podium.offsetWidth;
+            animated.forEach(element => { element.style.removeProperty('animation'); });
+        });
+        shapePodium();
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', keepRankingPodiumOnly, { once: true });
+    } else {
+        keepRankingPodiumOnly();
+    }
+})();
+</script>
 
         <!-- TAB: GROUP SCOREBOARD -->
         <div id="group-scoreboard-tab" class="tab-content hidden">
@@ -4535,25 +4578,88 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                     </div>
                     <span class="group-scoreboard-caption-meta">Total points · descending order</span>
                 </div>
-                <div id="groupScoreboardBody" class="group-scorecard-grid" role="list" aria-live="polite">
-                    <div class="group-scorecard-empty" role="status">
-                        <i class="fas fa-spinner fa-spin" aria-hidden="true"></i>
-                        <strong>Loading the board</strong>
-                        <span>Gathering the month’s totals…</span>
+                <div id="groupScoreboardLayout" class="group-scoreboard-layout">
+                    <div id="groupScoreboardBody" class="group-scorecard-grid" role="list" aria-live="polite">
+                        <div class="group-scorecard-empty" role="status">
+                            <i class="fas fa-spinner fa-spin" aria-hidden="true"></i>
+                            <strong>Loading the board</strong>
+                            <span>Gathering the month’s totals…</span>
+                        </div>
+                    </div>
+                    <div id="groupScoreboardDetailColumn" class="group-scoreboard-detail-column">
+                        <section id="groupScoreboardStudentsEmpty" class="group-scoreboard-students-empty" role="status">
+                            <span class="group-scoreboard-caption-kicker">Choose a group</span>
+                            <i class="fas fa-users" aria-hidden="true"></i>
+                            <h3>Meet the group</h3>
+                            <p>Select a group on the left to reveal its students and monthly points.</p>
+                        </section>
+                        <section id="groupScoreboardStudents" class="group-scoreboard-students hidden" aria-live="polite" aria-labelledby="groupScoreboardStudentsTitle">
+                            <header>
+                                <div>
+                                    <span class="group-scoreboard-caption-kicker">Student roster</span>
+                                    <h3 id="groupScoreboardStudentsTitle">Group members</h3>
+                                </div>
+                                <button type="button" class="group-scoreboard-close" onclick="toggleGroupScoreboardStudents('')" aria-label="Close student roster">×</button>
+                            </header>
+                            <div id="groupScoreboardStudentsBody" class="group-scoreboard-student-list" role="list"></div>
+                        </section>
                     </div>
                 </div>
-                <section id="groupScoreboardStudents" class="group-scoreboard-students hidden" aria-live="polite" aria-labelledby="groupScoreboardStudentsTitle">
-                    <header>
-                        <div>
-                            <span class="group-scoreboard-caption-kicker">Student roster</span>
-                            <h3 id="groupScoreboardStudentsTitle">Group members</h3>
-                        </div>
-                        <button type="button" class="group-scoreboard-close" onclick="toggleGroupScoreboardStudents('')" aria-label="Close student roster">×</button>
-                    </header>
-                    <div id="groupScoreboardStudentsBody" class="group-scoreboard-student-list" role="list"></div>
-                </section>
             </section>
         </div>
+
+<script>
+(function () {
+    function attachGroupScoreboardMotion() {
+        const board = document.getElementById('groupScoreboardBody');
+        const layout = document.getElementById('groupScoreboardLayout');
+        const roster = document.getElementById('groupScoreboardStudents');
+        const empty = document.getElementById('groupScoreboardStudentsEmpty');
+        const tab = document.getElementById('group-scoreboard-tab');
+        if (!board || !layout || !roster || !empty || !tab) return;
+
+        let frame = 0;
+        function update() {
+            frame = 0;
+            const card = board.querySelector('.group-scorecard.is-selected');
+            const open = Boolean(card && !roster.classList.contains('hidden'));
+            layout.classList.toggle('has-selection', open);
+            empty.classList.toggle('hidden', open);
+            if (!open) {
+                roster.classList.remove('group-detail-enter');
+                layout.style.removeProperty('--group-scoreboard-anchor-y');
+                layout.style.removeProperty('--group-scoreboard-rgb');
+                return;
+            }
+
+            const cardRect = card.getBoundingClientRect();
+            const layoutRect = layout.getBoundingClientRect();
+            let anchor = cardRect.top - layoutRect.top + cardRect.height / 2;
+            if (layout.clientHeight > 28) anchor = Math.max(14, Math.min(anchor, layout.clientHeight - 14));
+            const color = getComputedStyle(card).getPropertyValue('--scorecard-rgb').trim();
+            layout.style.setProperty('--group-scoreboard-anchor-y', String(anchor) + 'px');
+            layout.style.setProperty('--group-scoreboard-rgb', color || '56,189,248');
+            roster.classList.add('group-detail-enter');
+        }
+        function schedule() {
+            if (!frame) frame = requestAnimationFrame(update);
+        }
+
+        new MutationObserver(schedule).observe(board, {
+            childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'aria-expanded']
+        });
+        new MutationObserver(schedule).observe(tab, { attributes: true, attributeFilter: ['class'] });
+        board.addEventListener('scroll', schedule, { passive: true });
+        window.addEventListener('resize', schedule);
+        schedule();
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', attachGroupScoreboardMotion, { once: true });
+    } else {
+        attachGroupScoreboardMotion();
+    }
+})();
+</script>
 
         <!-- TAB: PARTY STANDINGS -->
         <div id="party-standings-tab" class="tab-content hidden">
@@ -4564,7 +4670,17 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                 </div>
             </div>
             <div id="partyStandingsNotice" class="ea-results-advisory" role="status" aria-live="polite"></div>
-            <div class="scoreboard-wrapper">
+            <div id="partyStandingsLayout" class="party-standings-layout">
+                <div id="partyStandingsRail" class="party-standings-rail" aria-label="Ranked parties"></div>
+                <section id="partyStandingsDetail" class="party-standings-detail" aria-live="polite">
+                    <div class="party-standings-placeholder">
+                        <i class="fas fa-flag" aria-hidden="true"></i>
+                        <h3>Choose a party</h3>
+                        <p>Select a party on the left to see its members and monthly standing.</p>
+                    </div>
+                </section>
+            </div>
+            <div class="scoreboard-wrapper party-standings-legacy-tables">
                 <div class="scoreboard-scroll">
                     <table class="scoreboard" id="partyStandingsTable">
                         <thead>
@@ -4585,7 +4701,7 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                     </table>
                 </div>
             </div>
-            <div class="scoreboard-wrapper" style="margin-top: 18px;">
+            <div class="scoreboard-wrapper party-standings-legacy-tables" style="margin-top: 18px;">
                 <div class="scoreboard-scroll">
                     <table class="scoreboard" id="partyStandingsRosterTable">
                         <thead>
@@ -4607,6 +4723,209 @@ try { if (localStorage.getItem('ea_sidebar_collapsed') === 'true') document.body
                 </div>
             </div>
         </div>
+
+<script>
+(function () {
+    function attachPartyStandingsView() {
+        const tab = document.getElementById('party-standings-tab');
+        const layout = document.getElementById('partyStandingsLayout');
+        const rail = document.getElementById('partyStandingsRail');
+        const detail = document.getElementById('partyStandingsDetail');
+        const summary = document.getElementById('partyStandingsBody');
+        const roster = document.getElementById('partyStandingsRosterBody');
+        if (!tab || !layout || !rail || !detail || !summary || !roster) return;
+
+        let selected = '';
+        let frame = 0;
+        const make = (tag, className, value) => {
+            const element = document.createElement(tag);
+            element.className = className;
+            if (value !== undefined) element.textContent = value;
+            return element;
+        };
+        const codeOf = row => row.querySelector('.party-code-tag')?.textContent.trim().toUpperCase() || '';
+        const labelOf = row => row.querySelector('.party-full-label')?.textContent.trim() || codeOf(row);
+        const accentOf = row => row.querySelector('.party-name-chip')?.style.borderColor || '#f97316';
+        const rollKey = value => String(value || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+
+        function officeRolesForParty(code) {
+            if (typeof db === 'undefined' || !db?.getData) return new Map();
+            const data = db.getData();
+            const party = (data.parties || []).find(item => String(item.code || '').trim().toUpperCase() === code);
+            const students = db.getStudents ? db.getStudents() : (data.students || []);
+            const rollById = new Map(students.map(student => [Number(student.id), student.roll]));
+            const month = document.getElementById('partyStandingsMonthFilter')?.value || '';
+            const currentMonth = typeof getCurrentMonthKey === 'function' ? getCurrentMonthKey() : month;
+            const roles = new Map();
+            (party?.members || []).forEach(member => {
+                const state = window.EAResults
+                    ? EAResults.membershipState(member, month, currentMonth)
+                    : { active: String(member.status || '').toLowerCase() !== 'ended' };
+                if (!state.active) return;
+                const designation = String(member.designation || '').trim().toLowerCase().replace(/_/g, ' ');
+                const role = ['president', 'party president', 'pp'].includes(designation) ? 'pp'
+                    : ['deputy president', 'deputy party president', 'dpp'].includes(designation) ? 'dpp' : '';
+                const key = rollKey(member.roll || rollById.get(Number(member.studentId)));
+                if (role && key && (role === 'pp' || !roles.has(key))) roles.set(key, role);
+            });
+            return roles;
+        }
+
+        function updateAnchor() {
+            const card = Array.from(rail.querySelectorAll('.party-standings-card')).find(item => item.dataset.party === selected);
+            if (!card) {
+                layout.classList.remove('has-selection');
+                return;
+            }
+            const cardRect = card.getBoundingClientRect();
+            const layoutRect = layout.getBoundingClientRect();
+            layout.style.setProperty('--party-anchor-y', Math.max(14, Math.min(cardRect.top - layoutRect.top + cardRect.height / 2, layout.clientHeight - 14)) + 'px');
+            layout.style.setProperty('--party-accent', card.style.getPropertyValue('--party-accent'));
+            layout.classList.add('has-selection');
+        }
+
+        function showParty(rows, revealMembers = false) {
+            const selectedRow = rows.find(row => codeOf(row) === selected);
+            rail.querySelectorAll('.party-standings-card').forEach(card => {
+                const active = card.dataset.party === selected;
+                card.classList.toggle('is-selected', active);
+                card.setAttribute('aria-pressed', active ? 'true' : 'false');
+            });
+            detail.replaceChildren();
+            if (!selectedRow) {
+                selected = '';
+                layout.classList.remove('has-selection');
+                const prompt = make('div', 'party-standings-placeholder');
+                const icon = make('i', 'fas fa-flag');
+                icon.setAttribute('aria-hidden', 'true');
+                prompt.append(icon, make('h3', '', rows.length ? 'Choose a party' : 'No parties found'),
+                    make('p', '', rows.length ? 'Select a party on the left to see its members and monthly standing.' : 'Try another month when party standings are available.'));
+                detail.append(prompt);
+                return;
+            }
+
+            const cells = selectedRow.cells;
+            const head = make('header', 'party-standings-detail-header');
+            const heading = make('div', 'party-standings-detail-heading');
+            heading.append(make('span', 'party-standings-kicker', 'PARTY ROSTER'), make('h3', '', labelOf(selectedRow)));
+            const close = make('button', 'party-standings-close', '×');
+            close.type = 'button';
+            close.setAttribute('aria-label', 'Close party roster');
+            close.addEventListener('click', () => {
+                const card = Array.from(rail.querySelectorAll('.party-standings-card')).find(item => item.dataset.party === selected);
+                selected = '';
+                showParty(rows);
+                card?.focus({ preventScroll: true });
+            });
+            head.append(heading, close);
+
+            const stats = make('div', 'party-standings-stats');
+            [['Rank', cells[0].textContent.trim()], ['Members', cells[2].textContent.trim()],
+             ['Total points', cells[3].textContent.trim()], ['Average', cells[4].textContent.trim()],
+             ['Vote power', cells[5].textContent.trim()]].forEach(([label, value]) => {
+                const stat = make('div', 'party-standings-stat');
+                stat.append(make('span', '', label), make('strong', '', value));
+                stats.append(stat);
+            });
+
+            const list = make('div', 'party-standings-member-list');
+            const members = Array.from(roster.querySelectorAll('tr')).filter(row => codeOf(row) === selected);
+            const officeRoles = officeRolesForParty(selected);
+            const officers = make('div', 'party-standings-officers');
+            const officerByRole = new Map();
+            members.forEach((row, index) => {
+                const entry = make('article', 'party-standings-member');
+                entry.append(make('span', 'party-standings-member-rank', String(index + 1).padStart(2, '0')));
+                const identity = make('div', 'party-standings-member-identity');
+                const name = make('strong', '', row.cells[2].textContent.trim());
+                const meta = make('small', '', row.cells[1].textContent.trim() + ' · Class ' + row.cells[3].textContent.trim());
+                identity.append(name, meta);
+                const tableRole = row.cells[5].textContent.trim().toLowerCase();
+                const office = officeRoles.get(rollKey(row.cells[1].textContent)) ||
+                    (tableRole === 'president' ? 'pp' : tableRole === 'deputy president' ? 'dpp' : '');
+                if (office) {
+                    const title = office === 'pp' ? 'Party President' : 'Deputy Party President';
+                    entry.classList.add('is-' + office);
+                    identity.append(make('span', 'party-standings-role-badge', (office === 'pp' ? 'PP' : 'DPP') + ' · ' + title));
+                    if (!officerByRole.has(office)) {
+                        const spotlight = make('div', 'party-standings-officer is-' + office);
+                        spotlight.append(make('span', 'party-standings-officer-monogram', office.toUpperCase()),
+                            make('div', 'party-standings-officer-copy', title),
+                            make('strong', 'party-standings-officer-name', row.cells[2].textContent.trim()));
+                        officerByRole.set(office, spotlight);
+                    }
+                } else {
+                    identity.append(make('span', 'party-standings-member-role', 'Member'));
+                }
+                const score = make('span', 'party-standings-member-score', row.cells[4].textContent.trim());
+                entry.append(identity, score);
+                list.append(entry);
+            });
+            ['pp', 'dpp'].forEach(role => {
+                if (officerByRole.has(role)) officers.append(officerByRole.get(role));
+            });
+            if (revealMembers) {
+                const entries = list.querySelectorAll('.party-standings-member');
+                const step = Math.min(115, Math.floor(1500 / Math.max(1, entries.length - 1)));
+                entries.forEach((entry, index) => {
+                    entry.style.setProperty('--member-delay', `${140 + index * step}ms`);
+                    entry.classList.add('member-emerge');
+                });
+            }
+            if (!members.length) list.append(make('p', 'party-standings-no-members', 'No members are available for this party and month.'));
+            detail.style.setProperty('--party-accent', accentOf(selectedRow));
+            detail.append(head, stats);
+            if (officers.childElementCount) detail.append(officers);
+            detail.append(make('h4', 'party-standings-list-title', 'Students'), list);
+            detail.classList.remove('party-enter');
+            void detail.offsetWidth;
+            detail.classList.add('party-enter');
+            updateAnchor();
+        }
+
+        function refresh() {
+            frame = 0;
+            const rows = Array.from(summary.querySelectorAll('tr')).filter(row => codeOf(row));
+            rail.replaceChildren();
+            rows.forEach(row => {
+                const cells = row.cells;
+                const code = codeOf(row);
+                const card = make('button', 'party-standings-card');
+                card.type = 'button';
+                card.dataset.party = code;
+                card.style.setProperty('--party-accent', accentOf(row));
+                card.append(make('span', 'party-standings-card-rank', cells[0].textContent.trim()),
+                    make('strong', 'party-standings-card-name', labelOf(row)),
+                    make('span', 'party-standings-card-code', code),
+                    make('span', 'party-standings-card-total', cells[3].textContent.trim() + ' points'),
+                    make('small', 'party-standings-card-meta', cells[2].textContent.trim() + ' members · ' + cells[5].textContent.trim() + ' vote power'));
+                card.addEventListener('click', () => {
+                    selected = selected === code ? '' : code;
+                    showParty(rows, Boolean(selected));
+                });
+                rail.append(card);
+            });
+            if (!rows.length) rail.append(make('p', 'party-standings-rail-empty', 'No parties for this month.'));
+            showParty(rows);
+        }
+        function schedule() {
+            if (!frame) frame = requestAnimationFrame(refresh);
+        }
+        new MutationObserver(schedule).observe(summary, { childList: true });
+        new MutationObserver(schedule).observe(roster, { childList: true });
+        new MutationObserver(() => requestAnimationFrame(updateAnchor)).observe(tab, { attributes: true, attributeFilter: ['class'] });
+        rail.addEventListener('scroll', updateAnchor, { passive: true });
+        window.addEventListener('resize', updateAnchor);
+        tab.classList.add('party-standings-enhanced');
+        schedule();
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', attachPartyStandingsView, { once: true });
+    } else {
+        attachPartyStandingsView();
+    }
+})();
+</script>
 
         <!-- TAB: TEAM COMPETITION -->
         <div id="team-competition-tab" class="tab-content hidden">
@@ -19298,7 +19617,9 @@ function eaCompatibilitySet(mode) {
 let eaStudentRequestRows = [];
 let eaStudentRequestCsrf = '';
 let eaStudentRequestSelected = '';
+let eaStudentRequestSelectedStudent = '';
 let eaStudentRequestPoll = 0;
+let eaPortalUsage = null;
 
 function eaStudentRequestsAdmin() {
     return String(currentUserRole || '').toLowerCase() === 'admin' && (!SERVER_SYNC.enabled || hasServerSession);
@@ -19306,6 +19627,7 @@ function eaStudentRequestsAdmin() {
 function eaStudentRequestsEscape(value) {
     const node = document.createElement('span'); node.textContent = String(value == null ? '' : value); return node.innerHTML;
 }
+function eaStudentRequestsEscapeAttr(value) { return eaStudentRequestsEscape(value).replaceAll('"', '&quot;').replaceAll("'", '&#39;'); }
 function eaStudentRequestsInit() {
     if (document.getElementById('student-requests-tab')) return;
     const helpdeskSide = document.querySelector('.sidebar-nav-item[data-tab="helpdesk"]');
@@ -19330,20 +19652,28 @@ function eaStudentRequestsInit() {
     if (helpdeskPanel) {
         const panel = document.createElement('div'); panel.id = 'student-requests-tab'; panel.className = 'tab-content hidden';
         panel.innerHTML = '<section class="card ea-student-requests-shell">'
-            + '<div class="ea-student-requests-head"><div><p class="ea-request-kicker">Cloud intake · LAN review</p><h2>Student Requests</h2><p>Missing-score, correction and transfer requests in one durable channel. Approval does not itself change a score.</p></div>'
+            + '<div class="ea-student-requests-head"><div><p class="ea-request-kicker">Cloud intake · LAN review</p><h2>Student Requests</h2><p>Approve verified score requests here to update the scoreboard. Transfers keep a separate review action.</p></div>'
             + '<div class="ea-request-actions"><button type="button" class="secondary" id="eaStudentRequestRefresh">Refresh</button><button type="button" class="primary" id="eaStudentRequestSync">Sync Cloud</button></div></div>'
             + '<div id="eaStudentRequestStatus" class="ea-request-status" role="status"></div>'
-            + '<section class="ea-portal-activation" aria-labelledby="eaPortalActivationTitle"><div><p class="ea-request-kicker">Student portal access</p><h3 id="eaPortalActivationTitle">Portal Activation</h3><p>Enter the student’s current roll/login ID. The one-use code is shown only once and expires after 24 hours.</p></div>'
-            + '<form id="eaPortalActivationForm" class="ea-portal-activation-form"><label>Student roll / login ID<input id="eaPortalActivationLogin" name="login_id" type="text" maxlength="100" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="EA26A01" required></label><button type="submit" class="primary" id="eaPortalActivationIssue">Issue activation code</button></form>'
-            + '<div id="eaPortalActivationResult" class="ea-portal-activation-result hidden" aria-live="polite"><div><strong id="eaPortalActivationIdentity"></strong><small id="eaPortalActivationExpiry"></small></div><label>One-use activation code<input id="eaPortalActivationToken" type="text" readonly autocomplete="off" aria-label="One-use activation code"></label><button type="button" class="secondary" id="eaPortalActivationCopy">Copy code</button></div></section>'
-            + '<div class="ea-student-requests-grid"><aside><label>Status <select id="eaStudentRequestFilter"><option value="">All</option><option value="awaiting_admin">Awaiting Admin</option><option value="in_review">In review</option><option value="needs_information">Needs information</option><option value="approved_processing">Approved processing</option><option value="completed">Completed</option><option value="declined">Declined</option></select></label><div id="eaStudentRequestList" class="ea-request-list"></div></aside><main id="eaStudentRequestDetail" class="ea-request-detail"><div class="ea-request-empty">Select a request to review its exact day, target and conversation.</div></main></div>'
+            + '<section class="ea-portal-activation" aria-labelledby="eaPortalActivationTitle"><div><p class="ea-request-kicker">Student portal access</p><h3 id="eaPortalActivationTitle">Portal Activation &amp; Password Reset</h3><p>Verify the student’s identity, then enter their current roll/login ID. This one-use code activates a new account or resets a forgotten password. It is shown once and expires after 24 hours; using it signs out older devices.</p></div>'
+            + '<form id="eaPortalActivationForm" class="ea-portal-activation-form"><label>Student roll / login ID<input id="eaPortalActivationLogin" name="login_id" type="text" maxlength="100" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="EA26A01" required></label><button type="submit" class="primary" id="eaPortalActivationIssue">Issue activation / reset code</button></form>'
+            + '<div id="eaPortalActivationResult" class="ea-portal-activation-result hidden" aria-live="polite"><div><strong id="eaPortalActivationIdentity"></strong><span class="ea-request-roll" id="eaPortalActivationRoll"></span><small id="eaPortalActivationExpiry"></small></div><label>One-use activation / reset code<input id="eaPortalActivationToken" type="text" readonly autocomplete="off" aria-label="One-use activation or reset code"></label><button type="button" class="secondary" id="eaPortalActivationCopy">Copy code</button></div></section>'
+            + '<section class="ea-portal-activation hidden" id="eaPortalStaffSection" aria-labelledby="eaPortalStaffTitle"><div><p class="ea-request-kicker">Teacher and Admin portal access</p><h3 id="eaPortalStaffTitle">Staff Activation</h3><p>Verify the staff member, then issue a one-use cloud account code. This uses a separate portal password and signs out their older portal devices when used.</p></div>'
+            + '<form id="eaPortalStaffForm" class="ea-portal-activation-form"><label>Staff account<select id="eaPortalStaffIdentity" required></select></label><button type="submit" class="primary" id="eaPortalStaffIssue">Issue staff code</button></form>'
+            + '<div id="eaPortalStaffResult" class="ea-portal-activation-result hidden" aria-live="polite"><div><strong id="eaPortalStaffName"></strong><small id="eaPortalStaffExpiry"></small></div><label>One-use staff code<input id="eaPortalStaffToken" type="text" readonly autocomplete="off"></label><button type="button" class="secondary" id="eaPortalStaffCopy">Copy code</button></div></section>'
+            + '<section class="ea-portal-usage" aria-labelledby="eaPortalUsageTitle"><div class="ea-portal-usage-head"><div><p class="ea-request-kicker">Cloudflare My Profile</p><h3 id="eaPortalUsageTitle">Student access and usage</h3><p>Review account setup, recent use, requests and active devices. More than two valid sessions are flagged for review.</p></div><button type="button" class="secondary" id="eaPortalUsageRefresh">Load usage</button></div><div id="eaPortalUsageReport" role="status">Load the report to see current Cloudflare activity.</div></section>'
+            + '<div class="ea-student-requests-grid"><aside><div class="ea-request-filters"><label>Status <select id="eaStudentRequestFilter"><option value="">All</option><option value="awaiting_admin">Awaiting Admin</option><option value="in_review">In review</option><option value="needs_information">Needs information</option><option value="approved_processing">Approved processing</option><option value="applied">Applied</option><option value="completed">Completed</option><option value="declined">Declined</option><option value="delivery_delayed">Delivery delayed</option><option value="withdrawn">Withdrawn</option></select></label><label>Find student or request<input id="eaStudentRequestSearch" type="search" placeholder="Name, roll, ID or request text"></label></div><p id="eaStudentRequestCount" class="ea-request-count"></p><div id="eaStudentRequestList" class="ea-request-list"></div></aside><main class="ea-request-review-column"><section id="eaStudentRequestStudentRequests" class="ea-request-student-panel"><div class="ea-request-empty">Select a student to see their requests by received date.</div></section><section id="eaStudentRequestDetail" class="ea-request-detail"><div class="ea-request-empty">Select a request above to review and decide it.</div></section></main></div>'
             + '</section>';
         helpdeskPanel.before(panel);
         panel.querySelector('#eaStudentRequestRefresh').addEventListener('click', () => loadStudentRequestsTab(true));
         panel.querySelector('#eaStudentRequestSync').addEventListener('click', eaStudentRequestsSync);
         panel.querySelector('#eaStudentRequestFilter').addEventListener('change', eaStudentRequestsRenderList);
+        panel.querySelector('#eaStudentRequestSearch').addEventListener('input', eaStudentRequestsRenderList);
         panel.querySelector('#eaPortalActivationForm').addEventListener('submit', eaPortalActivationIssue);
         panel.querySelector('#eaPortalActivationCopy').addEventListener('click', eaPortalActivationCopy);
+        panel.querySelector('#eaPortalStaffForm').addEventListener('submit', eaPortalStaffIssue);
+        panel.querySelector('#eaPortalStaffCopy').addEventListener('click', eaPortalStaffCopy);
+        panel.querySelector('#eaPortalUsageRefresh').addEventListener('click', eaPortalUsageLoad);
     }
     _tabDomCache = null;
     eaStudentRequestsRefreshVisibility();
@@ -19381,7 +19711,7 @@ function eaStudentRequestsUpdateBadge(unread) {
 async function eaStudentRequestsPollUnread() {
     if (!eaStudentRequestsAdmin() || document.hidden) return;
     try {
-        const data = await eaStudentRequestsFetch('/scoreboard/api/student-requests?limit=100');
+        const data = await eaStudentRequestsFetch('/scoreboard/api/student-requests?limit=500');
         eaStudentRequestCsrf = data.csrf_token || eaStudentRequestCsrf;
         eaStudentRequestsUpdateBadge(Number(data.unread || 0));
         if (getActiveTabName() === 'student-requests') { eaStudentRequestRows = data.requests || []; eaStudentRequestsRenderList(); }
@@ -19391,9 +19721,10 @@ async function eaStudentRequestsPollUnread() {
 }
 async function loadStudentRequestsTab(force = false) {
     if (!eaStudentRequestsAdmin()) return;
+    eaPortalStaffLoad();
     eaStudentRequestsSetStatus('Loading requests…');
     try {
-        const data = await eaStudentRequestsFetch('/scoreboard/api/student-requests?limit=200');
+        const data = await eaStudentRequestsFetch('/scoreboard/api/student-requests?limit=500');
         eaStudentRequestRows = data.requests || []; eaStudentRequestCsrf = data.csrf_token || '';
         eaStudentRequestsUpdateBadge(Number(data.unread || 0)); eaStudentRequestsRenderList();
         eaStudentRequestsSetStatus(`${eaStudentRequestRows.length} request${eaStudentRequestRows.length === 1 ? '' : 's'} available.`);
@@ -19405,29 +19736,155 @@ async function loadStudentRequestsTab(force = false) {
 function eaStudentRequestsRenderList() {
     const host = document.getElementById('eaStudentRequestList'), select = document.getElementById('eaStudentRequestFilter');
     if (!host) return;
-    const rows = eaStudentRequestRows.filter(row => !select?.value || row.status === select.value);
-    host.innerHTML = rows.length ? rows.map(row => '<button type="button" class="ea-request-row' + (row.request_id === eaStudentRequestSelected ? ' selected' : '') + '" data-request-id="' + eaStudentRequestsEscape(row.request_id) + '"><span><strong>' + eaStudentRequestsEscape(row.kind.replaceAll('_',' ')) + '</strong><small>' + eaStudentRequestsEscape(row.target_date) + ' · Student ' + eaStudentRequestsEscape(row.student_id) + '</small></span><em data-status="' + eaStudentRequestsEscape(row.status) + '">' + eaStudentRequestsEscape(row.status.replaceAll('_',' ')) + '</em><p>' + eaStudentRequestsEscape(row.message) + '</p></button>').join('') : '<div class="ea-request-empty">No requests match this filter.</div>';
+    const query = String(document.getElementById('eaStudentRequestSearch')?.value || '').trim().toLowerCase();
+    const statusRows = eaStudentRequestRows.filter(row => !select?.value || row.status === select.value)
+        .sort((a, b) => String(b.received_at || b.created_at || '').localeCompare(String(a.received_at || a.created_at || '')));
+    const groups = new Map();
+    statusRows.forEach(row => {
+        const key = String(row.student_id);
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key).push(row);
+    });
+    if (query) for (const [studentId, requests] of groups) {
+        if (!requests.some(row => {
+            const student = row.student || {};
+            return [student.name, student.roll, student.class_label, row.student_id, row.message, row.kind, row.target_date]
+                .some(value => String(value || '').toLowerCase().includes(query));
+        })) groups.delete(studentId);
+    }
+    const visibleRows = Array.from(groups.values()).flat();
+    const count = document.getElementById('eaStudentRequestCount');
+    if (count) count.textContent = `${visibleRows.length} of ${eaStudentRequestRows.length} requests${eaStudentRequestRows.length >= 500 ? ' · latest 500 shown' : ''}`;
+    if (!groups.has(eaStudentRequestSelectedStudent)) {
+        eaStudentRequestSelectedStudent = groups.keys().next().value || '';
+        eaStudentRequestSelected = '';
+        const detail = document.getElementById('eaStudentRequestDetail');
+        if (detail) detail.innerHTML = '<div class="ea-request-empty">Select a request above to review and decide it.</div>';
+    }
+    if (eaStudentRequestSelected && !visibleRows.some(row => row.request_id === eaStudentRequestSelected)) {
+        eaStudentRequestSelected = '';
+        const detail = document.getElementById('eaStudentRequestDetail');
+        if (detail) detail.innerHTML = '<div class="ea-request-empty">Select a request above to review and decide it.</div>';
+    }
+    host.innerHTML = visibleRows.length ? Array.from(groups, ([studentId, requests]) => {
+        const student = requests[0].student || {}, name = eaStudentRequestsName(student, studentId);
+        const secondary = [student.class_label ? `Class ${student.class_label}` : null, !student.name || !student.roll ? `Student ID ${studentId}` : null].filter(Boolean).join(' · ');
+        const pending = requests.filter(row => ['awaiting_admin','needs_information','delivery_delayed'].includes(row.status)).length;
+        const latest = requests[0];
+        return '<button type="button" class="ea-request-student-card' + (studentId === eaStudentRequestSelectedStudent ? ' selected' : '') + '" data-student-id="' + eaStudentRequestsEscapeAttr(studentId) + '" aria-pressed="' + (studentId === eaStudentRequestSelectedStudent) + '"><strong>' + eaStudentRequestsEscape(name) + '</strong>' + eaStudentRequestsRoll(student) + (secondary ? '<small>' + eaStudentRequestsEscape(secondary) + '</small>' : '') + '<span class="ea-request-stats">' + requests.length + ' request' + (requests.length === 1 ? '' : 's') + (pending ? ' · ' + pending + ' need attention' : '') + '</span><p>Latest: ' + eaStudentRequestsEscape(eaStudentRequestsLabel(latest.kind)) + ' · ' + eaStudentRequestsEscape(latest.message) + '</p></button>';
+    }).join('') : '<div class="ea-request-empty">No requests match this filter.</div>';
+    host.querySelectorAll('[data-student-id]').forEach(button => button.addEventListener('click', () => eaStudentRequestsOpenStudent(button.dataset.studentId)));
+    eaStudentRequestsRenderStudent(groups.get(eaStudentRequestSelectedStudent) || []);
+}
+function eaStudentRequestsOpenStudent(studentId) {
+    if (eaStudentRequestSelectedStudent !== studentId) {
+        eaStudentRequestSelectedStudent = studentId;
+        eaStudentRequestSelected = '';
+        const detail = document.getElementById('eaStudentRequestDetail');
+        if (detail) detail.innerHTML = '<div class="ea-request-empty">Select a request above to review and decide it.</div>';
+    }
+    eaStudentRequestsRenderList();
+}
+function eaStudentRequestsRenderStudent(requests) {
+    const host = document.getElementById('eaStudentRequestStudentRequests');
+    if (!host) return;
+    if (!requests.length) {
+        host.innerHTML = '<div class="ea-request-empty">Select a student to see their requests by received date.</div>';
+        return;
+    }
+    const student = requests[0].student || {}, name = eaStudentRequestsName(student, requests[0].student_id);
+    const dates = new Map();
+    requests.forEach(row => {
+        const received = eaStudentRequestsDate(row.received_at || row.created_at);
+        if (!dates.has(received)) dates.set(received, []);
+        dates.get(received).push(row);
+    });
+    host.innerHTML = '<header><div><p class="ea-request-kicker">Requests from student</p><h3>' + eaStudentRequestsEscape(name) + '</h3>' + eaStudentRequestsRoll(student) + '<p>' + eaStudentRequestsEscape([student.class_label ? `Class ${student.class_label}` : null, !student.name || !student.roll ? `Student ID ${requests[0].student_id}` : null].filter(Boolean).join(' · ')) + '</p></div><span class="ea-request-group-count">' + requests.length + ' request' + (requests.length === 1 ? '' : 's') + '</span></header>'
+        + Array.from(dates, ([date, dayRows]) => '<section class="ea-request-date-group"><h4>Received ' + eaStudentRequestsEscape(date) + ' <span>· ' + dayRows.length + '</span></h4>' + dayRows.map(row => '<button type="button" class="ea-request-row' + (row.request_id === eaStudentRequestSelected ? ' selected' : '') + '" data-request-id="' + eaStudentRequestsEscapeAttr(row.request_id) + '" aria-pressed="' + (row.request_id === eaStudentRequestSelected) + '"><span><strong>' + eaStudentRequestsEscape(eaStudentRequestsLabel(row.kind)) + '</strong><small>For ' + eaStudentRequestsEscape(row.target_date) + '</small></span><em data-status="' + eaStudentRequestsEscapeAttr(row.status) + '">' + eaStudentRequestsEscape(eaStudentRequestsLabel(row.status)) + '</em><p>' + eaStudentRequestsEscape(row.message) + '</p></button>').join('') + '</section>').join('');
     host.querySelectorAll('[data-request-id]').forEach(button => button.addEventListener('click', () => eaStudentRequestsOpen(button.dataset.requestId)));
 }
+function eaStudentRequestsLabel(value) { return String(value || '').replaceAll('_', ' ').replace(/\b\w/g, letter => letter.toUpperCase()); }
+function eaStudentRequestsName(student, studentId) { return student?.name || `Name unavailable · Student ID ${studentId}`; }
+function eaStudentRequestsRoll(student) { return student?.roll ? '<span class="ea-request-roll">Roll no. ' + eaStudentRequestsEscape(student.roll) + '</span>' : ''; }
+function eaStudentRequestsDate(value) {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? String(value || 'date unavailable').slice(0, 10) : date.toLocaleDateString(undefined, {year:'numeric', month:'short', day:'numeric'});
+}
+function eaStudentRequestsDateTime(value) {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? String(value || 'time unavailable') : date.toLocaleString(undefined, {year:'numeric', month:'short', day:'numeric', hour:'numeric', minute:'2-digit'});
+}
+function eaStudentRequestsIdentity(student) {
+    const identity = student || {}, parts = [];
+    if (identity.class_label) parts.push('<div><dt>Current class</dt><dd>' + eaStudentRequestsEscape(identity.class_label) + '</dd></div>');
+    if (!identity.name || !identity.roll) parts.push('<div><dt>Student ID for verification</dt><dd>' + eaStudentRequestsEscape(identity.student_id || '') + '</dd></div>');
+    return parts.join('');
+}
+function eaStudentRequestsScoreContext(item) {
+    const context = item.score_context;
+    if (!context) return '';
+    if (context.unavailable) return '<p class="ea-request-context-warning">The current score record is unavailable. Review the ledger before deciding.</p>';
+    const entry = context.target_entry;
+    const summary = context.day_entry_count
+        ? `${context.day_entry_count} recorded ${context.day_entry_count === 1 ? 'entry' : 'entries'} · ${context.day_points} points on this day`
+        : 'No score entry currently recorded on this day';
+    let target = '';
+    if (item.kind === 'incorrect_entry') {
+        const warnings = {missing:'The selected entry is no longer in the current record. Review the day before deciding.', ambiguous:'More than one entry matches this request. Review manually.', changed:'This entry changed after the student sent the request. Review its current value before deciding.'};
+        target = warnings[context.target_status] ? '<p class="ea-request-context-warning">' + eaStudentRequestsEscape(warnings[context.target_status]) + '</p>' : '';
+        if (entry) target += '<p><strong>Entry selected by student · current record:</strong> ' + eaStudentRequestsEscape(entry.points) + ' points' + (entry.note ? ' · ' + eaStudentRequestsEscape(entry.note) : '') + '</p>';
+    }
+    const dayEntries = (context.day_entries || []).map(row => '<li><strong>' + eaStudentRequestsEscape(row.points) + ' points</strong>' + (row.note ? ' · ' + eaStudentRequestsEscape(row.note) : '') + '</li>').join('');
+    return '<section class="ea-request-record-context"><h4>Current record for ' + eaStudentRequestsEscape(item.target_date) + '</h4><p>' + eaStudentRequestsEscape(summary) + '</p>' + target + (dayEntries ? '<details><summary>View recorded entries</summary><ul>' + dayEntries + '</ul></details>' : '') + '</section>';
+}
 async function eaStudentRequestsOpen(requestId) {
+    const row = eaStudentRequestRows.find(item => item.request_id === requestId);
+    if (row) eaStudentRequestSelectedStudent = String(row.student_id);
     eaStudentRequestSelected = requestId; eaStudentRequestsRenderList();
     const host = document.getElementById('eaStudentRequestDetail'); if (!host) return;
     host.innerHTML = '<div class="ea-request-empty">Loading conversation…</div>';
     try {
         const data = await eaStudentRequestsFetch('/scoreboard/api/student-requests/' + encodeURIComponent(requestId));
-        const item = data.request, events = item.events || [];
+        if (eaStudentRequestSelected !== requestId) return;
+        const item = data.request, events = item.events || [], capabilities = data.capabilities || {};
         const closed = ['completed','declined','withdrawn'].includes(item.status);
-        host.innerHTML = '<header><p class="ea-request-kicker">' + eaStudentRequestsEscape(item.kind.replaceAll('_',' ')) + '</p><h3>' + eaStudentRequestsEscape(item.target_date) + '</h3><span class="ea-request-chip">' + eaStudentRequestsEscape(item.status.replaceAll('_',' ')) + '</span></header>'
-          + '<dl><div><dt>Student ID</dt><dd>' + eaStudentRequestsEscape(item.student_id) + '</dd></div><div><dt>Entry target</dt><dd>' + eaStudentRequestsEscape(item.target_entry_ref || 'Day-level request') + '</dd></div><div><dt>Context</dt><dd>' + eaStudentRequestsEscape(item.context_version) + '</dd></div><div><dt>Claimed points</dt><dd>' + eaStudentRequestsEscape(item.claimed_points == null ? 'Not specified' : item.claimed_points) + '</dd></div></dl>'
-          + '<blockquote>' + eaStudentRequestsEscape(item.message) + '</blockquote>'
-          + '<section class="ea-request-timeline"><h4>Conversation and decisions</h4>' + events.map(event => '<article><b>' + eaStudentRequestsEscape(event.event_type.replaceAll('_',' ')) + '</b><small>' + eaStudentRequestsEscape(event.actor_id || event.actor_type) + ' · ' + eaStudentRequestsEscape(event.created_at) + '</small><p>' + eaStudentRequestsEscape(event.payload?.message || '') + '</p><em>' + eaStudentRequestsEscape(event.delivery_status === 'pending' ? 'Waiting for cloud delivery' : '') + '</em></article>').join('') + '</section>'
-          + (closed ? '<p class="ea-request-closed">This request is closed.</p>' : '<form id="eaStudentRequestReply"><label>Reply or decision reason<textarea id="eaStudentRequestMessage" rows="3" maxlength="2000"></textarea></label><div class="ea-request-decision"><button type="button" data-event="review_started">Start review</button><button type="button" data-event="message_added">Reply</button><button type="button" data-event="needs_information">Need information</button><button type="button" data-event="approved_for_processing">Approve for processing</button><button type="button" data-event="declined" class="danger">Decline</button></div><p>“Approve for processing” records review approval. It does not change the ledger by itself.</p></form>'
-          + (item.status === 'approved_processing' && ['missing_score','incorrect_entry'].includes(item.kind) ? '<section class="ea-request-effect"><h4>Apply reviewed score command</h4><label>' + (item.kind === 'incorrect_entry' ? 'Replacement points' : 'Points to add') + '<input id="eaStudentRequestPoints" type="number" step="0.01" min="-10000" max="10000"></label><label>Admin reason<textarea id="eaStudentRequestEffectReason" maxlength="500"></textarea></label><button type="button" id="eaStudentRequestApplyScore">Apply with receipt</button><p>The command revalidates student, month and entry digest, is idempotent across retries, and returns an effect receipt.</p></section>' : ''));
-        if (item.status === 'approved_processing' && item.kind === 'transfer_request') {
+        const isScoreRequest = ['missing_score','incorrect_entry'].includes(item.kind);
+        const reviewToken = data.score_preview?.ready ? String(data.score_preview.review_token || '') : '';
+        const scoreReady = Boolean(reviewToken);
+        const isAmendment = item.kind === 'incorrect_entry';
+        const claimed = item.claimed_points == null ? null : Number(item.claimed_points);
+        const suggested = Number.isSafeInteger(claimed) && (isAmendment || claimed > 0) ? String(claimed) : '';
+        const scoreIntro = scoreReady
+            ? `Current day score: ${data.score_preview.current_points} points. ${isAmendment ? 'Enter the verified final day score; it will replace the current total.' : 'Enter verified new points; they will be added to the current total.'}`
+            : `Score application needs review: ${data.score_preview?.reason || 'Refresh this request to load the current score.'}`;
+        const scoreAction = !closed && isScoreRequest && capabilities.score_effects
+          ? '<section class="ea-request-effect"><h4>' + (isAmendment ? 'Approve final score' : 'Approve new points') + '</h4><p class="' + (scoreReady ? '' : 'ea-request-context-warning') + '">' + eaStudentRequestsEscape(scoreIntro) + '</p>'
+            + '<label>' + (isAmendment ? 'Verified final day score' : 'Verified additional points') + '<input id="eaStudentRequestPoints" type="number" step="1" min="' + (isAmendment ? '-10000' : '1') + '" max="10000" value="' + eaStudentRequestsEscapeAttr(suggested) + '"></label>'
+            + (suggested ? '<small>Suggested from the student’s claim. Confirm or change it after checking the record.</small>' : '')
+            + '<label>Admin reason<textarea id="eaStudentRequestEffectReason" maxlength="500" rows="3"></textarea></label>'
+            + '<div class="ea-request-effect-actions"><button type="button" id="eaStudentRequestApplyScore" data-review-token="' + eaStudentRequestsEscapeAttr(reviewToken) + '" data-review-error="' + eaStudentRequestsEscapeAttr(data.score_preview?.reason || '') + '" data-current-points="' + eaStudentRequestsEscapeAttr(data.score_preview?.current_points) + '">' + (isAmendment ? 'Approve &amp; Set Final Score' : 'Approve &amp; Add Points') + '</button><button type="button" class="secondary" id="eaStudentRequestReviewRefresh">Refresh score view</button></div>'
+            + '<p>Approval writes one score change and records the decision. If this day changes before saving, refresh and review it again.</p></section>'
+          : '';
+        const student = item.student || {student_id:item.student_id};
+        const studentName = eaStudentRequestsName(student, item.student_id);
+        const studentNotice = !student.name ? '<p class="ea-request-context-warning">Name unavailable in the current roster. Verify the student ID before acting.</p>' : '';
+        const recipient = item.recipient ? '<div><dt>Transfer recipient</dt><dd>' + eaStudentRequestsEscape(eaStudentRequestsName(item.recipient, item.recipient.student_id)) + eaStudentRequestsRoll(item.recipient) + '</dd></div>' : '';
+        const amount = item.transfer ? '<div><dt>Requested transfer</dt><dd>' + eaStudentRequestsEscape(item.transfer.amount) + ' ' + eaStudentRequestsEscape(item.transfer.transfer_type) + '</dd></div>' : '';
+        host.innerHTML = '<header><div><p class="ea-request-kicker">' + eaStudentRequestsEscape(eaStudentRequestsLabel(item.kind)) + ' · For ' + eaStudentRequestsEscape(item.target_date) + '</p><h3>' + eaStudentRequestsEscape(studentName) + '</h3>' + eaStudentRequestsRoll(student) + '</div><span class="ea-request-chip">' + eaStudentRequestsEscape(eaStudentRequestsLabel(item.status)) + '</span></header>'
+          + studentNotice + '<dl>' + eaStudentRequestsIdentity(student) + '<div><dt>Received</dt><dd>' + eaStudentRequestsEscape(eaStudentRequestsDateTime(item.received_at || events.find(event => event.event_type === 'received_by_lan')?.created_at || item.created_at)) + '</dd></div>' + (item.claimed_points == null ? '' : '<div><dt>Points claimed by student</dt><dd>' + eaStudentRequestsEscape(item.claimed_points) + '</dd></div>') + recipient + amount + '</dl>'
+          + '<section class="ea-request-student-message"><h4>Student request</h4><blockquote>' + eaStudentRequestsEscape(item.message) + '</blockquote></section>'
+          + eaStudentRequestsScoreContext(item)
+          + '<section class="ea-request-timeline"><h4>Conversation and decisions</h4>' + events.map(event => '<article><b>' + eaStudentRequestsEscape(event.event_type === 'received_by_lan' ? 'Received by school' : eaStudentRequestsLabel(event.event_type)) + '</b><small>' + eaStudentRequestsEscape(event.actor_type === 'connector' ? 'System' : event.actor_type === 'student' ? studentName : event.actor_id || 'Staff') + ' · ' + eaStudentRequestsEscape(eaStudentRequestsDateTime(event.created_at)) + '</small><p>' + eaStudentRequestsEscape(event.payload?.message || '') + '</p><em>' + eaStudentRequestsEscape(event.delivery_status === 'pending' ? 'Waiting for cloud delivery' : '') + '</em></article>').join('') + '</section>'
+          + (closed ? '<p class="ea-request-closed">This request is closed.</p>' : '<form id="eaStudentRequestReply"><label>Reply or decision reason<textarea id="eaStudentRequestMessage" rows="3" maxlength="2000"></textarea></label><div class="ea-request-decision"><button type="button" data-event="review_started">Start review</button><button type="button" data-event="message_added">Reply</button><button type="button" data-event="needs_information">Need information</button>' + (isScoreRequest && capabilities.score_effects ? '' : '<button type="button" data-event="approved_for_processing">Approve for processing</button>') + '<button type="button" data-event="declined" class="danger">Decline request</button></div>' + (isScoreRequest && capabilities.score_effects ? '' : '<p>“Approve for processing” records review approval. It does not change the ledger by itself.</p>') + '</form>'
+          + scoreAction
+          + (item.status === 'approved_processing' && isScoreRequest && !capabilities.score_effects ? '<section class="ea-request-effect ea-request-effect-disabled"><h4>Score application is not enabled for this release</h4><p>Approval records the decision only. To award verified points now, use Record Score and check the student, date and amount. Do not post the same award twice.</p><button type="button" id="eaStudentRequestRecordScore">Open Record Score</button></section>' : ''));
+        if (item.status === 'approved_processing' && item.kind === 'transfer_request' && capabilities.transfers) {
             host.insertAdjacentHTML('beforeend','<section class="ea-request-effect"><h4>Apply reviewed transfer</h4><p>The command rechecks both students, current balances, transaction and 24-hour limits, then writes debit and credit under one durable command.</p><button type="button" id="eaStudentRequestApplyTransfer">Apply transfer with receipt</button></section>');
         }
         host.querySelectorAll('[data-event]').forEach(button => button.addEventListener('click', () => eaStudentRequestsEvent(item.request_id, button.dataset.event)));
         host.querySelector('#eaStudentRequestApplyScore')?.addEventListener('click', () => eaStudentRequestsApplyScore(item.request_id));
+        host.querySelector('#eaStudentRequestReviewRefresh')?.addEventListener('click', () => eaStudentRequestsRefreshScoreView(item.request_id));
+        host.querySelector('#eaStudentRequestRecordScore')?.addEventListener('click', () => switchTab('add-score'));
         host.querySelector('#eaStudentRequestApplyTransfer')?.addEventListener('click', () => eaStudentRequestsApplyTransfer(item.request_id));
     } catch (error) { host.innerHTML = '<div class="ea-request-empty">Could not load this request: ' + eaStudentRequestsEscape(error.message) + '</div>'; }
 }
@@ -19438,9 +19895,11 @@ function eaPortalActivationClear() {
     const result = document.getElementById('eaPortalActivationResult');
     const token = document.getElementById('eaPortalActivationToken');
     const identity = document.getElementById('eaPortalActivationIdentity');
+    const roll = document.getElementById('eaPortalActivationRoll');
     const expiry = document.getElementById('eaPortalActivationExpiry');
     if (token) token.value = '';
     if (identity) identity.textContent = '';
+    if (roll) roll.textContent = '';
     if (expiry) expiry.textContent = '';
     result?.classList.add('hidden');
 }
@@ -19461,15 +19920,17 @@ async function eaPortalActivationIssue(event) {
         });
         const token = document.getElementById('eaPortalActivationToken');
         const identity = document.getElementById('eaPortalActivationIdentity');
+        const roll = document.getElementById('eaPortalActivationRoll');
         const expiry = document.getElementById('eaPortalActivationExpiry');
         if (token) token.value = String(data.activation_token || '');
-        if (identity) identity.textContent = `${data.login_id || loginId} · Student ${data.student_id || ''}`;
+        if (identity) identity.textContent = data.student_name || `Student ID ${data.student_id || ''}`;
+        if (roll) roll.textContent = `Roll no. ${data.login_id || loginId}`;
         if (expiry) {
             const parsed = new Date(data.expires_at);
             expiry.textContent = `Expires ${Number.isNaN(parsed.getTime()) ? data.expires_at : parsed.toLocaleString()}`;
         }
         document.getElementById('eaPortalActivationResult')?.classList.remove('hidden');
-        eaStudentRequestsSetStatus('Activation code issued. Copy it now; it is shown only once.');
+        eaStudentRequestsSetStatus('Activation / reset code issued. Copy it now; it is shown only once.');
     } catch (error) {
         const message = error.message === 'not_found' ? 'Portal activation is not enabled for this release.' : error.message;
         eaStudentRequestsSetStatus('Could not issue activation code: ' + message, 'error');
@@ -19483,6 +19944,133 @@ async function eaPortalActivationCopy() {
         else { input.focus(); input.select(); if (!document.execCommand('copy')) throw new Error('copy_failed'); }
         eaStudentRequestsSetStatus('Activation code copied. Give it only to the named student.');
     } catch (_) { eaStudentRequestsSetStatus('Copy was blocked by the browser. Select the code and copy it manually.', 'error'); }
+}
+async function eaPortalStaffLoad() {
+    try {
+        const data = await eaStudentRequestsFetch('/scoreboard/api/portal-admin/staff-identities');
+        const select = document.getElementById('eaPortalStaffIdentity');
+        if (!select) return;
+        select.innerHTML = (data.staff || []).map(row => '<option value="' + eaStudentRequestsEscapeAttr(row.staff_id) + '">' +
+            eaStudentRequestsEscape(row.login_id) + ' · ' + eaStudentRequestsEscape(eaStudentRequestsLabel(row.role)) + '</option>').join('');
+        document.getElementById('eaPortalStaffSection')?.classList.remove('hidden');
+    } catch (_) { document.getElementById('eaPortalStaffSection')?.classList.add('hidden'); }
+}
+async function eaPortalStaffIssue(event) {
+    event.preventDefault();
+    const button = document.getElementById('eaPortalStaffIssue');
+    const staffId = Number(document.getElementById('eaPortalStaffIdentity')?.value);
+    if (!Number.isSafeInteger(staffId) || staffId <= 0) return;
+    if (button) button.disabled = true;
+    document.getElementById('eaPortalStaffResult')?.classList.add('hidden');
+    try {
+        await eaPortalActivationEnsureCsrf();
+        const data = await eaStudentRequestsFetch('/scoreboard/api/portal-admin/cloud-staff-activations', {
+            method:'POST', headers:{'Content-Type':'application/json','X-CSRFToken':eaStudentRequestCsrf},
+            body:JSON.stringify({staff_id:staffId}),
+        });
+        document.getElementById('eaPortalStaffToken').value = String(data.activation_token || '');
+        document.getElementById('eaPortalStaffName').textContent = `${data.login_id} · ${eaStudentRequestsLabel(data.role)}`;
+        document.getElementById('eaPortalStaffExpiry').textContent = `Expires ${new Date(data.expires_at).toLocaleString()}`;
+        document.getElementById('eaPortalStaffResult')?.classList.remove('hidden');
+        eaStudentRequestsSetStatus('Staff code issued. Give it only to the named staff member.');
+    } catch (error) { eaStudentRequestsSetStatus('Could not issue staff code: ' + error.message, 'error'); }
+    finally { if (button) button.disabled = false; }
+}
+async function eaPortalStaffCopy() {
+    const input = document.getElementById('eaPortalStaffToken');
+    if (!input?.value) return;
+    try {
+        if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(input.value);
+        else { input.focus(); input.select(); if (!document.execCommand('copy')) throw new Error('copy_failed'); }
+        eaStudentRequestsSetStatus('Staff code copied. Give it only to the named staff member.');
+    } catch (_) { eaStudentRequestsSetStatus('Copy was blocked by the browser. Select the code and copy it manually.', 'error'); }
+}
+async function eaPortalUsageLoad() {
+    if (!eaStudentRequestsAdmin()) return;
+    const host = document.getElementById('eaPortalUsageReport');
+    const button = document.getElementById('eaPortalUsageRefresh');
+    if (!host) return;
+    if (button) button.disabled = true;
+    host.textContent = 'Loading Cloudflare usage…';
+    try {
+        eaPortalUsage = await eaStudentRequestsFetch('/scoreboard/api/portal-admin/cloud-usage');
+        eaPortalUsageRender();
+    } catch (error) {
+        host.textContent = 'Could not load Cloudflare usage: ' + error.message;
+    } finally { if (button) button.disabled = false; }
+}
+function eaPortalUsageRender() {
+    const host = document.getElementById('eaPortalUsageReport');
+    if (!host || !eaPortalUsage) return;
+    const summary = eaPortalUsage.summary || {};
+    const metrics = [
+        ['Active published students', summary.active_students],
+        ['Accounts activated', summary.activated_students],
+        ['Students who accessed', summary.accessed_students],
+        ['Used in last 30 days', summary.recent_students],
+        ['More than 2 sessions', summary.device_review_students],
+        ['Admin blocked', summary.blocked_students],
+        ['Recorded profile opens', summary.profile_opens],
+        ['Recorded month views', summary.month_opens],
+        ['Requests', summary.requests],
+    ];
+    const statuses = {not_activated:'Not activated',used_last_30_days:'Used in last 30 days',
+        no_use_last_30_days:'No use in 30 days',temporarily_locked:'Sign-in lockout',
+        admin_blocked:'Admin blocked',account_disabled:'Account disabled',inactive_roster:'Inactive roster'};
+    const rows = (eaPortalUsage.students || []).slice().sort((a,b) =>
+        Number(Boolean(b.device_review)) - Number(Boolean(a.device_review)) ||
+        String(a.login_id || '').localeCompare(String(b.login_id || '')));
+    const date = value => value ? eaStudentRequestsDateTime(value) : '—';
+    host.innerHTML = '<div class="ea-portal-usage-metrics">' + metrics.map(([label,value]) =>
+        '<div><strong>' + eaStudentRequestsEscape(Number(value || 0)) + '</strong><span>' + eaStudentRequestsEscape(label) + '</span></div>').join('') + '</div>'
+        + '<p class="ea-portal-usage-note">Valid sessions are a device-count proxy, not proof of distinct physical devices. Sign-in sessions include first setup and password resets. Recorded view counts begin when this report is released and may miss a visit if activity logging fails. As of ' + eaStudentRequestsEscape(date(eaPortalUsage.as_of)) + '.</p>'
+        + '<div class="ea-portal-usage-scroll"><table><thead><tr><th>Student</th><th>Status</th><th>Sign-in sessions</th><th>Valid sessions</th><th>Profile / month views</th><th>Requests</th><th>Last use</th><th>Admin control</th></tr></thead><tbody>'
+        + rows.map(row => {
+            const blocked = row.status === 'admin_blocked';
+            const control = !row.account_id ? 'Issue a setup code first' :
+                '<label>Block for <select data-block-duration><option value="1">24 hours</option><option value="7">7 days</option><option value="30">30 days</option><option value="permanent">Permanently</option></select></label>'
+                + '<input data-block-reason maxlength="200" aria-label="Block reason" placeholder="Reason (optional)">'
+                + '<button type="button" data-usage-block>' + (blocked ? 'Change block' : 'Block access') + '</button>'
+                + (blocked ? '<button type="button" class="secondary" data-usage-unblock>Unblock</button>' : '');
+            return '<tr data-usage-student="' + eaStudentRequestsEscapeAttr(row.student_id) + '"><td><strong>' + eaStudentRequestsEscape(row.display_name || row.login_id) + '</strong><small>' + eaStudentRequestsEscape(row.login_id) + ' · ' + eaStudentRequestsEscape(row.class_label || '—') + '</small></td>'
+                + '<td><span class="ea-portal-usage-status">' + eaStudentRequestsEscape(statuses[row.status] || row.status) + '</span>'
+                + (row.device_review ? '<strong class="ea-portal-device-warning">Review devices</strong>' : '')
+                + (blocked ? '<small>' + eaStudentRequestsEscape(row.block_kind === 'permanent' ? 'Until Admin unblocks' : 'Until ' + date(row.blocked_until)) + (row.block_reason ? ' · ' + eaStudentRequestsEscape(row.block_reason) : '') + '</small>' : '') + '</td>'
+                + '<td>' + eaStudentRequestsEscape(row.sign_in_sessions || 0) + '<small>Last: ' + eaStudentRequestsEscape(date(row.last_sign_in_at)) + '</small></td><td>' + eaStudentRequestsEscape(row.valid_device_sessions || 0) + '<small>' + eaStudentRequestsEscape(row.valid_device_labels || '—') + '</small></td>'
+                + '<td>' + eaStudentRequestsEscape(row.profile_opens || 0) + ' / ' + eaStudentRequestsEscape(row.month_opens || 0) + '</td><td>' + eaStudentRequestsEscape(row.request_count || 0) + '</td>'
+                + '<td>' + eaStudentRequestsEscape(date(row.last_seen_at)) + '</td><td class="ea-portal-usage-controls">' + control + '</td></tr>';
+        }).join('') + '</tbody></table></div>';
+    host.querySelectorAll('[data-usage-block]').forEach(button => button.addEventListener('click', eaPortalUsageBlock));
+    host.querySelectorAll('[data-usage-unblock]').forEach(button => button.addEventListener('click', eaPortalUsageUnblock));
+}
+async function eaPortalUsageBlock(event) {
+    const row = event.currentTarget.closest('[data-usage-student]');
+    const choice = row?.querySelector('[data-block-duration]')?.value;
+    if (!row || !choice) return;
+    const button = event.currentTarget; button.disabled = true;
+    try {
+        await eaPortalActivationEnsureCsrf();
+        const permanent = choice === 'permanent';
+        await eaStudentRequestsFetch('/scoreboard/api/portal-admin/cloud-accounts/' + encodeURIComponent(row.dataset.usageStudent) + '/block', {
+            method:'POST', headers:{'Content-Type':'application/json','X-CSRFToken':eaStudentRequestCsrf},
+            body:JSON.stringify({kind:permanent?'permanent':'temporary',duration_days:permanent?null:Number(choice),reason:row.querySelector('[data-block-reason]')?.value || ''}),
+        });
+        await eaPortalUsageLoad();
+        eaStudentRequestsSetStatus('Cloudflare account blocked; its existing sessions and unused codes were revoked.');
+    } catch (error) { eaStudentRequestsSetStatus('Could not block account: ' + error.message, 'error'); button.disabled = false; }
+}
+async function eaPortalUsageUnblock(event) {
+    const row = event.currentTarget.closest('[data-usage-student]');
+    if (!row) return;
+    const button = event.currentTarget; button.disabled = true;
+    try {
+        await eaPortalActivationEnsureCsrf();
+        await eaStudentRequestsFetch('/scoreboard/api/portal-admin/cloud-accounts/' + encodeURIComponent(row.dataset.usageStudent) + '/unblock', {
+            method:'POST', headers:{'X-CSRFToken':eaStudentRequestCsrf},
+        });
+        await eaPortalUsageLoad();
+        eaStudentRequestsSetStatus('Cloudflare account unblocked. The student must sign in again.');
+    } catch (error) { eaStudentRequestsSetStatus('Could not unblock account: ' + error.message, 'error'); button.disabled = false; }
 }
 async function eaStudentRequestsEvent(requestId, eventType) {
     const message = String(document.getElementById('eaStudentRequestMessage')?.value || '').trim();
@@ -19500,14 +20088,41 @@ async function eaStudentRequestsSync() {
     } catch (error) { eaStudentRequestsSetStatus('Sync did not complete: ' + error.message, 'error'); }
 }
 async function eaStudentRequestsApplyScore(requestId) {
-    const points = Number(document.getElementById('eaStudentRequestPoints')?.value);
+    const button = document.getElementById('eaStudentRequestApplyScore');
+    const reviewToken = String(button?.dataset.reviewToken || '');
+    if (!reviewToken) { eaStudentRequestsSetStatus('Score cannot be applied yet: ' + (button?.dataset.reviewError || 'Refresh the score view and review this request.'), 'error'); return; }
+    const rawPoints = String(document.getElementById('eaStudentRequestPoints')?.value || '').trim();
+    const points = Number(rawPoints);
     const reason = String(document.getElementById('eaStudentRequestEffectReason')?.value || '').trim();
-    if (!Number.isFinite(points) || !reason) { eaStudentRequestsSetStatus('Enter reviewed points and an Admin reason.', 'error'); return; }
+    if (!rawPoints || !Number.isSafeInteger(points) || Math.abs(points) > 10000 || !reason) { eaStudentRequestsSetStatus('Enter whole-number reviewed points and an Admin reason.', 'error'); return; }
+    const detail = eaStudentRequestRows.find(row => row.request_id === requestId);
+    if (detail?.kind === 'missing_score' && points <= 0) { eaStudentRequestsSetStatus('Points to add must be greater than zero.', 'error'); return; }
+    const student = detail?.student || {};
+    const currentPoints = Number(button?.dataset.currentPoints);
+    const resultPoints = detail?.kind === 'incorrect_entry' ? points : currentPoints + points;
+    if (!window.confirm(`Approve for ${eaStudentRequestsName(student, detail?.student_id || '—')}${student.roll ? ` (Roll no. ${student.roll})` : ''} on ${detail?.target_date || 'the requested day'}? Current: ${currentPoints} points. ${detail?.kind === 'incorrect_entry' ? 'Verified final score' : `Add ${points} verified points; new total`}: ${resultPoints} points. Admin reason: ${reason}`)) return;
+    if (button) button.disabled = true;
     try {
-        const data = await eaStudentRequestsFetch('/scoreboard/api/student-requests/' + encodeURIComponent(requestId) + '/score-command', {method:'POST',headers:{'Content-Type':'application/json','X-CSRFToken':eaStudentRequestCsrf,'Idempotency-Key':'score-' + eaStudentRequestsNonce()},body:JSON.stringify({points,reason})});
-        eaStudentRequestsSetStatus(data.effect_receipt ? 'Score applied and effect receipt recorded.' : 'Score command accepted for repair.');
+        const data = await eaStudentRequestsFetch('/scoreboard/api/student-requests/' + encodeURIComponent(requestId) + '/score-command', {method:'POST',headers:{'Content-Type':'application/json','X-CSRFToken':eaStudentRequestCsrf,'Idempotency-Key':'score-' + eaStudentRequestsNonce()},body:JSON.stringify({points,reason,review_token:reviewToken})});
+        if (!data.effect_receipt) throw new Error('score effect receipt missing; refresh before another action');
         await loadStudentRequestsTab(true);
-    } catch (error) { eaStudentRequestsSetStatus('Score command was not applied: ' + error.message, 'error'); }
+        const before = Number(data.effect_receipt.previous_points);
+        const finalScore = detail?.kind === 'incorrect_entry' ? points : before + points;
+        eaStudentRequestsSetStatus(Number.isFinite(before) && Number.isFinite(finalScore)
+            ? `Score applied to the scoreboard: ${before} → ${finalScore} points. Request completed with an effect receipt.`
+            : 'Score applied to the scoreboard. Request completed with an effect receipt.');
+    } catch (error) { eaStudentRequestsSetStatus('Could not confirm score completion: ' + error.message + '. Refresh this request before any manual score entry.', 'error'); }
+    finally { if (button) button.disabled = false; }
+}
+async function eaStudentRequestsRefreshScoreView(requestId) {
+    const points = document.getElementById('eaStudentRequestPoints')?.value || '';
+    const reason = document.getElementById('eaStudentRequestEffectReason')?.value || '';
+    await eaStudentRequestsOpen(requestId);
+    if (eaStudentRequestSelected !== requestId) return;
+    const pointsInput = document.getElementById('eaStudentRequestPoints');
+    const reasonInput = document.getElementById('eaStudentRequestEffectReason');
+    if (pointsInput) pointsInput.value = points;
+    if (reasonInput) reasonInput.value = reason;
 }
 async function eaStudentRequestsApplyTransfer(requestId) {
     try {
@@ -19989,7 +20604,12 @@ function eaWorkspaceResultsBar(bar, tab) {
     refresh.type = 'button';
     refresh.className = 'ea-workspace-link ea-results-refresh';
     refresh.dataset.allow = 'true';
-    refresh.addEventListener('click', () => refreshActiveTabFromSync({ passive: false }));
+    refresh.addEventListener('click', () => {
+        if (tab === 'scoreboard' && typeof markScoreboardForTodayOnRefresh === 'function') {
+            markScoreboardForTodayOnRefresh();
+        }
+        refreshActiveTabFromSync({ passive: false });
+    });
     bar.append(refresh);
 }
 
@@ -22130,9 +22750,17 @@ function eaNotebookFetch(url, options, fetcher) { return window.eaNotebookComman
 
         let activeTabRefreshTimer = null;
         let lastPassiveSyncRefreshAt = 0;
+        let scoreboardTabletScrollActive = false;
+        let scoreboardTabletRefreshQueued = false;
+        let scoreboardTabletScrollIdleTimer = null;
+        let scoreboardTabletScrollListenerBound = false;
         function scheduleActiveTabRefreshFromSync(delayMs = 90, options = {}) {
             const passive = options.passive === true;
             const force = options.force === true;
+            if (passive && scoreboardTabletScrollActive && getActiveTabName() === 'scoreboard') {
+                scoreboardTabletRefreshQueued = true;
+                return;
+            }
             if (passive && !force) {
                 const now = Date.now();
                 // Guard against jitter when snapshots arrive in bursts (SSE + polling).
@@ -22146,6 +22774,10 @@ function eaNotebookFetch(url, options, fetcher) { return window.eaNotebookComman
             const wait = Math.max(0, parseInt(delayMs, 10) || 0);
             activeTabRefreshTimer = setTimeout(() => {
                 activeTabRefreshTimer = null;
+                if (passive && scoreboardTabletScrollActive && getActiveTabName() === 'scoreboard') {
+                    scoreboardTabletRefreshQueued = true;
+                    return;
+                }
                 refreshActiveTabFromSync({ passive });
             }, wait);
         }
@@ -27653,8 +28285,35 @@ function eaNotebookFetch(url, options, fetcher) { return window.eaNotebookComman
         // active horizontal scroll to disable heavy paint effects (text-shadows,
         // box-shadows, filters, transitions) via CSS. Removed after scroll settles.
         let _sbScrollingTimer = null;
+        const _sbTabletSize = window.matchMedia && window.matchMedia('(min-width: 601px) and (min-height: 600px) and (max-width: 1600px)');
+        const _sbTabletLayout = _sbTabletSize && {
+            get matches() {
+                const tabletOs = /Android|iPad|Tablet/i.test(navigator.userAgent || '')
+                    || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+                return _sbTabletSize.matches && (window.matchMedia('(any-pointer: coarse)').matches
+                    || (tabletOs && navigator.maxTouchPoints > 0));
+            }
+        };
+        let _sbCenterOnNextRender = false;
+        function markScoreboardForTodayOnRefresh() {
+            if (!_sbTabletLayout || !_sbTabletLayout.matches || getActiveTabName() !== 'scoreboard'
+                || getElementValue('monthSelector') !== getCurrentMonthKey()) return false;
+            _sbCenterOnNextRender = true;
+            return true;
+        }
+        async function refreshScoreboardFromServer() {
+            try {
+                return await pullFromServer(true, true);
+            } finally {
+                if (_sbTabletLayout && _sbTabletLayout.matches && getActiveTabName() === 'scoreboard'
+                    && getElementValue('monthSelector') === getCurrentMonthKey()) {
+                    if (activeTabRefreshTimer) markScoreboardForTodayOnRefresh();
+                    else requestAnimationFrame(() => scrollScoreboardToCurrentDateWindow(getCurrentMonthKey()));
+                }
+            }
+        }
         function _setSbScrollingActive(bottom) {
-            if (!bottom) return;
+            if (!bottom || (_sbTabletLayout && _sbTabletLayout.matches)) return;
             bottom.classList.add('sb-scrolling');
             if (_sbScrollingTimer) clearTimeout(_sbScrollingTimer);
             _sbScrollingTimer = setTimeout(() => {
@@ -27710,6 +28369,19 @@ function eaNotebookFetch(url, options, fetcher) { return window.eaNotebookComman
                 dayViewport: visibleDayWidth
             };
         }
+        function noteScoreboardTabletScroll() {
+            if (!(_sbTabletLayout && _sbTabletLayout.matches)) return;
+            scoreboardTabletScrollActive = true;
+            if (scoreboardTabletScrollIdleTimer) clearTimeout(scoreboardTabletScrollIdleTimer);
+            scoreboardTabletScrollIdleTimer = setTimeout(() => {
+                scoreboardTabletScrollActive = false;
+                scoreboardTabletScrollIdleTimer = null;
+                if (scoreboardTabletRefreshQueued) {
+                    scoreboardTabletRefreshQueued = false;
+                    scheduleActiveTabRefreshFromSync(0, { passive: true, force: true });
+                }
+            }, 300);
+        }
         function syncScoreboardDualScrollbars() {
             const top = document.getElementById('scoreboardTopScroll');
             const spacer = document.getElementById('scoreboardTopScrollSpacer');
@@ -27717,6 +28389,14 @@ function eaNotebookFetch(url, options, fetcher) { return window.eaNotebookComman
             const table = document.getElementById('scoreboardTable');
             const headerRow = document.getElementById('scoreboardHeaderRow');
             if (!top || !spacer || !bottom || !table) return;
+            if (_sbTabletLayout && _sbTabletLayout.matches) {
+                top.style.display = 'none';
+                if (!scoreboardTabletScrollListenerBound) {
+                    bottom.addEventListener('scroll', noteScoreboardTabletScroll, { passive: true });
+                    scoreboardTabletScrollListenerBound = true;
+                }
+                return;
+            }
 
             const metrics = getScoreboardDayScrollMetrics(bottom, headerRow);
             _sbCachedMetrics = metrics; // Cache for scroll event handlers
@@ -27735,7 +28415,9 @@ function eaNotebookFetch(url, options, fetcher) { return window.eaNotebookComman
             top.style.display = 'block';
 
             if (!scoreboardScrollSyncBound) {
+                let lastBottomScrollLeft = bottom.scrollLeft || 0;
                 top.addEventListener('scroll', () => {
+                    if (_sbTabletLayout && _sbTabletLayout.matches) return;
                     if (scoreboardScrollSyncBusy) return;
                     if (_sbScrollRafPending) return;
                     _sbScrollRafPending = true;
@@ -27748,11 +28430,16 @@ function eaNotebookFetch(url, options, fetcher) { return window.eaNotebookComman
                         const nextTop = Math.max(0, Math.min(top.scrollLeft, activeMetrics.dayMax));
                         const nextBottom = Math.max(0, Math.min(activeMetrics.dayStart + nextTop, activeMetrics.bottomMax));
                         bottom.scrollLeft = nextBottom;
+                        lastBottomScrollLeft = bottom.scrollLeft || 0;
                         scoreboardScrollSyncBusy = false;
                     });
                     _setSbScrollingActive(bottom);
                 }, { passive: true });
                 bottom.addEventListener('scroll', () => {
+                    if (_sbTabletLayout && _sbTabletLayout.matches) return;
+                    const currentLeft = bottom.scrollLeft || 0;
+                    if (Math.abs(currentLeft - lastBottomScrollLeft) < 1) return;
+                    lastBottomScrollLeft = currentLeft;
                     if (scoreboardScrollSyncBusy) return;
                     if (_sbScrollRafPending) return;
                     _sbScrollRafPending = true;
@@ -27776,6 +28463,129 @@ function eaNotebookFetch(url, options, fetcher) { return window.eaNotebookComman
                 top.scrollLeft = mappedTop;
             }
         }
+
+        function syncScoreboardTabletSplit() {
+            const host = document.getElementById('scoreboardBottomScroll');
+            const sourceTable = document.getElementById('scoreboardTable');
+            if (!host || !sourceTable) return;
+            const savedTop = host.scrollTop;
+            const oldCenter = host.querySelector('.sb-tablet-center-body');
+            const savedLeft = oldCenter ? oldCenter.scrollLeft : 0;
+            host.querySelectorAll(':scope > .sb-tablet-split').forEach(view => view.remove());
+            host.classList.remove('sb-tablet-split-ready');
+            if (!(_sbTabletLayout && _sbTabletLayout.matches && window.CSS && CSS.supports('display', 'grid'))) return;
+
+            const headerRow = sourceTable.querySelector('thead tr');
+            const bodyRows = Array.from(sourceTable.querySelectorAll('tbody > tr'));
+            if (!headerRow || !bodyRows.length) return;
+
+            const headers = Array.from(headerRow.children);
+            const compact = window.innerWidth <= 900;
+            const visibleMiddle = headers.map((cell, index) => index)
+                .filter(index => index >= 3 && index < headers.length - 2
+                    && !(compact && (index === 3 || index === 4))
+                    && getComputedStyle(headers[index]).display !== 'none');
+            const leftIndices = [0, 1, 2];
+            const rightIndices = [headers.length - 2, headers.length - 1];
+            const widths = headers.map(cell => {
+                const measured = cell.getBoundingClientRect().width;
+                return Math.max(cell.hasAttribute('data-score-date') ? (compact ? 48 : 52) : 1, measured);
+            });
+            [widths[0], widths[1], widths[2]] = compact ? [56, 100, 180] : [64, 118, 220];
+            [widths[headers.length - 2], widths[headers.length - 1]] = compact ? [112, 72] : [130, 80];
+            const tracks = indices => indices.map(index => `${widths[index]}px`).join(' ');
+
+            const view = document.createElement('div');
+            view.className = 'sb-tablet-split';
+            view.style.setProperty('--sb-pane-left', `${leftIndices.reduce((sum, index) => sum + widths[index], 0)}px`);
+            view.style.setProperty('--sb-pane-right', `${rightIndices.reduce((sum, index) => sum + widths[index], 0)}px`);
+            view.style.setProperty('--sb-pane-left-tracks', tracks(leftIndices));
+            view.style.setProperty('--sb-pane-center-tracks', tracks(visibleMiddle));
+            view.style.setProperty('--sb-pane-right-tracks', tracks(rightIndices));
+            const headerStrip = document.createElement('div');
+            headerStrip.className = 'sb-tablet-header-strip';
+            const bodyStrip = document.createElement('div');
+            bodyStrip.className = 'sb-tablet-body-strip';
+
+            const cloneCells = (sourceRow, targetRow, indices, side) => {
+                if (sourceRow.classList.contains('rank-ellipsis-row')) {
+                    const filler = document.createElement('td');
+                    filler.style.gridColumn = '1 / -1';
+                    if (side === 'left') filler.textContent = '· · ·';
+                    targetRow.appendChild(filler);
+                    return;
+                }
+                indices.forEach(index => {
+                    const cell = sourceRow.children[index];
+                    if (!cell) return;
+                    const clone = cell.cloneNode(true);
+                    clone.classList.remove('sticky-left', 'sticky-left-1', 'sticky-left-2',
+                        'sticky-left-3', 'sticky-left-4', 'sticky-right', 'sticky-right-1', 'extra-fixed');
+                    clone.removeAttribute('id');
+                    clone.querySelectorAll('[id]').forEach(child => child.removeAttribute('id'));
+                    targetRow.appendChild(clone);
+                });
+            };
+            const makePane = (side, indices) => {
+                const headViewport = document.createElement('div');
+                headViewport.className = `sb-tablet-${side}-header`;
+                const bodyViewport = document.createElement('div');
+                bodyViewport.className = `sb-tablet-${side}-body`;
+                const headTable = document.createElement('table');
+                const bodyTable = document.createElement('table');
+                headTable.className = bodyTable.className = `scoreboard sb-tablet-pane-table sb-tablet-${side}-table`;
+                headTable.style.fontSize = bodyTable.style.fontSize = sourceTable.style.fontSize;
+                const head = document.createElement('thead');
+                const headRow = headerRow.cloneNode(false);
+                headRow.removeAttribute('id');
+                cloneCells(headerRow, headRow, indices, side);
+                head.appendChild(headRow);
+                headTable.appendChild(head);
+                const body = document.createElement('tbody');
+                const rows = bodyRows.map(sourceRow => {
+                    const row = sourceRow.cloneNode(false);
+                    row.removeAttribute('id');
+                    cloneCells(sourceRow, row, indices, side);
+                    body.appendChild(row);
+                    return row;
+                });
+                bodyTable.appendChild(body);
+                headViewport.appendChild(headTable);
+                bodyViewport.appendChild(bodyTable);
+                return { headViewport, bodyViewport, headRow, rows };
+            };
+            const left = makePane('left', leftIndices);
+            const center = makePane('center', visibleMiddle);
+            const right = makePane('right', rightIndices);
+            headerStrip.append(left.headViewport, center.headViewport, right.headViewport);
+            bodyStrip.append(left.bodyViewport, center.bodyViewport, right.bodyViewport);
+            view.append(headerStrip, bodyStrip);
+            host.insertBefore(view, sourceTable);
+            host.classList.add('sb-tablet-split-ready');
+
+            const headerHeight = Math.ceil(Math.max(...[left, center, right]
+                .map(pane => pane.headRow.getBoundingClientRect().height)));
+            [left, center, right].forEach(pane => { pane.headRow.style.height = `${headerHeight}px`; });
+            const heights = bodyRows.map((_, index) => Math.ceil(Math.max(...[left, center, right]
+                .map(pane => pane.rows[index].getBoundingClientRect().height))));
+            heights.forEach((height, index) => [left, center, right].forEach(pane => {
+                pane.rows[index].style.height = `${height}px`;
+            }));
+            center.bodyViewport.addEventListener('scroll', () => {
+                center.headViewport.scrollLeft = center.bodyViewport.scrollLeft;
+                noteScoreboardTabletScroll();
+            }, { passive: true });
+            center.bodyViewport.scrollLeft = savedLeft;
+            center.headViewport.scrollLeft = center.bodyViewport.scrollLeft;
+            host.scrollTop = savedTop;
+        }
+        let scoreboardTabletRailResizeTimer = null;
+        window.addEventListener('resize', () => {
+            if (scoreboardTabletRailResizeTimer) clearTimeout(scoreboardTabletRailResizeTimer);
+            scoreboardTabletRailResizeTimer = setTimeout(() => {
+                if (getActiveTabName() === 'scoreboard') syncScoreboardTabletSplit();
+            }, 180);
+        }, { passive: true });
 
         function syncScoreboardStickyOffsets() {
             // CSS already handles all sticky-left positioning via calc() with CSS
@@ -27802,6 +28612,7 @@ function eaNotebookFetch(url, options, fetcher) { return window.eaNotebookComman
             const month = options.month || getElementValue('monthSelector') || getCurrentMonthKey();
             requestAnimationFrame(() => {
                 autoAdjustSingleTableFont(table);
+                syncScoreboardTabletSplit();
                 requestAnimationFrame(() => {
                     syncScoreboardStickyOffsets();
                     syncScoreboardDualScrollbars();
@@ -27827,6 +28638,30 @@ function eaNotebookFetch(url, options, fetcher) { return window.eaNotebookComman
             if (currentIndex < 0) {
                 const nextIndex = dateHeaders.findIndex(th => String(th.getAttribute('data-score-date') || '') > today);
                 currentIndex = nextIndex === -1 ? dateHeaders.length - 1 : Math.max(0, nextIndex - 1);
+            }
+
+            if (_sbTabletLayout && _sbTabletLayout.matches) {
+                const center = bottom.querySelector('.sb-tablet-center-body');
+                const centerHeader = bottom.querySelector('.sb-tablet-center-header');
+                const splitDateHeaders = Array.from(centerHeader?.querySelectorAll('th[data-score-date]') || []);
+                if (center && splitDateHeaders[currentIndex]) {
+                    const currentHeader = splitDateHeaders[currentIndex];
+                    const dateCenter = (currentHeader.offsetLeft || 0) + (currentHeader.offsetWidth || 0) / 2;
+                    const maxScroll = Math.max(0, center.scrollWidth - center.clientWidth);
+                    center.scrollLeft = Math.max(0, Math.min(dateCenter - center.clientWidth / 2, maxScroll));
+                    centerHeader.scrollLeft = center.scrollLeft;
+                    return;
+                }
+                const leftHeaders = headerRow.querySelectorAll('th.rank-cell.sticky-left, th.sticky-left-1, th.sticky-left-2');
+                const rightHeaders = headerRow.querySelectorAll('th.total-cell.sticky-right, th.vote-cell.sticky-right');
+                const leftWidth = Array.from(leftHeaders).reduce((sum, th) => sum + (th.offsetWidth || 0), 0);
+                const rightWidth = Array.from(rightHeaders).reduce((sum, th) => sum + (th.offsetWidth || 0), 0);
+                const dateViewport = Math.max(0, bottom.clientWidth - leftWidth - rightWidth);
+                const currentHeader = dateHeaders[currentIndex];
+                const dateCenter = (currentHeader.offsetLeft || 0) + (currentHeader.offsetWidth || 0) / 2;
+                const maxScroll = Math.max(0, bottom.scrollWidth - bottom.clientWidth);
+                bottom.scrollLeft = Math.max(0, Math.min(dateCenter - leftWidth - dateViewport / 2, maxScroll));
+                return;
             }
 
             const startIndex = Math.max(0, currentIndex - 5);
@@ -28661,6 +29496,10 @@ function eaNotebookFetch(url, options, fetcher) { return window.eaNotebookComman
                 scoreboardRefreshPending = true;
                 return;
             }
+            if (_sbTabletLayout && _sbTabletLayout.matches && scoreboardTabletScrollActive) {
+                scoreboardTabletRefreshQueued = true;
+                return;
+            }
             scoreboardRefreshPending = false;
             if (localRosterNeedsRecovery()) {
                 rosterRecoveryQueuedTab = 'scoreboard';
@@ -28699,7 +29538,9 @@ function eaNotebookFetch(url, options, fetcher) { return window.eaNotebookComman
             const _perfTag = `sb-render-${Date.now()}`;
             if (_perfMark) { performance.mark(`${_perfTag}-start`); }
             const scoreboardScroll = document.getElementById('scoreboardBottomScroll');
-            const scrollToDate = !filterOnly && !(scoreboardScroll && scoreboardScroll.dataset.eaScoreboardReady === '1');
+            const scrollToDate = !filterOnly && (!(scoreboardScroll && scoreboardScroll.dataset.eaScoreboardReady === '1')
+                || (_sbCenterOnNextRender && _sbTabletLayout && _sbTabletLayout.matches));
+            if (scrollToDate) _sbCenterOnNextRender = false;
             if (month) {
                 localStorage.setItem(ACTIVE_SCOREBOARD_MONTH_KEY, month);
             }
@@ -28781,6 +29622,22 @@ function eaNotebookFetch(url, options, fetcher) { return window.eaNotebookComman
             const table = document.getElementById('scoreboardTable');
             const headerRow = document.getElementById('scoreboardHeaderRow');
             const tbody = document.getElementById('scoreboardBody');
+
+            // Tablet grid rows share one immutable column template. Fixed tracks
+            // avoid table auto-layout changes while Chrome is painting a scroll.
+            const gridSignature = `${dates.length}|${monthExtraCols.length}`;
+            if (table.dataset.eaGridSignature !== gridSignature) {
+                const middleTracks = [
+                    dates.length ? `repeat(${dates.length}, var(--sb-day-w))` : '',
+                    monthExtraCols.length ? `repeat(${monthExtraCols.length}, var(--sb-extra-w))` : ''
+                ].filter(Boolean).join(' ');
+                const tailTracks = `${middleTracks} var(--sb-total-w) var(--sb-vote-w)`;
+                table.style.setProperty('--sb-grid-wide',
+                    `var(--sb-rank-w) var(--sb-roll-w) var(--sb-name-w) var(--sb-class-w) var(--sb-fees-w) ${tailTracks}`);
+                table.style.setProperty('--sb-grid-compact',
+                    `var(--sb-rank-w) var(--sb-roll-w) var(--sb-name-w) ${tailTracks}`);
+                table.dataset.eaGridSignature = gridSignature;
+            }
 
             // Update header with dates
             const dateHeaders = dates.map((date, dateIndex) => {
@@ -37700,6 +38557,7 @@ function eaNotebookFetch(url, options, fetcher) { return window.eaNotebookComman
             const detailState = window.__eaGroupScoreboardDetail || { group: '', month: '', rows: [] };
             const normalized = String(group || '').trim().toUpperCase();
             detailState.group = normalized && detailState.group !== normalized ? normalized : '';
+            detailState.revealGroup = detailState.group;
             window.__eaGroupScoreboardDetail = detailState;
             renderGroupScoreboardStudents();
         }
@@ -37724,6 +38582,8 @@ function eaNotebookFetch(url, options, fetcher) { return window.eaNotebookComman
                 .sort((a, b) => (Number(b.total) || 0) - (Number(a.total) || 0) ||
                     String(safeProp(a.student, 'roll') || '').localeCompare(String(safeProp(b.student, 'roll') || ''), undefined, {numeric:true}));
             const groupTitle = group === 'UNGROUPED' ? 'Ungrouped students' : `Group ${group} students`;
+            const revealMembers = detailState.revealGroup === group;
+            detailState.revealGroup = '';
             host.className = `group-scoreboard-students ${getGroupRowClass(group)}`;
             if (title) title.textContent = `${groupTitle} · ${rows.length}`;
             body.innerHTML = rows.length ? rows.map((row, index) => {
@@ -37738,6 +38598,14 @@ function eaNotebookFetch(url, options, fetcher) { return window.eaNotebookComman
                     <span class="group-scoreboard-student-score"><strong>${total}</strong><small>points</small></span>
                 </article>`;
             }).join('') : '<div class="group-scoreboard-student-empty">No students are available for this group and period.</div>';
+            if (revealMembers) {
+                const members = body.querySelectorAll('.group-scoreboard-student');
+                const step = Math.min(115, Math.floor(1500 / Math.max(1, members.length - 1)));
+                members.forEach((member, index) => {
+                    member.style.setProperty('--member-delay', `${140 + index * step}ms`);
+                    member.classList.add('member-emerge');
+                });
+            }
         }
 
         function loadPartyStandings() {

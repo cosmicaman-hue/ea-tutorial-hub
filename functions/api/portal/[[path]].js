@@ -1,4 +1,4 @@
-const ALLOWED = /^\/v1\/(?:auth\/(?:activate|login|logout|me|csrf|sessions(?:\/[0-9a-f-]+)?)|me\/(?:profile(?:\/months\/\d{4}-\d{2})?|requests(?:\/[0-9a-f-]+\/events)?|notifications(?:\/socket)?|transfer-recipients))$/i;
+const ALLOWED = /^\/v1\/(?:auth\/(?:activate|login|staff\/(?:activate|login)|logout|me|csrf|sessions(?:\/[0-9a-f-]+)?)|me\/(?:workspace|profile(?:\/months\/\d{4}-\d{2})?|requests(?:\/[0-9a-f-]+\/events)?|notifications(?:\/socket)?|transfer-recipients)|chat\/(?:(?:general|council)\/messages(?:\/[0-9a-f-]+\/moderate)?|restrictions))$/i;
 
 export async function onRequest(context) {
   if (!context.env.PORTAL_API || typeof context.env.PORTAL_API.fetch !== 'function') {
