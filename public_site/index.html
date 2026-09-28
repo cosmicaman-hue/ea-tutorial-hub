@@ -13,7 +13,7 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <link rel="stylesheet" href="./excel_results/styles.css">
     <link rel="stylesheet" href="./excel_study_notes/styles.css">
-    <link rel="stylesheet" href="./profile/styles.css">
+    <link rel="stylesheet" href="./profile/styles.css?v=20260928-media">
     <style>
         :root {
             color-scheme: light;
@@ -1452,7 +1452,15 @@
             text-align: left;
         }
 
-    </style>
+    /* EA_LARGE_PORTRAITS */
+#rankingPanel .public-podium-avatar{width:150px;height:150px}
+#rankingPanel .rank-1 .public-podium-avatar{width:190px;height:190px}
+#rankingPanel .rank-2 .public-podium-avatar{width:170px;height:170px}
+#rankingPanel .rank-3 .public-podium-avatar{width:150px;height:150px}
+.party-modal-member{position:relative;min-height:88px;padding-right:90px!important}
+.party-modal-member .m-avatar{position:absolute;right:5px;top:50%;transform:translateY(-50%);width:78px;height:78px;flex:0 0 78px;margin:0;font-size:24px;border-radius:50%;overflow:hidden}
+@media(max-width:640px){#rankingPanel .public-podium-avatar,#rankingPanel .rank-3 .public-podium-avatar{width:104px;height:104px}#rankingPanel .rank-2 .public-podium-avatar{width:112px;height:112px}#rankingPanel .rank-1 .public-podium-avatar{width:128px;height:128px}}
+</style>
 </head>
 <body>
 <script>(function(){if(localStorage.getItem('ea_theme')==='dark')document.body.classList.add('dark');})()</script>
@@ -1648,7 +1656,7 @@
                 <div class="auth-bar">
                     <span id="rankingAuthUser"></span>
                     <span class="auth-spacer"></span>
-                    <button type="button" class="logout-btn" data-logout>Logout</button>
+                    <button type="button" class="logout-btn" data-secure-logout>Logout</button>
                 </div>
                 <div class="public-ranking-wrap">
                     <div class="public-ranking-controls">
@@ -1677,7 +1685,7 @@
                 <div class="auth-bar">
                     <span id="partiesAuthUser"></span>
                     <span class="auth-spacer"></span>
-                    <button type="button" class="logout-btn" data-logout>Logout</button>
+                    <button type="button" class="logout-btn" data-secure-logout>Logout</button>
                 </div>
                 <div class="public-parties-wrap">
                     <div class="public-parties-controls">
@@ -2070,6 +2078,7 @@
         </div>
     </div>
 
+    <script src="./academy-auth.js"></script>
     <script>
         // ════════════════════════════════════════════════════════════
         // CLIENT-SIDE LOGIN GATE (soft gate — see README.md)
@@ -2077,6 +2086,8 @@
         // On success the Scoreboard, Information, and Study Notes tabs render from
         // ./scores.json. No server / SPA routing required.
         // ════════════════════════════════════════════════════════════
+        let pendingSecureTab = null;
+        let scoresLoadGeneration = 0;
         const AUTH_KEY = 'ea_public_auth';
         const CREDENTIALS_URL = './credentials.json';
         const SCORES_URL = './scores.json';
@@ -2149,12 +2160,40 @@
         }
 
         async function loadScores() {
-            if (scoresData) return scoresData;
-            const res = await fetch(SCORES_URL, { cache: 'no-store' });
-            if (!res.ok) throw new Error('scoreboard data unavailable');
-            scoresData = await res.json();
+            const generation = ++scoresLoadGeneration;
+            let publicData={},generalError='';
+            try{const publicResponse=await fetch(SCORES_URL,{cache:'no-store'});if(!publicResponse.ok)throw new Error('General scoreboard data unavailable');publicData=await publicResponse.json();}
+            catch(error){generalError=error.message;}
+            // Public snapshot fields never unlock or supply the protected views.
+            const general = Object.fromEntries(['updated_at','months','scoreboard','top_full_count','chess_champion','public_information'].map(key=>[key,publicData[key]]));
+            let secured = {};
+            if (window.EA_ACADEMY?.isSignedIn()) {
+                try { secured = await window.EA_ACADEMY.load();document.querySelectorAll('[data-academy-status]').forEach(node=>node.remove()); }
+                catch(error) { if(generation!==scoresLoadGeneration)throw error;clearProtectedViews();window.dispatchEvent(new CustomEvent('ea-academy-error',{detail:error.message})); }
+            }
+            if(generation!==scoresLoadGeneration)throw new Error('View changed; refresh data.');
+            scoresData = {...general,ranking:secured.ranking||{},parties:secured.parties||{},academy_updated_at:secured.updated_at,
+                academy_revision:secured.source_revision,academy_stale:secured.stale_projection,academy_months:secured.months||[],general_error:generalError};
+            const host=document.getElementById('scoreboardContent');let status=host.querySelector('[data-general-status]');
+            if(generalError){if(!status){status=document.createElement('p');status.dataset.generalStatus='true';status.setAttribute('role','status');host.prepend(status);}status.textContent=generalError+'. Refresh to retry.';}else status?.remove();
             return scoresData;
         }
+        function clearProtectedViews(){
+            ['publicRankingBody','partiesCircleField','partyModalBody','publicRankingMeta','partiesMeta'].forEach(id=>document.getElementById(id)?.replaceChildren());
+            closePartyModal();stopPublicRankingAnimationLoop();
+        }
+        function openSecureProfile(destination) {
+            pendingSecureTab = destination || null;
+            document.getElementById('tabMyProfile').click();
+        }
+        window.addEventListener('ea-secure-auth-changed',()=>{
+            scoresLoadGeneration++;scoresData=null;clearProtectedViews();applyAuthState();
+            if(window.EA_ACADEMY?.isSignedIn()&&pendingSecureTab){const destination=pendingSecureTab;pendingSecureTab=null;setActiveTab(destination);}
+            else if(window.EA_ACADEMY?.isSignedIn()&&['ranking','parties'].includes(activeTab))setActiveTab(activeTab);
+        });
+        window.addEventListener('ea-academy-error',event=>{
+            for(const id of ['rankingContent','partiesContent']){const host=document.getElementById(id);if(!host)continue;let status=host.querySelector('[data-academy-status]');if(!status){status=document.createElement('p');status.dataset.academyStatus='true';status.setAttribute('role','status');host.prepend(status);}status.textContent='Protected data could not be refreshed: '+event.detail+'. Refresh or sign in again.';}
+        });
 
         // ── Login modal ──
         function openLoginModal() {
@@ -2225,6 +2264,7 @@
             if (isLoggedIn()) { logout(); } else { openLoginModal(); }
         });
         document.querySelectorAll('[data-logout]').forEach(btn => btn.addEventListener('click', logout));
+        document.querySelectorAll('[data-secure-logout]').forEach(btn=>btn.addEventListener('click',async()=>{btn.disabled=true;try{if(await window.EA_PROFILE_APP?.signOut())setActiveTab('home');else openSecureProfile();}finally{btn.disabled=false;}}));
 
         // ── Apply auth state to UI ──
         function applyAuthState() {
@@ -2245,10 +2285,10 @@
             const infoContent = document.getElementById('infoContent');
             sbGate.hidden = loggedIn;
             sbContent.hidden = !loggedIn;
-            rankingGate.hidden = loggedIn;
-            rankingContent.hidden = !loggedIn;
-            partiesGate.hidden = loggedIn;
-            partiesContent.hidden = !loggedIn;
+            rankingGate.hidden = !!window.EA_ACADEMY?.isSignedIn();
+            rankingContent.hidden = !window.EA_ACADEMY?.isSignedIn();
+            partiesGate.hidden = !!window.EA_ACADEMY?.isSignedIn();
+            partiesContent.hidden = !window.EA_ACADEMY?.isSignedIn();
             chessGate.hidden = loggedIn;
             chessContent.hidden = !loggedIn;
             infoGate.hidden = loggedIn;
@@ -2256,12 +2296,11 @@
 
             if (loggedIn) {
                 document.getElementById('scoreboardAuthUser').textContent = 'Signed in: ' + auth.roll;
-                document.getElementById('rankingAuthUser').textContent = 'Signed in: ' + auth.roll;
-                document.getElementById('partiesAuthUser').textContent = 'Signed in: ' + auth.roll;
                 document.getElementById('chessAuthUser').textContent = 'Signed in: ' + auth.roll;
                 document.getElementById('infoAuthUser').textContent = 'Signed in: ' + auth.roll;
                 if (scoresData) { renderScoreboard(scoresData); renderRanking(scoresData); renderParties(scoresData); renderChessChampion(scoresData); renderInfo(scoresData); }
             }
+            for(const id of ['rankingAuthUser','partiesAuthUser'])document.getElementById(id).textContent=window.EA_ACADEMY?.isSignedIn()?'Secure portal session':'';
         }
 
         // ── Scoreboard rendering ──
@@ -2371,16 +2410,17 @@
         function publicRankingAvatar(row, card = false) {
             const photo = !row.masked ? String(row.photo_path || '').trim() : '';
             const initials = publicRankingInitials(row);
+            let content = '<span class="public-avatar-initials">' + initials + '</span>';
             if (photo && /^\/static\/uploads\/students\/[A-Za-z0-9_-]+\.(?:jpg|jpeg|png|webp)$/i.test(photo)) {
-                return '<img src="' + escapeHtml(photo) + '" alt="" loading="lazy" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'inline\';"><span class="public-avatar-initials" style="display:none;">' + initials + '</span>';
+                content = '<img src="' + escapeHtml(photo) + '" alt="" loading="lazy" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'inline\';"><span class="public-avatar-initials" style="display:none;">' + initials + '</span>';
             }
-            return '<span class="public-avatar-initials">' + initials + '</span>';
+            return row.masked ? content : '<span data-ea-public-portrait="' + escapeHtml(row.roll || '') + '" style="display:block;width:100%;height:100%">' + content + '</span>';
         }
         function publicRankingStudentName(row) {
             return row.masked ? 'Private ranking' : escapeHtml(row.name || 'Student');
         }
         function publicRankingRows(month) {
-            const rows = (scoresData && scoresData.scoreboard && scoresData.scoreboard[month]) || [];
+            const rows = (scoresData && scoresData.ranking && scoresData.ranking[month]) || [];
             return rows.slice().sort((a, b) => (Number(a.rank) || 0) - (Number(b.rank) || 0));
         }
         function renderPublicRankingMonth(month) {
@@ -2437,15 +2477,16 @@
             }
         }
         function renderRanking(data) {
+            if(!window.EA_ACADEMY?.isSignedIn())return;
             scoresData = data;
-            const months = (data && data.months) || [];
+            const months = (data && data.academy_months) || [];
             const sel = document.getElementById('publicRankingMonth');
             const meta = document.getElementById('publicRankingMeta');
             if (!sel) return;
             sel.innerHTML = months.map(m => '<option value="' + escapeHtml(m) + '">' + escapeHtml(m) + '</option>').join('');
             if (meta) {
-                const d = new Date(data && data.updated_at);
-                meta.textContent = data && data.updated_at ? 'Updated ' + (isNaN(d) ? data.updated_at : d.toLocaleString()) : '';
+                const d = new Date(data && data.academy_updated_at);
+                meta.textContent = data && data.academy_updated_at ? 'Verified snapshot ' + (isNaN(d) ? data.academy_updated_at : d.toLocaleString()) + ' · Revision '+data.academy_revision+(data.academy_stale?' · Awaiting today’s refresh':'') : '';
             }
             sel.onchange = () => renderPublicRankingMonth(sel.value);
             if (months.length) renderPublicRankingMonth(months[0]);
@@ -2850,14 +2891,15 @@ function renderInfo(data) {
         }
 
         function renderParties(data) {
+            if(!window.EA_ACADEMY?.isSignedIn())return;
             scoresData = data;
-            const months = (data && data.months) || [];
+            const months = (data && data.academy_months) || [];
             partiesMonthSelect = document.getElementById('partiesMonthSelect');
             partiesMonthSelect.innerHTML = months.map(m => '<option value="' + escapeHtml(m) + '">' + escapeHtml(formatPartyMonthLabel(m)) + '</option>').join('');
             const meta = document.getElementById('partiesMeta');
-            if (data && data.updated_at) {
-                const d = new Date(data.updated_at);
-                meta.textContent = 'Updated ' + (isNaN(d) ? data.updated_at : d.toLocaleString());
+            if (data && data.academy_updated_at) {
+                const d = new Date(data.academy_updated_at);
+                meta.textContent = 'Verified snapshot ' + (isNaN(d) ? data.academy_updated_at : d.toLocaleString())+' · Revision '+data.academy_revision+(data.academy_stale?' · Awaiting today’s refresh':'');
             } else {
                 meta.textContent = '';
             }
@@ -2884,9 +2926,12 @@ function renderInfo(data) {
                 field.innerHTML = '<div class="party-modal-empty">No party data for this month.</div>';
                 return;
             }
-            const maxVp = Math.max(1, ...allParties.map(p => p.votePower || 0));
-            const sorted = allParties.slice().sort((a, b) => (b.votePower || 0) - (a.votePower || 0));
-            field.innerHTML = sorted.map((p, i) => {
+            const unavailable=allParties.filter(p=>p.available===false);
+            const validated=allParties.filter(p=>p.available!==false);
+            const warning=unavailable.length?'<div class="party-modal-empty" role="status">Statistics awaiting membership review: '+unavailable.map(p=>escapeHtml(p.fullName||p.code)).join(', ')+'. Full party ranks are unavailable.</div>':'';
+            const maxVp = Math.max(1, ...validated.map(p => p.votePower || 0));
+            const sorted = validated.slice().sort((a, b) => (b.votePower || 0) - (a.votePower || 0));
+            field.innerHTML = warning+sorted.map((p, i) => {
                 const empty = !(p.memberCount > 0);
                 const size = partyCircleDiameter(p.votePower || 0, maxVp, empty);
                 const floatDelay = (i * 0.9).toFixed(2) + 's';
@@ -2899,7 +2944,7 @@ function renderInfo(data) {
                     + 'data-party-code="' + escapeHtml(p.code) + '" '
                     + 'aria-label="' + escapeHtml(p.fullName || p.code) + ' — vote power ' + (p.votePower || 0) + '">'
                     + '<span class="party-sphere" aria-hidden="true"></span>'
-                    + '<span class="circle-rank">#' + (p.rank || (i + 1)) + '</span>'
+                    + '<span class="circle-rank">' + (p.rank==null?'Rank unavailable':'#'+p.rank) + '</span>'
                     + '<span class="circle-content">'
                     + '<span class="circle-symbol">' + escapeHtml(p.symbol || '⚖️') + '</span>'
                     + '<span class="circle-code">' + escapeHtml(p.code) + '</span>'
@@ -2934,7 +2979,7 @@ function renderInfo(data) {
                 ? members.map((m, i) => {
                     const initials = (m.name || '?').trim().split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase() || '?';
                     return '<li class="party-modal-member" style="animation-delay:' + (i * 0.06) + 's;">'
-                        + '<span class="m-avatar">' + escapeHtml(initials) + '</span>'
+                        + '<span class="m-avatar">' + (window.eaPublicPortrait ? window.eaPublicPortrait(m) : escapeHtml(initials)) + '</span>'
                         + '<span class="m-info">'
                         + '<span class="m-name">' + escapeHtml(m.name || '-') + '</span>'
                         + '<span class="m-sub">'
@@ -3041,7 +3086,7 @@ function renderInfo(data) {
                 });
             }
             // Preload data when an authenticated user opens a locked tab
-            if (isLoggedIn() && (isScoreboard || isRanking || isParties || isChess || tabKey === 'info')) {
+            if ((isLoggedIn() || window.EA_ACADEMY?.isSignedIn()) && (isScoreboard || isRanking || isParties || isChess || tabKey === 'info')) {
                 loadScores().then(d => { renderScoreboard(d); renderRanking(d); renderParties(d); renderChessChampion(d); renderInfo(d); }).catch(() => {});
             }
             if (isRanking) startPublicRankingAnimationLoop();
@@ -3407,11 +3452,11 @@ function renderInfo(data) {
             setActiveTab('scoreboard');
         });
         tabRanking.addEventListener('click', () => {
-            if (!isLoggedIn()) { activeTab = 'ranking'; openLoginModal(); return; }
+            if (!window.EA_ACADEMY?.isSignedIn()) { openSecureProfile('ranking'); return; }
             setActiveTab('ranking');
         });
         tabParties.addEventListener('click', () => {
-            if (!isLoggedIn()) { activeTab = 'parties'; openLoginModal(); return; }
+            if (!window.EA_ACADEMY?.isSignedIn()) { openSecureProfile('parties'); return; }
             setActiveTab('parties');
         });
         tabChess.addEventListener('click', () => {
@@ -3438,8 +3483,8 @@ function renderInfo(data) {
             scoreboardPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
         });
         document.getElementById('scoreboardLoginLink').addEventListener('click', openLoginModal);
-        document.getElementById('rankingLoginLink').addEventListener('click', openLoginModal);
-        document.getElementById('partiesLoginLink').addEventListener('click', openLoginModal);
+        document.getElementById('rankingLoginLink').addEventListener('click', () => openSecureProfile('ranking'));
+        document.getElementById('partiesLoginLink').addEventListener('click', () => openSecureProfile('parties'));
         document.getElementById('chessLoginLink').addEventListener('click', openLoginModal);
         document.getElementById('publicRankingReplay').addEventListener('click', replayPublicRanking);
         document.getElementById('infoLoginLink').addEventListener('click', openLoginModal);
@@ -3463,9 +3508,9 @@ function renderInfo(data) {
             } else if (h === '#scoreboard') {
                 if (!isLoggedIn()) openLoginModal(); else setActiveTab('scoreboard');
             } else if (h === '#ranking') {
-                if (!isLoggedIn()) openLoginModal(); else setActiveTab('ranking');
+                if (!window.EA_ACADEMY?.isSignedIn()) openSecureProfile('ranking'); else setActiveTab('ranking');
             } else if (h === '#parties') {
-                if (!isLoggedIn()) openLoginModal(); else setActiveTab('parties');
+                if (!window.EA_ACADEMY?.isSignedIn()) openSecureProfile('parties'); else setActiveTab('parties');
             } else if (h === '#chess') {
                 if (!isLoggedIn()) openLoginModal(); else setActiveTab('chess');
             } else if (h === '#info') {
@@ -3552,5 +3597,7 @@ function renderInfo(data) {
     </script>
     <script src="./excel_study_notes/app.js"></script>
     <script src="./profile/app.js"></script>
+    <script>window.EA_ACADEMY.refresh();</script>
+<script src="./student-portraits.js"></script>
 </body>
 </html>

@@ -25,6 +25,9 @@
 /profile/app.js
   Cache-Control: no-cache, must-revalidate, max-age=0
 
+/academy-auth.js
+  Cache-Control: no-cache, must-revalidate, max-age=0
+
 /profile/styles.css
   Cache-Control: public, max-age=3600, must-revalidate
 
