@@ -7,7 +7,7 @@ export async function onRequest(context) {
   const suffix = Array.isArray(context.params.path) ? context.params.path.join('/') : String(context.params.path || '');
   const upstreamPath = '/v1/' + suffix.replace(/^v1\//, '');
   const governance=/^\/v1\/(?:admin\/(?:audit|party-policy)|me\/audit-events|party-governance(?:\/(?:pacts(?:\/[0-9a-f-]+\/(?:sign|terminate|review))?|bonds(?:\/[0-9a-f-]+\/sign)?|exits(?:\/[0-9a-f-]+\/review)?))?)$/i;
-  const media=/^\/v1\/(?:gallery|me\/media|media\/(?:portraits|[0-9a-f-]+))$/i;
+  const media=/^\/v1\/(?:gallery(?:\/submissions)?|me\/media|media\/(?:portraits|[0-9a-f-]+))$/i;
   if (!ALLOWED.test(upstreamPath)&&!governance.test(upstreamPath)&&!media.test(upstreamPath)) return Response.json({success:false,error:'not_found'}, {status:404});
   const incoming = new URL(context.request.url);
   const upstream = new URL('https://portal-api.internal' + upstreamPath + incoming.search);

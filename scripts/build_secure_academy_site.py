@@ -6,15 +6,16 @@ and referenced public images enter the output; the legacy SPA is excluded.
 from pathlib import Path
 import argparse
 import json
+import re
 import shutil
 from urllib.parse import urlsplit, unquote
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / 'public_site'
 OUTPUT = ROOT / 'rebuild/out/secure_academy_site'
-GENERAL_KEYS = {'updated_at','top_full_count','months','scoreboard','chess_champion','public_information'}
+GENERAL_KEYS = {'updated_at','top_full_count','months','scoreboard','ranking_movement','chess_champion','public_information'}
 ROW_KEYS = {'rank','roll','name','class','total','photo_path','masked'}
-FILES = ['index.html','_headers','academy-auth.js','student-portraits.js','profile/app.js','profile/styles.css',
+FILES = ['index.html','_headers','academy-auth.js','academy-gallery.js','student-portraits.js','profile/app.js','profile/styles.css',
          'excel_results/app.js','excel_results/styles.css','excel_results/catalog.json',
          'excel_study_notes/app.js','excel_study_notes/styles.css','excel_study_notes/catalog.json']
 
@@ -22,6 +23,16 @@ def general_snapshot(data):
     result={key:value for key,value in data.items() if key in GENERAL_KEYS}
     result['scoreboard']={month:[{key:value for key,value in row.items() if key in ROW_KEYS}
         for row in rows] for month,rows in (data.get('scoreboard') or {}).items()}
+    result['ranking']={month:rows[:10] for month,rows in result['scoreboard'].items()}
+    movement={}
+    for month, value in (data.get('ranking_movement') or {}).items():
+        if month not in result['scoreboard'] or not isinstance(value,dict):continue
+        day=value.get('date')
+        if not isinstance(day,str) or not re.fullmatch(r'\d{4}-\d{2}-\d{2}',day) or not day.startswith(month+'-'):day=None
+        rolls={row.get('roll') for row in result['scoreboard'][month]}
+        ranks=value.get('ranks') if isinstance(value.get('ranks'),dict) else {}
+        movement[month]={'date':day,'ranks':{roll:rank for roll,rank in ranks.items() if day and roll in rolls and type(rank) is int and 1<=rank<=len(rolls)}}
+    if 'ranking_movement' in data:result['ranking_movement']=movement
     return result
 
 def referenced_files(value):
@@ -56,6 +67,15 @@ def expected_files():
     generated={'scores.json':json.dumps(data,ensure_ascii=False,separators=(',',':')).encode(),
                'credentials.json':json.dumps(credentials,separators=(',',':')).encode()}
     allowed=set(FILES)
+    gallery=SOURCE/'gallery/catalog.json'
+    if gallery.is_file():
+        catalog=json.loads(gallery.read_text(encoding='utf-8-sig'))
+        allowed.add('gallery/catalog.json')
+        for row in catalog.get('photos',[]):
+            path=str(row.get('photo_path',''))
+            import re
+            if not re.fullmatch(r'gallery/[0-9a-f-]{36}\.jpg',path,re.I):raise ValueError('Unsafe gallery image path')
+            allowed.add(path)
     allowed.update(referenced_files(data))
     for folder in ('excel_results','excel_study_notes'):
         catalog=json.loads((SOURCE/folder/'catalog.json').read_text(encoding='utf-8-sig'))

@@ -4,9 +4,10 @@ let account=null,generation=0;
 const signal=()=>window.dispatchEvent(new CustomEvent('ea-secure-auth-changed'));
 async function refresh(){
   const token=++generation;
+  const previous=JSON.stringify(account);
   try{const response=await fetch('/api/portal/auth/me',{credentials:'include',cache:'no-store'});const data=await response.json();if(token!==generation)return;account=response.ok&&data.success?data.account:null;}
   catch{if(token===generation)account=null;}
-  if(token===generation)signal();
+  if(token===generation&&JSON.stringify(account)!==previous)signal();
 }
 async function load(){
   const token=generation;

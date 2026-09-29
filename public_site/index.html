@@ -1460,7 +1460,121 @@
 .party-modal-member{position:relative;min-height:88px;padding-right:90px!important}
 .party-modal-member .m-avatar{position:absolute;right:5px;top:50%;transform:translateY(-50%);width:78px;height:78px;flex:0 0 78px;margin:0;font-size:24px;border-radius:50%;overflow:hidden}
 @media(max-width:640px){#rankingPanel .public-podium-avatar,#rankingPanel .rank-3 .public-podium-avatar{width:104px;height:104px}#rankingPanel .rank-2 .public-podium-avatar{width:112px;height:112px}#rankingPanel .rank-1 .public-podium-avatar{width:128px;height:128px}}
+/* Public top ten: seven full-width rows with circular portraits. */
+#rankingPanel .public-ranking-cards { grid-template-columns:1fr; }
+#rankingPanel .public-ranking-card { padding:12px 18px; gap:16px; }
+#rankingPanel .public-ranking-avatar { flex-basis:78px; width:78px; height:78px; border-width:3px; }
+#rankingPanel .public-ranking-name { font-size:1rem; white-space:normal; }
+#rankingPanel .public-ranking-class { font-size:.82rem; }
+#rankingPanel .public-ranking-total { font-size:1.25rem; }
+#publicRankingFireworks { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; z-index:3; }
+@media(max-width:640px){#rankingPanel .public-ranking-card{padding:10px;gap:10px}#rankingPanel .public-ranking-avatar{flex-basis:64px;width:64px;height:64px}}
 </style>
+
+
+
+
+
+
+
+
+
+
+<style id="ea-ranking-theme-style">
+/* Scoped celebration theme; inline copies are generated from this file. */
+:is(#ranking-tab,#rankingPanel) .ea-rank-movement{display:none;align-items:center;justify-content:center;min-width:64px;padding:5px 9px;border-radius:999px;font-size:.78rem;font-weight:800;background:#64748b22;color:var(--text,var(--text-primary,#334155));border:1px solid #64748b55}
+:is(#rankingContent,#publicRankingBody).ea-show-movements .ea-rank-movement{display:inline-flex}
+:is(#ranking-tab,#rankingPanel) .ea-rank-up{color:#047857;background:#34d39925;border-color:#10b98166}
+:is(#ranking-tab,#rankingPanel) .ea-rank-down{color:#be123c;background:#fb718525;border-color:#f43f5e66}
+:is(#ranking-tab,#rankingPanel) .podium-slot .ea-rank-movement,:is(#ranking-tab,#rankingPanel) .public-podium-slot .ea-rank-movement{margin:8px 0 0;color:#fff}
+:is(#ranking-tab,#rankingPanel) .ea-movement-controls{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:12px 0 20px;font-size:.85rem}
+:is(#ranking-tab,#rankingPanel) .ea-movement-controls button{border:1px solid #a78bfa88;border-radius:999px;background:linear-gradient(120deg,#6d28d9,#2563eb);color:#fff;font-weight:750;padding:10px 16px;cursor:pointer}
+:is(#ranking-tab,#rankingPanel) .ea-movement-controls button:focus-visible{outline:3px solid #fbbf24;outline-offset:3px}
+:is(#ranking-tab,#rankingPanel) :is(.ranking-podium,.public-ranking-podium){overflow:hidden;isolation:isolate;padding-top:60px!important;border-color:#fbbf2488;background:radial-gradient(ellipse at 50% 15%,#fbbf2455,transparent 50%),radial-gradient(ellipse at 0% 100%,#7c3aed80,transparent 60%),radial-gradient(ellipse at 100% 100%,#06b6d470,transparent 60%),linear-gradient(135deg,#111b3d,#281744 50%,#073747)!important}
+:is(#ranking-tab,#rankingPanel) :is(.podium-slot,.public-podium-slot){isolation:isolate}
+:is(#ranking-tab,#rankingPanel) :is(.podium-avatar,.public-podium-avatar){width:132px!important;height:132px!important;position:relative;z-index:1;flex-shrink:0;background:linear-gradient(135deg,#374b80,#56346c)!important}
+:is(#ranking-tab,#rankingPanel) :is(.podium-slot-1,.rank-1){--ea-sun-size:180px}
+:is(#ranking-tab,#rankingPanel) :is(.podium-slot-1,.rank-1) :is(.podium-avatar,.public-podium-avatar){width:var(--ea-sun-size)!important;height:var(--ea-sun-size)!important;border:5px solid #ffe59a!important;box-shadow:0 0 20px #ffdf79,0 0 48px #fbbf2480,0 0 80px #f9731644!important}
+:is(#ranking-tab,#rankingPanel) :is(.podium-slot-1,.rank-1)::before{content:"";pointer-events:none;position:absolute;z-index:0;width:calc(var(--ea-sun-size) * 1.8);height:calc(var(--ea-sun-size) * 1.8);left:50%;top:calc(var(--ea-sun-size) * -.4);margin-left:calc(var(--ea-sun-size) * -.9);border-radius:50%;background:repeating-conic-gradient(from 0deg,#ffd56b00 0deg,#ffd56b77 7deg,#ffecad00 14deg,transparent 24deg);mask-image:radial-gradient(circle,#000 10%,#0009 38%,transparent 70%);animation:eaSunOrbit 32s linear infinite}
+:is(#ranking-tab,#rankingPanel) :is(.podium-slot-1,.rank-1)::after{content:"";pointer-events:none;position:absolute;z-index:0;width:calc(var(--ea-sun-size) * 1.55);height:calc(var(--ea-sun-size) * 1.55);left:50%;top:calc(var(--ea-sun-size) * -.275);margin-left:calc(var(--ea-sun-size) * -.775);border-radius:50%;background:radial-gradient(circle,#ffedaf77,transparent 70%);animation:eaSunPulse 4s ease-in-out infinite alternate}
+:is(#ranking-tab,#rankingPanel) .podium-glow-1{display:none}
+:is(#ranking-tab,#rankingPanel) :is(.podium-name,.public-podium-name){position:relative;z-index:1;white-space:normal;color:#fff!important}
+#ranking-tab .ranking-cards{grid-template-columns:1fr!important}
+:is(#ranking-tab,#rankingPanel) :is(.ranking-card,.public-ranking-card){gap:18px;padding:16px 20px;border-radius:22px;border:1px solid #8b5cf655;background:linear-gradient(110deg,#8b5cf614,#38bdf810 55%,#fbbf2418);flex-wrap:wrap}
+:is(#ranking-tab,#rankingPanel) :is(.ranking-card-avatar,.public-ranking-avatar){flex:0 0 100px!important;width:100px!important;height:100px!important;border:3px solid #a78bfa!important;box-shadow:0 0 0 5px #a78bfa15,0 8px 24px #6366f122}
+#ranking-tab .ranking-card-name{font-size:1rem;white-space:normal}
+#ranking-tab .ranking-card-score{font-size:1.3rem}
+:is(#ranking-tab,#rankingPanel) :is(.ranking-card-score,.public-ranking-total,.ranking-card-rank,.public-ranking-rank,.ranking-group-tier,.public-ranking-tier){color:#6d28d9!important}
+:is(#ranking-tab,#rankingPanel) :is(.podium-meta,.public-podium-class){color:#dbeafe!important}
+body.dark :is(#ranking-tab,#rankingPanel) :is(.ranking-card-score,.public-ranking-total,.ranking-card-rank,.public-ranking-rank,.ranking-group-tier,.public-ranking-tier),body.dark-mode :is(#ranking-tab,#rankingPanel) :is(.ranking-card-score,.public-ranking-total,.ranking-card-rank,.public-ranking-rank,.ranking-group-tier,.public-ranking-tier){color:#c4b5fd!important}
+body.dark :is(#ranking-tab,#rankingPanel) .ea-rank-up,body.dark-mode :is(#ranking-tab,#rankingPanel) .ea-rank-up{color:#6ee7b7}
+body.dark :is(#ranking-tab,#rankingPanel) .ea-rank-down,body.dark-mode :is(#ranking-tab,#rankingPanel) .ea-rank-down{color:#fda4af}
+body:not(.light-mode) #ranking-tab .ea-rank-up{color:#6ee7b7}
+body:not(.light-mode) #ranking-tab .ea-rank-down{color:#fda4af}
+body:not(.light-mode) #ranking-tab :is(.ranking-card-score,.ranking-card-rank,.ranking-group-tier){color:#c4b5fd!important}
+@keyframes eaSunOrbit{to{transform:rotate(360deg)}}
+@keyframes eaSunPulse{from{opacity:.5;transform:scale(.95)}to{opacity:1;transform:scale(1.1)}}
+@media(max-width:640px){:is(#ranking-tab,#rankingPanel) :is(.podium-slot-1,.rank-1){--ea-sun-size:112px}:is(#ranking-tab,#rankingPanel) :is(.podium-avatar,.public-podium-avatar){width:86px!important;height:86px!important}:is(#ranking-tab,#rankingPanel) :is(.ranking-card-avatar,.public-ranking-avatar){flex-basis:82px!important;width:82px!important;height:82px!important}:is(#ranking-tab,#rankingPanel) :is(.ranking-card,.public-ranking-card){gap:10px;padding:12px}:is(#ranking-tab,#rankingPanel) .ea-rank-movement{min-width:0;font-size:.72rem}#ranking-tab .podium-platform{max-width:100%}}
+@media(max-width:360px){:is(#ranking-tab,#rankingPanel) :is(.podium-slot-1,.rank-1){--ea-sun-size:96px}:is(#ranking-tab,#rankingPanel) :is(.podium-avatar,.public-podium-avatar){width:72px!important;height:72px!important}}
+@media(prefers-reduced-motion:reduce){:is(#ranking-tab,#rankingPanel) *, :is(#ranking-tab,#rankingPanel) *::before,:is(#ranking-tab,#rankingPanel) *::after{animation:none!important;transition:none!important;opacity:1!important}}
+.ea-ranking-paused :is(#ranking-tab,#rankingPanel) *::before,.ea-ranking-paused :is(#ranking-tab,#rankingPanel) *::after{animation-play-state:paused!important}
+#ranking-tab.hidden *,#ranking-tab.hidden *::before,#ranking-tab.hidden *::after,#rankingPanel[hidden] *,#rankingPanel[hidden] *::before,#rankingPanel[hidden] *::after{animation-play-state:paused!important}
+
+</style>
+<script id="ea-ranking-theme">
+/* Shared legacy LAN / public Ranking presentation. */
+window.EARankingTheme = (() => {
+    function priorDay(month, now = new Date()) {
+        const parts = new Intl.DateTimeFormat('en-CA', {timeZone:'Asia/Kolkata',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(now);
+        const value = type => parts.find(p => p.type === type).value;
+        const today = `${value('year')}-${value('month')}-${value('day')}`;
+        if (month < '2026-02' || month > today.slice(0,7)) return '';
+        const [year, number] = month.split('-').map(Number);
+        const last = new Date(Date.UTC(year, number, 0)).toISOString().slice(0,10);
+        const day = month === today.slice(0,7) ? today : last;
+        const prior = new Date(Date.parse(day+'T00:00:00Z') - 86400000).toISOString().slice(0,10);
+        return prior.startsWith(month) ? prior : '';
+    }
+    function priorRows(rows, cutoff, compare) {
+        if (!cutoff) return [];
+        return rows.map(row => ({...row,rank:undefined,total: Number(row.total) - (row.dailyScores || []).reduce((sum, score, i) => sum + ((row.dates || [])[i] > cutoff ? Number(score) || 0 : 0), 0)}))
+            .sort((a,b) => b.total - a.total || compare(a,b));
+    }
+    function movement(previous, identity, key) {
+        const ranks = new Map();
+        previous.forEach((row, index) => {
+            const id = identity(row);
+            if (id && !row.masked) ranks.set(String(id), Number(row.rank) || index + 1);
+        });
+        return (row, rank) => {
+            const prior = ranks.get(String(identity(row)));
+            const delta = prior === undefined ? null : prior - rank;
+            const kind = delta === null ? 'unknown' : delta > 0 ? 'up' : delta < 0 ? 'down' : 'same';
+            const label = delta === null ? 'No prior data' : delta > 0 ? `↑ ${delta}` : delta < 0 ? `↓ ${-delta}` : '↔ Same';
+            const detail = delta === null ? `No matching rank in ${key}` : `Rank ${prior} in ${key}; ${delta > 0 ? 'up' : delta < 0 ? 'down' : 'unchanged'}${delta ? ' ' + Math.abs(delta) + ' places' : ''}`;
+            return `<span class="ea-rank-movement ea-rank-${kind}" title="${detail}" aria-label="${detail}">${label}</span>`;
+        };
+    }
+    function toggle(button, hostId) {
+        const host = document.getElementById(hostId);
+        if (!host) return;
+        const show = button.getAttribute('aria-pressed') !== 'true';
+        button.setAttribute('aria-pressed', String(show));
+        button.textContent = show ? '↑ ↓ Hide movements' : '↑ ↓ Show movements';
+        host.classList.toggle('ea-show-movements', show);
+    }
+    function sync(hostId) {
+        const host = document.getElementById(hostId), button = host?.querySelector('.ea-movement-controls button');
+        if (!button) return;
+        const show = host.classList.contains('ea-show-movements');
+        button.setAttribute('aria-pressed', String(show));
+        button.textContent = show ? '↑ ↓ Hide movements' : '↑ ↓ Show movements';
+    }
+    document.addEventListener('visibilitychange', () => document.documentElement.classList.toggle('ea-ranking-paused', document.hidden));
+    return { priorDay, priorRows, movement, toggle, sync };
+})();
+
+</script>
 </head>
 <body>
 <script>(function(){if(localStorage.getItem('ea_theme')==='dark')document.body.classList.add('dark');})()</script>
@@ -1485,6 +1599,7 @@
             <button id="tabMyProfile" class="tab-btn" type="button"><i class="fas fa-user-circle"></i> My Profile</button>
             <button id="tabScoreboard" class="tab-btn" type="button"><i class="fas fa-table-columns"></i> Scoreboard</button>
             <button id="tabRanking" class="tab-btn" type="button"><i class="fas fa-trophy"></i> Ranking</button>
+            <button id="tabGallery" class="tab-btn" type="button"><i class="fas fa-images"></i> Academy Gallery</button>
             <button id="tabParties" class="tab-btn" type="button"><i class="fas fa-scale-balanced"></i> Parties</button>
             <button id="tabChess" class="tab-btn" type="button"><i class="fas fa-chess-knight"></i> Chess Champion</button>
             <button id="tabExcelResults" class="tab-btn" type="button"><i class="fas fa-file-lines"></i> Excel Results</button>
@@ -1644,19 +1759,22 @@
             </div>
         </section>
 
+        <section id="galleryPanel" class="panel panel-shell">
+            <div id="academyGallery"></div>
+        </section>
         <section id="rankingPanel" class="panel panel-shell">
-            <div class="login-gate" id="rankingGate">
+            <div class="login-gate" id="rankingGate" hidden>
                 <div class="login-gate-icon">🏆</div>
                 <h2>Ranking Showcase</h2>
                 <p>The monthly podium and student ranking showcase is available to logged-in users.</p>
                 <p style="font-size:0.85rem;color:var(--muted);margin-bottom:18px;">Please log in to view the latest podium and grouped rankings.</p>
                 <button type="button" class="cta-button" id="rankingLoginLink">🔐 Login to View Ranking</button>
             </div>
-            <div id="rankingContent" hidden>
+            <div id="rankingContent">
                 <div class="auth-bar">
-                    <span id="rankingAuthUser"></span>
+                    <span id="rankingAuthUser">Public top 10</span>
                     <span class="auth-spacer"></span>
-                    <button type="button" class="logout-btn" data-secure-logout>Logout</button>
+                    <span>🏆 Monthly Ranking</span>
                 </div>
                 <div class="public-ranking-wrap">
                     <div class="public-ranking-controls">
@@ -2096,6 +2214,7 @@
         const tabMyProfile = document.getElementById('tabMyProfile');
         const tabScoreboard = document.getElementById('tabScoreboard');
         const tabRanking = document.getElementById('tabRanking');
+        const tabGallery = document.getElementById('tabGallery');
         const tabParties = document.getElementById('tabParties');
         const tabChess = document.getElementById('tabChess');
         const tabExcelResults = document.getElementById('tabExcelResults');
@@ -2165,22 +2284,22 @@
             try{const publicResponse=await fetch(SCORES_URL,{cache:'no-store'});if(!publicResponse.ok)throw new Error('General scoreboard data unavailable');publicData=await publicResponse.json();}
             catch(error){generalError=error.message;}
             // Public snapshot fields never unlock or supply the protected views.
-            const general = Object.fromEntries(['updated_at','months','scoreboard','top_full_count','chess_champion','public_information'].map(key=>[key,publicData[key]]));
+            const general = Object.fromEntries(['updated_at','months','scoreboard','ranking','ranking_movement','top_full_count','chess_champion','public_information'].map(key=>[key,publicData[key]]));
             let secured = {};
             if (window.EA_ACADEMY?.isSignedIn()) {
                 try { secured = await window.EA_ACADEMY.load();document.querySelectorAll('[data-academy-status]').forEach(node=>node.remove()); }
                 catch(error) { if(generation!==scoresLoadGeneration)throw error;clearProtectedViews();window.dispatchEvent(new CustomEvent('ea-academy-error',{detail:error.message})); }
             }
             if(generation!==scoresLoadGeneration)throw new Error('View changed; refresh data.');
-            scoresData = {...general,ranking:secured.ranking||{},parties:secured.parties||{},academy_updated_at:secured.updated_at,
+            scoresData = {...general,ranking:general.ranking||general.scoreboard||{},parties:secured.parties||{},academy_updated_at:secured.updated_at,
                 academy_revision:secured.source_revision,academy_stale:secured.stale_projection,academy_months:secured.months||[],general_error:generalError};
             const host=document.getElementById('scoreboardContent');let status=host.querySelector('[data-general-status]');
             if(generalError){if(!status){status=document.createElement('p');status.dataset.generalStatus='true';status.setAttribute('role','status');host.prepend(status);}status.textContent=generalError+'. Refresh to retry.';}else status?.remove();
             return scoresData;
         }
         function clearProtectedViews(){
-            ['publicRankingBody','partiesCircleField','partyModalBody','publicRankingMeta','partiesMeta'].forEach(id=>document.getElementById(id)?.replaceChildren());
-            closePartyModal();stopPublicRankingAnimationLoop();
+            ['partiesCircleField','partyModalBody','partiesMeta'].forEach(id=>document.getElementById(id)?.replaceChildren());
+            closePartyModal();
         }
         function openSecureProfile(destination) {
             pendingSecureTab = destination || null;
@@ -2192,7 +2311,7 @@
             else if(window.EA_ACADEMY?.isSignedIn()&&['ranking','parties'].includes(activeTab))setActiveTab(activeTab);
         });
         window.addEventListener('ea-academy-error',event=>{
-            for(const id of ['rankingContent','partiesContent']){const host=document.getElementById(id);if(!host)continue;let status=host.querySelector('[data-academy-status]');if(!status){status=document.createElement('p');status.dataset.academyStatus='true';status.setAttribute('role','status');host.prepend(status);}status.textContent='Protected data could not be refreshed: '+event.detail+'. Refresh or sign in again.';}
+            for(const id of ['partiesContent']){const host=document.getElementById(id);if(!host)continue;let status=host.querySelector('[data-academy-status]');if(!status){status=document.createElement('p');status.dataset.academyStatus='true';status.setAttribute('role','status');host.prepend(status);}status.textContent='Protected data could not be refreshed: '+event.detail+'. Refresh or sign in again.';}
         });
 
         // ── Login modal ──
@@ -2285,8 +2404,8 @@
             const infoContent = document.getElementById('infoContent');
             sbGate.hidden = loggedIn;
             sbContent.hidden = !loggedIn;
-            rankingGate.hidden = !!window.EA_ACADEMY?.isSignedIn();
-            rankingContent.hidden = !window.EA_ACADEMY?.isSignedIn();
+            rankingGate.hidden = true;
+            rankingContent.hidden = false;
             partiesGate.hidden = !!window.EA_ACADEMY?.isSignedIn();
             partiesContent.hidden = !window.EA_ACADEMY?.isSignedIn();
             chessGate.hidden = loggedIn;
@@ -2423,15 +2542,23 @@
             const rows = (scoresData && scoresData.ranking && scoresData.ranking[month]) || [];
             return rows.slice().sort((a, b) => (Number(a.rank) || 0) - (Number(b.rank) || 0));
         }
+        let publicRankingRenderedKey = null;
         function renderPublicRankingMonth(month) {
             const body = document.getElementById('publicRankingBody');
             if (!body) return;
-            const rows = publicRankingRows(month).filter(row => !row.masked && Number(row.rank) <= 15);
+            const rows = publicRankingRows(month).filter(row => !row.masked && Number(row.rank) >= 1 && Number(row.rank) <= 10).slice(0,10);
             if (!rows.length) {
+                publicRankingRenderedKey = null;
                 stopPublicRankingAnimationLoop();
                 body.innerHTML = '<div class="empty" style="padding:40px;text-align:center;color:var(--muted);">No public ranking data available for this month.</div>';
                 return;
             }
+            const movementInfo = scoresData?.ranking_movement?.[month] || {date:null,ranks:{}};
+            const movementRows = Object.entries(movementInfo.ranks || {}).map(([roll,rank]) => ({roll,rank}));
+            const movement = EARankingTheme.movement(movementRows, row => row.roll, movementInfo.date || 'previous day');
+            const key = JSON.stringify([month,rows,movementInfo]);
+            if (key === publicRankingRenderedKey) return;
+            publicRankingRenderedKey = key;
             const top = rows.slice(0, 3);
             const displayOrder = [1, 0, 2];
             const podiumColors = { 1: '#d4af37', 2: '#cbd5e1', 3: '#fb923c' };
@@ -2444,14 +2571,14 @@
                     '<div class="public-podium-medal">' + (PUBLIC_RANKING_MEDALS[rank] || '') + '</div>' +
                     '<div class="public-podium-name">' + publicRankingStudentName(row) + '</div>' +
                     '<div class="public-podium-class">Class ' + escapeHtml(row.class || '') + '</div>' +
-                    '<div class="public-podium-score">' + escapeHtml(row.total) + '</div>' +
+                    '<div class="public-podium-score">' + escapeHtml(row.total) + '</div>' + movement(row,rank) +
                     '<div class="public-podium-platform">' + rank + '</div>' +
                     '</div>';
             }).join('');
 
             const groups = [];
             const remaining = rows.slice(3);
-            for (let i = 0; i < remaining.length; i += 5) groups.push(remaining.slice(i, i + 5));
+            for (let i = 0; i < remaining.length; i += 7) groups.push(remaining.slice(i, i + 7));
             const groupHtml = groups.map((group, groupIndex) => {
                 const tag = PUBLIC_RANKING_GROUPS[groupIndex] || PUBLIC_RANKING_GROUPS[PUBLIC_RANKING_GROUPS.length - 1];
                 const start = Number(group[0].rank) || (4 + groupIndex * 5);
@@ -2462,7 +2589,7 @@
                         '<div class="public-ranking-rank">' + rank + '</div>' +
                         '<div class="public-ranking-avatar">' + publicRankingAvatar(row, true) + '</div>' +
                         '<div class="public-ranking-info"><div class="public-ranking-name">' + publicRankingStudentName(row) + '</div><div class="public-ranking-class">Class ' + escapeHtml(row.class || '') + '</div></div>' +
-                        '<div class="public-ranking-total">' + escapeHtml(row.total) + '</div>' +
+                        '<div class="public-ranking-total">' + escapeHtml(row.total) + '</div>' + movement(row,rank) +
                         '</div>';
                 }).join('');
                 return '<section class="public-ranking-group" style="--group-color:' + tag.color + ';--group-bg:' + tag.bg + ';--group-border:' + tag.border + ';--ranking-delay:' + (0.72 + groupIndex * .16) + 's">' +
@@ -2470,26 +2597,28 @@
                     '<div class="public-ranking-cards">' + cards + '</div></section>';
             }).join('');
 
-            body.innerHTML = '<div class="public-ranking-podium">' + podium + '</div>' + groupHtml + '<p class="public-ranking-note">Showing the top 15 public positions. Full student details remain protected.</p>';
+            body.innerHTML = '<div class="public-ranking-podium">' + podium + '</div>' + '<div class="ea-movement-controls"><button type="button" aria-pressed="false" onclick="EARankingTheme.toggle(this,\'publicRankingBody\')">↑ ↓ Show movements</button><span></span></div>'.replace('<span></span>', '<span>' + (movementInfo.date ? 'Compared with ' + escapeHtml(movementInfo.date) + ' · cumulative dated scores' : 'Previous-day comparison unavailable · refresh after publication') + '</span>') + groupHtml + '<p class="public-ranking-note">Top 10 · Monthly public ranking</p>';
+            EARankingTheme.sync('publicRankingBody');
             if (isPublicRankingVisible()) {
                 startPublicRankingAnimationLoop();
                 requestAnimationFrame(() => triggerPublicRankingFireworks());
             }
         }
         function renderRanking(data) {
-            if(!window.EA_ACADEMY?.isSignedIn())return;
             scoresData = data;
-            const months = (data && data.academy_months) || [];
+            const months = (data && data.months) || [];
             const sel = document.getElementById('publicRankingMonth');
             const meta = document.getElementById('publicRankingMeta');
             if (!sel) return;
+            const selectedMonth = months.includes(sel.value) ? sel.value : months[0];
             sel.innerHTML = months.map(m => '<option value="' + escapeHtml(m) + '">' + escapeHtml(m) + '</option>').join('');
+            if (selectedMonth) sel.value = selectedMonth;
             if (meta) {
-                const d = new Date(data && data.academy_updated_at);
-                meta.textContent = data && data.academy_updated_at ? 'Verified snapshot ' + (isNaN(d) ? data.academy_updated_at : d.toLocaleString()) + ' · Revision '+data.academy_revision+(data.academy_stale?' · Awaiting today’s refresh':'') : '';
+                const d = new Date(data && data.updated_at);
+                meta.textContent = data && data.updated_at ? 'Updated ' + (isNaN(d) ? data.updated_at : d.toLocaleString()) : '';
             }
             sel.onchange = () => renderPublicRankingMonth(sel.value);
-            if (months.length) renderPublicRankingMonth(months[0]);
+            if (months.length) renderPublicRankingMonth(sel.value);
             else document.getElementById('publicRankingBody').innerHTML = '<div class="empty" style="padding:40px;text-align:center;color:var(--muted);">No ranking months available.</div>';
         }
         function replayPublicRanking() {
@@ -2499,35 +2628,48 @@
             triggerPublicRankingFireworks();
         }
         function triggerPublicRankingFireworks() {
-            if (!isPublicRankingVisible()) return;
+            if (!isPublicRankingVisible() || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
             const canvas = document.getElementById('publicRankingFireworks');
             const host = document.getElementById('publicRankingContainer');
-            if (!canvas || !host) return;
+            const podium = host?.querySelector('.public-ranking-podium');
+            if (!canvas || !host || !podium) return;
             const rect = host.getBoundingClientRect();
+            const podiumRect = podium.getBoundingClientRect();
             canvas.width = Math.max(1, Math.floor(rect.width));
             canvas.height = Math.max(1, Math.floor(rect.height));
             const ctx = canvas.getContext('2d');
+            if (!ctx) return;
             const colors = ['#d4af37', '#f7931e', '#34d399', '#38bdf8', '#c4314b', '#a78bfa'];
-            const particles = [];
-            for (let burst = 0; burst < 4; burst++) {
-                setTimeout(() => {
-                    const x = canvas.width * (.2 + Math.random() * .6);
-                    const y = canvas.height * (.08 + Math.random() * .24);
-                    const color = colors[Math.floor(Math.random() * colors.length)];
-                    for (let i = 0; i < 34; i++) {
-                        const angle = Math.PI * 2 * i / 34;
-                        const speed = 1.8 + Math.random() * 3.1;
-                        particles.push({ x, y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, life: 1, color, size: 2 + Math.random() * 2 });
-                    }
-                }, burst * 220);
-            }
+            const originY = Math.max(30,podiumRect.top-rect.top+podiumRect.height*.35);
+            const particles = Array.from({length:120},(_,i)=>({
+                x:canvas.width*(.18+(i%3)*.32),y:originY,
+                vx:(Math.random()-.5)*canvas.width*.6,vy:-70-Math.random()*180,
+                color:colors[i%colors.length],angle:Math.random()*6.28,delay:(i%3)*.18
+            }));
+            const balloons=Array.from({length:9},(_,i)=>({x:canvas.width*(.1+i*.1),color:colors[i%colors.length]}));
             if (publicRankingRaf) cancelAnimationFrame(publicRankingRaf);
-            function frame() {
+            const started=performance.now();
+            function frame(now) {
+                if(!isPublicRankingVisible()){publicRankingRaf=null;return;}
+                const elapsed=(now-started)/1000;
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
-                let alive = false;
-                particles.forEach(p => { p.x += p.vx; p.y += p.vy; p.vy += .07; p.life -= .015; if (p.life > 0) { alive = true; ctx.globalAlpha = p.life; ctx.fillStyle = p.color; ctx.beginPath(); ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2); ctx.fill(); } });
+                particles.forEach(p=>{
+                    const t=elapsed-p.delay;if(t<0)return;
+                    // Scale gravity to the full list height so ribbons reach row ten.
+                    const y=p.y+p.vy*t+(canvas.height/12)*t*t;if(y>canvas.height+20)return;
+                    const x=p.x+p.vx*(1-Math.exp(-t))*.6;
+                    ctx.globalAlpha=Math.max(0,Math.min(1,(4.8-elapsed)*2));
+                    ctx.strokeStyle=p.color;ctx.lineWidth=3;
+                    ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+Math.sin(t*6+p.angle)*8,y+18);ctx.stroke();
+                });
+                ctx.globalAlpha=Math.max(0,1-elapsed/3.8);
+                balloons.forEach((b,i)=>{
+                    const y=originY+80-elapsed*100+(i%3)*16;
+                    ctx.fillStyle=b.color;ctx.beginPath();ctx.ellipse(b.x,y,10,14,0,0,Math.PI*2);ctx.fill();
+                    ctx.strokeStyle=b.color;ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(b.x,y+14);ctx.lineTo(b.x+Math.sin(elapsed*3+i)*5,y+48);ctx.stroke();
+                });
                 ctx.globalAlpha = 1;
-                if (alive || particles.length < 136) publicRankingRaf = requestAnimationFrame(frame);
+                if (elapsed < 4.8) publicRankingRaf = requestAnimationFrame(frame);
                 else { ctx.clearRect(0, 0, canvas.width, canvas.height); publicRankingRaf = null; }
             }
             publicRankingRaf = requestAnimationFrame(frame);
@@ -3035,6 +3177,9 @@ function renderInfo(data) {
         // ── Tabs ──
         function setActiveTab(tabKey) {
             activeTab = tabKey;
+            tabGallery.classList.toggle('active',tabKey==='gallery');
+            document.getElementById('galleryPanel').classList.toggle('active',tabKey==='gallery');
+            if(tabKey==='gallery')window.EA_GALLERY?.open();
             const isHome = tabKey === 'home';
             const isMyProfile = tabKey === 'my-profile';
             const isScoreboard = tabKey === 'scoreboard';
@@ -3086,7 +3231,7 @@ function renderInfo(data) {
                 });
             }
             // Preload data when an authenticated user opens a locked tab
-            if ((isLoggedIn() || window.EA_ACADEMY?.isSignedIn()) && (isScoreboard || isRanking || isParties || isChess || tabKey === 'info')) {
+            if (isRanking || ((isLoggedIn() || window.EA_ACADEMY?.isSignedIn()) && (isScoreboard || isParties || isChess || tabKey === 'info'))) {
                 loadScores().then(d => { renderScoreboard(d); renderRanking(d); renderParties(d); renderChessChampion(d); renderInfo(d); }).catch(() => {});
             }
             if (isRanking) startPublicRankingAnimationLoop();
@@ -3452,9 +3597,9 @@ function renderInfo(data) {
             setActiveTab('scoreboard');
         });
         tabRanking.addEventListener('click', () => {
-            if (!window.EA_ACADEMY?.isSignedIn()) { openSecureProfile('ranking'); return; }
             setActiveTab('ranking');
         });
+        tabGallery.addEventListener('click',()=>setActiveTab('gallery'));
         tabParties.addEventListener('click', () => {
             if (!window.EA_ACADEMY?.isSignedIn()) { openSecureProfile('parties'); return; }
             setActiveTab('parties');
@@ -3508,7 +3653,9 @@ function renderInfo(data) {
             } else if (h === '#scoreboard') {
                 if (!isLoggedIn()) openLoginModal(); else setActiveTab('scoreboard');
             } else if (h === '#ranking') {
-                if (!window.EA_ACADEMY?.isSignedIn()) openSecureProfile('ranking'); else setActiveTab('ranking');
+                setActiveTab('ranking');
+            } else if (h === '#gallery') {
+                setActiveTab('gallery');
             } else if (h === '#parties') {
                 if (!window.EA_ACADEMY?.isSignedIn()) openSecureProfile('parties'); else setActiveTab('parties');
             } else if (h === '#chess') {
@@ -3599,5 +3746,6 @@ function renderInfo(data) {
     <script src="./profile/app.js"></script>
     <script>window.EA_ACADEMY.refresh();</script>
 <script src="./student-portraits.js"></script>
+<script src="./academy-gallery.js"></script>
 </body>
 </html>
