@@ -1,5 +1,14 @@
 // This fragment is embedded in app.js so the isolated portal keeps one entry point.
 let portraitMap=new Map();
+function profileMediaUUID(){
+  const source=globalThis.crypto;
+  if(typeof source?.randomUUID==='function')return source.randomUUID();
+  if(typeof source?.getRandomValues!=='function')throw new Error('This browser cannot prepare an upload ID. Please use an updated browser.');
+  const bytes=source.getRandomValues(new Uint8Array(16));
+  bytes[6]=(bytes[6]&15)|64;bytes[8]=(bytes[8]&63)|128;
+  const hex=Array.from(bytes,value=>value.toString(16).padStart(2,'0')).join('');
+  return `${hex.slice(0,8)}-${hex.slice(8,12)}-${hex.slice(12,16)}-${hex.slice(16,20)}-${hex.slice(20)}`;
+}
 function portraitHtml(studentId, name, broad=false){
   const id=portraitMap.get(String(studentId));
   const initials=String(name||'?').trim().split(/\s+/).slice(0,2).map(x=>x[0]).join('').toUpperCase();
@@ -30,7 +39,7 @@ function bindPhotoForms(){
     form.onsubmit=async event=>{
       event.preventDefault();const button=form.querySelector('button[type=submit]'),status=form.querySelector('[data-upload-status]');button.disabled=true;
       try{
-        form.dataset.mediaId ||= crypto.randomUUID();
+        form.dataset.mediaId ||= profileMediaUUID();
         status.textContent='Preparing your photo…';
         const image_data=await preparePhoto(form.querySelector('[name=photo]').files[0],form.dataset.photoUpload);
         await api('/me/media',{method:'POST',body:JSON.stringify({media_id:form.dataset.mediaId,kind:form.dataset.photoUpload,caption:form.querySelector('[name=caption]').value,image_data})});
