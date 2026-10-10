@@ -1,0 +1,11 @@
+.academy-rules{max-width:1100px;margin:auto;padding:24px;color:var(--text)}
+.academy-rules header,.rule-toolbar,.rule-buttons{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.academy-rules header h2{margin-right:auto}.academy-rules button,.academy-rules select,.academy-rules input,.academy-rules textarea{font:inherit;color:inherit;background:var(--card-bg,#fff);border:1px solid var(--border,#cbd5e1);border-radius:9px;padding:9px 12px}
+body.dark .academy-rules button,body.dark .academy-rules select,body.dark .academy-rules input,body.dark .academy-rules textarea{background:#111;border-color:#334155}
+.academy-rules button{cursor:pointer}.academy-rules button:disabled{opacity:.55;cursor:wait}.academy-rules button[aria-pressed=true],.academy-rules button[aria-selected=true]{border-color:var(--primary,#6366f1);box-shadow:0 0 0 1px var(--primary,#6366f1)}
+.academy-rules .rule-list{display:grid;gap:14px;margin-top:18px}.academy-rules article{padding:18px;border:1px solid var(--border,#cbd5e1);border-radius:14px;background:var(--card-bg,#fff)}
+body.dark .academy-rules article{background:linear-gradient(135deg,#07111e,#101018);border-color:#334155}
+.academy-rules article h3{margin:6px 0 12px}.academy-rules p{white-space:pre-wrap;overflow-wrap:anywhere}.academy-rules .rule-meta{font-size:.88rem;opacity:.85}.academy-rules .rule-status{font-weight:700;color:var(--primary,#6366f1)}
+.academy-rules form{display:grid;gap:10px;margin:14px 0}.academy-rules label{display:grid;gap:5px}.academy-rules textarea{width:100%;min-height:90px;box-sizing:border-box}.academy-rules .rule-thread{margin-top:18px;padding-top:14px;border-top:1px solid var(--border,#cbd5e1)}
+.academy-rules .rule-message{padding:12px;margin:10px 0;border-left:3px solid var(--primary,#6366f1);background:rgba(99,102,241,.08);border-radius:8px}.academy-rules .rule-message small{opacity:.8}.academy-rules .rule-notice{min-height:24px;white-space:pre-wrap}.academy-rules .rule-topic{display:block;text-align:left;width:100%;margin:10px 0}.academy-rules :focus-visible{outline:3px solid var(--primary,#6366f1);outline-offset:3px}
+@media(max-width:600px){.academy-rules{padding:14px}.academy-rules article{padding:14px}.academy-rules .rule-toolbar>*{max-width:100%}}

@@ -15,7 +15,7 @@ SOURCE = ROOT / 'public_site'
 OUTPUT = ROOT / 'rebuild/out/secure_academy_site'
 GENERAL_KEYS = {'updated_at','top_full_count','months','scoreboard','ranking_movement','chess_champion','public_information'}
 ROW_KEYS = {'rank','roll','name','class','total','photo_path','masked'}
-FILES = ['index.html','_headers','academy-auth.js','academy-gallery.js','student-portraits.js','profile/app.js','profile/styles.css',
+FILES = ['index.html','_headers','academy-auth.js','academy-gallery.js','student-portraits.js','general-auth.js','academy-rules.js','academy-rules.css','profile/app.js','profile/styles.css',
          'excel_results/app.js','excel_results/styles.css','excel_results/catalog.json',
          'excel_study_notes/app.js','excel_study_notes/styles.css','excel_study_notes/catalog.json']
 
@@ -66,6 +66,9 @@ def expected_files():
     credentials={'credentials':[{k:v for k,v in row.items() if k in {'roll','salt','hash'}} for row in credentials.get('credentials',[])]}
     generated={'scores.json':json.dumps(data,ensure_ascii=False,separators=(',',':')).encode(),
                'credentials.json':json.dumps(credentials,separators=(',',':')).encode()}
+    gateway=ROOT/'functions/api/portal/[[path]].js'
+    if gateway.is_symlink() or not gateway.is_file():raise ValueError('Missing or unsafe Pages portal gateway')
+    generated['functions/api/portal/[[path]].js']=gateway.read_bytes()
     allowed=set(FILES)
     gallery=SOURCE/'gallery/catalog.json'
     if gallery.is_file():

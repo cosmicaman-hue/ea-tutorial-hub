@@ -43,7 +43,7 @@ function submissionForm(){
  if(!allowed())return gate();
  host.querySelector('[data-gallery-submission]')?.remove();
  const form=document.createElement('form');form.dataset.gallerySubmission='true';form.className='academy-gallery-controls';
- form.innerHTML=`<h3>Submit photographs</h3><label>General login<input name="roll" maxlength="100" autocomplete="username" required></label><label>General password<input name="password" type="password" maxlength="128" autocomplete="current-password" required></label><label>Month<input name="month" type="month" value="${new Date().toISOString().slice(0,7)}" required></label><label>Folder<input name="folder" maxlength="100" placeholder="Annual Day / Classes / Sports"></label><label>Caption<input name="caption" maxlength="500" required></label><label>Photos<input name="photos" type="file" accept="image/jpeg,image/png,image/webp" multiple required></label><button type="submit">Send for Admin approval</button><button type="button" data-cancel>Cancel</button><p role="status" data-status></p>`;
+ form.innerHTML=`<h3>Submit photographs</h3><p>Your current general login identifies this submission.</p><label>Month<input name="month" type="month" value="${new Date().toISOString().slice(0,7)}" required></label><label>Folder<input name="folder" maxlength="100" placeholder="Annual Day / Classes / Sports"></label><label>Caption<input name="caption" maxlength="500" required></label><label>Photos<input name="photos" type="file" accept="image/jpeg,image/png,image/webp" multiple required></label><button type="submit">Send for Admin approval</button><button type="button" data-cancel>Cancel</button><p role="status" data-status></p>`;
  host.querySelector('.academy-gallery-controls').after(form);form.querySelector('[data-cancel]').onclick=()=>form.remove();
  form.onsubmit=async event=>{
   event.preventDefault();const button=form.querySelector('[type=submit]'),status=form.querySelector('[data-status]');button.disabled=true;
@@ -54,11 +54,10 @@ function submissionForm(){
     if(!allowed()||!form.isConnected)break;status.textContent=`Preparing ${saved+1} of ${files.length}…`;
     file.galleryId ||= crypto.randomUUID();
     const image_data=await prepare(file);
-    const response=await fetch('/api/portal/gallery/submissions',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({media_id:file.galleryId,roll:form.elements.roll.value,password:form.elements.password.value,album_month:form.elements.month.value,folder:form.elements.folder.value,caption:form.elements.caption.value,image_data})});
-    const data=await response.json();if(!response.ok||!data.success)throw new Error(data.error||'Submission failed.');saved++;
+    await window.EA_GENERAL.request('/gallery/submissions',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({media_id:file.galleryId,album_month:form.elements.month.value,folder:form.elements.folder.value,caption:form.elements.caption.value,image_data})});saved++;
    }
    status.textContent=`${saved} photographs saved for Admin approval.`;
-   form.elements.photos.value='';form.elements.password.value='';
+   form.elements.photos.value='';
   }catch(error){status.textContent=`${saved} saved. ${error.message}`;}finally{button.disabled=false;}
  };
 }

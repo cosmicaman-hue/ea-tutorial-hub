@@ -3,7 +3,9 @@
 This folder contains public files for static hosting on Cloudflare Pages.
 
 ## Files
-- `index.html` - public read-only site (client-side login gate + scoreboard/ranking/party/chess/info rendering)
+- `index.html` - academy site with general login, published views and Rules discussions
+- `general-auth.js` - server-confirmed general sessions and shared browser admission
+- `academy-rules.js`, `academy-rules.css` - published Rules, student reactions, comments and discussion topics
 - `scores.json` - exported scoreboard snapshot (scoreboard + ranking rows + party standings + `chess_champion` + `public_information`)
 - `credentials.json` - per-student salted SHA-256 login credentials (manually maintained)
 - `offline_scoreboard.html` - full SPA scoreboard (cross-origin mode via meta tag; no longer linked from the public UI)
@@ -17,23 +19,29 @@ The repository-root `functions/api/portal/[[path]].js` is the allowlisted Pages
 Function gateway. Bind it to the separately deployed portal Worker as the
 `PORTAL_API` service binding. It deliberately cannot proxy connector endpoints.
 
-## Client-side login gate
+## General login and Rules
 
-The Scoreboard, Ranking, and Information tabs are locked behind a login dialog that runs
-entirely in the browser. There is **no server and no routing to the local SPA**:
+The existing Roll No./Password dialog now authenticates through the Cloudflare
+Worker. An HttpOnly session establishes identity; localStorage contains display
+metadata only. The same registered browser is used by general and secure student
+login on the same origin. Two browsers register automatically; an additional
+browser requires LAN Admin approval and replacement of an old slot. Logout and
+session expiry do not free registered slots. Staff access is unchanged.
 
-1. The user clicks **Login** (header button or a locked tab).
-2. A modal prompts for **Roll No.** and **Password**.
-3. The browser fetches `credentials.json`, finds the matching roll, and computes
-   `SHA-256(salt + password)` (UTF-8) via Web Crypto.
-4. On a hash match, the tabs unlock and render directly from `scores.json`.
-5. The Excel Chess Champion tab shows the read-only tournament standings, live match room, and knockout bracket from the published `chess_champion` snapshot.
-6. The login is remembered in `localStorage`; **Logout** clears it.
+Force Publish sends an allowlisted official Rules projection and the current
+student contribution directory to D1 through the signed LAN connector. Rules
+cannot be edited through the student site. Active students can like/dislike,
+remove a reaction, comment, start a discussion and reply. LAN Admin can hide or
+restore cloud comments/discussions from Student Requests. Cloud history survives
+official rule deletion; removed rules no longer accept contributions.
 
-This is a **soft gate only**. `credentials.json` is a public static file — anyone
-can download it and brute-force the hashes offline. Use strong, unique passwords
-and never reuse passwords that protect sensitive accounts. This model hides the
-scoreboard from casual visitors; it is **not** real security.
+The existing static scoreboard/resource snapshots remain downloadable static
+assets. This change does not turn those static files into private records.
+Private profiles and Rules interactions require Worker authorization.
+
+Activation requires migration `0014_rules_and_devices.sql`, the Worker and Pages
+release, and the LAN backend restart. Existing unbound student sessions require
+one fresh login. See `docs/cloudflare-rules-and-device-plan-2026-10-10.md`.
 
 ### Managing credentials
 

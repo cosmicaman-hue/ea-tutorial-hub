@@ -8,7 +8,8 @@ export async function onRequest(context) {
   const upstreamPath = '/v1/' + suffix.replace(/^v1\//, '');
   const governance=/^\/v1\/(?:admin\/(?:audit|party-policy)|me\/audit-events|party-governance(?:\/(?:pacts(?:\/[0-9a-f-]+\/(?:sign|terminate|review))?|bonds(?:\/[0-9a-f-]+\/sign)?|exits(?:\/[0-9a-f-]+\/review)?))?)$/i;
   const media=/^\/v1\/(?:gallery(?:\/submissions)?|me\/media|media\/(?:portraits|[0-9a-f-]+))$/i;
-  if (!ALLOWED.test(upstreamPath)&&!governance.test(upstreamPath)&&!media.test(upstreamPath)) return Response.json({success:false,error:'not_found'}, {status:404});
+  const rules=/^\/v1\/(?:general\/auth\/(?:login|logout|me|csrf)|rules(?:\/[^/]{1,360}(?:\/(?:reactions|comments|topics)(?:\/[0-9a-f-]+)?)?)?)$/i;
+  if (!ALLOWED.test(upstreamPath)&&!governance.test(upstreamPath)&&!media.test(upstreamPath)&&!rules.test(upstreamPath)) return Response.json({success:false,error:'not_found'}, {status:404});
   const incoming = new URL(context.request.url);
   const upstream = new URL('https://portal-api.internal' + upstreamPath + incoming.search);
   return context.env.PORTAL_API.fetch(new Request(upstream, context.request));

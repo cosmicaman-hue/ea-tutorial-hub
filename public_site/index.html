@@ -1605,6 +1605,7 @@ window.EARankingTheme = (() => {
             <button id="tabExcelResults" class="tab-btn" type="button"><i class="fas fa-file-lines"></i> Excel Results</button>
             <button id="tabExcelStudyNotes" class="tab-btn" type="button"><i class="fas fa-book-open"></i> Excel Study Notes</button>
             <button id="tabInfo" class="tab-btn" type="button"><i class="fas fa-circle-info"></i> Information</button>
+            <button id="tabRules" class="tab-btn" type="button"><i class="fas fa-book"></i> Rules &amp; Discussion</button>
             <button id="tabHelpdesk" class="tab-btn" type="button"><i class="fas fa-comments"></i> Helpdesk</button>
         </nav>
     </header>
@@ -1719,6 +1720,9 @@ window.EARankingTheme = (() => {
             </div>
         </section>
 
+        <section id="rulesPanel" class="panel panel-shell" aria-label="Rules and Discussion">
+            <div id="rulesRoot" class="academy-rules"></div>
+        </section>
         <section id="myProfilePanel" class="panel panel-shell" aria-label="My Profile">
             <div id="myProfileRoot" class="profile-app" aria-live="polite"></div>
         </section>
@@ -2196,18 +2200,18 @@ window.EARankingTheme = (() => {
         </div>
     </div>
 
+    <link rel="stylesheet" href="./academy-rules.css">
+    <script src="./general-auth.js"></script>
     <script src="./academy-auth.js"></script>
     <script>
         // ════════════════════════════════════════════════════════════
-        // CLIENT-SIDE LOGIN GATE (soft gate — see README.md)
-        // Credentials verified against ./credentials.json (salted SHA-256).
+        // General login uses a server-confirmed session and device admission.
         // On success the Scoreboard, Information, and Study Notes tabs render from
-        // ./scores.json. No server / SPA routing required.
+        // ./scores.json. Rules and discussions use the Cloudflare Worker.
         // ════════════════════════════════════════════════════════════
         let pendingSecureTab = null;
         let scoresLoadGeneration = 0;
         const AUTH_KEY = 'ea_public_auth';
-        const CREDENTIALS_URL = './credentials.json';
         const SCORES_URL = './scores.json';
 
         const tabHome = document.getElementById('tabHome');
@@ -2245,38 +2249,14 @@ window.EARankingTheme = (() => {
         const headerLoginBtn = document.getElementById('headerLoginBtn');
 
         let scoresData = null;        // cached scores.json payload
-        let credentialsCache = null;  // cached credentials.json payload
         let activeTab = 'home';
 
         // ── Auth state ──
         function getAuth() {
-            try { return JSON.parse(localStorage.getItem(AUTH_KEY) || 'null'); } catch(e) { return null; }
+            return window.EA_GENERAL?.account() || null;
         }
         function isLoggedIn() { return !!getAuth(); }
 
-        function setAuth(roll) {
-            try { localStorage.setItem(AUTH_KEY, JSON.stringify({ roll: roll, ts: Date.now() })); } catch(e) {}
-            window.dispatchEvent(new CustomEvent('ea-auth-changed'));
-        }
-        function clearAuth() {
-            try { localStorage.removeItem(AUTH_KEY); } catch(e) {}
-            window.dispatchEvent(new CustomEvent('ea-auth-changed'));
-        }
-
-        // SHA-256 of a UTF-8 string → hex. Matches scripts/generate_credentials.py.
-        async function sha256Hex(text) {
-            const buf = new TextEncoder().encode(text);
-            const digest = await crypto.subtle.digest('SHA-256', buf);
-            return Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
-        }
-
-        async function loadCredentials() {
-            if (credentialsCache) return credentialsCache;
-            const res = await fetch(CREDENTIALS_URL, { cache: 'no-store' });
-            if (!res.ok) throw new Error('credentials file unavailable');
-            credentialsCache = await res.json();
-            return credentialsCache;
-        }
 
         async function loadScores() {
             const generation = ++scoresLoadGeneration;
@@ -2343,21 +2323,8 @@ window.EARankingTheme = (() => {
                 return;
             }
             try {
-                const creds = await loadCredentials();
-                const list = (creds && creds.credentials) || [];
-                const entry = list.find(c => String(c.roll || '').toUpperCase() === roll);
-                if (!entry) {
-                    loginError.textContent = 'Invalid roll number or password.';
-                    loginSubmit.disabled = false;
-                    return;
-                }
-                const computed = await sha256Hex(entry.salt + pass);
-                if (computed.toLowerCase() !== String(entry.hash || '').toLowerCase()) {
-                    loginError.textContent = 'Invalid roll number or password.';
-                    loginSubmit.disabled = false;
-                    return;
-                }
-                setAuth(roll);
+                await window.EA_GENERAL.login(roll,pass);
+                loginPass.value = '';
                 closeLoginModal();
                 loginSubmit.disabled = false;
                 applyAuthState();
@@ -2374,8 +2341,9 @@ window.EARankingTheme = (() => {
         document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && loginModal.classList.contains('open')) closeLoginModal(); });
 
         // ── Logout ──
-        function logout() {
-            clearAuth();
+        async function logout() {
+            try { await window.EA_GENERAL.logout(); }
+            catch(error) { openLoginModal(); loginError.textContent = 'Sign out could not be confirmed: ' + error.message; return; }
             applyAuthState();
             setActiveTab('home');
         }
@@ -3177,6 +3145,9 @@ function renderInfo(data) {
         // ── Tabs ──
         function setActiveTab(tabKey) {
             activeTab = tabKey;
+            document.getElementById('tabRules').classList.toggle('active',tabKey==='rules');
+            document.getElementById('rulesPanel').classList.toggle('active',tabKey==='rules');
+            if(tabKey==='rules')window.EA_RULES?.open();
             tabGallery.classList.toggle('active',tabKey==='gallery');
             document.getElementById('galleryPanel').classList.toggle('active',tabKey==='gallery');
             if(tabKey==='gallery')window.EA_GALLERY?.open();
@@ -3219,6 +3190,7 @@ function renderInfo(data) {
                 'excel-results': 'tabExcelResults',
                 'excel-study-notes': 'tabExcelStudyNotes',
                 'info': 'tabInfo',
+                'rules': 'tabRules',
                 'helpdesk': 'tabHelpdesk'
             }[tabKey] || 'tabHome');
             if (activeTabBtn && typeof activeTabBtn.scrollIntoView === 'function') {
@@ -3617,6 +3589,7 @@ function renderInfo(data) {
             setActiveTab('excel-study-notes');
             if (String(location.hash || '').indexOf('#sn') !== 0) location.hash = '#sn/';
         });
+        document.getElementById('tabRules').addEventListener('click',()=>setActiveTab('rules'));
         tabInfo.addEventListener('click', () => {
             if (!isLoggedIn()) { openLoginModal(); return; }
             setActiveTab('info');
@@ -3637,6 +3610,7 @@ function renderInfo(data) {
         // ── Init & Hash Routing ──
         function handleHash() {
             const h = String(location.hash || '').toLowerCase();
+            if (h === '#rules') { setActiveTab('rules'); return; }
             if (h === '#my-profile') {
                 setActiveTab('my-profile');
                 window.EA_PROFILE_APP?.open();
@@ -3747,5 +3721,10 @@ function renderInfo(data) {
     <script>window.EA_ACADEMY.refresh();</script>
 <script src="./student-portraits.js"></script>
 <script src="./academy-gallery.js"></script>
+<script src="./academy-rules.js"></script>
+<script>
+window.addEventListener('ea-auth-changed',()=>{scoresLoadGeneration++;scoresData=null;applyAuthState();});
+window.EA_GENERAL.refresh().then(()=>{if(activeTab==='rules')window.EA_RULES.open();});
+</script>
 </body>
 </html>
