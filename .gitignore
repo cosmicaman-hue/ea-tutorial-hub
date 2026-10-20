@@ -78,3 +78,9 @@ scratch/
 # salted SHA-256 hashes of public-gate passwords, public by design).
 ea_data.db
 _ayush_scores_*.json
+
+# wrangler files
+.wrangler
+.dev.vars*
+!.dev.vars.example
+!.env.example
