@@ -3416,15 +3416,16 @@ function renderInfo(data) {
                             message: message
                         })
                     });
-                    if (res.ok) {
+                    const receipt = await res.json().catch(() => ({}));
+                    if (res.ok && receipt.success === true && receipt.receipt_id) {
                         document.getElementById('helpdeskForm').style.display = 'none';
                         document.getElementById('helpdeskSuccessAlert').style.display = 'block';
                     } else {
-                        const data = await res.json().catch(() => ({}));
-                        throw new Error(data.error || 'Server submission failed. Please use WhatsApp.');
+                        throw new Error(receipt.error || 'Delivery was not confirmed. Please use WhatsApp.');
                     }
                 } catch(err) {
-                    // Save locally in browser as offline fallback ticket so user never loses data
+                    // A retained draft is not an Academy receipt. Keep the form
+                    // and its WhatsApp option available; never show success here.
                     try {
                         const localTickets = JSON.parse(localStorage.getItem('ea_feedback_tickets') || '[]');
                         localTickets.unshift({
@@ -3433,11 +3434,12 @@ function renderInfo(data) {
                             phone: phone,
                             roll_no: roll,
                             message: message,
+                            delivery_status: 'draft',
                             ts: new Date().toISOString()
                         });
                         localStorage.setItem('ea_feedback_tickets', JSON.stringify(localTickets.slice(0, 50)));
-                        document.getElementById('helpdeskForm').style.display = 'none';
-                        document.getElementById('helpdeskSuccessAlert').style.display = 'block';
+                        errBox.textContent = 'Draft saved on this device only. It has not been delivered to the Academy. Select WhatsApp to send it.';
+                        errBox.style.display = 'block';
                     } catch(e2) {
                         errBox.textContent = err.message || 'Submission error. Please send via WhatsApp.';
                         errBox.style.display = 'block';
@@ -3524,7 +3526,8 @@ function renderInfo(data) {
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ category: cat, name: name, phone: phone, roll_no: roll || null, message: message })
                     });
-                    if (res.ok) {
+                    const receipt = await res.json().catch(() => ({}));
+                    if (res.ok && receipt.success === true && receipt.receipt_id) {
                         document.getElementById('modalHelpdeskForm').style.display = 'none';
                         document.getElementById('modalSuccessAlert').style.display = 'block';
                     } else {
@@ -3534,10 +3537,10 @@ function renderInfo(data) {
                     // Fallback to local ticket store
                     try {
                         const localTickets = JSON.parse(localStorage.getItem('ea_feedback_tickets') || '[]');
-                        localTickets.unshift({ category: cat, name: name, phone: phone, roll_no: roll, message: message, ts: new Date().toISOString() });
+                        localTickets.unshift({ category: cat, name: name, phone: phone, roll_no: roll, message: message, delivery_status:'draft', ts: new Date().toISOString() });
                         localStorage.setItem('ea_feedback_tickets', JSON.stringify(localTickets.slice(0, 50)));
-                        document.getElementById('modalHelpdeskForm').style.display = 'none';
-                        document.getElementById('modalSuccessAlert').style.display = 'block';
+                        errBox.textContent = 'Draft saved on this device only. It has not been delivered to the Academy. Select WhatsApp to send it.';
+                        errBox.style.display = 'block';
                     } catch(e2) {
                         errBox.textContent = 'Could not submit. Please use WhatsApp.';
                         errBox.style.display = 'block';

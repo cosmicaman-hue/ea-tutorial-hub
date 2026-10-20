@@ -1,142 +1,58 @@
-# Public Scoreboard (Static Host)
+# Public academy site
 
-This folder contains public files for static hosting on Cloudflare Pages.
+The legacy LAN app remains the authority for official academy data. The public shell is served at https://ea-tutorial-hub.pages.dev by Pages project `ea-scoreboard`. Svelte and Android are separate from this flow.
 
-## Files
-- `index.html` - academy site with general login, published views and Rules discussions
-- `general-auth.js` - server-confirmed general sessions and shared browser admission
-- `academy-rules.js`, `academy-rules.css` - published Rules, student reactions, comments and discussion topics
-- `scores.json` - exported scoreboard snapshot (scoreboard + ranking rows + party standings + `chess_champion` + `public_information`)
-- `credentials.json` - per-student salted SHA-256 login credentials (manually maintained)
-- `offline_scoreboard.html` - full SPA scoreboard (cross-origin mode via meta tag; no longer linked from the public UI)
-- `static/css/offline-scoreboard.css` - SPA stylesheet
-- `excel_results/` - Excel Results SPA (`catalog.json`, papers, `app.js`) managed from the LAN admin tab; see `excel_results/README.md`
-- `excel_study_notes/` - published-only PDF Study Notes catalog, reader assets, and files managed from the LAN admin tab
-- `profile/` - secure My Profile client; it stores only CSRF and notification cursors in session storage
-- `_headers` - cache-control rules (keeps `scores.json`, `credentials.json`, Excel Results, Study Notes, and SPA assets fresh on Cloudflare)
+## Required production settings
 
-The repository-root `functions/api/portal/[[path]].js` is the allowlisted Pages
-Function gateway. Bind it to the separately deployed portal Worker as the
-`PORTAL_API` service binding. It deliberately cannot proxy connector endpoints.
+- Production branch: `main`
+- Build command: `python3 scripts/build_secure_academy_site.py`
+- Build output: `rebuild/out/secure_academy_site`
+- Pages service binding: `PORTAL_API` to `project-ea-private-portal-staging`
 
-## General login and Rules
+The builder exports allowlisted files. The count changes with published resources; verify the manifest instead of assuming a fixed count. Never publish all of `public_site`, the legacy SPA, or private staging output. Root `wrangler.toml` belongs to private staging. An ad-hoc config using `../site` can overwrite the public destination and break later Git builds. Use controlled Git builds and verify settings after each release.
 
-The existing Roll No./Password dialog now authenticates through the Cloudflare
-Worker. An HttpOnly session establishes identity; localStorage contains display
-metadata only. The same registered browser is used by general and secure student
-login on the same origin. Two browsers register automatically; an additional
-browser requires LAN Admin approval and replacement of an old slot. Logout and
-session expiry do not free registered slots. Staff access is unchanged.
+## Separate delivery paths
 
-Force Publish sends an allowlisted official Rules projection and the current
-student contribution directory to D1 through the signed LAN connector. Rules
-cannot be edited through the student site. Active students can like/dislike,
-remove a reaction, comment, start a discussion and reply. LAN Admin can hide or
-restore cloud comments/discussions from Student Requests. Cloud history survives
-official rule deletion; removed rules no longer accept contributions.
+Scoreboard, public Ranking, Chess, Information, Results and Study Notes are static published projections. Their update time is the snapshot's time. Relevant tabs fetch static data with no-store semantics. An already-open page may need refreshing after deployment.
 
-The existing static scoreboard/resource snapshots remain downloadable static
-assets. This change does not turn those static files into private records.
-Private profiles and Rules interactions require Worker authorization.
+My Profile and protected party views use the authenticated Worker and D1. The LAN connector delivers sanitized projections through durable outboxes and receives student requests. Only Admin-managed/activated profiles are published by default. An old public Ranking does not establish that the private connector is offline.
 
-Activation requires migration `0014_rules_and_devices.sql`, the Worker and Pages
-release, and the LAN backend restart. Existing unbound student sessions require
-one fresh login. See `docs/cloudflare-rules-and-device-plan-2026-10-10.md`.
+Official Rules publish through the signed LAN connector. Cloud discussions cannot change official rules. Student browser admission is enforced by the Worker: two registrations are allowed; later registrations await LAN Admin approval. LAN login policy is unchanged.
 
-### Managing credentials
+General login and secure My Profile login have separate account/session paths. General credentials are managed in the LAN Admin Control Panel and delivered directly to the Worker. The builder does not export password verifiers; `/credentials.json` is explicitly denied. Removing the current file cannot make older downloads or historical releases secret. Password replacement is a separate Admin decision.
 
-Credentials are **admin-managed** from the LAN app's **Admin Control Panel**
-(the `PublicSiteCredential` table is the single source of truth). On every
-**Force Publish**, the server writes `public_site/credentials.json` from the
-active rows.
+Static scoreboard/resource files remain downloadable. Their visual login gate does not make those files private. Private profiles, Rules interactions and protected party records require server authorization.
 
-**Primary path (admin UI):**
+## Publish from LAN
 
-1. Log in to the LAN app as **Admin**.
-2. Open **Admin Control Panel** → scroll to the *Public Site Login Credentials
-   (Cloudflare)* section.
-3. Set credentials:
-   - **Per-student**: enter Roll No. + Password → *Set / Update One*.
-   - **Bulk**: enter a shared Password (and optionally a rolls list; leave empty
-     to apply to all students in the ledger) → *Set for All / Listed*.
-4. Use the table to **Enable/Disable** a credential (keeps the password) or
-   **Revoke** it (deletes the row).
-5. Click **Force Publish** — the new `credentials.json` is written and pushed to
-   Cloudflare Pages.
+1. Save pending LAN changes normally.
+2. As Admin, click Force Publish. The repaired backend captures a canonical server snapshot and queues publication without rewriting the ledger.
+3. Publishing status displays a durable receipt, source revision, export, GitHub delivery, Rules result and hosted-content verification.
+4. A partial result identifies a separate failed stage. GitHub success alone is not a hosting receipt. Interrupted jobs resume on LAN startup.
+5. Refresh the public page after verified delivery. The repaired local backend needs the normal LAN restart to activate installed source changes.
 
-A warning is shown in the panel when no credentials are configured: until the
-admin sets at least one, Force Publish writes `{"credentials":[]}` and the public
-site login is locked.
+Internet outages delay cloud delivery independently of LAN operation. Do not clear browser queues or edit the live ledger to repair public publication.
 
-`credentials.json` schema (generated by the server, not hand-edited):
+## Recovery and manual fallback
 
-```json
-{
-  "credentials": [
-    { "roll": "EA24B15", "salt": "<16-hex-chars>", "hash": "<sha256(salt+password) hex>" }
-  ]
-}
-```
-
-**Standalone fallback (`scripts/generate_credentials.py`):** useful for offline
-or CLI-only provisioning; uses the exact same salted SHA-256 / UTF-8 encoding as
-the browser and server. Note that the file it writes is overwritten by the server
-on the next Force Publish — use it only when the LAN admin app is unavailable.
-
-```bash
-python scripts/generate_credentials.py EA24B15        # add/update one (hidden prompt)
-python scripts/generate_credentials.py --csv rolls.csv # bulk import (roll,password)
-python scripts/generate_credentials.py --list          # list configured rolls
-python scripts/generate_credentials.py --remove EA24B15
-```
-
-The file is served with `no-store` so credential changes/revocations propagate
-immediately after the next Force Publish.
-
-
-## Cross-Origin Mode (Cloudflare Pages → Tunnel Backend)
-
-When `offline_scoreboard.html` is served from Cloudflare Pages, a `<meta name="ea-backend-url">` tag is injected by the publish flow. This activates cross-origin mode:
-
-- All API calls are rewritten to the tunnel backend URL (set via `EA_TUNNEL_ORIGIN` env var)
-- Auth headers (`X-EA-Login-ID`, `X-EA-Login-Code`) are injected from localStorage
-- An offline banner appears when the backend is unreachable; changes queue in a WAL for replay on reconnect
-- `lz-string.min.js` and `json-parse-worker.js` are inlined — no external `/static/js/` dependencies
-
-## Environment Variables (Backend)
-
-- `EA_TUNNEL_ORIGIN` - Cloudflare Named Tunnel domain (e.g. `sync.yourdomain.com`). Used to inject the meta tag and validate CORS.
-- `EA_CLOUDFLARE_PAGES_ORIGIN` - Cloudflare Pages custom domain for CORS validation.
-- `EA_ALLOW_PAGES_DEV` - Set to `1` to allow `*.pages.dev` preview deployments in CORS.
-- `EA_PUBLIC_SITE_AUTO_PUSH` - Set to `1` (default) to auto-push public_site changes on Force Publish.
-
-## Publish flow (Cloudflare Pages)
-
-Primary path:
-- In LAN admin app, use `Force Publish`.
-- Server writes `public_site/scores.json`, syncs SPA files, and auto-pushes if enabled.
-
-Manual fallback (from project root):
+The PowerShell fallback pushes existing exported files; it does not regenerate the snapshot. Review intended paths before `-Push`. It requires `main` and excludes the legacy SPA and password file.
 
 ```powershell
-pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\publish_public_scoreboard.ps1 -Push
+pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/publish_public_scoreboard.ps1 -Push
+node --use-system-ca scripts/public_cloud_delivery.mjs inspect
+node --use-system-ca scripts/public_cloud_delivery.mjs logs <deployment-id>
 ```
 
-This fallback only commits/pushes existing `public_site` files. It does not regenerate `scores.json`.
+For wrong public build settings, `configure` saves a private local backup and restores the required command/output. Retry requires a reviewed full main commit SHA and refuses if remote main changed:
 
-## Cloudflare Pages settings
-- Production branch: `main`
-- Framework preset: `None`
-- Build command: *(empty)*
-- Build output directory: `public_site`
+```powershell
+node --use-system-ca scripts/public_cloud_delivery.mjs configure
+node --use-system-ca scripts/public_cloud_delivery.mjs retry <reviewed-40-character-commit>
+node --use-system-ca scripts/public_cloud_delivery.mjs verify <isolated-sanitized-build-folder>
+```
 
-Keep admin/LAN app private; host only this folder publicly.
+Wait for deployment success; compare the sanitized `scores.json` hash to live bytes. Protected academy access must return 401, connector access through Pages 404, and the old credential-file URL 404. Raw source formatting can differ from sanitized output.
 
-The My Profile tab is a separate authenticated service. It does not use
-`credentials.json`; its opaque session cookie is issued by the portal Worker,
-and D1 stores only sanitized per-student projections and request conversations.
-Students use an Admin-issued one-use code for first setup or to reset a forgotten
-password. The sign-in screen's **Forgot password?** path explains how to obtain
-a new code. A reset signs out older devices and opens the profile with the new
-password. Admin can review Cloudflare student usage and block or unblock an
-account in the LAN Student Requests tab.
+## Helpdesk
+
+The public generic `/api/feedback` intake is not deployed. An unconfirmed submission is retained as a browser-only draft and explicitly labelled as not delivered. Use the visible WhatsApp option to send it. Receipt is reported only when an API returns success with a receipt ID. Authenticated student requests retain their separate Worker/LAN flow. Browser drafts are not silently converted into student requests or cloud records.
