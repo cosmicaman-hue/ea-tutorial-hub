@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "timezone": "Asia/Kolkata",
+  "policies": [
+    {
+      "id": "vote-power-20-cap25-v1",
+      "topic": "vote_power",
+      "title": "Previous Vote Power rule",
+      "effective_date": null,
+      "step": 20,
+      "minimum": 1,
+      "maximum": 25,
+      "summary": "One additional unit of Vote Power per 20 monthly points, with a minimum of 1 and a maximum of 25. This records the previous rule; it is not a newly issued notice.",
+      "notice": null
+    },
+    {
+      "id": "vote-power-30-uncapped-v2",
+      "topic": "vote_power",
+      "title": "Vote Power: uniform 30-point steps",
+      "notice_number": "EA/POL/2026/001",
+      "issued_date": "2026-10-20",
+      "effective_date": "2026-10-20",
+      "step": 30,
+      "minimum": 1,
+      "maximum": null,
+      "summary": "From 20 October 2026, Vote Power increases by one for every complete 30 points in the official monthly Scoreboard total. The minimum remains 1. There is no maximum ceiling.",
+      "notice": "vote-power-30-uncapped-2026-10-20.pdf",
+      "clauses": [
+        "Vote Power = max(1, floor(official monthly score / 30) + 1). The same 30-point step applies throughout the entire score range.",
+        "Lower score boundaries are inclusive. A score is not rounded upward before applying the rule. Negative scores and zero scores retain Vote Power 1.",
+        "The effective date is 20 October 2026, from 00:00 India Standard Time. Earlier dates use the previous 20-point rule with its maximum of 25. Historical monthly views use the rule in effect at the end of that month; the current month uses the rule in effect today.",
+        "This policy changes Vote Power only. It does not change points, attendance adjustments, Stars, VETOs, rankings or the existing official monthly score calculation.",
+        "Elections already opened retain their recorded electorate and teacher weights through all rounds and approval. New elections use the policy effective when they are opened. The existing teacher-weight formula and majority rules continue unchanged.",
+        "Party standings add eligible members' individual powers; an individual ceiling is not applied to the party total. Party-council elections retain one vote per eligible party.",
+        "Policy amendments must be issued as separate dated notices. Earlier notices and completed election records remain available for reference. This notice replaces the previous Vote Power rule from the effective date stated above."
+      ]
+    }
+  ]
+}

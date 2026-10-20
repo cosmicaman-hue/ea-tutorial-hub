@@ -70,13 +70,20 @@ def expected_files():
     if denied.is_symlink() or not denied.is_file():raise ValueError('Missing credential-file denial route')
     generated['functions/credentials.json.js']=denied.read_bytes()
     allowed=set(FILES)
+    # Public policy notices contain no roster, account or ledger data.
+    registry=json.loads((SOURCE/'policies/catalog.json').read_text(encoding='utf-8'))
+    allowed.update('policies/'+name for name in ('catalog.json','index.html','app.js','styles.css'))
+    for policy in registry['policies']:
+        notice=policy.get('notice')
+        if notice:
+            if not re.fullmatch(r'[a-z0-9-]+\.pdf',notice):raise ValueError('Unsafe policy notice path')
+            allowed.add('policies/'+notice)
     gallery=SOURCE/'gallery/catalog.json'
     if gallery.is_file():
         catalog=json.loads(gallery.read_text(encoding='utf-8-sig'))
         allowed.add('gallery/catalog.json')
         for row in catalog.get('photos',[]):
             path=str(row.get('photo_path',''))
-            import re
             if not re.fullmatch(r'gallery/[0-9a-f-]{36}\.jpg',path,re.I):raise ValueError('Unsafe gallery image path')
             allowed.add(path)
     allowed.update(referenced_files(data))

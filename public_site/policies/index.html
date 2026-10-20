@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Policies &amp; Notices | Excel Academy</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <main>
+    <header class="masthead"><p class="eyebrow">PROJECT EA / OFFICIAL POLICY REGISTER</p><h1>EXCEL ACADEMY</h1><p>Policies &amp; Notices</p></header>
+    <p class="intro">Every notice records its issue date and effective date. Earlier notices remain available when a policy changes.</p>
+    <section class="tools" aria-label="Policy date and Vote Power preview">
+      <label>Policy status on date <input id="policyDate" type="date" required></label>
+      <label>Monthly score <input id="policyScore" type="number" step="any" value="1468"></label>
+      <output id="policyPreview" aria-live="polite"></output>
+    </section>
+    <div id="policyStatus" role="status">Loading the policy register...</div>
+    <div id="policyNotices"></div>
+    <footer>Dates follow India Standard Time (Asia/Kolkata). The preview uses the policy on the selected date; an election already opened keeps its recorded weights.</footer>
+  </main>
+  <script src="./app.js"></script>
+</body>
+</html>

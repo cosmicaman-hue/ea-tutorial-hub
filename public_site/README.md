@@ -25,6 +25,13 @@ Static scoreboard/resource files remain downloadable. Their visual login gate do
 
 ## Publish from LAN
 
+Policies & Notices is a public tab and a standalone register at `/policies/`.
+It lists issue/effective dates and links to typewritten PDF notices. The
+canonical register is `app/static/policies/catalog.json`; run
+`scripts/build_policy_notices.py` after adding a dated notice. The normal LAN
+publication copies these assets, and the secure builder explicitly allowlists
+them. Add amendments as new entries; do not overwrite an earlier notice.
+
 1. Save pending LAN changes normally.
 2. As Admin, click Force Publish. The repaired backend captures a canonical server snapshot and queues publication without rewriting the ledger.
 3. Publishing status displays a durable receipt, source revision, export, GitHub delivery, Rules result and hosted-content verification.

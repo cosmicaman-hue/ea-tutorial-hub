@@ -1605,6 +1605,7 @@ window.EARankingTheme = (() => {
             <button id="tabExcelResults" class="tab-btn" type="button"><i class="fas fa-file-lines"></i> Excel Results</button>
             <button id="tabExcelStudyNotes" class="tab-btn" type="button"><i class="fas fa-book-open"></i> Excel Study Notes</button>
             <button id="tabInfo" class="tab-btn" type="button"><i class="fas fa-circle-info"></i> Information</button>
+            <button id="tabPolicies" class="tab-btn" type="button"><i class="fas fa-file-lines"></i> Policies &amp; Notices</button>
             <button id="tabRules" class="tab-btn" type="button"><i class="fas fa-book"></i> Rules &amp; Discussion</button>
             <button id="tabHelpdesk" class="tab-btn" type="button"><i class="fas fa-comments"></i> Helpdesk</button>
         </nav>
@@ -1720,6 +1721,10 @@ window.EARankingTheme = (() => {
             </div>
         </section>
 
+        <section id="policiesPanel" class="panel panel-shell" aria-label="Policies and Notices">
+            <iframe title="Academy policies and PDF notices" src="./policies/index.html" loading="lazy" style="width:100%;height:85vh;min-height:520px;border:0;border-radius:12px;background:#f5f1e7"></iframe>
+            <p><a href="./policies/" target="_blank" rel="noopener">Open policy register in a new page</a></p>
+        </section>
         <section id="rulesPanel" class="panel panel-shell" aria-label="Rules and Discussion">
             <div id="rulesRoot" class="academy-rules"></div>
         </section>
@@ -3145,6 +3150,8 @@ function renderInfo(data) {
         // ── Tabs ──
         function setActiveTab(tabKey) {
             activeTab = tabKey;
+            document.getElementById('tabPolicies').classList.toggle('active',tabKey==='policies');
+            document.getElementById('policiesPanel').classList.toggle('active',tabKey==='policies');
             document.getElementById('tabRules').classList.toggle('active',tabKey==='rules');
             document.getElementById('rulesPanel').classList.toggle('active',tabKey==='rules');
             if(tabKey==='rules')window.EA_RULES?.open();
@@ -3191,6 +3198,7 @@ function renderInfo(data) {
                 'excel-study-notes': 'tabExcelStudyNotes',
                 'info': 'tabInfo',
                 'rules': 'tabRules',
+                'policies': 'tabPolicies',
                 'helpdesk': 'tabHelpdesk'
             }[tabKey] || 'tabHome');
             if (activeTabBtn && typeof activeTabBtn.scrollIntoView === 'function') {
@@ -3561,6 +3569,7 @@ function renderInfo(data) {
             });
         }
 
+        document.getElementById('tabPolicies').addEventListener('click', () => setActiveTab('policies'));
         tabHome.addEventListener('click', () => setActiveTab('home'));
         tabMyProfile.addEventListener('click', () => {
             setActiveTab('my-profile');
