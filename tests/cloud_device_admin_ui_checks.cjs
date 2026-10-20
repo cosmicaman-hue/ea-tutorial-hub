@@ -20,7 +20,7 @@ async function fixture(count=2){
 (async()=>{
  const f=await fixture();try{
   const select=f.w.document.querySelector('[data-replace]');assert.equal(select.options.length,3);assert(select.options[0].disabled);assert.match(select.options[0].textContent,/Choose a browser/);assert(!f.w.document.querySelector('[data-cloud-admin-report] img'));
-  f.w.document.querySelector('[data-approve]').click();await tick();assert.equal(f.decisions.length,0);assert.match(f.status(),/Both slots are occupied/);
+  f.w.document.querySelector('[data-approve]').click();await tick();assert.equal(f.decisions.length,0);assert.match(f.status(),/Both slots are occupied/);assert.match(f.w.document.querySelector('[data-approve]').closest('td').querySelector('[data-cloud-decision-status]').textContent,/Both slots are occupied/);
   select.value=uuid(1);f.w.document.querySelector('[data-approve]').click();await tick();await tick();assert.equal(f.decisions[0].replace_device_id,uuid(1));assert.match(f.status(),/Browser approved/);assert.equal(f.w.document.querySelectorAll('[data-approve]').length,0);
   f.w.currentUserRole='teacher';f.w.eaCloudAdminReset();assert.equal(f.w.document.querySelectorAll('[data-cloud-device]').length,0);assert.equal(f.status(),'');
  }finally{f.dom.window.close();}
