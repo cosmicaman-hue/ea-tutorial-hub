@@ -2,21 +2,35 @@
 <html lang="en">
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#123d44">
   <title>Policies &amp; Notices | Excel Academy</title>
   <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
   <main>
-    <header class="masthead"><p class="eyebrow">PROJECT EA / OFFICIAL POLICY REGISTER</p><h1>EXCEL ACADEMY</h1><p>Policies &amp; Notices</p></header>
-    <p class="intro">Every notice records its issue date and effective date. Earlier notices remain available when a policy changes.</p>
-    <section class="tools" aria-label="Policy date and Vote Power preview">
-      <label>Policy status on date <input id="policyDate" type="date" required></label>
-      <label>Monthly score <input id="policyScore" type="number" step="any" value="1468"></label>
+    <header class="masthead">
+      <div class="brand"><span class="brand-mark" aria-hidden="true">EA</span><span>EXCEL ACADEMY<small>Official policy register · आधिकारिक नीति संग्रह</small></span><span class="language-tag">English + हिन्दी</span></div>
+      <p class="eyebrow">CLEAR RULES. FAIR PLAY. / स्पष्ट नियम। निष्पक्ष व्यवहार।</p>
+      <h1>Policies &amp; Notices<span lang="hi">नीतियाँ एवं सूचनाएँ</span></h1>
+      <p class="intro">Know the rule, its start date, and how it applies.<br><span lang="hi">नियम, लागू होने की तारीख और उसका सही उपयोग जानें।</span></p>
+      <div class="hero-note">New amendments take effect on 23 October 2026, 00:00 IST.<br><span lang="hi">नए संशोधन 23 अक्टूबर 2026, रात 12:00 बजे (भारतीय समय) से लागू होंगे।</span></div>
+    </header>
+    <section class="find-panel" aria-label="Find a policy / नीति खोजें">
+      <label class="search-label" for="policySearch">Find a policy <span lang="hi">नीति खोजें</span></label>
+      <input id="policySearch" type="search" placeholder="Try Star, points, waiver… / स्टार, अंक, माफ़ी…" autocomplete="off">
+      <nav id="policyTopics" class="topics" aria-label="Policy topics / नीति विषय"></nav>
+      <div class="filter-row"><label for="policyDate">Status on date / इस तारीख को स्थिति <input id="policyDate" type="date" required></label><label for="policyState">Show / दिखाएँ <select id="policyState"><option value="all">All notices / सभी सूचनाएँ</option><option value="current">In effect / लागू</option><option value="scheduled">Upcoming / आगामी</option><option value="history">Previous / पिछली</option></select></label></div>
+    </section>
+    <div class="list-heading"><h2>Browse notices <span lang="hi">सूचनाएँ देखें</span></h2><p id="policyCount" aria-live="polite"></p></div>
+    <div id="policyStatus" role="status">Loading policies… / नीतियाँ लोड हो रही हैं…</div>
+    <div id="policyNotices"></div>
+    <p id="policyEmpty" class="empty" hidden>No matching policies. Try another word or topic.<br><span lang="hi">कोई नीति नहीं मिली। दूसरा शब्द या विषय चुनें।</span></p>
+    <section class="preview tools" aria-label="Vote Power preview / मत शक्ति का उदाहरण">
+      <div><p class="eyebrow">QUICK CHECK / तुरंत जाँचें</p><h2>Vote Power preview <span lang="hi">मत शक्ति का उदाहरण</span></h2><p>Uses the date selected above. Open elections keep their recorded weights.<br><span lang="hi">ऊपर चुनी तारीख का नियम लागू है। चल रहे चुनावों की दर्ज मत शक्ति सुरक्षित रहती है।</span></p></div>
+      <label for="policyScore">Monthly score / मासिक स्कोर <input id="policyScore" type="number" step="any" value="1468"></label>
       <output id="policyPreview" aria-live="polite"></output>
     </section>
-    <div id="policyStatus" role="status">Loading the policy register...</div>
-    <div id="policyNotices"></div>
-    <footer>Dates follow India Standard Time (Asia/Kolkata). The preview uses the policy on the selected date; an election already opened keeps its recorded weights.</footer>
+    <footer>Dates follow India Standard Time (Asia/Kolkata). Earlier notices stay available for reference.<br><span lang="hi">सभी तारीखें भारतीय मानक समय के अनुसार हैं। पिछली सूचनाएँ संदर्भ के लिए उपलब्ध रहेंगी।</span></footer>
   </main>
   <script src="./app.js"></script>
 </body>

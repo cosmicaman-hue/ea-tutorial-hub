@@ -11,7 +11,9 @@
       "minimum": 1,
       "maximum": 25,
       "summary": "One additional unit of Vote Power per 20 monthly points, with a minimum of 1 and a maximum of 25. This records the previous rule; it is not a newly issued notice.",
-      "notice": null
+      "notice": null,
+      "title_hi": "मत शक्ति का पिछला नियम",
+      "summary_hi": "मासिक स्कोर में हर पूरे 20 अंकों पर मत शक्ति में एक की वृद्धि; न्यूनतम 1 और अधिकतम 25। यह पिछले नियम का रिकॉर्ड है, नई सूचना नहीं।"
     },
     {
       "id": "vote-power-30-uncapped-v2",
@@ -33,6 +35,154 @@
         "Elections already opened retain their recorded electorate and teacher weights through all rounds and approval. New elections use the policy effective when they are opened. The existing teacher-weight formula and majority rules continue unchanged.",
         "Party standings add eligible members' individual powers; an individual ceiling is not applied to the party total. Party-council elections retain one vote per eligible party.",
         "Policy amendments must be issued as separate dated notices. Earlier notices and completed election records remain available for reference. This notice replaces the previous Vote Power rule from the effective date stated above."
+      ],
+      "title_hi": "मत शक्ति: हर 30 अंकों पर समान वृद्धि",
+      "summary_hi": "20 अक्टूबर 2026 से आधिकारिक मासिक स्कोर में हर पूरे 30 अंकों पर मत शक्ति में एक की वृद्धि होगी। न्यूनतम 1 रहेगा और कोई अधिकतम सीमा नहीं होगी.",
+      "clauses_hi": [
+        "मत शक्ति = अधिकतम(1, पूर्णांक-नीचे(आधिकारिक मासिक स्कोर / 30) + 1)। पूरे स्कोर दायरे में हर 30 अंकों का समान चरण लागू है।",
+        "प्रत्येक चरण की निचली सीमा शामिल है। गणना से पहले स्कोर ऊपर की ओर पूर्णांकित नहीं होगा। ऋणात्मक और शून्य स्कोर पर मत शक्ति 1 रहेगी।",
+        "20 अक्टूबर 2026, रात 12:00 बजे (भारतीय समय) से लागू। उससे पहले 20 अंकों वाला नियम और अधिकतम 25 की सीमा रहेगी। पिछले महीनों में महीने के अंत का नियम, चालू महीने में आज का नियम लागू है।",
+        "इस नीति से केवल मत शक्ति बदलती है। अंक, उपस्थिति समायोजन, स्टार, वीटो, रैंकिंग और मौजूदा आधिकारिक मासिक स्कोर की गणना नहीं बदलती।",
+        "पहले से खुले चुनावों में दर्ज मतदाता और शिक्षक भार सभी चरणों व अनुमोदन तक सुरक्षित रहेंगे। नए चुनाव शुरू होने की तारीख का नियम अपनाएँगे। शिक्षक भार और बहुमत के मौजूदा नियम यथावत हैं।",
+        "पार्टी की कुल मत शक्ति पात्र सदस्यों की व्यक्तिगत शक्तियों का योग है; पार्टी के योग पर व्यक्तिगत अधिकतम सीमा नहीं लगेगी। पार्टी परिषद चुनाव में प्रत्येक पात्र पार्टी का एक मत बना रहेगा।",
+        "हर संशोधन अलग तारीख वाली सूचना से जारी होगा। पुरानी सूचनाएँ और पूर्ण चुनाव रिकॉर्ड उपलब्ध रहेंगे। यह सूचना बताई गई लागू तारीख से पिछला मत शक्ति नियम बदलती है।"
+      ]
+    },
+    {
+      "id": "normal-star-unlimited-v1",
+      "topic": "normal_star",
+      "title": "Normal Stars: previous erasure rule",
+      "title_hi": "नॉर्मल स्टार: अंक मिटाने का पिछला नियम",
+      "effective_date": "2026-02-01",
+      "summary": "For score dates before 23 October 2026, Normal Star usage clears the full eligible negative daily total. The existing bonus threshold and timing apply.",
+      "summary_hi": "23 अक्टूबर 2026 से पहले की स्कोर तारीखों पर नॉर्मल स्टार से उस दिन का पूरा पात्र ऋणात्मक स्कोर मिटता है। बोनस की मौजूदा सीमा और समय लागू रहते हैं।",
+      "notice": null,
+      "clauses": [
+        "This historical rule remains applicable to score dates through 22 October 2026, even if a record is entered or corrected later.",
+        "A daily score strictly above −50 before Star usage qualifies for +100 per Normal Star, credited the next day within the month, or the same day at month end. Exactly −50 and lower receive no bonus."
+      ],
+      "clauses_hi": [
+        "यह पिछला नियम 22 अक्टूबर 2026 तक की स्कोर तारीखों पर लागू रहेगा, भले ही रिकॉर्ड बाद में दर्ज या सुधारा जाए।",
+        "स्टार उपयोग से पहले दैनिक स्कोर −50 से अधिक हो तो प्रत्येक नॉर्मल स्टार पर +100 बोनस उसी महीने के अगले दिन मिलता है; महीने के अंतिम दिन बोनस उसी दिन मिलता है। ठीक −50 या उससे कम पर बोनस नहीं मिलता।"
+      ]
+    },
+    {
+      "id": "normal-star-100-per-star-2026-10-23",
+      "topic": "normal_star",
+      "title": "Normal Stars: up to 100 points erased per Star",
+      "title_hi": "नॉर्मल स्टार: हर स्टार से अधिकतम 100 ऋणात्मक अंक मिटेंगे",
+      "notice_number": "EA/POL/2026/002",
+      "issued_date": "2026-10-22",
+      "effective_date": "2026-10-23",
+      "erase_per_star": 100,
+      "summary": "Each Normal Star erases up to 100 eligible negative points from that day's total. Any remaining negative score stays. The existing +100 bonus rule continues.",
+      "summary_hi": "हर नॉर्मल स्टार उस दिन के कुल पात्र ऋणात्मक स्कोर में से अधिकतम 100 अंक मिटाएगा। बचा हुआ ऋणात्मक स्कोर बना रहेगा। मौजूदा +100 बोनस नियम जारी रहेगा।",
+      "notice": null,
+      "clauses": [
+        "Applies to score dates from 23 October 2026 (00:00 IST). Dates up to 22 October retain the previous rule, even when entered later. All other Star rules and existing exclusions continue.",
+        "Calculate once on the eligible daily total: maximum erasure = 100 × Normal Stars used that day, limited to the actual negative total. Splitting entries or saving again cannot multiply this allowance. Unused erasure cannot create positive points or carry forward.",
+        "Test bonus eligibility on the daily total BEFORE any Star erasure. A score strictly above −50 gets +100 per Normal Star; exactly −50 or lower gets no bonus. Using more Stars cannot first lift a low score into the bonus range.",
+        "The bonus is credited the next day within the same month, or on the same day at month end. Existing Disciplinary Star rules, including no further halving on a day with Normal usage, remain unchanged."
+      ],
+      "clauses_hi": [
+        "23 अक्टूबर 2026, रात 12:00 बजे (भारतीय समय) से शुरू स्कोर तारीखों पर लागू। 22 अक्टूबर तक की तारीखों पर पिछला नियम रहेगा, भले ही अंक बाद में दर्ज हों। स्टार के अन्य नियम और मौजूदा अपवाद यथावत रहेंगे।",
+        "गणना दिन के कुल पात्र स्कोर पर एक बार होगी: अधिकतम मिटने वाले अंक = 100 × उस दिन उपयोग किए गए नॉर्मल स्टार; वास्तविक ऋणात्मक स्कोर से अधिक नहीं। अलग प्रविष्टियाँ या बार-बार सेव करने से सीमा नहीं बढ़ेगी। बची छूट से धनात्मक अंक नहीं बनेंगे और वह आगे नहीं जाएगी।",
+        "बोनस के लिए स्टार से अंक मिटाने से पहले का दैनिक कुल देखें। −50 से अधिक पर हर नॉर्मल स्टार का +100 बोनस मिलेगा; ठीक −50 या उससे कम पर नहीं। अधिक स्टार लगाकर पहले स्कोर बढ़ाना और फिर बोनस लेना मान्य नहीं है।",
+        "बोनस उसी महीने के अगले दिन मिलेगा; महीने के अंतिम दिन उसी दिन मिलेगा। डिसिप्लिनरी स्टार के मौजूदा नियम यथावत हैं; नॉर्मल उपयोग वाले दिन अतिरिक्त आधा करना लागू नहीं होगा।"
+      ],
+      "examples": [
+        [
+          "−300",
+          1,
+          "−200",
+          "0"
+        ],
+        [
+          "−300",
+          2,
+          "−100",
+          "0"
+        ],
+        [
+          "−300",
+          3,
+          "0",
+          "0"
+        ],
+        [
+          "−100",
+          1,
+          "0",
+          "0"
+        ],
+        [
+          "−50",
+          1,
+          "0",
+          "0"
+        ],
+        [
+          "−49",
+          1,
+          "0",
+          "+100"
+        ],
+        [
+          "+40",
+          1,
+          "+40",
+          "+100"
+        ]
+      ],
+      "note": "“After” is the eligible daily score after erasure. Any bonus is credited separately at the time stated above; existing exempt entries keep their existing treatment.",
+      "note_hi": "“बाद” का अर्थ अंक मिटने के बाद का पात्र दैनिक स्कोर है। बोनस ऊपर बताए समय पर अलग जुड़ेगा; मौजूदा छूट वाली प्रविष्टियों का व्यवहार नहीं बदलेगा।"
+    },
+    {
+      "id": "awarded-points-entry-2026-10-23",
+      "topic": "score_entry",
+      "title": "Awarded points: entry window and My Profile exception",
+      "title_hi": "पुरस्कृत अंक: दर्ज करने की समय-सीमा और My Profile की छूट",
+      "notice_number": "EA/POL/2026/003",
+      "issued_date": "2026-10-22",
+      "effective_date": "2026-10-23",
+      "summary": "Normally, Admin may enter awarded points on the award date or the next two calendar days. A request through Cloudflare My Profile removes this limit for the current month.",
+      "summary_hi": "सामान्यतः एडमिन पुरस्कृत अंक पुरस्कार की तारीख या अगले दो कैलेंडर दिनों में दर्ज कर सकते हैं। Cloudflare My Profile से अनुरोध करने पर चालू महीने के लिए यह समय-सीमा नहीं रहेगी।",
+      "notice": null,
+      "clauses": [
+        "Effective 23 October 2026. The ordinary deadline is 23:59 IST on the second calendar day after the actual award date; weekends and holidays count. Example: points awarded on 23 October may be entered through 25 October.",
+        "For a student's request raised through My Profile on the Cloudflare site, Admin may enter verified awarded points for any date in the current calendar month, without the two-day restriction. Earlier months are outside this exception; a pending request does not extend the month.",
+        "The award date and entry date remain distinct. Re-reporting an award does not restart the ordinary deadline. The exception permits late entry of an existing award; it does not create an entitlement to extra points or a duplicate award.",
+        "Admin verifies the award and records it only once against the correct student and award date. An informal message or a request outside Cloudflare My Profile does not itself qualify for the current-month exception."
+      ],
+      "clauses_hi": [
+        "23 अक्टूबर 2026 से लागू। सामान्य अंतिम समय वास्तविक पुरस्कार तारीख के बाद दूसरे कैलेंडर दिन की रात 11:59 बजे (भारतीय समय) तक है; रविवार और छुट्टियाँ भी गिनी जाएँगी। उदाहरण: 23 अक्टूबर को मिले अंक 25 अक्टूबर तक दर्ज हो सकते हैं।",
+        "विद्यार्थी द्वारा Cloudflare साइट के My Profile से उठाए अनुरोध पर एडमिन चालू कैलेंडर महीने की किसी भी तारीख के सत्यापित पुरस्कृत अंक दर्ज कर सकते हैं; दो दिन की सीमा नहीं होगी। पिछले महीने इसमें शामिल नहीं हैं; लंबित अनुरोध महीने की सीमा आगे नहीं बढ़ाता।",
+        "पुरस्कार की तारीख और अंक दर्ज होने की तारीख अलग रहेंगी। दोबारा सूचना देने से सामान्य समय-सीमा फिर शुरू नहीं होगी। छूट पहले से मिले पुरस्कार को देर से दर्ज करने के लिए है; अतिरिक्त या दोहरा पुरस्कार पाने का अधिकार नहीं है।",
+        "एडमिन पुरस्कार की जाँच करके सही विद्यार्थी और वास्तविक पुरस्कार तारीख पर केवल एक बार अंक दर्ज करेंगे। अनौपचारिक संदेश या Cloudflare My Profile के बाहर का अनुरोध अपने आप चालू महीने की छूट नहीं देता।"
+      ]
+    },
+    {
+      "id": "punitive-only-leadership-waivers-2026-10-23",
+      "topic": "punitive_waiver",
+      "title": "Leadership waivers: punitive deductions only",
+      "title_hi": "नेतृत्व द्वारा अंक माफ़ी: केवल दंडात्मक कटौती",
+      "notice_number": "EA/POL/2026/004",
+      "issued_date": "2026-10-22",
+      "effective_date": "2026-10-23",
+      "summary": "Leader, CoLs and LoP may waive only identifiable punitive deductions imposed by a teacher, Admin or postholder. Game and activity results remain protected, including on mixed days.",
+      "summary_hi": "लीडर, CoLs और LoP केवल शिक्षक, एडमिन या पदाधिकारी द्वारा लगाई गई स्पष्ट दंडात्मक कटौती माफ़ कर सकते हैं। खेल और गतिविधियों के परिणाम सुरक्षित रहेंगे, चाहे उसी दिन दंड भी लगा हो।",
+      "notice": null,
+      "clauses": [
+        "Effective 23 October 2026. Within their existing authority and approval limits, Leader, CoLs and LoP may waive only a specifically identified punitive deduction imposed by a teacher, Admin or postholder. This policy grants no new waiver power.",
+        "Points earned or lost through any game or activity cannot be removed, cancelled or refunded using these waiver powers. The source and purpose of the points decide eligibility, even if a teacher, Admin or postholder entered them manually.",
+        "On a mixed day, only the separately identifiable punitive amount may be waived. Example: activity −80 plus punishment −40 permits at most a 40-point waiver; the activity loss of 80 stays. Positive activity earnings also stay unchanged.",
+        "A mixed or unclear entry must first have its punitive portion verified by Admin. Until that amount is clear, it cannot be waived. Renaming an activity result as punishment, combining entries or using repeated waivers cannot bypass this restriction."
+      ],
+      "clauses_hi": [
+        "23 अक्टूबर 2026 से लागू। लीडर, CoLs और LoP अपनी मौजूदा अधिकार-सीमा और अनुमोदन शर्तों के भीतर शिक्षक, एडमिन या पदाधिकारी की किसी स्पष्ट रूप से पहचानी गई दंडात्मक कटौती को ही माफ़ कर सकते हैं। इस नीति से नया माफ़ी अधिकार नहीं मिलता।",
+        "किसी खेल या गतिविधि से कमाए या खोए गए अंक इन माफ़ी अधिकारों से हटाए, रद्द या वापस नहीं किए जा सकते। पात्रता अंकों के स्रोत और उद्देश्य से तय होगी, भले ही उन्हें शिक्षक, एडमिन या पदाधिकारी ने हाथ से दर्ज किया हो।",
+        "एक ही दिन दोनों प्रकार के अंक हों तो केवल अलग पहचानी जा सकने वाली दंडात्मक राशि माफ़ होगी। उदाहरण: गतिविधि −80 और दंड −40 पर अधिकतम 40 अंक माफ़ होंगे; गतिविधि का −80 बना रहेगा। गतिविधि से मिले धनात्मक अंक भी यथावत रहेंगे।",
+        "मिली-जुली या अस्पष्ट प्रविष्टि के दंडात्मक हिस्से की पहले एडमिन से पुष्टि आवश्यक है। राशि स्पष्ट होने तक माफ़ी नहीं होगी। गतिविधि का नाम बदलकर दंड कहना, प्रविष्टियाँ जोड़ना या बार-बार माफ़ी देना इस रोक को नहीं बदल सकता।"
       ]
     }
   ]
