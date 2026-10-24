@@ -1,7 +1,7 @@
 {
   "version": 1,
-  "revision": 21,
-  "updated_at": "2026-10-24T15:25:48Z",
+  "revision": 27,
+  "updated_at": "2026-10-24T16:04:41Z",
   "groups": [
     {
       "id": "grp-a610e04369",
@@ -215,7 +215,19 @@
               "id": "sub-39f9b2e827",
               "name": "Phyics",
               "sort_order": 0,
-              "notes": []
+              "notes": [
+                {
+                  "id": "note-ac6df49935",
+                  "title": "Electric Current",
+                  "description": "",
+                  "tags": [],
+                  "file_type": "pdf",
+                  "original_name": "Electric-Current-C10-Notes.pdf",
+                  "storage_key": "note-ac6df49935-f5ba07006afc.pdf",
+                  "size_bytes": 783204,
+                  "date_added": "2026-10-24T16:04:39Z"
+                }
+              ]
             },
             {
               "id": "sub-5035df180d",
@@ -227,7 +239,19 @@
               "id": "sub-a8e6fe3a8f",
               "name": "Biology",
               "sort_order": 2,
-              "notes": []
+              "notes": [
+                {
+                  "id": "note-c0f938888e",
+                  "title": "Control and Coordination",
+                  "description": "",
+                  "tags": [],
+                  "file_type": "pdf",
+                  "original_name": "Control-and-Coordination-notes-C10-2.pdf",
+                  "storage_key": "note-c0f938888e-b9e9ed4f09dc.pdf",
+                  "size_bytes": 4541302,
+                  "date_added": "2026-10-24T15:59:57Z"
+                }
+              ]
             },
             {
               "id": "sub-27f06700ac",
@@ -269,13 +293,59 @@
               "id": "sub-25a35c430d",
               "name": "Geography",
               "sort_order": 9,
-              "notes": []
+              "notes": [
+                {
+                  "id": "note-71a7cce3e4",
+                  "title": "Water Resources",
+                  "description": "",
+                  "tags": [],
+                  "file_type": "pdf",
+                  "original_name": "Class-10-Geography-CH3-Notes.pdf",
+                  "storage_key": "note-71a7cce3e4-abc00993ff0b.pdf",
+                  "size_bytes": 4170572,
+                  "date_added": "2026-10-24T15:58:35Z"
+                }
+              ]
             },
             {
               "id": "sub-d6a37184c6",
               "name": "Economics",
               "sort_order": 10,
-              "notes": []
+              "notes": [
+                {
+                  "id": "note-ffc1ea9fb2",
+                  "title": "Economics Chapter 3 and 4 in Q&A format",
+                  "description": "",
+                  "tags": [],
+                  "file_type": "pdf",
+                  "original_name": "Economics-C10-CH3-and-4-Q-A.pdf",
+                  "storage_key": "note-ffc1ea9fb2-24f484949758.pdf",
+                  "size_bytes": 4200839,
+                  "date_added": "2026-10-24T16:03:03Z"
+                },
+                {
+                  "id": "note-7c010927b3",
+                  "title": "Globalisation and the Indian Economy",
+                  "description": "",
+                  "tags": [],
+                  "file_type": "pdf",
+                  "original_name": "C10-Economics-Notes-CH-4.pdf",
+                  "storage_key": "note-7c010927b3-7f5ebd06311e.pdf",
+                  "size_bytes": 4233272,
+                  "date_added": "2026-10-24T15:57:00Z"
+                },
+                {
+                  "id": "note-53ee2c789e",
+                  "title": "Money and Credit",
+                  "description": "",
+                  "tags": [],
+                  "file_type": "pdf",
+                  "original_name": "Class-10-Economics-CH-3-Notes.pdf",
+                  "storage_key": "note-53ee2c789e-c96a72acfcc5.pdf",
+                  "size_bytes": 4249722,
+                  "date_added": "2026-10-24T15:56:30Z"
+                }
+              ]
             }
           ]
         }
@@ -342,7 +412,19 @@
               "id": "sub-44af9ea05d",
               "name": "Biology",
               "sort_order": 2,
-              "notes": []
+              "notes": [
+                {
+                  "id": "note-b0ca3c9f36",
+                  "title": "Drug Addiction & its effects",
+                  "description": "",
+                  "tags": [],
+                  "file_type": "pdf",
+                  "original_name": "Bio-Notes-for-Practical-test-C11.pdf",
+                  "storage_key": "note-b0ca3c9f36-fc4fe3bf22ca.pdf",
+                  "size_bytes": 113409,
+                  "date_added": "2026-10-24T15:31:02Z"
+                }
+              ]
             },
             {
               "id": "sub-e5268b07b7",
