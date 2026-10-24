@@ -1,7 +1,7 @@
 {
   "version": 1,
-  "revision": 30,
-  "updated_at": "2026-10-24T16:11:08Z",
+  "revision": 33,
+  "updated_at": "2026-10-24T16:34:33Z",
   "groups": [
     {
       "id": "grp-a610e04369",
@@ -183,6 +183,17 @@
                   "storage_key": "note-be7c0e4caa-10627d072f03.pdf",
                   "size_bytes": 517264,
                   "date_added": "2026-09-10T15:14:30Z"
+                },
+                {
+                  "id": "note-7ca9054a00",
+                  "title": "उपसर्ग-प्रत्यय",
+                  "description": "",
+                  "tags": [],
+                  "file_type": "pdf",
+                  "original_name": "pdf.pdf",
+                  "storage_key": "note-7ca9054a00-f6750358d561.pdf",
+                  "size_bytes": 388964,
+                  "date_added": "2026-10-24T16:25:30Z"
                 }
               ]
             },
@@ -244,7 +255,19 @@
               "id": "sub-5035df180d",
               "name": "Chemistry",
               "sort_order": 1,
-              "notes": []
+              "notes": [
+                {
+                  "id": "note-43d0408d8f",
+                  "title": "Metals and Non-Metals",
+                  "description": "",
+                  "tags": [],
+                  "file_type": "pdf",
+                  "original_name": "Metals-and-Non--Metals-Notes.pdf",
+                  "storage_key": "note-43d0408d8f-01e530afa0a8.pdf",
+                  "size_bytes": 263156,
+                  "date_added": "2026-10-24T16:12:21Z"
+                }
+              ]
             },
             {
               "id": "sub-a8e6fe3a8f",
@@ -261,6 +284,17 @@
                   "storage_key": "note-c0f938888e-b9e9ed4f09dc.pdf",
                   "size_bytes": 4541302,
                   "date_added": "2026-10-24T15:59:57Z"
+                },
+                {
+                  "id": "note-4bea7961bc",
+                  "title": "Heredity",
+                  "description": "",
+                  "tags": [],
+                  "file_type": "pdf",
+                  "original_name": "C10-CH8-Notes.pdf",
+                  "storage_key": "note-4bea7961bc-e82c1db2f7a5.pdf",
+                  "size_bytes": 186084,
+                  "date_added": "2026-10-24T16:34:31Z"
                 }
               ]
             },
