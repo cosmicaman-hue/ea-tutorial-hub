@@ -1,7 +1,7 @@
 {
   "version": 1,
-  "revision": 27,
-  "updated_at": "2026-10-24T16:04:41Z",
+  "revision": 28,
+  "updated_at": "2026-10-24T16:07:44Z",
   "groups": [
     {
       "id": "grp-a610e04369",
@@ -213,7 +213,7 @@
           "subjects": [
             {
               "id": "sub-39f9b2e827",
-              "name": "Phyics",
+              "name": "Physics",
               "sort_order": 0,
               "notes": [
                 {
