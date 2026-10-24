@@ -1,7 +1,7 @@
 {
   "version": 1,
-  "revision": 19,
-  "updated_at": "2026-09-20T13:06:47Z",
+  "revision": 21,
+  "updated_at": "2026-10-24T15:25:48Z",
   "groups": [
     {
       "id": "grp-a610e04369",
@@ -130,13 +130,37 @@
               "id": "sub-e866a49d20",
               "name": "English Literature",
               "sort_order": 2,
-              "notes": []
+              "notes": [
+                {
+                  "id": "note-217e427e90",
+                  "title": "Ishwaran Chapter Summary",
+                  "description": "",
+                  "tags": [],
+                  "file_type": "pdf",
+                  "original_name": "Ishwaran--The-story-teller-Summary.pdf",
+                  "storage_key": "note-217e427e90-a82ba4da94bc.pdf",
+                  "size_bytes": 133490,
+                  "date_added": "2026-10-24T15:25:45Z"
+                }
+              ]
             },
             {
               "id": "sub-34fd0c1e46",
               "name": "English Grammar",
               "sort_order": 3,
-              "notes": []
+              "notes": [
+                {
+                  "id": "note-547cea95e9",
+                  "title": "Types of Sentences",
+                  "description": "",
+                  "tags": [],
+                  "file_type": "pdf",
+                  "original_name": "English-Grammar-Notes--Sentences--Types.pdf",
+                  "storage_key": "note-547cea95e9-6b7e7f3e697a.pdf",
+                  "size_bytes": 4201928,
+                  "date_added": "2026-10-24T15:24:24Z"
+                }
+              ]
             },
             {
               "id": "sub-a53890f66a",
